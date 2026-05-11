@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+
+/**
+ * Design Tokens - Tailwind v4
+ * Trip King Light Theme - Uber-style minimal mobile-first
+ *
+ * Colors map to Tailwind utilities:
+ *  bg-primary, text-primary, bg-secondary, etc.
+ */
+@theme {
+  /* Typography - multi-script support (English + Tamil + Hindi) */
+  --font-family:
+    'Inter', 'Noto Sans Tamil', 'Noto Sans Devanagari', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --default-font-family:
+    'Inter', 'Noto Sans Tamil', 'Noto Sans Devanagari', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Primary — emerald green (driver / vacancy posts / success) */
+  --color-primary: #10b981;
+  --color-primary-foreground: #ffffff;
+
+  /* Secondary — slate gray (manager surfaces) */
+  --color-secondary: #475569;
+  --color-secondary-foreground: #ffffff;
+
+  /* Accent — amber (notifications + ratings stars) */
+  --color-accent: #f59e0b;
+  --color-accent-foreground: #ffffff;
+
+  /* Background — Uber-style off-white */
+  --color-background: #ffffff;
+  --color-foreground: #0a0a0a;
+
+  /* Muted — light gray */
+  --color-muted: #f3f4f6;
+  --color-muted-foreground: #6b7280;
+
+  /* Card */
+  --color-card: #ffffff;
+  --color-card-foreground: #0a0a0a;
+
+  /* Popover */
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0a0a0a;
+
+  /* Border / input / ring */
+  --color-border: #e5e7eb;
+  --color-input: #e5e7eb;
+  --color-ring: #10b981;
+
+  /* Destructive */
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  /* Success / Warning */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+
+  /* Role-specific accents (for badges, sidebars, etc.) */
+  --color-driver: #10b981;
+  --color-manager: #3b82f6;
+  --color-admin: #8b5cf6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family:
+    'Inter', 'Noto Sans Tamil', 'Noto Sans Devanagari', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--color-background);
+  color: var(--color-foreground);
+}
+
+/* iOS Safari: prevent auto-zoom on input focus */
+@media screen and (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* iOS standalone PWA: keep content (page headers, back arrows, bottom bars)
+   clear of the Dynamic Island / status bar and home indicator.
+   viewport-fit=cover + apple-mobile-web-app-status-bar-style:black-translucent
+   make the web view render full-screen under the notch — so we re-add the
+   safe-area gap here. Scoped to display-mode:standalone so browser tabs are
+   unaffected. NOTE: a position:fixed/sticky top or bottom bar ignores body
+   padding and must add its own env(safe-area-inset-*) padding. */
+@media all and (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}

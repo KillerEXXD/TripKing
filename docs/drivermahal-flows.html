@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriverMahal — Operational Flows</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f172a;--card:#1e293b;--card-hover:#253349;--border:#334155;
+  --text:#e2e8f0;--text-muted:#94a3b8;--text-dim:#64748b;
+  --driver:#10b981;--manager:#3b82f6;--admin:#8b5cf6;
+  --notify:#f59e0b;--success:#22c55e;--danger:#ef4444;--warning:#eab308;
+  --uber-black:#000;--uber-white:#fff;
+  --radius:12px;--shadow:0 4px 24px rgba(0,0,0,.35);
+}
+html{scroll-behavior:smooth;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,sans-serif;line-height:1.6}
+body{min-height:100vh}
+a{color:var(--manager);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* NAV */
+.nav{position:sticky;top:0;z-index:100;background:rgba(15,23,42,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 1rem}
+.nav-inner{max-width:1200px;margin:0 auto;display:flex;align-items:center;gap:.5rem;overflow-x:auto;white-space:nowrap;scrollbar-width:none;-ms-overflow-style:none;padding:.6rem 0}
+.nav-inner::-webkit-scrollbar{display:none}
+.nav a{font-size:.78rem;padding:.35rem .7rem;border-radius:6px;color:var(--text-muted);transition:all .2s}
+.nav a:hover{background:var(--card);color:var(--text);text-decoration:none}
+
+/* HERO */
+.hero{text-align:center;padding:4rem 1.5rem 3rem;background:linear-gradient(180deg,#0f172a 0%,#131c31 100%)}
+.hero h1{font-size:clamp(1.6rem,4vw,2.6rem);font-weight:700;letter-spacing:-.02em;margin-bottom:.5rem}
+.hero h1 span{background:linear-gradient(135deg,var(--driver),var(--manager));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--text-muted);font-size:1.05rem;margin-bottom:1.5rem}
+.hero-tag{display:inline-block;background:rgba(16,185,129,.15);color:var(--driver);padding:.25rem .8rem;border-radius:20px;font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.8rem}
+
+/* LEGEND */
+.legend{display:flex;flex-wrap:wrap;justify-content:center;gap:.8rem 1.4rem;margin-top:1.2rem}
+.legend-item{display:flex;align-items:center;gap:.4rem;font-size:.82rem;color:var(--text-muted)}
+.legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* SECTION */
+.section{max-width:1200px;margin:0 auto;padding:3rem 1.5rem}
+.section-title{font-size:1.5rem;font-weight:700;margin-bottom:.4rem;display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.section-sub{color:var(--text-muted);margin-bottom:2rem;font-size:.92rem}
+.section-badge{font-size:.65rem;padding:.2rem .6rem;border-radius:20px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+
+/* FLOW CONTAINERS */
+.flow-h{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.5rem;padding-bottom:1rem}
+.flow-v{display:flex;flex-direction:column;align-items:center;gap:0}
+.flow-grid{display:grid;gap:1.5rem}
+
+/* BOXES */
+.box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.2rem;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s;position:relative}
+.box:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.45)}
+.box-icon{font-size:1.3rem;margin-bottom:.3rem}
+.box-title{font-weight:600;font-size:.92rem;margin-bottom:.25rem}
+.box-desc{font-size:.78rem;color:var(--text-muted);line-height:1.5}
+.box-accent{border-top:3px solid}
+
+/* ARROWS */
+.arrow-down{display:flex;justify-content:center;padding:.15rem 0;color:var(--text-dim);font-size:1.1rem;line-height:1}
+.arrow-right{display:flex;align-items:center;color:var(--text-dim);font-size:1.3rem;padding:0 .2rem;flex-shrink:0}
+
+/* PHASE COLUMN */
+.phase-col{display:flex;flex-direction:column;align-items:stretch;gap:0}
+.phase-header{text-align:center;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;padding:.5rem;border-radius:8px;margin-bottom:.5rem}
+
+/* TABLES */
+.flow-table{width:100%;border-collapse:collapse;font-size:.8rem;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.flow-table th{background:#253349;padding:.6rem .8rem;text-align:left;font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted)}
+.flow-table td{padding:.55rem .8rem;border-top:1px solid var(--border)}
+.flow-table tr:hover td{background:rgba(255,255,255,.03)}
+.check{color:var(--driver);font-weight:700}
+.no-check{color:var(--text-dim)}
+
+/* MOCK DASHBOARD */
+.mock-dash{background:var(--card);border-radius:var(--radius);padding:1.2rem;box-shadow:var(--shadow);border:1px solid var(--border)}
+.mock-row{display:flex;align-items:center;gap:.6rem;padding:.45rem .6rem;border-radius:6px;font-size:.78rem;margin-bottom:.3rem}
+.mock-row:hover{background:rgba(255,255,255,.04)}
+.mock-time{font-weight:700;min-width:52px;color:var(--text-muted)}
+.mock-badge{font-size:.65rem;padding:.15rem .45rem;border-radius:4px;font-weight:600}
+.mock-note{font-style:italic;color:var(--text-dim);font-size:.72rem}
+.mock-btn{font-size:.68rem;padding:.2rem .5rem;border-radius:4px;border:1px solid;cursor:default;font-weight:600}
+
+/* PHONE FRAME (Uber-style mobile mock) */
+.phone{width:280px;border:8px solid #1f2937;border-radius:32px;background:#0a0e1a;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.5);margin:0 auto}
+.phone-screen{background:#fff;color:#000;min-height:480px;display:flex;flex-direction:column;font-size:.78rem}
+.phone-status{background:#000;color:#fff;padding:.3rem .8rem;font-size:.65rem;display:flex;justify-content:space-between;font-weight:600}
+.phone-header{padding:.6rem .8rem;background:#fff;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:.85rem;display:flex;align-items:center;gap:.4rem}
+.phone-body{flex:1;padding:.8rem;overflow:hidden}
+.phone-bottom{padding:.6rem .8rem;background:#000;color:#fff;border-radius:0 0 24px 24px}
+.btn-uber{background:#000;color:#fff;text-align:center;padding:.7rem;border-radius:8px;font-weight:700;font-size:.85rem;letter-spacing:.02em}
+.driver-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.6rem;margin-bottom:.5rem}
+.driver-card-row{display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#10b981,#3b82f6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:.8rem;flex-shrink:0}
+.star-rating{color:#f59e0b;font-size:.72rem;font-weight:600}
+.trip-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:.7rem;margin-bottom:.5rem}
+.route{font-weight:700;font-size:.85rem;color:#000}
+.route-arrow{color:#6b7280;margin:0 .4rem}
+.fare{font-weight:800;font-size:1.05rem;color:#000}
+.meta{font-size:.7rem;color:#6b7280;margin-top:.2rem}
+.pill{display:inline-block;padding:.15rem .5rem;border-radius:12px;font-size:.65rem;font-weight:700;margin-right:.3rem}
+.pill-open{background:#dbeafe;color:#1e40af}
+.pill-applied{background:#fef3c7;color:#92400e}
+.pill-assigned{background:#d1fae5;color:#065f46}
+.pill-completed{background:#e5e7eb;color:#374151}
+.pill-cancelled{background:#fee2e2;color:#991b1b}
+.pill-progress{background:#dbeafe;color:#1e40af}
+
+/* NOTIFICATION BADGE */
+.notif-box{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:.8rem 1rem;margin-top:1rem;font-size:.8rem}
+.notif-box .bell{font-size:1rem;margin-right:.4rem}
+
+/* GRID LAYOUTS */
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.2rem}
+.grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.8rem}
+.grid-5{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.8rem}
+
+/* LANGUAGE PICKER */
+.lang-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:.8rem;text-align:center;cursor:default}
+.lang-script{font-size:1.4rem;font-weight:700;margin-bottom:.2rem}
+.lang-name{font-size:.75rem;color:var(--text-muted)}
+
+/* STATUS PIPELINE */
+.pipeline{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;justify-content:center;margin:.8rem 0}
+.pipe-step{padding:.3rem .7rem;border-radius:20px;font-size:.7rem;font-weight:600;border:1px solid var(--border);background:var(--card);color:var(--text-muted)}
+.pipe-step.active{background:rgba(16,185,129,.2);color:var(--driver);border-color:var(--driver)}
+.pipe-step.done{background:rgba(34,197,94,.15);color:var(--success);border-color:var(--success)}
+.pipe-arrow{color:var(--text-dim);font-size:.9rem}
+
+/* RATING BAR */
+.rating-bar-row{display:grid;grid-template-columns:30px 1fr 40px;gap:.4rem;align-items:center;margin-bottom:.2rem;font-size:.7rem}
+.rating-bar-track{background:#e5e7eb;height:8px;border-radius:4px;overflow:hidden}
+.rating-bar-fill{background:#f59e0b;height:100%;border-radius:4px}
+
+/* TAG CHIPS */
+.tag-chip{display:inline-block;padding:.2rem .5rem;border-radius:12px;font-size:.65rem;font-weight:600;margin:.15rem;border:1px solid}
+.tag-positive{background:rgba(16,185,129,.12);color:var(--driver);border-color:rgba(16,185,129,.3)}
+.tag-negative{background:rgba(239,68,68,.12);color:var(--danger);border-color:rgba(239,68,68,.3)}
+
+/* FOOTER */
+.footer{text-align:center;padding:2rem;color:var(--text-dim);font-size:.78rem;border-top:1px solid var(--border);margin-top:2rem}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .flow-h{grid-template-columns:1fr}
+  .arrow-right{transform:rotate(90deg);padding:.3rem 0;justify-content:center}
+  .phase-col{min-width:100%}
+  .section{padding:2rem 1rem}
+  .phone{width:100%;max-width:300px}
+}
+</style>
+</head>
+<body>
+
+<!-- NAVIGATION -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#" style="color:#e2e8f0;font-weight:700;font-size:.85rem;margin-right:.5rem;display:flex;align-items:center;gap:.3rem">🚖 DriverMahal</a>
+    <span style="color:#334155;margin-right:.5rem">|</span>
+    <a href="#system">System Flow</a>
+    <a href="#driver-journey">Driver Journey</a>
+    <a href="#manager-journey">Manager Journey</a>
+    <a href="#admin">Admin</a>
+    <a href="#kyc">KYC + Video Call</a>
+    <a href="#vacancy">Vacancy</a>
+    <a href="#trip-post">Post Trip</a>
+    <a href="#acceptance">Multi-Driver Accept</a>
+    <a href="#multi-trip">Multi-Trip Dashboard</a>
+    <a href="#alerts">Alerts</a>
+    <a href="#vehicle">Vehicle Eligibility</a>
+    <a href="#reviews">Reviews & Ratings</a>
+    <a href="#i18n">i18n</a>
+    <a href="#access">Access Matrix</a>
+    <a href="#summary">Summary</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <span class="hero-tag">🚖 Operational Flows · v2 · 2026-05-09</span>
+  <h1><span>DriverMahal</span></h1>
+  <h1 style="font-size:clamp(1rem,2.5vw,1.5rem);font-weight:400;color:var(--text-muted)">Cab Driver &amp; Trip Marketplace PWA</h1>
+  <p>Uber-style 3-role marketplace · Driver · Trip Manager · Admin</p>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--driver)"></div>Cab Driver</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--manager)"></div>Trip Manager</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--admin)"></div>Administrator</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--notify)"></div>Notification</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div>Approved / Success</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div>Rejected / Expired</div>
+  </div>
+</header>
+
+<!-- 1. OVERALL SYSTEM FLOW -->
+<section class="section" id="system">
+  <h2 class="section-title">1. Overall System Flow</h2>
+  <p class="section-sub">End-to-end flow from first install through completed trip and review, across 5 phases.</p>
+  <div class="flow-h">
+    <!-- Phase 1: Onboarding -->
+    <div class="phase-col">
+      <div class="phase-header" style="background:rgba(16,185,129,.15);color:var(--driver)">Phase 1: Onboarding</div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">📱</div><div class="box-title">Install PWA</div><div class="box-desc">Driver / Manager downloads app, picks language (EN / தமிழ் / हिन्दी)</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">📞</div><div class="box-title">Phone OTP</div><div class="box-desc">Sign up, OTP-verify phone</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">📤</div><div class="box-title">Upload KYC Docs</div><div class="box-desc">Aadhaar, Voter ID, License (driver), Selfie, Vehicle photos</div></div>
+    </div>
+    <!-- Phase 2: KYC -->
+    <div class="phase-col">
+      <div class="phase-header" style="background:rgba(139,92,246,.15);color:var(--admin)">Phase 2: KYC + Video</div>
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">📅</div><div class="box-title">Schedule Video Call</div><div class="box-desc">User picks 15-min slot from admin's availability</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">🎥</div><div class="box-title">Video Verification</div><div class="box-desc">Admin: face match + physical doc check + liveness</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--success)"><div class="box-icon">✅</div><div class="box-title">Approved</div><div class="box-desc">Push notification (in user's language) — app unlocks</div></div>
+    </div>
+    <!-- Phase 3: Posting -->
+    <div class="phase-col">
+      <div class="phase-header" style="background:rgba(59,130,246,.15);color:var(--manager)">Phase 3: Posting</div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">🟢</div><div class="box-title">Driver Posts Vacancy</div><div class="box-desc">Vellore → Chennai / Pondicherry / Bangalore</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager)"><div class="box-icon">📝</div><div class="box-title">Manager Posts Trip</div><div class="box-desc">Route, ₹/km, distance, commission %, GST, car type</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--notify)"><div class="box-icon">🔔</div><div class="box-title">Alert Matcher Fires</div><div class="box-desc">Push to drivers/managers with matching criteria</div></div>
+    </div>
+    <!-- Phase 4: Acceptance -->
+    <div class="phase-col">
+      <div class="phase-header" style="background:rgba(245,158,11,.15);color:var(--notify)">Phase 4: Acceptance</div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">🤝</div><div class="box-title">Drivers Apply</div><div class="box-desc">Multiple drivers can apply per trip</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager)"><div class="box-icon">👀</div><div class="box-title">Poster Reviews Applicants</div><div class="box-desc">Photos · ★ rating · trips · vehicle · counter-quote</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--success)"><div class="box-icon">🎯</div><div class="box-title">Pick One Driver</div><div class="box-desc">Selected pushed; others auto-rejected with notice</div></div>
+    </div>
+    <!-- Phase 5: Lifecycle -->
+    <div class="phase-col">
+      <div class="phase-header" style="background:rgba(34,197,94,.15);color:var(--success)">Phase 5: Trip + Review</div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">🚗</div><div class="box-title">Trip In Progress</div><div class="box-desc">Driver starts → status=in_progress</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--success)"><div class="box-icon">🏁</div><div class="box-title">Completed</div><div class="box-desc">Payout finalized, both prompted to rate</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--notify)"><div class="box-icon">⭐</div><div class="box-title">Review Posted</div><div class="box-desc">★ + tags + comment → public driver profile</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. DRIVER JOURNEY -->
+<section class="section" id="driver-journey">
+  <h2 class="section-title">2. Driver Journey <span class="section-badge" style="background:rgba(16,185,129,.15);color:var(--driver)">Driver</span></h2>
+  <p class="section-sub">Complete cab driver experience — from first install through completed trip and review received.</p>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0;max-width:600px;margin:0 auto">
+    <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📱</div><div class="box-title">Install + Pick Language</div><div class="box-desc">Splash → English (default) / தமிழ் / हिन्दी; saved per user, switchable in Profile anytime</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📞</div><div class="box-title">Sign Up + Phone OTP</div><div class="box-desc">Phone-first, large numeric keypad, single screen</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📋</div><div class="box-title">Profile Setup</div><div class="box-desc">Name, home city, email (optional)</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📤</div><div class="box-title">KYC Document Upload</div><div class="box-desc">Aadhaar (front+back) · Voter ID (front+back) · License + expiry · Profile selfie</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🚗</div><div class="box-title">Add Primary Vehicle</div><div class="box-desc">Make/model/year (year validated against admin's min) · Registration · 4-side photos · RC + Insurance + Permit</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">📅</div><div class="box-title">Schedule Video Call</div><div class="box-desc">Pick 15-min slot from admin availability calendar</div></div>
+    <div class="arrow-down">▼</div>
+    <div style="width:100%;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:var(--radius);padding:1rem;text-align:center;margin:.5rem 0">
+      <div style="color:var(--notify);font-weight:700;font-size:.85rem;margin-bottom:.4rem">⏳ KYC Pending Screen</div>
+      <div class="pipeline">
+        <span class="pipe-step done">📤 Docs Submitted</span>
+        <span class="pipe-arrow">▶</span>
+        <span class="pipe-step active">📅 Video Pending</span>
+        <span class="pipe-arrow">▶</span>
+        <span class="pipe-step">🎥 In Review</span>
+        <span class="pipe-arrow">▶</span>
+        <span class="pipe-step">✅ Approved</span>
+      </div>
+      <div style="font-size:.7rem;color:var(--text-dim);margin-top:.4rem">Driver sees a read-only state until admin approves</div>
+    </div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">🎥</div><div class="box-title">Video Call With Admin</div><div class="box-desc">Show original docs to camera · Face match against Aadhaar/profile photo · Simple liveness (turn head / blink)</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--success);width:100%"><div class="box-icon">✅</div><div class="box-title">Approved → App Unlocks</div><div class="box-desc">Push notification in driver's chosen language</div></div>
+    <div class="arrow-down">▼</div>
+    <!-- Operational fan-out -->
+    <div class="grid-2" style="width:100%">
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">🟢</div><div class="box-title">Post Vacancy</div><div class="box-desc">"I'm in Vellore, free 2pm–8pm, will go to Chennai / Pondicherry / Bangalore"</div></div>
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">🔍</div><div class="box-title">Browse Trip Feed</div><div class="box-desc">Filtered by vehicle type + alerts; tap to view trip</div></div>
+    </div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🤝</div><div class="box-title">Apply for Trip</div><div class="box-desc">Tap "Apply"; optional counter-quote &amp; message; status=applied</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">👀</div><div class="box-title">Wait for Poster Review</div><div class="box-desc">Multiple drivers may apply. Push received whether selected or rejected.</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--success);width:100%"><div class="box-icon">🎯</div><div class="box-title">Selected → Trip Assigned</div><div class="box-desc">All other open applications auto-withdraw</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="grid-2" style="width:100%">
+      <div class="box box-accent" style="border-top-color:var(--driver)"><div class="box-icon">🚗</div><div class="box-title">Start &amp; Drive</div><div class="box-desc">Status: in_progress → completed</div></div>
+      <div class="box box-accent" style="border-top-color:var(--notify)"><div class="box-icon">⭐</div><div class="box-title">Receive Review</div><div class="box-desc">★ + tags + comment from manager → updates rating_avg + public profile</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. TRIP MANAGER JOURNEY -->
+<section class="section" id="manager-journey">
+  <h2 class="section-title">3. Trip Manager Journey <span class="section-badge" style="background:rgba(59,130,246,.15);color:var(--manager)">Trip Manager</span></h2>
+  <p class="section-sub">Same KYC bar as drivers — Trip Managers also need admin-approved video verification before posting trips.</p>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0;max-width:600px;margin:0 auto">
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📱</div><div class="box-title">Install + Pick Language</div><div class="box-desc">Same splash + language picker as drivers</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📞</div><div class="box-title">Sign Up + Phone OTP</div><div class="box-desc">Phone or email; OTP via SMS/email</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📋</div><div class="box-title">Profile + Optional Business</div><div class="box-desc">Name, business name (optional), business city</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📤</div><div class="box-title">KYC Document Upload</div><div class="box-desc">Aadhaar (front+back) · Voter ID (front+back) · Profile selfie · No license/vehicle needed</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">📅</div><div class="box-title">Schedule Video Call</div><div class="box-desc">Same flow as drivers — admin verifies face + docs + liveness</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--success);width:100%"><div class="box-icon">✅</div><div class="box-title">Approved → Dashboard Unlocks</div><div class="box-desc">Cannot post trips or assign drivers until kyc_status='approved'</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="grid-2" style="width:100%">
+      <div class="box box-accent" style="border-top-color:var(--manager)"><div class="box-icon">📝</div><div class="box-title">Post Trip</div><div class="box-desc">Route, ₹/km, distance auto-suggested, commission %, GST, car type, passenger info</div></div>
+      <div class="box box-accent" style="border-top-color:var(--manager)"><div class="box-icon">🗺</div><div class="box-title">Find Driver</div><div class="box-desc">Map of nearby vacancies + filter by car type / min rate</div></div>
+    </div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📋</div><div class="box-title">Multi-Trip Dashboard</div><div class="box-desc">Tabs: Open / Has Applicants / Assigned / In Progress / Completed / Cancelled — manage many trips in parallel</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">👀</div><div class="box-title">Review Applicants</div><div class="box-desc">Driver cards: photo · ★ rating · trips · vehicle · distance · counter-quote</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--success);width:100%"><div class="box-icon">🎯</div><div class="box-title">Pick Best Driver</div><div class="box-desc">One tap → all other applicants auto-rejected (with polite push)</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📞</div><div class="box-title">Track + Contact Driver</div><div class="box-desc">Status updates · in-app message · phone call</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">⭐</div><div class="box-title">Leave Review</div><div class="box-desc">After completion: ★ 1–5 + tags (Punctual / Clean car / Polite / Safe driver) + comment</div></div>
+  </div>
+</section>
+
+<!-- 4. ADMIN -->
+<section class="section" id="admin">
+  <h2 class="section-title">4. Administrator <span class="section-badge" style="background:rgba(139,92,246,.15);color:var(--admin)">Admin</span></h2>
+  <p class="section-sub">Web-first console (English-only at launch). First admin provisioned manually via SQL.</p>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:0;max-width:1000px;margin:0 auto">
+    <div class="box box-accent" style="border-top-color:var(--admin);width:240px;text-align:center"><div class="box-icon">🔐</div><div class="box-title">Admin Login</div><div class="box-desc">Email + password (no OTP, no self-signup)</div></div>
+    <div class="arrow-down">▼</div>
+    <div class="grid-3" style="width:100%">
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">📊</div><div class="box-title">Admin Dashboard</div><div class="box-desc">KPI cards: pending KYC, video calls today, expiring vehicles, support tickets</div></div>
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">✋</div><div class="box-title">KYC Queue (Drivers)</div><div class="box-desc">docs_submitted / video_pending / approved / rejected — review docs side-by-side</div></div>
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">✋</div><div class="box-title">KYC Queue (Managers)</div><div class="box-desc">Same flow, separate tab</div></div>
+    </div>
+    <div class="arrow-down">▼</div>
+    <div class="grid-3" style="width:100%">
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">🎥</div><div class="box-title">Video Call Console</div><div class="box-desc">Today's calls + Start button + face/docs/liveness checklist + Approve / Reject / Reschedule</div></div>
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">🚗</div><div class="box-title">Vehicle Eligibility</div><div class="box-desc">All vehicles · year · retirement year · status (Eligible / Expiring soon / Expired) · bulk-notify · CSV export</div></div>
+      <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">🌐</div><div class="box-title">Translation Manager</div><div class="box-desc">Languages list · Coverage dashboard · Key-by-key editor · CSV import/export · Missing-keys log</div></div>
+    </div>
+    <div class="arrow-down">▼</div>
+    <div style="text-align:center;font-weight:600;font-size:.82rem;color:var(--admin);margin-bottom:.6rem">Master Data Pages (CRUD for each)</div>
+    <div class="grid-4" style="width:100%">
+      <div class="box" style="text-align:center"><div class="box-icon">🏙</div><div class="box-title">Cities</div><div class="box-desc">Name, state, lat/lng, active</div></div>
+      <div class="box" style="text-align:center"><div class="box-icon">🚙</div><div class="box-title">Car Types</div><div class="box-desc">Hatchback, Sedan, SUV, Innova, Tempo Traveller, Mini Bus</div></div>
+      <div class="box" style="text-align:center"><div class="box-icon">⚙️</div><div class="box-title">App Settings</div><div class="box-desc">min_vehicle_year, default radius, default commission %, push rate-limit</div></div>
+      <div class="box" style="text-align:center"><div class="box-icon">🌐</div><div class="box-title">Languages</div><div class="box-desc">en, ta, hi (admin-toggleable, more can be added)</div></div>
+    </div>
+    <div class="arrow-down">▼</div>
+    <div class="grid-4" style="width:100%">
+      <div class="box" style="text-align:center"><div class="box-icon">🔔</div><div class="box-title">Reviews Moderation</div><div class="box-desc">Auto-flagged + reported queue · publish/hide/delete · 1-tap deactivate</div></div>
+      <div class="box" style="text-align:center"><div class="box-icon">📈</div><div class="box-title">Reports</div><div class="box-desc">Active drivers · trips/day · revenue · commission · video no-show rate · language distribution</div></div>
+      <div class="box" style="text-align:center"><div class="box-icon">📜</div><div class="box-title">Audit Log</div><div class="box-desc">Searchable timeline of every admin action</div></div>
+      <div class="box" style="text-align:center"><div class="box-icon">👨‍💼</div><div class="box-title">Admin Users</div><div class="box-desc">Add/remove other admins (first one is SQL-seeded)</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. KYC + VIDEO CALL FLOW -->
+<section class="section" id="kyc">
+  <h2 class="section-title">5. KYC &amp; Video Verification Flow <span class="section-badge" style="background:rgba(139,92,246,.15);color:var(--admin)">Admin</span></h2>
+  <p class="section-sub">Drivers AND Trip Managers go through identical KYC + video-call verification. No exceptions.</p>
+
+  <div class="grid-2" style="max-width:1000px;margin:0 auto">
+    <!-- Left: subject side -->
+    <div>
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:.8rem;color:var(--driver)">Subject (Driver / Manager) Side</h3>
+      <div class="flow-v">
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📤</div><div class="box-title">Upload All Docs</div><div class="box-desc">Aadhaar (front+back), Voter ID (front+back), License (drivers), Profile selfie. Number stored as masked last-4 only.</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">✋</div><div class="box-title">Consent Checkbox</div><div class="box-desc">UIDAI Aadhaar handling consent — explicit opt-in</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📅</div><div class="box-title">Pick 15-min Slot</div><div class="box-desc">From admin's availability calendar; reschedulable up to 1 hour before</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🎥</div><div class="box-title">Join Video Call</div><div class="box-desc">In-app WebRTC (Daily.co) or Jitsi link — works on iOS Safari + Android Chrome</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📜</div><div class="box-title">Show Originals to Camera</div><div class="box-desc">Hold up Aadhaar, Voter ID, License (driver) physically</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">👁</div><div class="box-title">Liveness Action</div><div class="box-desc">Turn head left/right, blink — confirms not a photo replay</div></div>
+      </div>
+    </div>
+    <!-- Right: admin side -->
+    <div>
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:.8rem;color:var(--admin)">Admin Side — Video Call Console</h3>
+      <div class="flow-v">
+        <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">📋</div><div class="box-title">Today's Schedule</div><div class="box-desc">List of scheduled calls with subject details, role, time</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">▶️</div><div class="box-title">"Start Call"</div><div class="box-desc">Opens meeting URL alongside KYC docs panel</div></div>
+        <div class="arrow-down">▼</div>
+        <!-- Checklist -->
+        <div class="box" style="background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.3);width:100%">
+          <div class="box-title" style="color:var(--admin);margin-bottom:.5rem">✅ Verification Checklist</div>
+          <div style="font-size:.78rem;line-height:1.9;color:var(--text)">
+            <div>☐ Face matches Aadhaar photo</div>
+            <div>☐ Face matches uploaded selfie</div>
+            <div>☐ Original Aadhaar shown</div>
+            <div>☐ Original Voter ID shown</div>
+            <div>☐ Original License shown <span style="color:var(--text-dim)">(drivers only)</span></div>
+            <div>☐ Liveness action passed</div>
+            <div>☐ Address / phone verbally confirmed</div>
+          </div>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="grid-3" style="width:100%">
+          <div class="box" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);text-align:center"><div class="box-icon">✅</div><div class="box-title" style="color:var(--success);font-size:.82rem">Approve</div></div>
+          <div class="box" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);text-align:center"><div class="box-icon">↻</div><div class="box-title" style="color:var(--notify);font-size:.82rem">Resubmit</div></div>
+          <div class="box" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);text-align:center"><div class="box-icon">❌</div><div class="box-title" style="color:var(--danger);font-size:.82rem">Reject</div></div>
+        </div>
+        <div class="notif-box"><span class="bell">📲</span><strong>Push to subject:</strong> "Your KYC has been approved. You can now post a vacancy / trip."</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. VACANCY POSTING -->
+<section class="section" id="vacancy">
+  <h2 class="section-title">6. Vacancy Posting <span class="section-badge" style="background:rgba(16,185,129,.15);color:var(--driver)">Driver</span></h2>
+  <p class="section-sub">"I'm in Vellore right now, free 2pm–8pm — willing to drive to one of these destinations."</p>
+
+  <div class="grid-2" style="max-width:1000px;margin:0 auto;align-items:flex-start">
+    <!-- Left: flow -->
+    <div class="flow-v">
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🟢</div><div class="box-title">Tap "Post Vacancy"</div><div class="box-desc">Big green primary button on Home screen</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📍</div><div class="box-title">Auto-fill Current City</div><div class="box-desc">HTML5 Geolocation → reverse-geocode to nearest city; manual override allowed</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🏷</div><div class="box-title">Multi-select Destinations</div><div class="box-desc">Chips: Chennai · Pondicherry · Bangalore · Tirupati — driver picks any subset</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">⏰</div><div class="box-title">Availability Window</div><div class="box-desc">From / Until (default +24h if blank); optional min ₹/km floor; optional notes</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📤</div><div class="box-title">Submit</div><div class="box-desc">Row created in vacancy_posts (status=active); visible to managers + drivers with matching alerts</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">🔔</div><div class="box-title">Alert Matcher Fires</div><div class="box-desc">Every manager/driver with a matching alert (city + radius) gets a Web Push</div></div>
+    </div>
+    <!-- Right: phone mockup -->
+    <div>
+      <div class="phone">
+        <div class="phone-status"><span>9:41</span><span>● ● ●</span></div>
+        <div class="phone-header">🟢 Post Vacancy</div>
+        <div class="phone-body" style="background:#f9fafb">
+          <div style="background:#fff;border-radius:8px;padding:.5rem;margin-bottom:.5rem;border:1px solid #e5e7eb">
+            <div style="font-size:.65rem;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Current City</div>
+            <div style="font-weight:700;font-size:.95rem">📍 Vellore</div>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:.5rem;margin-bottom:.5rem;border:1px solid #e5e7eb">
+            <div style="font-size:.65rem;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;font-weight:600;margin-bottom:.3rem">Willing to go to</div>
+            <span class="pill" style="background:#10b981;color:#fff">Chennai ✓</span>
+            <span class="pill" style="background:#10b981;color:#fff">Pondicherry ✓</span>
+            <span class="pill" style="background:#10b981;color:#fff">Bangalore ✓</span>
+            <span class="pill" style="background:#e5e7eb;color:#374151">Tirupati</span>
+            <span class="pill" style="background:#e5e7eb;color:#374151">Salem</span>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:.5rem;margin-bottom:.5rem;border:1px solid #e5e7eb">
+            <div style="font-size:.65rem;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Available</div>
+            <div style="font-weight:700;font-size:.85rem">Today 2:00 PM → 8:00 PM</div>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:.5rem;margin-bottom:.5rem;border:1px solid #e5e7eb">
+            <div style="font-size:.65rem;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;font-weight:600">Min Rate</div>
+            <div style="font-weight:700;font-size:.85rem">₹14 / km</div>
+          </div>
+        </div>
+        <div class="phone-bottom">
+          <div class="btn-uber">POST VACANCY</div>
+        </div>
+      </div>
+      <div style="text-align:center;font-size:.7rem;color:var(--text-dim);margin-top:.5rem;font-style:italic">Uber-style mobile mock — bottom black CTA, large tap targets</div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. TRIP POSTING -->
+<section class="section" id="trip-post">
+  <h2 class="section-title">7. Trip Posting <span class="section-badge" style="background:rgba(59,130,246,.15);color:var(--manager)">Manager / Driver</span></h2>
+  <p class="section-sub">Both Trip Managers and approved Drivers can post trips with full commercial specs.</p>
+
+  <div class="grid-2" style="max-width:1100px;margin:0 auto;align-items:flex-start">
+    <div class="flow-v">
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📝</div><div class="box-title">Open "Post Trip"</div><div class="box-desc">Same form for managers and drivers</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">🗺</div><div class="box-title">From / To + Distance</div><div class="box-desc">From city → To city; distance auto-suggested via Google Distance Matrix (editable)</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">⏰</div><div class="box-title">Pickup DateTime</div><div class="box-desc">Date + time picker</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">🚙</div><div class="box-title">Vehicle Requirements</div><div class="box-desc">Car type, seats, AC y/n</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">💰</div><div class="box-title">Commercial Specs</div><div class="box-desc">₹/km · total fare auto-calc · commission % · GST (₹) · toll handling · driver_payout previewed</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">👤</div><div class="box-title">Passenger Info</div><div class="box-desc">Name, phone, count, luggage, special requests</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">📤</div><div class="box-title">Publish</div><div class="box-desc">match_alerts_for_trip() runs → pushes to all matching alerts + active vacancies</div></div>
+    </div>
+
+    <!-- Mock dashboard: payout calc -->
+    <div class="mock-dash">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;color:var(--manager)">📋 Trip Form Preview</div>
+      <table class="flow-table" style="font-size:.75rem;background:transparent;box-shadow:none">
+        <tr><td style="color:var(--text-muted);width:40%">From</td><td><strong>Vellore</strong></td></tr>
+        <tr><td style="color:var(--text-muted)">To</td><td><strong>Chennai</strong></td></tr>
+        <tr><td style="color:var(--text-muted)">Distance</td><td><strong>140 km</strong> <span style="color:var(--text-dim)">(auto)</span></td></tr>
+        <tr><td style="color:var(--text-muted)">Pickup</td><td>Today 16:30</td></tr>
+        <tr><td style="color:var(--text-muted)">Car type</td><td>Sedan, AC</td></tr>
+        <tr><td style="color:var(--text-muted)">Rate</td><td>₹15 / km</td></tr>
+        <tr><td style="color:var(--text-muted)">Total fare</td><td>₹2,100</td></tr>
+        <tr><td style="color:var(--text-muted)">Commission</td><td>10% (₹210)</td></tr>
+        <tr><td style="color:var(--text-muted)">GST</td><td>₹100</td></tr>
+        <tr><td style="color:var(--text-muted)">Toll</td><td>Passenger pays</td></tr>
+        <tr style="background:rgba(34,197,94,.08)"><td style="color:var(--success);font-weight:700">Driver payout</td><td style="color:var(--success);font-weight:700">₹1,790</td></tr>
+      </table>
+      <div style="margin-top:.8rem;padding:.5rem;background:rgba(245,158,11,.1);border:1px dashed rgba(245,158,11,.3);border-radius:6px;font-size:.7rem;color:var(--notify)">
+        🔔 On Publish: alert matcher will push to drivers/managers with matching from/to + radius criteria.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8. MULTI-DRIVER ACCEPTANCE -->
+<section class="section" id="acceptance">
+  <h2 class="section-title">8. Multi-Driver Acceptance Flow <span class="section-badge" style="background:rgba(245,158,11,.15);color:var(--notify)">Critical UX</span></h2>
+  <p class="section-sub">Multiple drivers can apply for the same trip. The poster sees an applicant list and picks one.</p>
+
+  <!-- Lifecycle pipeline -->
+  <div style="margin-bottom:2rem">
+    <h3 style="font-size:.95rem;font-weight:600;margin-bottom:.8rem;color:var(--text-muted)">Trip status lifecycle</h3>
+    <div class="pipeline">
+      <span class="pipe-step done">📤 open</span>
+      <span class="pipe-arrow">▶</span>
+      <span class="pipe-step active">🤝 has_applicants</span>
+      <span class="pipe-arrow">▶</span>
+      <span class="pipe-step">🎯 assigned</span>
+      <span class="pipe-arrow">▶</span>
+      <span class="pipe-step">🚗 in_progress</span>
+      <span class="pipe-arrow">▶</span>
+      <span class="pipe-step">🏁 completed</span>
+      <span class="pipe-arrow">|</span>
+      <span class="pipe-step" style="border-color:var(--danger);color:var(--danger)">❌ cancelled</span>
+    </div>
+  </div>
+
+  <div class="grid-2" style="max-width:1100px;margin:0 auto;align-items:flex-start">
+    <!-- Left: flow -->
+    <div class="flow-v">
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📝</div><div class="box-title">Trip Published</div><div class="box-desc">status=open · applicant_count=0</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🤝</div><div class="box-title">Driver A Applies</div><div class="box-desc">trip_acceptances row · status=applied · optional counter-quote</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🤝</div><div class="box-title">Drivers B, C, D Apply</div><div class="box-desc">trip.status flips to has_applicants · count badge updates</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">👀</div><div class="box-title">Poster Opens Applicant Review</div><div class="box-desc">Cards sorted by ★ rating / distance / counter-quote — sees photos, profiles, vehicles</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--success);width:100%"><div class="box-icon">🎯</div><div class="box-title">Pick One Driver</div><div class="box-desc">Selected: status=selected → all others auto-rejected, trip.assigned_driver_id set</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">🔔</div><div class="box-title">Push to All Applicants</div><div class="box-desc">Selected driver: "You got the trip!" · Rejected: "Trip awarded to another driver"</div></div>
+    </div>
+
+    <!-- Right: mock applicant review screen -->
+    <div class="mock-dash">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+        <div style="font-weight:700;font-size:.85rem;color:var(--manager)">👥 Applicant Review</div>
+        <div style="font-size:.7rem;color:var(--text-muted)">Vellore → Chennai · 4 applicants</div>
+      </div>
+
+      <div class="driver-card">
+        <div class="driver-card-row">
+          <div class="avatar">RK</div>
+          <div style="flex:1">
+            <div style="font-weight:700;color:#000;font-size:.85rem">Ravi Kumar</div>
+            <div class="star-rating">★ 4.9 · 142 trips · Vellore</div>
+          </div>
+          <span class="pill" style="background:#10b981;color:#fff">Top Rated</span>
+        </div>
+        <div style="font-size:.7rem;color:#6b7280;margin-bottom:.3rem">Toyota Innova 2020 · 7 seats · AC</div>
+        <div style="display:flex;gap:.4rem">
+          <span class="tag-chip tag-positive">Punctual</span>
+          <span class="tag-chip tag-positive">Clean car</span>
+        </div>
+        <div style="display:flex;gap:.3rem;margin-top:.5rem">
+          <span class="mock-btn" style="color:#fff;background:#000;border-color:#000">✓ Choose</span>
+          <span class="mock-btn" style="color:#374151;border-color:#d1d5db">View profile</span>
+          <span class="mock-btn" style="color:#991b1b;border-color:#fca5a5">Reject</span>
+        </div>
+      </div>
+
+      <div class="driver-card">
+        <div class="driver-card-row">
+          <div class="avatar" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6)">PS</div>
+          <div style="flex:1">
+            <div style="font-weight:700;color:#000;font-size:.85rem">Prakash Selvaraj</div>
+            <div class="star-rating">★ 4.6 · 87 trips · Vellore</div>
+          </div>
+        </div>
+        <div style="font-size:.7rem;color:#6b7280;margin-bottom:.3rem">Maruti Dzire 2019 · 4 seats · AC</div>
+        <div style="font-size:.7rem;color:#92400e;margin-bottom:.3rem;background:#fef3c7;padding:.2rem .4rem;border-radius:4px;display:inline-block">Counter-quote: ₹14/km</div>
+      </div>
+
+      <div class="driver-card">
+        <div class="driver-card-row">
+          <div class="avatar" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">MS</div>
+          <div style="flex:1">
+            <div style="font-weight:700;color:#000;font-size:.85rem">Murugan Sivam</div>
+            <div class="star-rating">★ 4.2 · 23 trips · Katpadi</div>
+          </div>
+        </div>
+        <div style="font-size:.7rem;color:#6b7280">Hyundai Aura 2021 · 4 seats · AC · 3.2 km from pickup</div>
+      </div>
+
+      <div class="driver-card">
+        <div class="driver-card-row">
+          <div class="avatar" style="background:linear-gradient(135deg,#22c55e,#10b981)">AK</div>
+          <div style="flex:1">
+            <div style="font-weight:700;color:#000;font-size:.85rem">Arun Kannan</div>
+            <div class="star-rating">★ ★ New driver · 4 trips</div>
+          </div>
+        </div>
+        <div style="font-size:.7rem;color:#6b7280">Honda Amaze 2022 · 4 seats · AC</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9. MULTI-TRIP DASHBOARD -->
+<section class="section" id="multi-trip">
+  <h2 class="section-title">9. Multi-Trip Management Dashboard <span class="section-badge" style="background:rgba(59,130,246,.15);color:var(--manager)">Manager / Driver poster</span></h2>
+  <p class="section-sub">Designed for posters with many active trips — tabbed by status, applicant counts on each row, click → detail.</p>
+
+  <div class="mock-dash" style="max-width:900px;margin:0 auto">
+    <!-- Tabs -->
+    <div style="display:flex;gap:.4rem;border-bottom:1px solid var(--border);padding-bottom:.5rem;margin-bottom:.8rem;flex-wrap:wrap">
+      <span class="pill" style="background:var(--manager);color:#fff">Open · 2</span>
+      <span class="pill" style="background:rgba(245,158,11,.15);color:var(--notify);border:1px solid rgba(245,158,11,.3)">Has Applicants · 3</span>
+      <span class="pill" style="background:rgba(16,185,129,.15);color:var(--driver);border:1px solid rgba(16,185,129,.3)">Assigned · 1</span>
+      <span class="pill" style="background:rgba(59,130,246,.15);color:var(--manager);border:1px solid rgba(59,130,246,.3)">In Progress · 1</span>
+      <span class="pill" style="background:rgba(100,116,139,.15);color:var(--text-muted);border:1px solid var(--border)">Completed · 47</span>
+      <span class="pill" style="background:rgba(239,68,68,.15);color:var(--danger);border:1px solid rgba(239,68,68,.3)">Cancelled · 3</span>
+    </div>
+
+    <table class="flow-table">
+      <thead>
+        <tr><th>Route</th><th>Pickup</th><th>Status</th><th>Applicants</th><th>Driver</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Vellore → Chennai</strong><br><span style="color:var(--text-dim);font-size:.7rem">140 km · ₹15/km</span></td>
+          <td>Today 16:30</td>
+          <td><span class="pill pill-applied">Has Applicants</span></td>
+          <td><span class="pill" style="background:#fef3c7;color:#92400e">4 applied</span></td>
+          <td><span style="color:var(--text-dim)">—</span></td>
+          <td><span class="mock-btn" style="color:var(--manager);border-color:var(--manager)">Review</span></td>
+        </tr>
+        <tr>
+          <td><strong>Chennai → Bangalore</strong><br><span style="color:var(--text-dim);font-size:.7rem">350 km · ₹14/km</span></td>
+          <td>Tomorrow 08:00</td>
+          <td><span class="pill pill-applied">Has Applicants</span></td>
+          <td><span class="pill" style="background:#fef3c7;color:#92400e">2 applied</span></td>
+          <td><span style="color:var(--text-dim)">—</span></td>
+          <td><span class="mock-btn" style="color:var(--manager);border-color:var(--manager)">Review</span></td>
+        </tr>
+        <tr>
+          <td><strong>Vellore → Pondicherry</strong><br><span style="color:var(--text-dim);font-size:.7rem">160 km · ₹13/km</span></td>
+          <td>Today 21:00</td>
+          <td><span class="pill pill-open">Open</span></td>
+          <td>0</td>
+          <td><span style="color:var(--text-dim)">—</span></td>
+          <td><span class="mock-btn" style="color:var(--text-dim);border-color:var(--border)">Edit</span></td>
+        </tr>
+        <tr>
+          <td><strong>Tirupati → Chennai</strong><br><span style="color:var(--text-dim);font-size:.7rem">155 km · ₹15/km</span></td>
+          <td>Today 14:00</td>
+          <td><span class="pill pill-assigned">Assigned</span></td>
+          <td>3 → 1 selected</td>
+          <td>👤 Ravi K · ★ 4.9</td>
+          <td><span class="mock-btn" style="color:var(--success);border-color:var(--success)">Track</span></td>
+        </tr>
+        <tr>
+          <td><strong>Salem → Coimbatore</strong><br><span style="color:var(--text-dim);font-size:.7rem">160 km · ₹14/km</span></td>
+          <td>Today 11:00</td>
+          <td><span class="pill pill-progress">In Progress</span></td>
+          <td>—</td>
+          <td>👤 Prakash S · ★ 4.6</td>
+          <td><span class="mock-btn" style="color:var(--manager);border-color:var(--manager)">Contact</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:.6rem;font-size:.7rem;color:var(--text-dim);text-align:center;font-style:italic">Status pills mirror the trip lifecycle. Designed to manage many trips without confusion.</div>
+  </div>
+</section>
+
+<!-- 10. ALERTS & NOTIFICATIONS -->
+<section class="section" id="alerts">
+  <h2 class="section-title">10. Alert Subscriptions &amp; Notifications</h2>
+  <p class="section-sub">Drivers and Managers subscribe to from→to + radius criteria; the matcher fires on every new trip / vacancy.</p>
+
+  <div class="grid-2" style="max-width:1000px;margin:0 auto;align-items:flex-start">
+    <div>
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:.8rem;color:var(--driver)">Alert Creation</h3>
+      <div class="flow-v">
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">➕</div><div class="box-title">Create Alert</div><div class="box-desc">Name, From + radius (default 25km), To + radius (optional, null = "any"), min ₹/km, min commission %, car types, daily window</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📡</div><div class="box-title">Notification Channels</div><div class="box-desc">Pick: Web Push · in-app · SMS · email</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🔘</div><div class="box-title">Pause / Resume / Delete</div><div class="box-desc">Anytime from Alerts page</div></div>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:.8rem;color:var(--notify)">Notification Pipeline</h3>
+      <div class="flow-v">
+        <div class="box box-accent" style="border-top-color:var(--manager);width:100%"><div class="box-icon">📝</div><div class="box-title">New Trip Posted</div><div class="box-desc">Or new vacancy posted</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">🔄</div><div class="box-title">match_alerts_for_trip()</div><div class="box-desc">PG function: from-radius haversine + to-match + rate/commission/car/window filters</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">📲</div><div class="box-title">Web Push (VAPID)</div><div class="box-desc">Service worker · iOS Safari fallback to in-app + SMS</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">⏱</div><div class="box-title">Rate-limited</div><div class="box-desc">Max 1 push per 5 min per alert (anti-spam)</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notif-box" style="max-width:800px;margin:1.5rem auto 0">
+    <span class="bell">🔔</span><strong>Sample Push:</strong> "New trip — Vellore → Chennai · ₹15/km · Sedan AC · pickup in 4h. Tap to view."
+  </div>
+</section>
+
+<!-- 11. VEHICLE ELIGIBILITY -->
+<section class="section" id="vehicle">
+  <h2 class="section-title">11. Vehicle Eligibility Monitoring <span class="section-badge" style="background:rgba(139,92,246,.15);color:var(--admin)">Admin</span></h2>
+  <p class="section-sub">Admin sets a global minimum vehicle year. Vehicles older than that are rejected at upload, and an Eligibility Dashboard tracks vehicles approaching expiry.</p>
+
+  <div class="grid-2" style="max-width:1000px;margin:0 auto;align-items:flex-start">
+    <div class="flow-v">
+      <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">⚙️</div><div class="box-title">Admin Sets min_vehicle_year</div><div class="box-desc">Either fixed year (e.g. 2015) OR relative ("must be ≤ 10 years old")</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📤</div><div class="box-title">Driver Uploads Vehicle</div><div class="box-desc">Year validated inline — rejected if year &lt; min_vehicle_year</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--admin);width:100%"><div class="box-icon">🌙</div><div class="box-title">Nightly Refresh Job</div><div class="box-desc">refresh_vehicle_eligibility() recomputes retirement_year + eligibility_status for every active vehicle</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="grid-3" style="width:100%">
+        <div class="box" style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);text-align:center"><div class="box-icon">✅</div><div class="box-title" style="color:var(--success);font-size:.82rem">Eligible</div></div>
+        <div class="box" style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);text-align:center"><div class="box-icon">⚠️</div><div class="box-title" style="color:var(--notify);font-size:.82rem">Expiring soon</div></div>
+        <div class="box" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);text-align:center"><div class="box-icon">❌</div><div class="box-title" style="color:var(--danger);font-size:.82rem">Expired</div></div>
+      </div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">📲</div><div class="box-title">Push to Driver</div><div class="box-desc">"Your vehicle XYZ becomes ineligible in N days" — sent at 90 / 30 / 7-day marks</div></div>
+    </div>
+
+    <!-- Mock dashboard -->
+    <div class="mock-dash">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+        <div style="font-weight:700;font-size:.85rem;color:var(--admin)">🚗 Vehicle Eligibility</div>
+        <div style="font-size:.7rem;color:var(--text-muted)">min_vehicle_year = 2015</div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="grid-3" style="margin-bottom:.6rem">
+        <div style="background:rgba(34,197,94,.1);padding:.5rem;border-radius:6px;text-align:center">
+          <div style="font-weight:800;color:var(--success);font-size:1.1rem">347</div>
+          <div style="font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Eligible</div>
+        </div>
+        <div style="background:rgba(245,158,11,.1);padding:.5rem;border-radius:6px;text-align:center">
+          <div style="font-weight:800;color:var(--notify);font-size:1.1rem">14</div>
+          <div style="font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Expiring soon</div>
+        </div>
+        <div style="background:rgba(239,68,68,.1);padding:.5rem;border-radius:6px;text-align:center">
+          <div style="font-weight:800;color:var(--danger);font-size:1.1rem">3</div>
+          <div style="font-size:.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Expired</div>
+        </div>
+      </div>
+
+      <table class="flow-table" style="font-size:.72rem">
+        <thead><tr><th>Driver</th><th>Vehicle</th><th>Year</th><th>Retire</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>R. Kumar</td><td>Innova</td><td>2020</td><td>2030</td><td><span class="pill" style="background:rgba(34,197,94,.15);color:var(--success)">Eligible</span></td></tr>
+          <tr><td>S. Murugan</td><td>Dzire</td><td>2016</td><td>2026</td><td><span class="pill" style="background:rgba(245,158,11,.15);color:var(--notify)">⚠ 89 days</span></td></tr>
+          <tr><td>A. Krishnan</td><td>Etios</td><td>2015</td><td>2025</td><td><span class="pill" style="background:rgba(245,158,11,.15);color:var(--notify)">⚠ 12 days</span></td></tr>
+          <tr><td>V. Selvam</td><td>Indica</td><td>2014</td><td>2024</td><td><span class="pill" style="background:rgba(239,68,68,.15);color:var(--danger)">❌ Expired</span></td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:.6rem;text-align:right">
+        <span class="mock-btn" style="color:var(--admin);border-color:var(--admin)">Notify selected</span>
+        <span class="mock-btn" style="color:var(--text-muted);border-color:var(--border)">Export CSV</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 12. REVIEWS & RATINGS -->
+<section class="section" id="reviews">
+  <h2 class="section-title">12. Reviews &amp; Ratings <span class="section-badge" style="background:rgba(245,158,11,.15);color:var(--notify)">Reputation</span></h2>
+  <p class="section-sub">First-class feature. Reviews surface on driver public profiles and applicant cards — where reputation pays off.</p>
+
+  <div class="grid-2" style="max-width:1100px;margin:0 auto;align-items:flex-start">
+    <div>
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:.8rem;color:var(--manager)">Leaving a review (Manager)</h3>
+      <div class="flow-v">
+        <div class="box box-accent" style="border-top-color:var(--success);width:100%"><div class="box-icon">🏁</div><div class="box-title">Trip Completed</div><div class="box-desc">Push: "Rate your driver — Ravi Kumar"</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">⭐</div><div class="box-title">5-star Selector</div><div class="box-desc">Big tap targets · 1–5 stars</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">🏷</div><div class="box-title">Pre-canned Tags</div><div class="box-desc">Multi-select chips, color-coded:</div>
+          <div style="margin-top:.4rem">
+            <span class="tag-chip tag-positive">Punctual</span>
+            <span class="tag-chip tag-positive">Clean car</span>
+            <span class="tag-chip tag-positive">Polite</span>
+            <span class="tag-chip tag-positive">Safe driver</span>
+            <span class="tag-chip tag-positive">Knew the route</span>
+            <span class="tag-chip tag-negative">Late</span>
+            <span class="tag-chip tag-negative">Rude</span>
+            <span class="tag-chip tag-negative">Reckless</span>
+          </div>
+        </div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--notify);width:100%"><div class="box-icon">📝</div><div class="box-title">Free-text Comment</div><div class="box-desc">Optional, max 500 chars</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🚀</div><div class="box-title">Submit</div><div class="box-desc">drivers.rating_avg + rating_count + rating_distribution + top_tags trigger-recomputed; visible on public profile within seconds</div></div>
+        <div class="arrow-down">▼</div>
+        <div class="box box-accent" style="border-top-color:var(--text-dim);width:100%"><div class="box-icon">⏱</div><div class="box-title">24-hour Edit Window</div><div class="box-desc">Review locked after that; history retained in ratings_edits audit</div></div>
+      </div>
+    </div>
+
+    <div>
+      <h3 style="font-size:1rem;font-weight:600;margin-bottom:.8rem;color:var(--driver)">Public Driver Profile</h3>
+      <div class="mock-dash">
+        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:.6rem">
+          <div class="avatar" style="width:56px;height:56px;font-size:1.2rem">RK</div>
+          <div>
+            <div style="font-weight:800;font-size:1.05rem">Ravi Kumar</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">Vellore · Toyota Innova 2020</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.8rem">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--notify)">★ 4.9</div>
+          <div style="font-size:.7rem;color:var(--text-muted)">142 trips · 138 reviews</div>
+        </div>
+
+        <!-- Histogram -->
+        <div style="margin-bottom:.6rem">
+          <div class="rating-bar-row"><span>5★</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:80%"></div></div><span>110</span></div>
+          <div class="rating-bar-row"><span>4★</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:14%"></div></div><span>20</span></div>
+          <div class="rating-bar-row"><span>3★</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:4%"></div></div><span>5</span></div>
+          <div class="rating-bar-row"><span>2★</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:1%"></div></div><span>2</span></div>
+          <div class="rating-bar-row"><span>1★</span><div class="rating-bar-track"><div class="rating-bar-fill" style="width:1%"></div></div><span>1</span></div>
+        </div>
+
+        <div style="margin-bottom:.6rem">
+          <span class="tag-chip tag-positive">★ Punctual</span>
+          <span class="tag-chip tag-positive">★ Clean car</span>
+          <span class="tag-chip tag-positive">★ Polite</span>
+        </div>
+
+        <!-- Recent reviews -->
+        <div style="border-top:1px solid var(--border);padding-top:.5rem">
+          <div style="font-weight:700;font-size:.78rem;margin-bottom:.4rem">Recent Reviews</div>
+          <div style="font-size:.75rem;background:rgba(255,255,255,.03);padding:.5rem;border-radius:6px;margin-bottom:.4rem">
+            <div style="display:flex;justify-content:space-between"><span>★★★★★</span><span style="color:var(--text-dim);font-size:.65rem">2 days ago · Trip Manager</span></div>
+            <div style="color:var(--text-muted);margin-top:.2rem">"Reached on time, vehicle was spotless. Highly recommend."</div>
+          </div>
+          <div style="font-size:.75rem;background:rgba(255,255,255,.03);padding:.5rem;border-radius:6px">
+            <div style="display:flex;justify-content:space-between"><span>★★★★★</span><span style="color:var(--text-dim);font-size:.65rem">5 days ago · Trip Manager</span></div>
+            <div style="color:var(--text-muted);margin-top:.2rem">"Great driver, knew shortcuts to avoid traffic."</div>
+          </div>
+          <div style="font-size:.7rem;color:var(--text-dim);text-align:center;margin-top:.4rem;font-style:italic">Rater identity hidden — shown only as role</div>
+        </div>
+      </div>
+
+      <div class="notif-box" style="margin-top:1rem">
+        <strong>Anti-gaming rules:</strong> one review per trip per direction · 7-day submit window · 24h edit window · self-review impossible · "New driver" badge for &lt; 5 trips
+      </div>
+    </div>
+  </div>
+
+  <h3 style="font-size:1rem;font-weight:600;margin:2rem 0 .8rem;color:var(--admin)">Reviews Moderation (Admin)</h3>
+  <div class="grid-3" style="max-width:900px;margin:0 auto">
+    <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">🚩</div><div class="box-title">Auto-flagging</div><div class="box-desc">Profanity (EN/TA/HI keyword lists) + simple PII detector (phone/email)</div></div>
+    <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">📢</div><div class="box-title">User Reporting</div><div class="box-desc">Any user can "Report this review" → adds to flagged queue</div></div>
+    <div class="box box-accent" style="border-top-color:var(--admin)"><div class="box-icon">⚖️</div><div class="box-title">Admin Decides</div><div class="box-desc">Publish · Hide · Delete · 1-tap deactivate offending account</div></div>
+  </div>
+</section>
+
+<!-- 13. I18N -->
+<section class="section" id="i18n">
+  <h2 class="section-title">13. Multi-language Support (i18n)</h2>
+  <p class="section-sub">Three languages at launch — English (default), Tamil, Hindi. Admin manages translations via Translation Manager (no code redeploy needed).</p>
+
+  <div style="max-width:600px;margin:0 auto 2rem">
+    <div class="grid-3">
+      <div class="lang-card">
+        <div class="lang-script">English</div>
+        <div class="lang-name">Default</div>
+      </div>
+      <div class="lang-card">
+        <div class="lang-script">தமிழ்</div>
+        <div class="lang-name">Tamil</div>
+      </div>
+      <div class="lang-card">
+        <div class="lang-script">हिन्दी</div>
+        <div class="lang-name">Hindi</div>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:.75rem;color:var(--text-dim);margin-top:.6rem;font-style:italic">Driver picks at first launch · Switchable anytime in Profile · Admin app stays English at launch</div>
+  </div>
+
+  <div class="grid-2" style="max-width:1000px;margin:0 auto;align-items:flex-start">
+    <div class="flow-v">
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">📱</div><div class="box-title">Splash Language Picker</div><div class="box-desc">First launch only — saved to user_preferences.language_code</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">🔄</div><div class="box-title">Fetch Translations</div><div class="box-desc">App boots → fetches translations table for chosen language → caches in IndexedDB</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">↩️</div><div class="box-title">Fallback to English</div><div class="box-desc">Missing key → falls back to translation_keys.default_text + logged for admin</div></div>
+      <div class="arrow-down">▼</div>
+      <div class="box box-accent" style="border-top-color:var(--driver);width:100%"><div class="box-icon">⚙️</div><div class="box-title">Switch Language</div><div class="box-desc">Profile screen → pick another language → takes effect on next screen</div></div>
+    </div>
+
+    <div class="mock-dash">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.6rem;color:var(--admin)">🌐 Translation Coverage Dashboard</div>
+      <table class="flow-table" style="font-size:.72rem">
+        <thead><tr><th>Language</th><th>Translated</th><th>Coverage</th></tr></thead>
+        <tbody>
+          <tr><td>English (en)</td><td>847 / 847</td><td><span style="color:var(--success);font-weight:700">100% ✓</span></td></tr>
+          <tr><td>Tamil (ta)</td><td>820 / 847</td><td><span style="color:var(--notify);font-weight:700">96.8%</span></td></tr>
+          <tr><td>Hindi (hi)</td><td>734 / 847</td><td><span style="color:var(--notify);font-weight:700">86.7%</span></td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:.7rem;color:var(--text-dim);margin-top:.6rem;font-style:italic">CSV import/export · Key-by-key editor · Missing-keys log auto-populated when drivers hit fallback</div>
+      <div style="margin-top:.6rem;text-align:right">
+        <span class="mock-btn" style="color:var(--admin);border-color:var(--admin)">+ Add Language</span>
+        <span class="mock-btn" style="color:var(--text-muted);border-color:var(--border)">Edit ta</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 14. ACCESS CONTROL MATRIX -->
+<section class="section" id="access">
+  <h2 class="section-title">14. Access Control Matrix</h2>
+  <p class="section-sub">Who can do what. Enforced via Postgres RLS on every table.</p>
+  <table class="flow-table">
+    <thead>
+      <tr><th>Action</th><th style="text-align:center">Driver</th><th style="text-align:center">Trip Manager</th><th style="text-align:center">Admin</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Sign up</td><td style="text-align:center"><span class="check">✓</span></td><td style="text-align:center"><span class="check">✓</span></td><td style="text-align:center"><span class="no-check">SQL only</span></td></tr>
+      <tr><td>Upload KYC docs (Aadhaar + Voter ID + License)</td><td style="text-align:center"><span class="check">✓</span></td><td style="text-align:center"><span class="check">✓ (no license)</span></td><td style="text-align:center"><span class="no-check">—</span></td></tr>
+      <tr><td>Schedule + attend video call</td><td style="text-align:center"><span class="check">subject</span></td><td style="text-align:center"><span class="check">subject</span></td><td style="text-align:center"><span class="check">interviewer</span></td></tr>
+      <tr><td>Approve / reject KYC</td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Post vacancy</td><td style="text-align:center"><span class="check">✓ (if approved)</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td></tr>
+      <tr><td>Post trip</td><td style="text-align:center"><span class="check">✓ (if approved)</span></td><td style="text-align:center"><span class="check">✓ (if approved)</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Apply to trip</td><td style="text-align:center"><span class="check">✓ (if approved)</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td></tr>
+      <tr><td>Pick driver from applicants (own trip)</td><td style="text-align:center"><span class="check">✓ for own trips</span></td><td style="text-align:center"><span class="check">✓ for own trips</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Leave review</td><td style="text-align:center"><span class="no-check">v2 (driver→mgr)</span></td><td style="text-align:center"><span class="check">✓ post-trip</span></td><td style="text-align:center"><span class="no-check">—</span></td></tr>
+      <tr><td>Read other user's KYC docs</td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Edit master data (cities, car types, min_vehicle_year)</td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Edit translations</td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Moderate reviews</td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="no-check">—</span></td><td style="text-align:center"><span class="check">✓</span></td></tr>
+      <tr><td>Switch UI language anytime</td><td style="text-align:center"><span class="check">✓</span></td><td style="text-align:center"><span class="check">✓</span></td><td style="text-align:center"><span class="no-check">English only at launch</span></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 15. SUMMARY -->
+<section class="section" id="summary">
+  <h2 class="section-title">15. Role Summary</h2>
+  <p class="section-sub">High-level recap of what each role does and what they need to be productive.</p>
+
+  <div class="grid-3" style="max-width:1100px;margin:0 auto">
+    <div class="box box-accent" style="border-top-color:var(--driver)">
+      <div class="box-icon">👨‍✈️</div>
+      <div class="box-title" style="color:var(--driver);font-size:1.05rem;margin-bottom:.6rem">Cab Driver</div>
+      <div style="font-size:.75rem;color:var(--text-muted);line-height:1.7">
+        <div>📤 Aadhaar + Voter ID + License + Selfie</div>
+        <div>🎥 Video-call with admin</div>
+        <div>🚗 Vehicle + 4-side photos + RC + Insurance</div>
+        <div>🟢 Posts vacancy: city + multi-destination</div>
+        <div>🤝 Applies to trips (multiple at once)</div>
+        <div>🚙 Drives + receives review</div>
+        <div>🌐 Picks language at first launch</div>
+      </div>
+    </div>
+    <div class="box box-accent" style="border-top-color:var(--manager)">
+      <div class="box-icon">📋</div>
+      <div class="box-title" style="color:var(--manager);font-size:1.05rem;margin-bottom:.6rem">Trip Manager</div>
+      <div style="font-size:.75rem;color:var(--text-muted);line-height:1.7">
+        <div>📤 Aadhaar + Voter ID + Selfie</div>
+        <div>🎥 Video-call with admin</div>
+        <div>📝 Posts trips with full commercial specs</div>
+        <div>📋 Multi-trip dashboard (tabbed by status)</div>
+        <div>👀 Reviews driver applicants</div>
+        <div>🎯 Picks the best one</div>
+        <div>⭐ Leaves review post-trip</div>
+      </div>
+    </div>
+    <div class="box box-accent" style="border-top-color:var(--admin)">
+      <div class="box-icon">🛡</div>
+      <div class="box-title" style="color:var(--admin);font-size:1.05rem;margin-bottom:.6rem">Administrator</div>
+      <div style="font-size:.75rem;color:var(--text-muted);line-height:1.7">
+        <div>🔐 Provisioned manually via SQL (first one)</div>
+        <div>✋ Reviews KYC for both drivers + managers</div>
+        <div>🎥 Conducts video verification</div>
+        <div>🚗 Manages min_vehicle_year + eligibility dashboard</div>
+        <div>🌐 Manages translations</div>
+        <div>🏙 Manages cities, car types, app settings</div>
+        <div>⚖️ Moderates reviews</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;margin-top:2.5rem">
+    <a href="DRIVERMAHAL_REQUIREMENTS.md" style="display:inline-block;background:var(--card);border:1px solid var(--border);padding:.7rem 1.4rem;border-radius:8px;color:var(--text);font-weight:600;font-size:.85rem">📄 View Full Requirements Document →</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div>DriverMahal — Operational Flows v2 · 2026-05-09</div>
+  <div style="margin-top:.4rem">Companion to <code>docs/DRIVERMAHAL_REQUIREMENTS.md</code> · For stakeholder walkthrough before backend build</div>
+</footer>
+
+</body>
+</html>
