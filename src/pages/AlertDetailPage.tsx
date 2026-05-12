@@ -84,21 +84,26 @@ export function AlertDetailPage() {
   const notFound = !id || (alertQuery.isError && alertQuery.error instanceof ApiError && alertQuery.error.status === 404);
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate('/alerts')} className="-ml-2">
-        <ArrowLeft className="size-4" aria-hidden /> Back to alerts
-      </Button>
+    <div className="mx-auto max-w-md">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+        <button type="button" aria-label="Back" onClick={() => navigate('/alerts')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <ArrowLeft className="size-5" aria-hidden />
+        </button>
+        <div className="text-base font-semibold">Alert</div>
+      </header>
 
-      {notFound ? (
-        <ErrorState title="Alert not found" message="It may have been deleted." />
-      ) : alertQuery.isPending ? (
-        <LoadingSkeleton rows={5} />
-      ) : alertQuery.isError ? (
-        <ErrorState title="Couldn't load this alert" message="Check your connection and try again." onRetry={() => void alertQuery.refetch()} />
-      ) : (
-        <AlertDetail alert={alertQuery.data} />
-      )}
-    </main>
+      <div className="space-y-4 p-4">
+        {notFound ? (
+          <ErrorState title="Alert not found" message="It may have been deleted." />
+        ) : alertQuery.isPending ? (
+          <LoadingSkeleton rows={5} />
+        ) : alertQuery.isError ? (
+          <ErrorState title="Couldn't load this alert" message="Check your connection and try again." onRetry={() => void alertQuery.refetch()} />
+        ) : (
+          <AlertDetail alert={alertQuery.data} />
+        )}
+      </div>
+    </div>
   );
 }
 

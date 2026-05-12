@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateAlert } from '@/hooks/useAlerts';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
@@ -14,6 +15,17 @@ const CHANNELS: { value: NotifyChannel; label: string }[] = [
   { value: 'email', label: 'Email' },
 ];
 const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
+
+function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+        <ArrowLeft className="size-5" aria-hidden />
+      </button>
+      <h1 className="text-base font-semibold">{title}</h1>
+    </header>
+  );
+}
 
 /**
  * `/alerts/new` — create a saved-search alert. Pickup city + radius are required;
@@ -77,18 +89,22 @@ export function CreateAlertPage() {
 
   if (citiesQuery.isPending || carTypesQuery.isPending) {
     return (
-      <main className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-xl font-bold">New alert</h1>
-        <LoadingSkeleton rows={5} />
-      </main>
+      <div className="mx-auto max-w-md">
+        <FlowHeader title="New alert" onBack={() => navigate('/alerts')} />
+        <div className="p-4">
+          <LoadingSkeleton rows={5} />
+        </div>
+      </div>
     );
   }
   if (citiesQuery.isError || carTypesQuery.isError) {
     return (
-      <main className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-xl font-bold">New alert</h1>
-        <ErrorState title="Couldn't load the form" message="We need the city + car-type lists to create an alert." onRetry={() => { void citiesQuery.refetch(); void carTypesQuery.refetch(); }} />
-      </main>
+      <div className="mx-auto max-w-md">
+        <FlowHeader title="New alert" onBack={() => navigate('/alerts')} />
+        <div className="p-4">
+          <ErrorState title="Couldn't load the form" message="We need the city + car-type lists to create an alert." onRetry={() => { void citiesQuery.refetch(); void carTypesQuery.refetch(); }} />
+        </div>
+      </div>
     );
   }
 
@@ -96,8 +112,9 @@ export function CreateAlertPage() {
   const carTypes = (carTypesQuery.data ?? []).filter((c) => c.isActive);
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <h1 className="text-xl font-bold">New alert</h1>
+    <div className="mx-auto max-w-md">
+      <FlowHeader title="New alert" onBack={() => navigate('/alerts')} />
+      <div className="space-y-3 p-4">
       <Card className="gap-3">
         <label className="block space-y-1">
           <span className="text-sm font-medium">Alert name (optional)</span>
@@ -181,7 +198,8 @@ export function CreateAlertPage() {
           {createAlert.isPending ? 'Creating…' : 'Create alert'}
         </Button>
       </div>
-    </main>
+      </div>
+    </div>
   );
 }
 
