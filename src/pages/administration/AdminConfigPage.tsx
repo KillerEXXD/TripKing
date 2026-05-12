@@ -2,15 +2,30 @@ import { useState } from 'react';
 import { Card } from '@/components/ui';
 import { LookupListEditor } from '@/components/admin/LookupListEditor';
 import { AppSettingsForm } from '@/components/admin/AppSettingsForm';
+import { CancelReasonsEditor, CitiesEditor, LanguagesEditor, MakesModelsEditor, ReviewTagsEditor, SeatOptionsEditor } from '@/components/admin/extraEditors';
 import { carTypeHooks, fuelTypeHooks } from '@/hooks/useAdminConfig';
 
-type SectionId = 'general' | 'car-types' | 'fuel-types' | 'more';
+type SectionId =
+  | 'general'
+  | 'car-types'
+  | 'fuel-types'
+  | 'makes-models'
+  | 'seat-options'
+  | 'cities'
+  | 'languages'
+  | 'review-tags'
+  | 'cancel-reasons';
 
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'general', label: 'General settings' },
   { id: 'car-types', label: 'Car types' },
   { id: 'fuel-types', label: 'Fuel types' },
-  { id: 'more', label: 'More lists' },
+  { id: 'makes-models', label: 'Vehicle makes & models' },
+  { id: 'seat-options', label: 'Seat options' },
+  { id: 'cities', label: 'Cities' },
+  { id: 'languages', label: 'Languages' },
+  { id: 'review-tags', label: 'Review tags' },
+  { id: 'cancel-reasons', label: 'Cancellation reasons' },
 ];
 
 /** A label-list section — calls the resource's 6 hooks and feeds them to the generic editor. */
@@ -29,13 +44,7 @@ function LabelListSection({ hooks, title, itemNoun }: { hooks: typeof carTypeHoo
   );
 }
 
-/**
- * `/administration/config` — the master-data manager (§7.7).
- * General settings, Car types and Fuel types are wired; the remaining lists
- * (vehicle makes & models, seat options, cities, languages, review tags,
- * cancellation reasons) are the next iteration — their data layer
- * (`useAdminConfig`, `/admin/*`) is already in place.
- */
+/** `/administration/config` — the master-data manager (§7.7). */
 export function AdminConfigPage() {
   const [section, setSection] = useState<SectionId>('general');
   return (
@@ -58,16 +67,12 @@ export function AdminConfigPage() {
         {section === 'general' && <AppSettingsForm />}
         {section === 'car-types' && <LabelListSection hooks={carTypeHooks} title="Car types" itemNoun="car type" />}
         {section === 'fuel-types' && <LabelListSection hooks={fuelTypeHooks} title="Fuel types" itemNoun="fuel type" />}
-        {section === 'more' && (
-          <div className="space-y-2 text-sm text-secondary">
-            <p className="font-medium text-foreground">More lists — next iteration</p>
-            <p>
-              Vehicle makes &amp; models (master-detail), seat options, cities (name / state / lat / lng), languages,
-              review tags (by vocabulary) and cancellation reasons get their editors next — the data layer
-              (<code>useAdminConfig</code> hooks, the <code>/admin/*</code> contract) already supports all of them.
-            </p>
-          </div>
-        )}
+        {section === 'makes-models' && <MakesModelsEditor />}
+        {section === 'seat-options' && <SeatOptionsEditor />}
+        {section === 'cities' && <CitiesEditor />}
+        {section === 'languages' && <LanguagesEditor />}
+        {section === 'review-tags' && <ReviewTagsEditor />}
+        {section === 'cancel-reasons' && <CancelReasonsEditor />}
       </Card>
     </main>
   );
