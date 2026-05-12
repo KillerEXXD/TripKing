@@ -24,6 +24,7 @@ vi.mock('@/pages/NotificationsPage', () => ({ default: () => <div>notifications 
 vi.mock('@/pages/administration/KycReviewPage', () => ({ default: () => <div>kyc review page</div> }));
 vi.mock('@/pages/administration/VehicleEligibilityPage', () => ({ default: () => <div>vehicle eligibility page</div> }));
 vi.mock('@/pages/administration/ReviewModerationPage', () => ({ default: () => <div>review moderation page</div> }));
+vi.mock('@/pages/administration/TranslationManagerPage', () => ({ default: () => <div>translation manager page</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
 const driver: User = { ...admin, id: 'd', role: 'driver', displayName: 'Driver' };
@@ -189,6 +190,12 @@ describe('AppRoutes', () => {
     setAuth(admin);
     renderAt('/administration/reviews');
     expect(await screen.findByText(/review moderation page/i)).toBeInTheDocument();
+  });
+
+  it('/administration/translations renders the translation manager for an admin', async () => {
+    setAuth(admin);
+    renderAt('/administration/translations');
+    expect(await screen.findByText(/translation manager page/i)).toBeInTheDocument();
   });
 
   it('an unknown path renders the 404 page', async () => {

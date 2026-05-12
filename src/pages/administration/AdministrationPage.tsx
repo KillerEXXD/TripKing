@@ -34,7 +34,11 @@ export function AdministrationPage() {
               Reviews moderation →
             </Link>
           </li>
-          <li className="text-secondary">Translation manager — coming up.</li>
+          <li>
+            <Link to="/administration/translations" className="text-primary underline">
+              Translation manager →
+            </Link>
+          </li>
         </ul>
       </Card>
     </main>
