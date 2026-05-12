@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiClient } from '@/lib/api/client';
-import { createMyAgentProfile, createMyDriverProfile, getAgents, getDriver, updateAgentKyc, updateDriverKyc } from '@/lib/api/services/drivers';
+import { createMyAgentProfile, createMyDriverProfile, getAgents, getDriver, getMyAgent, getMyDriver, updateAgentKyc, updateDriverKyc } from '@/lib/api/services/drivers';
 
 function ok<T>(data: T) {
   return Promise.resolve({ success: true, data, error: null } as const);
@@ -41,6 +41,20 @@ describe('drivers service', () => {
     const driver = await getDriver('d9');
     expect(get).toHaveBeenCalledWith('/drivers/d9');
     expect(driver.id).toBe('d9');
+  });
+
+  it('getMyDriver → GET /drivers/me', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockReturnValue(ok({ id: 'd1', user_id: 'u1', full_name: 'Me' }) as never);
+    const d = await getMyDriver();
+    expect(get).toHaveBeenCalledWith('/drivers/me');
+    expect(d.fullName).toBe('Me');
+  });
+
+  it('getMyAgent → GET /agents/me', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockReturnValue(ok({ id: 'a1', user_id: 'u1', full_name: 'Me Agent', business_name: 'My Travels' }) as never);
+    const a = await getMyAgent();
+    expect(get).toHaveBeenCalledWith('/agents/me');
+    expect(a.businessName).toBe('My Travels');
   });
 
   it('getAgents({ kycStatus }) → GET /agents?kyc_status=', async () => {

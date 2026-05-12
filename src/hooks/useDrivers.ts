@@ -7,6 +7,8 @@ import {
   getAgents,
   getDriver,
   getDrivers,
+  getMyAgent,
+  getMyDriver,
   updateAgent,
   updateAgentKyc,
   updateDriver,
@@ -27,6 +29,14 @@ export function useAgent(id: string | undefined) {
 }
 export function useAgents(params?: AgentsQueryParams) {
   return useQuery({ queryKey: ['agents', params ?? {}], queryFn: () => getAgents(params), staleTime: STALE.profile });
+}
+/** The signed-in user's own driver profile (404 if they aren't a driver / haven't onboarded). */
+export function useMyDriver(enabled = true) {
+  return useQuery({ queryKey: ['driver', 'me'], queryFn: getMyDriver, enabled, staleTime: STALE.profile, retry: false });
+}
+/** The signed-in user's own agent profile (404 if they aren't an agent / haven't onboarded). */
+export function useMyAgent(enabled = true) {
+  return useQuery({ queryKey: ['agent', 'me'], queryFn: getMyAgent, enabled, staleTime: STALE.profile, retry: false });
 }
 
 function useInvalidateDriver() {

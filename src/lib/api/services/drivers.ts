@@ -50,6 +50,10 @@ export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {
 export function getDriver(id: string): Promise<Driver> {
   return apiClient.get<Api>(`/drivers/${id}`).then((r) => transformDriver(unwrap(r.data)));
 }
+/** The signed-in user's own driver profile (`GET /drivers/me`; throws an `ApiError` 404 if they don't have one). */
+export function getMyDriver(): Promise<Driver> {
+  return apiClient.get<Api>('/drivers/me').then((r) => transformDriver(unwrap(r.data)));
+}
 export function updateDriver(id: string, input: UpdateDriverInput): Promise<Driver> {
   return apiClient.patch<Api>(`/drivers/${id}`, toApiUpdateDriver(input)).then((r) => transformDriver(unwrap(r.data)));
 }
@@ -75,6 +79,10 @@ export function getAgents(params?: AgentsQueryParams): Promise<Agent[]> {
 }
 export function getAgent(id: string): Promise<Agent> {
   return apiClient.get<Api>(`/agents/${id}`).then((r) => transformAgent(unwrap(r.data)));
+}
+/** The signed-in user's own agent profile (`GET /agents/me`; throws an `ApiError` 404 if they don't have one). */
+export function getMyAgent(): Promise<Agent> {
+  return apiClient.get<Api>('/agents/me').then((r) => transformAgent(unwrap(r.data)));
 }
 /** Admin KYC workflow transition for an agent (`PATCH /agents/:id/kyc`). */
 export function updateAgentKyc(id: string, kycStatus: KycStatus, note?: string): Promise<Agent> {
