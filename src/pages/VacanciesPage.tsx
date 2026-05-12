@@ -5,15 +5,18 @@ import { useVacancies } from '@/hooks/useVacancies';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatINR } from '@/lib/utils';
+import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
-function shortDate(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-}
 function availableLabel(v: Vacancy): string {
-  return v.availableUntil ? `${shortDate(v.availableFrom)} – ${shortDate(v.availableUntil)}` : `from ${shortDate(v.availableFrom)}`;
+  const from = new Date(v.availableFrom);
+  if (Number.isNaN(from.getTime())) return v.availableFrom;
+  const to = v.availableUntil ? new Date(v.availableUntil) : null;
+  if (!to || Number.isNaN(to.getTime())) return `from ${formatShortDate(from)}, ${formatClockTime(from)}`;
+  const sameDay = from.toDateString() === to.toDateString();
+  return sameDay
+    ? `${formatShortDate(from)}, ${formatClockTime(from)} – ${formatClockTime(to)}`
+    : `${formatShortDate(from)} ${formatClockTime(from)} – ${formatShortDate(to)} ${formatClockTime(to)}`;
 }
 function vehicleLabel(v: Vacancy): string | null {
   if (!v.vehicle) return null;

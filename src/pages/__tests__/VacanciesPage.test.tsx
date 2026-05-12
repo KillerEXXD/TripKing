@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { VacanciesPage } from '@/pages/VacanciesPage';
+import { formatClockTime } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
 vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
@@ -77,6 +78,16 @@ describe('VacanciesPage', () => {
     expect(screen.getByText('Bangalore')).toBeInTheDocument(); // destination chip only
     expect(screen.getByText('Long trips welcome.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ravi kumar/i })).toHaveAttribute('href', '/drivers/d1');
+  });
+
+  it('shows the availability time window on the card', () => {
+    const from = '2099-06-01T09:00:00.000Z';
+    const to = '2099-06-01T13:00:00.000Z';
+    setVacancies({ data: [makeVacancy({ availableFrom: from, availableUntil: to })] });
+    renderVacancies();
+    const t0 = formatClockTime(new Date(from));
+    const t1 = formatClockTime(new Date(to));
+    expect(screen.getAllByText((txt) => txt.includes(t0) && txt.includes(t1)).length).toBeGreaterThan(0);
   });
 
   it('always requests active vacancies and re-requests when a city filter changes', () => {
