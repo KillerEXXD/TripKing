@@ -7,6 +7,9 @@ import { useDriverVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/myApplicationsStore';
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
+import { TripTracking } from '@/components/trip/TripTracking';
+import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
+import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -264,7 +267,10 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
   const applyable = trip.status === 'open' || trip.status === 'has_applicants';
   const showApplyBar = viewer.isDriver && !viewer.isPoster && applyable;
   const showAssignedBar = viewer.isAssignedDriver && (trip.status === 'assigned' || trip.status === 'in_progress');
+  const showTracking = viewer.isPoster || viewer.isAssignedDriver;
+  const canSharePassengerLink = viewer.isPoster && !!trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress');
   const myApplication: MyApplication | undefined = useMyApplicationsStore().byTrip[trip.id];
+  const [showShareLink, setShowShareLink] = useState(false);
 
   return (
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
@@ -288,6 +294,18 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
           {trip.acRequired ? <Badge variant="outline">AC required</Badge> : null}
         </div>
       </Card>
+
+      {showTracking ? <TripTracking trip={trip} /> : null}
+
+      {canSharePassengerLink ? (
+        <Card className="gap-2 border-primary/30 bg-primary/5">
+          <div className="text-sm font-semibold">Share the trip with your passenger</div>
+          <p className="text-xs text-secondary">Send them a link (the OTP is built in) — they see the trip, the assigned driver, and the driver&apos;s live location and ETA. No login needed.</p>
+          <Button variant="full" size="sm" onClick={() => setShowShareLink(true)}>
+            Share the passenger link
+          </Button>
+        </Card>
+      ) : null}
 
       <Card className="gap-2">
         <div className="font-semibold">Payout breakdown</div>
@@ -360,7 +378,9 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
 
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
+      {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
       {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} /> : showAssignedBar ? <AssignedDriverBar trip={trip} /> : null}
+      {showShareLink && trip.passengerOtp ? <PassengerLinkModal trip={trip} otp={trip.passengerOtp} onClose={() => setShowShareLink(false)} /> : null}
     </div>
   );
 }

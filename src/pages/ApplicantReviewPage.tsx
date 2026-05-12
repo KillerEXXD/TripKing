@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Car, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssignDriver, useRejectApplicant, useTrip, useTripApplicants } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
+import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -110,11 +112,18 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
   const assignable = trip.status === 'open' || trip.status === 'has_applicants';
   const canAct = isPoster && assignable;
   const applicants = applicantsQuery.data ?? [];
+  const [assignedTrip, setAssignedTrip] = useState<Trip | null>(null);
 
   function onAssign(acceptanceId: string) {
     assign.mutate(
       { tripId: trip.id, acceptanceId },
-      { onSuccess: () => toast.success('Driver selected — an OTP is now generated for the passenger'), onError: () => toast.error("Couldn't select that driver — try again.") },
+      {
+        onSuccess: (updated) => {
+          toast.success('Driver selected — share the trip link with the passenger.');
+          if (updated.passengerOtp) setAssignedTrip(updated);
+        },
+        onError: () => toast.error("Couldn't select that driver — try again."),
+      },
     );
   }
   function onReject(acceptanceId: string) {
@@ -139,6 +148,7 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
           onReject={() => onReject(a.id)}
         />
       ))}
+      {assignedTrip && assignedTrip.passengerOtp ? <PassengerLinkModal trip={assignedTrip} otp={assignedTrip.passengerOtp} onClose={() => setAssignedTrip(null)} /> : null}
     </div>
   );
 }

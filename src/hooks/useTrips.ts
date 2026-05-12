@@ -28,7 +28,14 @@ export function useTrips(params?: TripsQueryParams) {
   return useQuery({ queryKey: ['trips', params ?? {}], queryFn: () => getTrips(params), staleTime: staleForStatus(params?.status) });
 }
 export function useTrip(id: string | undefined) {
-  return useQuery({ queryKey: ['trip', id], queryFn: () => getTrip(id as string), enabled: !!id, staleTime: STALE.live });
+  return useQuery({
+    queryKey: ['trip', id],
+    queryFn: () => getTrip(id as string),
+    enabled: !!id,
+    staleTime: STALE.live,
+    // While the trip is running, poll so the live-tracking panel (driver position + ETA) stays current.
+    refetchInterval: (query) => (query.state.data?.status === 'in_progress' ? 15_000 : false),
+  });
 }
 /**
  * Public passenger-portal lookup — `GET /trips/by-otp/:otp` (the OTP is the

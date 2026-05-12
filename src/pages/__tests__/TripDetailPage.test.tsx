@@ -7,8 +7,8 @@ import type { Trip, User, Vehicle } from '@/types';
 
 vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn() }));
 import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip } from '@/hooks/useTrips';
-vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
-import { useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
+import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
 import { useDriverVehicles } from '@/hooks/useVehicles';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
@@ -132,6 +132,7 @@ describe('TripDetailPage', () => {
     vi.mocked(useWithdrawApplication).mockReset();
     vi.mocked(useStartTrip).mockReset();
     vi.mocked(useCompleteTrip).mockReset();
+    vi.mocked(useUpdateDriverLocation).mockReset().mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     vi.mocked(useMyApplicationsStore).mockReset();
     vi.mocked(useAuth).mockReset().mockReturnValue({ user: driver, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
     vi.mocked(toast.error).mockClear();
@@ -239,5 +240,14 @@ describe('TripDetailPage', () => {
     renderDetail();
     fireEvent.click(screen.getByRole('button', { name: /complete the trip/i }));
     await waitFor(() => expect(completeMutateAsync).toHaveBeenCalledWith({ tripId: 't1' }));
+  });
+
+  it('lets the poster open the passenger share link once a driver is assigned', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'assigned', passengerOtp: '123456' }) });
+    renderDetail();
+    expect(screen.getByText(/share the trip with your passenger/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /share the passenger link/i }));
+    expect(screen.getByText(/\/passenger\/123456/)).toBeInTheDocument();
   });
 });
