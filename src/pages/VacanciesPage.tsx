@@ -76,23 +76,24 @@ export function VacanciesPage() {
   const citiesQuery = cityHooks.useList();
   const vacancies = vacanciesQuery.data ?? [];
 
+  const chipSelect = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <header className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">Available drivers</h1>
-          <p className="text-sm text-secondary">{vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available` : 'Drivers who have posted their availability'}</p>
+    <div className="mx-auto max-w-md">
+      <header className="flex items-center gap-2 border-b bg-white px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base font-semibold">Available drivers</h1>
+          <p className="text-xs text-secondary">{vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available` : 'Drivers who have posted their availability'}</p>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link to="/vacancies/new">Post availability</Link>
         </Button>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
         <label className="sr-only" htmlFor="vac-current">
           Filter by where the driver is
         </label>
-        <select id="vac-current" value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)} className="h-9 rounded-full border border-input bg-background px-3 text-sm">
+        <select id="vac-current" value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)} className={chipSelect}>
           <option value="">Driver in any city</option>
           {(citiesQuery.data ?? []).map((c) => (
             <option key={c.id} value={c.id}>
@@ -103,7 +104,7 @@ export function VacanciesPage() {
         <label className="sr-only" htmlFor="vac-dest">
           Filter by destination
         </label>
-        <select id="vac-dest" value={destinationCityId} onChange={(e) => setDestinationCityId(e.target.value)} className="h-9 rounded-full border border-input bg-background px-3 text-sm">
+        <select id="vac-dest" value={destinationCityId} onChange={(e) => setDestinationCityId(e.target.value)} className={chipSelect}>
           <option value="">Going anywhere</option>
           {(citiesQuery.data ?? []).map((c) => (
             <option key={c.id} value={c.id}>
@@ -112,37 +113,35 @@ export function VacanciesPage() {
           ))}
         </select>
         {currentCityId || destinationCityId ? (
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={() => {
               setCurrentCityId('');
               setDestinationCityId('');
             }}
+            className="h-8 rounded-full border border-input bg-white px-3 text-xs font-medium"
           >
             Clear
-          </Button>
+          </button>
         ) : null}
       </div>
 
-      {vacanciesQuery.isPending ? (
-        <LoadingSkeleton rows={5} />
-      ) : vacanciesQuery.isError ? (
-        <ErrorState title="Couldn't load available drivers" message="Check your connection and try again." onRetry={() => void vacanciesQuery.refetch()} />
-      ) : vacancies.length === 0 ? (
-        <EmptyState
-          icon={<Star className="size-7" />}
-          title={currentCityId || destinationCityId ? 'No drivers match those filters' : 'No drivers have posted availability yet'}
-          message={currentCityId || destinationCityId ? 'Try widening the filters.' : 'When a driver posts their availability it shows up here.'}
-        />
-      ) : (
-        <div className="space-y-3">
-          {vacancies.map((v) => (
-            <VacancyCard key={v.id} vacancy={v} />
-          ))}
-        </div>
-      )}
-    </main>
+      <div className="space-y-3 p-4">
+        {vacanciesQuery.isPending ? (
+          <LoadingSkeleton rows={5} />
+        ) : vacanciesQuery.isError ? (
+          <ErrorState title="Couldn't load available drivers" message="Check your connection and try again." onRetry={() => void vacanciesQuery.refetch()} />
+        ) : vacancies.length === 0 ? (
+          <EmptyState
+            icon={<Star className="size-7" />}
+            title={currentCityId || destinationCityId ? 'No drivers match those filters' : 'No drivers have posted availability yet'}
+            message={currentCityId || destinationCityId ? 'Try widening the filters.' : 'When a driver posts their availability it shows up here.'}
+          />
+        ) : (
+          vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} />)
+        )}
+      </div>
+    </div>
   );
 }
 

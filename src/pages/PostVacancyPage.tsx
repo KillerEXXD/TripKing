@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy } from '@/hooks/useVacancies';
 import { cityHooks } from '@/hooks/useAdminConfig';
@@ -8,6 +9,17 @@ import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { PostVacancyInput } from '@/types';
 
 const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
+
+function FlowHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+        <ArrowLeft className="size-5" aria-hidden />
+      </button>
+      <h1 className="text-base font-semibold">Post your availability</h1>
+    </header>
+  );
+}
 
 function toIso(dateStr: string): string | undefined {
   if (!dateStr) return undefined;
@@ -64,26 +76,31 @@ export function PostVacancyPage() {
 
   if (citiesQuery.isPending) {
     return (
-      <main className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-xl font-bold">Post your availability</h1>
-        <LoadingSkeleton rows={5} />
-      </main>
+      <div className="mx-auto max-w-md">
+        <FlowHeader onBack={() => navigate('/vacancies')} />
+        <div className="p-4">
+          <LoadingSkeleton rows={5} />
+        </div>
+      </div>
     );
   }
   if (citiesQuery.isError) {
     return (
-      <main className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-xl font-bold">Post your availability</h1>
-        <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
-      </main>
+      <div className="mx-auto max-w-md">
+        <FlowHeader onBack={() => navigate('/vacancies')} />
+        <div className="p-4">
+          <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
+        </div>
+      </div>
     );
   }
 
   const cities = citiesQuery.data ?? [];
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <h1 className="text-xl font-bold">Post your availability</h1>
+    <div className="mx-auto max-w-md">
+      <FlowHeader onBack={() => navigate('/vacancies')} />
+      <div className="space-y-3 p-4">
       <Card className="gap-3">
         <label className="block space-y-1">
           <span className="text-sm font-medium">Where are you?</span>
@@ -155,7 +172,8 @@ export function PostVacancyPage() {
           {postVacancy.isPending ? 'Posting…' : 'Post availability'}
         </Button>
       </div>
-    </main>
+      </div>
+    </div>
   );
 }
 
