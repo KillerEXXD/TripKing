@@ -10,11 +10,13 @@
  *   POST /auth/logout       (Bearer access_token)          → { ok: true }
  *   GET  /me  (or /auth/me) (Bearer access_token)          → the public.users row
  *
- * DEV-OTP MODE (no SMS provider configured): request-otp returns the OTP in the response and
- * verify-otp accepts `123456` (or any 6-digit code). The session itself is real — verify-otp
- * find-or-creates the auth user for the phone (with a server-derived password the client never
- * sees) and `signInWithPassword` mints a genuine Supabase session, so `auth.uid()` works in RLS.
- * TODO: wire a real SMS provider (MSG91/Twilio) + an `auth_otps` table; drop the dev shortcut.
+ * DEV-OTP MODE (no SMS provider configured yet): `request-otp` is a no-op placeholder that always
+ * succeeds and returns the dev OTP in the response (so the client can auto-fill it); `verify-otp`
+ * accepts the dev OTP `12345` (the default) or any 4–6 digit code. The session itself is real —
+ * verify-otp find-or-creates the auth user for the phone (with a server-derived password the client
+ * never sees) and `signInWithPassword` mints a genuine Supabase session, so `auth.uid()` works in RLS.
+ * TODO(real SMS): wire MSG91/Twilio + an `auth_otps` table — `request-otp` then sends a real code and
+ * stores its hash; `verify-otp` checks it; stop returning `dev_otp`; gate `role:'admin'` for prod.
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -22,7 +24,7 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 
-const DEV_OTP = '123456';
+const DEV_OTP = '12345'; // PLACEHOLDER default until a real SMS provider is wired (see TODO above)
 type Db = ReturnType<typeof serviceClient>;
 
 const digits = (phone: string) => phone.replace(/[^\d]/g, '');
@@ -90,7 +92,9 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
   if (seg === 'request-otp') {
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     if (!phone) return fail('VALIDATION', 'phone required', 422);
-    // DEV: no SMS — return the code. (Prod: store an OTP row + send via SMS provider.)
+    // PLACEHOLDER — no SMS provider wired yet. This endpoint always succeeds (never throws); it
+    // returns the dev OTP so the client can auto-fill it. TODO(real SMS): generate a code, store its
+    // hash in `auth_otps`, send via MSG91/Twilio, and stop returning `dev_otp`.
     return ok({ sent: true, dev_otp: DEV_OTP });
   }
 
@@ -99,8 +103,9 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     const otp = typeof body.otp === 'string' ? body.otp.trim() : '';
     if (!phone || !otp) return fail('VALIDATION', 'phone and otp required', 422);
-    // DEV: accept the demo OTP (or any 6-digit). Replace with a real OTP-row check.
-    if (otp !== DEV_OTP && !/^\d{6}$/.test(otp)) return fail('INVALID_OTP', 'Incorrect or expired OTP', 401);
+    // DEV/PLACEHOLDER: accept the dev OTP `12345` (the default) or any 4–6 digit code. TODO(real SMS):
+    // verify against the hash stored by request-otp in `auth_otps` (and expire / rate-limit it).
+    if (otp !== DEV_OTP && !/^\d{4,6}$/.test(otp)) return fail('INVALID_OTP', 'Incorrect or expired OTP', 401);
 
     const password = await derivedPassword(phone);
     const email = syntheticEmail(phone);

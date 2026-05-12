@@ -79,12 +79,12 @@ async function j(method, path, { body, token } = {}) {
     check('GET /trips/:id → 200', get.status === 200 && get.json?.data?.id === tid, `status=${get.status}`);
     check('GET /trips/:id does not echo passenger_otp_hash', !('passenger_otp_hash' in (get.json?.data || {})), `keys=${Object.keys(get.json?.data || {}).join(',')}`);
 
-    // driver bootstrap → apply → assign → passenger OTP → by-otp (passenger portal) lookup
+    // driver bootstrap → apply → assign → passenger OTP → by-otp → start → live-location → complete
     const dPhone = `+919900${Math.floor(100000 + Math.random() * 900000)}`;
     await j('POST', '/auth/auth/request-otp', { body: { phone: dPhone } });
     const dAuth = await j('POST', '/auth/auth/verify-otp', { body: { phone: dPhone, otp: '123456', display_name: 'Trip Smoke Driver', role: 'driver' } });
     const dToken = dAuth.json?.data?.access_token;
-    await j('POST', '/drivers', { token: dToken, body: { full_name: 'Trip Smoke Driver' } });
+    const drvId = (await j('POST', '/drivers', { token: dToken, body: { full_name: 'Trip Smoke Driver' } })).json?.data?.id;
     const apply = await j('POST', `/trips/${tid}/applicants`, { token: dToken, body: {} });
     const aid = apply.json?.data?.id;
     const assign = await j('POST', `/trips/${tid}/assign`, { token, body: { acceptance_id: aid } });
@@ -97,10 +97,17 @@ async function j(method, path, { body, token } = {}) {
     const byBadOtp = await j('GET', '/trips/by-otp/000000');
     check('GET /trips/by-otp/<no match> → 404', byBadOtp.status === 404, `status=${byBadOtp.status}`);
 
-    const reasons = await j('GET', '/admin/cancel-reasons');
-    const rid = (reasons.json?.data || []).find((r) => r.applies_to === 'agent' || r.applies_to === 'both')?.id;
-    const cancel = await j('POST', `/trips/${tid}/cancel`, { token, body: { cancel_reason_id: rid || null } });
-    check('POST /trips/:id/cancel (poster) → 200, status=cancelled', cancel.status === 200 && cancel.json?.data?.status === 'cancelled', `status=${cancel.status} ${JSON.stringify(cancel.json?.error || '')}`);
+    // start the trip, then the driver pings their location → the manager sees it on the trip
+    const start = await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp } });
+    check('POST /trips/:id/start (assigned driver, valid OTP) → 200, status=in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
+    if (drvId) await j('PATCH', `/drivers/${drvId}/location`, { token: dToken, body: { current_lat: 13.05, current_lng: 80.2 } });
+    const live = await j('GET', `/trips/${tid}`);
+    check('GET /trips/:id (in_progress) → assigned-driver position + distance_to_destination_km', live.status === 200 && live.json?.data?.assigned_driver?.current_lat != null && typeof live.json?.data?.distance_to_destination_km === 'number', `status=${live.status} driver=${JSON.stringify(live.json?.data?.assigned_driver)} dist=${live.json?.data?.distance_to_destination_km}`);
+    const liveList = await j('GET', `/trips?status=in_progress&posted_by_user_id=${post.json?.data?.posted_by_user_id}`);
+    check('GET /trips?status=in_progress&posted_by_user_id= → contains the trip with the driver position', liveList.status === 200 && (liveList.json?.data || []).some((t) => t.id === tid && t.assigned_driver?.current_lat != null), `len=${liveList.json?.data?.length}`);
+
+    const complete = await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { driver_notes: 'smoke' } });
+    check('POST /trips/:id/complete (assigned driver) → 200, status=completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} ${JSON.stringify(complete.json?.error || '')}`);
   }
 
   if (failures) { console.error(`[test-trips] ${failures} check(s) failed`); process.exit(1); }

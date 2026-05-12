@@ -432,7 +432,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Request an SMS OTP (DEV returns it)",
+        "summary": "Request an SMS OTP — PLACEHOLDER (no SMS provider yet): always succeeds and returns the dev OTP \"12345\" in dev_otp",
         "requestBody": {
           "required": true,
           "content": {
@@ -463,7 +463,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Verify an OTP -> { user, access_token, refresh_token }",
+        "summary": "Verify an OTP → { user, access_token, refresh_token } (dev: accepts \"12345\" or any 4–6 digit code; role:admin is dev-only)",
         "requestBody": {
           "required": true,
           "content": {
@@ -575,14 +575,15 @@
         "tags": [
           "trips"
         ],
-        "summary": "List trips",
+        "summary": "List trips — each row carries the assigned driver (with live position). status=in_progress&posted_by_user_id=<me> is a trip manager's live-trips map; in-progress trips also get distance_to_destination_km",
         "parameters": [
           {
             "name": "status",
             "in": "query",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "one value or a CSV (e.g. open,has_applicants)"
           },
           {
             "name": "from_city_id",
@@ -660,7 +661,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Get a trip",
+        "summary": "Get a trip — joined (assigned driver with live position; distance_to_destination_km when in_progress); passenger_otp_hash stripped",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -2325,7 +2326,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Get the trip for a passenger OTP (public — the passenger portal) — joined assigned driver+vehicle; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed",
+        "summary": "Get the trip for a passenger OTP (public — the passenger portal) — joins the assigned driver (with live position) + vehicle; distance_to_destination_km when in_progress; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed",
         "parameters": [
           {
             "name": "otp",

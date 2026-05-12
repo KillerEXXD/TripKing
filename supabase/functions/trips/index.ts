@@ -18,6 +18,11 @@
  *   POST   /trips/:id/start             (assigned driver/admin) { passenger_otp, start_odo_* } — verifies OTP → in_progress
  *   POST   /trips/:id/complete          (assigned driver/admin) { end_odo_*, driver_notes }
  *   POST   /trips/:id/cancel            (poster/admin) { cancel_reason_id }
+ *
+ * Live tracking: every trip row carries the assigned driver (id, name, photo, ratings, and
+ * current_lat/current_lng/current_location_at). While a trip is in_progress, the assigned driver
+ * pings `PATCH /drivers/:id/location` periodically; the trip row then also gets `distance_to_destination_km`
+ * (haversine to the destination city's coords). A trip manager's live map = `GET /trips?status=in_progress&posted_by_user_id=<me>`.
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -27,11 +32,14 @@ import { serviceClient } from '../_shared/supabase.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 
-const TRIP_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label)';
-// for the passenger portal (GET /trips/by-otp/:otp) — adds the assigned driver + vehicle so the passenger can see who's coming.
+// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map.
+const TRIP_SELECT =
+  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
+  'assigned_driver:drivers!assigned_driver_id(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at)';
+// for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
 const BY_OTP_SELECT =
   '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
-  'assigned_driver:drivers!assigned_driver_id(id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed), ' +
+  'assigned_driver:drivers!assigned_driver_id(id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at), ' +
   'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
   '*, driver:drivers(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, current_city:cities!current_city_id(*)), ' +
@@ -69,6 +77,35 @@ function pgFail(error: { code?: string; message: string }, fallbackStatus = 400)
   if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
   return fail('DB_ERROR', error.message, fallbackStatus);
 }
+// ── trip-row enrichment (applied to every trip that leaves the API) ──────────
+function num(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
+}
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+/** Strip the passenger-OTP hash (SHA-256 of a 6-digit OTP — brute-forceable) and, for an in-progress
+ *  trip with a known assigned-driver position + destination coords, attach `distance_to_destination_km`. */
+function enrichTrip(row: Record<string, unknown>): Record<string, unknown> {
+  delete row.passenger_otp_hash;
+  if (row.status === 'in_progress') {
+    const d = row.assigned_driver as Record<string, unknown> | null | undefined;
+    const dest = row.to_city as Record<string, unknown> | null | undefined;
+    const dLat = num(d?.current_lat);
+    const dLng = num(d?.current_lng);
+    const tLat = num(dest?.lat);
+    const tLng = num(dest?.lng);
+    if (dLat != null && dLng != null && tLat != null && tLng != null) {
+      row.distance_to_destination_km = Math.round(haversineKm(dLat, dLng, tLat, tLng) * 10) / 10;
+    }
+  }
+  return row;
+}
 
 const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);
@@ -99,10 +136,12 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   async function fullTrip(id: string) {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', id).single();
     if (error) throw new Error(error.message);
-    return data;
+    return enrichTrip(data as Record<string, unknown>);
   }
 
-  // ── GET /trips/trips ─────────────────────────────────────────────────────
+  // ── GET /trips (list) ────────────────────────────────────────────────────
+  // Trip-manager "live map": GET /trips?status=in_progress&posted_by_user_id=<me> — each row carries
+  // the assigned driver's position + distance_to_destination_km.
   if (!tripId && req.method === 'GET') {
     let q = db.from('trips').select(TRIP_SELECT);
     const status = url.searchParams.get('status');
@@ -121,7 +160,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     q = q.order('pickup_at', { ascending: true }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    return ok((data ?? []).map((r) => enrichTrip(r as Record<string, unknown>)));
   }
 
   // ── POST /trips/trips ────────────────────────────────────────────────────
@@ -187,7 +226,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (error) return fail('DB_ERROR', error.message, 500);
     const row = (data ?? [])[0] as Record<string, unknown> | undefined;
     if (!row) return fail('NOT_FOUND', 'No trip matches that OTP', 404);
-    delete row.passenger_otp_hash; // never echo the hash
+    enrichTrip(row); // strips passenger_otp_hash + adds distance_to_destination_km when in_progress
     if (!row.show_fare_to_passenger) {
       for (const k of ['total_fare', 'rate_per_km', 'driver_payout', 'commission_pct', 'gst_amount', 'driver_bata']) row[k] = null;
     }
@@ -199,11 +238,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', tripId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
-    delete (data as Record<string, unknown>).passenger_otp_hash; // it's a SHA-256 of a 6-digit OTP — don't leak it
-    return ok(data);
+    return ok(enrichTrip(data as Record<string, unknown>));
   }
 
-  // ── /trips/trips/:id/applicants ──────────────────────────────────────────
+  // ── /trips/:id/applicants ────────────────────────────────────────────────
   if (sub === 'applicants') {
     if (!acceptanceId && req.method === 'GET') {
       const u = await authUser(db, req);
