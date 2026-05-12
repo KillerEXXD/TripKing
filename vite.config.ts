@@ -5,11 +5,16 @@ import tailwindcss from '@tailwindcss/vite';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
 
-// https://vitejs.dev/config/
+// Mirrors hudr-pwa/vite.config.ts. See CLAUDE.md §"Caching" for the Workbox strategy
+// and §"API" for the dev proxy. Dev: requests to /api/* are proxied to the real host
+// (CORS-free). Prod: the app calls VITE_API_BASE_URL directly.
+const DEV_API_TARGET = 'https://api.tripking.in';
+
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Upload source maps to Sentry (prod builds only — needs SENTRY_AUTH_TOKEN).
     sentryVitePlugin({
       org: process.env.SENTRY_ORG,
       project: process.env.SENTRY_PROJECT,
@@ -17,44 +22,35 @@ export default defineConfig({
       disable: !process.env.SENTRY_AUTH_TOKEN,
     }),
     VitePWA({
+      // New service worker activates immediately — no stale-bundle white screen.
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'icons/*.svg'],
+      includeAssets: ['favicon.svg', 'robots.txt', 'icons/*.svg'],
       manifest: {
-        name: 'Trip King — Cab & Trip Marketplace',
-        short_name: 'Trip King',
+        name: 'TripKing — Cab & Trip Marketplace',
+        short_name: 'TripKing',
         description:
-          'Find vacant cabs, post inter-city trips, and connect drivers with trip managers across India.',
+          'Outstation cab marketplace — agents post trips, verified drivers apply, OTP handshake, live tracking.',
         theme_color: '#10b981',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
-          {
-            src: 'icons/icon-192x192.svg',
-            sizes: '192x192',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
-          },
-          {
-            src: 'icons/icon-512x512.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
-          },
+          { src: 'icons/icon-192x192.svg', sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: 'icons/icon-512x512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
         ],
       },
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
+        // index.html is NOT precached — navigations always hit the network for fresh chunk refs.
         navigateFallbackDenylist: [/.*/],
-        globPatterns: ['**/*.{ico,png,jpg,webp,woff,woff2,svg}'],
+        globPatterns: ['**/*.{ico,png,jpg,jpeg,webp,woff,woff2,svg}'],
         runtimeCaching: [
           {
-            // LIVE-DATA endpoints — vacancies, applicants, in-progress trips.
-            // Always fetch network; fall back to cache only after 5 s.
-            urlPattern:
-              /^https:\/\/api\.drivermahal\.in\/(vacancies|applicants|trips-active|notifications)/i,
+            // Live-data endpoints — Network First (never serve stale): trip feeds,
+            // vacancy feed, applicant lists, /trips/{id}/applicants.
+            urlPattern: /^https:\/\/api\.tripking\.in\/(trips|vacancies|trip-acceptances)/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-live-cache',
@@ -63,8 +59,8 @@ export default defineConfig({
             },
           },
           {
-            // STABLE endpoints — cities, car types, translations, completed trips.
-            urlPattern: /^https:\/\/api\.drivermahal\.in\/.*/i,
+            // Everything else under the API (incl. /admin/*, /drivers, /reviews) — Stale While Revalidate.
+            urlPattern: /^https:\/\/api\.tripking\.in\/.*/i,
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'api-stable-cache',
@@ -72,33 +68,26 @@ export default defineConfig({
             },
           },
           {
-            // JS/CSS bundles
+            // JS/CSS bundles — SWR (instant, update in background).
             urlPattern: /\.(?:js|css)$/,
             handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'static-assets',
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
-            },
+            options: { cacheName: 'static-assets', expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 } },
           },
           {
-            // Images
+            // Images — Cache First.
             urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
             handler: 'CacheFirst',
-            options: {
-              cacheName: 'image-cache',
-              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
+            options: { cacheName: 'image-cache', expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 } },
           },
         ],
       },
     }),
   ],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
+    alias: { '@': path.resolve(__dirname, './src') },
   },
   build: {
+    // Hidden source maps — uploaded to Sentry, not served to the browser.
     sourcemap: 'hidden',
     rollupOptions: {
       output: {
@@ -127,5 +116,13 @@ export default defineConfig({
     port: 3002,
     open: true,
     allowedHosts: ['.ngrok.app', '.ngrok-free.app'],
+    proxy: {
+      '/api': {
+        target: DEV_API_TARGET,
+        changeOrigin: true,
+        secure: true,
+        rewrite: (p) => p.replace(/^\/api/, ''),
+      },
+    },
   },
 });

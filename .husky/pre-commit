@@ -1,0 +1,4 @@
+#!/bin/sh
+# Quick gate before each commit — full test/build run is on pre-push.
+echo "🔎  tsc --noEmit"
+npx tsc --noEmit || { echo "❌ Type errors — fix before committing."; exit 1; }

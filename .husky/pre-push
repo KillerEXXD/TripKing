@@ -1,0 +1,12 @@
+#!/bin/sh
+# Pre-push gate: type-check, tests, production build must all pass.
+echo "🔎  tsc --noEmit"
+npx tsc --noEmit || { echo "❌ Type errors — fix before pushing."; exit 1; }
+
+echo "🧪  npm run test:run"
+npm run test:run || { echo "❌ Tests failed — fix before pushing."; exit 1; }
+
+echo "🏗️   npm run build"
+npm run build || { echo "❌ Build failed — fix before pushing."; exit 1; }
+
+echo "✅  tsc + tests + build all green"
