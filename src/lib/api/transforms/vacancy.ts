@@ -92,6 +92,8 @@ export function toApiPostVacancy(input: PostVacancyInput): Record<string, unknow
     current_place_id: input.currentPlaceId ?? null,
     available_from: input.availableFrom,
     available_until: input.availableUntil ?? null,
+    // the unified list is preferred server-side; the parallel arrays stay as a fallback.
+    destinations: input.destinations && input.destinations.length > 0 ? input.destinations.map((d) => ({ cityId: d.cityId ?? null, placeId: d.placeId ?? null })) : null,
     destination_city_ids: input.destinationCityIds,
     destination_place_ids: input.destinationPlaceIds ?? null,
     min_rate_per_km: input.minRatePerKm ?? null,

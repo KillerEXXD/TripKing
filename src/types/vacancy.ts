@@ -28,6 +28,12 @@ export interface Vacancy {
   distanceKm?: number;
 }
 
+/** One destination on a posted vacancy — a curated city, a precise place, or both (≥1 required). */
+export interface VacancyDestinationInput {
+  cityId?: string;
+  placeId?: string;
+}
+
 export interface PostVacancyInput {
   vehicleId?: string;
   currentCityId: string;
@@ -36,7 +42,13 @@ export interface PostVacancyInput {
   availableFrom: string;
   availableUntil?: string;
   destinationCityIds: string[];
-  /** Optional precise destination places (`places.id`s) — when set, these become the destination rows (paired index-wise with `destinationCityIds`, or place-only). */
+  /**
+   * Preferred: the unified destinations list (each entry a city, a place, or both) — `POST /vacancies`
+   * creates one `vacancy_destinations` row per entry. When set, the server ignores `destinationCityIds`
+   * / `destinationPlaceIds`. (Those remain the legacy fallback.)
+   */
+  destinations?: VacancyDestinationInput[];
+  /** Legacy: precise destination places (`places.id`s) — paired index-wise with `destinationCityIds`. */
   destinationPlaceIds?: string[];
   minRatePerKm?: number;
   notes?: string;

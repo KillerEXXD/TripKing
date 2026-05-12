@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MapPin, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { cityHooks } from '@/hooks/useAdminConfig';
+import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { KycGateNotice } from '@/components/driver';
@@ -62,6 +63,8 @@ export function PostVacancyPage() {
   const [startLocal, setStartLocal] = useState(() => toDatetimeLocalValue(new Date()));
   const [hours, setHours] = useState(DEFAULT_HOURS);
   const [destinationCityIds, setDestinationCityIds] = useState<string[]>([]);
+  const [destPlaces, setDestPlaces] = useState<Place[]>([]);
+  const [destPlacePickerOpen, setDestPlacePickerOpen] = useState(false);
   const [destQuery, setDestQuery] = useState('');
   const [minRatePerKm, setMinRatePerKm] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
@@ -69,15 +72,20 @@ export function PostVacancyPage() {
   function toggleDestination(id: string) {
     setDestinationCityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
+  function addDestPlace(p: Place) {
+    setDestPlaces((prev) => (prev.some((x) => x.id === p.id) ? prev : [...prev, p]));
+    setDestPlacePickerOpen(false);
+  }
 
   const startDate = new Date(startLocal);
   const startValid = !Number.isNaN(startDate.getTime());
   const endDate = startValid ? new Date(startDate.getTime() + hours * HOUR_MS) : null;
   const sameDay = !!endDate && startDate.toDateString() === endDate.toDateString();
-  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && destinationCityIds.length > 0 && !postVacancy.isPending;
+  const hasDest = destinationCityIds.length > 0 || destPlaces.length > 0;
+  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && hasDest && !postVacancy.isPending;
 
   async function onSubmit() {
-    if (!currentCityId || !startValid || hours < MIN_HOURS || destinationCityIds.length === 0) {
+    if (!currentCityId || !startValid || hours < MIN_HOURS || !hasDest) {
       toast.error('Pick your city, when you’re available, and at least one destination');
       return;
     }
@@ -87,6 +95,7 @@ export function PostVacancyPage() {
       availableFrom: startDate.toISOString(),
       availableUntil: new Date(startDate.getTime() + hours * HOUR_MS).toISOString(),
       destinationCityIds,
+      destinations: [...destinationCityIds.map((cityId) => ({ cityId })), ...destPlaces.map((p) => ({ placeId: p.id }))],
       minRatePerKm: minRatePerKm === '' ? undefined : Math.max(0, Number(minRatePerKm)),
       notes: notes.trim() || undefined,
     };
@@ -212,8 +221,8 @@ export function PostVacancyPage() {
           type="search"
           value={destQuery}
           onChange={(e) => setDestQuery(e.target.value)}
-          placeholder="Search a destination…"
-          aria-label="Search destinations"
+          placeholder="Filter the cities…"
+          aria-label="Filter destination cities"
           className="h-9"
         />
         {shownCities.length > 0 ? (
@@ -236,7 +245,31 @@ export function PostVacancyPage() {
         ) : (
           <p className="text-xs text-secondary">No cities match “{destQuery.trim()}”.</p>
         )}
-        {destinationCityIds.length === 0 ? <p className="text-xs text-secondary">Pick at least one destination.</p> : <div className="flex flex-wrap gap-1.5">{destinationCityIds.map((id) => <Badge key={id} variant="muted">{cities.find((c) => c.id === id)?.name ?? id}</Badge>)}</div>}
+        <button type="button" onClick={() => setDestPlacePickerOpen(true)} className="inline-flex items-center gap-1 self-start text-xs text-secondary underline underline-offset-2">
+          <MapPin className="size-3" aria-hidden /> A place that&apos;s not in the list
+        </button>
+        {hasDest ? (
+          <div className="flex flex-wrap gap-1.5">
+            {destinationCityIds.map((id) => (
+              <Badge key={`c-${id}`} variant="muted">
+                {cities.find((c) => c.id === id)?.name ?? id}
+              </Badge>
+            ))}
+            {destPlaces.map((p) => (
+              <button
+                key={`p-${p.id}`}
+                type="button"
+                onClick={() => setDestPlaces((prev) => prev.filter((x) => x.id !== p.id))}
+                aria-label={`Remove the destination ${p.name}`}
+                className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+              >
+                <MapPin className="size-3" aria-hidden /> {p.name} <X className="size-3" aria-hidden />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-secondary">Pick at least one destination.</p>
+        )}
       </Card>
 
       <Card>
@@ -258,6 +291,10 @@ export function PostVacancyPage() {
         </Button>
       </div>
       </div>
+
+      {destPlacePickerOpen ? (
+        <LocationSearchPanel title="Add a destination" placeholder="Search a town, area, or landmark…" onPick={addDestPlace} onClose={() => setDestPlacePickerOpen(false)} />
+      ) : null}
     </div>
   );
 }

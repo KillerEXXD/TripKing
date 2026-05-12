@@ -86,7 +86,7 @@ describe('transformAlert', () => {
 });
 
 describe('toApi* writers', () => {
-  it('toApiPostVacancy (place ids null when absent; passed through when given)', () => {
+  it('toApiPostVacancy (place ids / destinations null when absent; passed through when given)', () => {
     const input: PostVacancyInput = { currentCityId: 'c1', availableFrom: '2026-06-01T06:00:00Z', destinationCityIds: ['c2', 'c3'], minRatePerKm: 12 };
     expect(toApiPostVacancy(input)).toEqual({
       vehicle_id: null,
@@ -94,6 +94,7 @@ describe('toApi* writers', () => {
       current_place_id: null,
       available_from: '2026-06-01T06:00:00Z',
       available_until: null,
+      destinations: null,
       destination_city_ids: ['c2', 'c3'],
       destination_place_ids: null,
       min_rate_per_km: 12,
@@ -102,6 +103,8 @@ describe('toApi* writers', () => {
     const withPlaces = toApiPostVacancy({ ...input, currentPlaceId: 'p1', destinationPlaceIds: ['p2', 'p3'] });
     expect(withPlaces.current_place_id).toBe('p1');
     expect(withPlaces.destination_place_ids).toEqual(['p2', 'p3']);
+    const withDestinations = toApiPostVacancy({ ...input, destinations: [{ cityId: 'c2' }, { placeId: 'p1' }] });
+    expect(withDestinations.destinations).toEqual([{ cityId: 'c2', placeId: null }, { cityId: null, placeId: 'p1' }]);
   });
   it('toApiAlert drops undefined; carries from/to place ids when given', () => {
     const input: Partial<AlertInput> = { name: 'X', fromCityId: 'c1', fromRadiusKm: 25, notifyVia: ['in_app'] };

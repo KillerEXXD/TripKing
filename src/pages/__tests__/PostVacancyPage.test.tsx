@@ -101,11 +101,11 @@ describe('PostVacancyPage', () => {
     renderPost();
     expect(screen.getByRole('button', { name: 'Vellore' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Chennai' })).toBeInTheDocument();
-    fireEvent.change(screen.getByPlaceholderText(/search a destination/i), { target: { value: 'chen' } });
+    fireEvent.change(screen.getByPlaceholderText(/filter the cities/i), { target: { value: 'chen' } });
     expect(screen.queryByRole('button', { name: 'Vellore' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Chennai' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Chennai' })); // select it
-    fireEvent.change(screen.getByPlaceholderText(/search a destination/i), { target: { value: 'vell' } });
+    fireEvent.change(screen.getByPlaceholderText(/filter the cities/i), { target: { value: 'vell' } });
     expect(screen.getByRole('button', { name: 'Chennai' })).toBeInTheDocument(); // still shown — it's selected
     expect(screen.getByRole('button', { name: 'Vellore' })).toBeInTheDocument(); // matches the query
   });
@@ -127,8 +127,32 @@ describe('PostVacancyPage', () => {
           availableFrom: start.toISOString(),
           availableUntil: new Date(start.getTime() + 5 * 3_600_000).toISOString(),
           destinationCityIds: ['c2'],
+          destinations: [{ cityId: 'c2' }],
         }),
       ),
+    );
+    expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
+  });
+
+  it('adding a "place not in the list" destination shows a removable chip and sends it in the destinations array', async () => {
+    const mutateAsync = setPost();
+    renderPost();
+    fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
+    expect(screen.getByRole('button', { name: /^post availability$/i })).toBeDisabled(); // no destination yet
+    fireEvent.click(screen.getByRole('button', { name: /a place that's not in the list/i }));
+    fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i })); // adds Katpadi, Vellore
+    const chip = screen.getByRole('button', { name: /remove the destination katpadi/i });
+    expect(chip).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^post availability$/i })).toBeEnabled(); // a destination place alone is enough
+    fireEvent.click(chip); // removable
+    expect(screen.queryByRole('button', { name: /remove the destination katpadi/i })).toBeNull();
+    // re-add it, also pick a city chip, submit
+    fireEvent.click(screen.getByRole('button', { name: /a place that's not in the list/i }));
+    fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
+    fireEvent.click(screen.getByRole('button', { name: /^post availability$/i }));
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ currentCityId: 'c1', destinationCityIds: ['c2'], destinations: [{ cityId: 'c2' }, { placeId: 'p1' }] })),
     );
     expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
   });
