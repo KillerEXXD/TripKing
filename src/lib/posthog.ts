@@ -1,14 +1,36 @@
-/**
- * PostHog bootstrap.
- *
- * Stub for the scaffold commit; the real `posthog-js` init (`VITE_POSTHOG_KEY`
- * / `VITE_POSTHOG_HOST`, session recording, autocapture) + the pageview
- * tracker land in the "providers + bootstrap" commit.
- */
+import posthog from 'posthog-js';
+import { logger } from '@/lib/logger';
+
+let initialized = false;
+
+/** Init PostHog if `VITE_POSTHOG_KEY` is set (no-op otherwise). Called once from `main.tsx`. */
 export function initPostHog(): void {
-  // intentionally empty until PostHog is wired
+  const key = import.meta.env.VITE_POSTHOG_KEY;
+  if (!key || initialized) return;
+  posthog.init(key, {
+    api_host: import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+    capture_pageview: false, // sent manually on route change — see PostHogPageviewTracker
+    autocapture: true,
+  });
+  initialized = true;
 }
 
-export function captureEvent(_event: string, _props?: Record<string, unknown>): void {
-  // intentionally empty until PostHog is wired
+export function captureEvent(event: string, props?: Record<string, unknown>): void {
+  if (!initialized) {
+    logger.debug(`[posthog:${event}]`, props);
+    return;
+  }
+  posthog.capture(event, props);
+}
+
+export function capturePageview(path: string): void {
+  if (initialized) posthog.capture('$pageview', { $current_url: path });
+}
+
+export function identifyUser(id: string, props?: Record<string, unknown>): void {
+  if (initialized) posthog.identify(id, props);
+}
+
+export function resetUser(): void {
+  if (initialized) posthog.reset();
 }
