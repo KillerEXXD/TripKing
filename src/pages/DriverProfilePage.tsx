@@ -199,21 +199,26 @@ export function DriverProfilePage() {
   const notFound = !id || (driverQuery.isError && driverQuery.error instanceof ApiError && driverQuery.error.status === 404);
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="-ml-2">
-        <ArrowLeft className="size-4" aria-hidden /> Back
-      </Button>
+    <div className="mx-auto max-w-md">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <ArrowLeft className="size-5" aria-hidden />
+        </button>
+        <div className="text-base font-semibold">Driver</div>
+      </header>
 
-      {notFound ? (
-        <ErrorState title="Driver not found" message="This profile may have been removed, or the link is out of date." />
-      ) : driverQuery.isPending ? (
-        <LoadingSkeleton rows={6} />
-      ) : driverQuery.isError ? (
-        <ErrorState title="Couldn't load this profile" message="Check your connection and try again." onRetry={() => void driverQuery.refetch()} />
-      ) : (
-        <DriverDetail driver={driverQuery.data} />
-      )}
-    </main>
+      <div className="space-y-4 p-4">
+        {notFound ? (
+          <ErrorState title="Driver not found" message="This profile may have been removed, or the link is out of date." />
+        ) : driverQuery.isPending ? (
+          <LoadingSkeleton rows={6} />
+        ) : driverQuery.isError ? (
+          <ErrorState title="Couldn't load this profile" message="Check your connection and try again." onRetry={() => void driverQuery.refetch()} />
+        ) : (
+          <DriverDetail driver={driverQuery.data} />
+        )}
+      </div>
+    </div>
   );
 }
 

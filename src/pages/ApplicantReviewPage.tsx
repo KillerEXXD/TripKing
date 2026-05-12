@@ -1,12 +1,12 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Car, CheckCircle2, Star } from 'lucide-react';
+import { ArrowLeft, Car, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssignDriver, useRejectApplicant, useTrip, useTripApplicants } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
-import { Badge, Button, Card } from '@/components/ui';
+import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR } from '@/lib/utils';
+import { formatINR, formatKm, initials } from '@/lib/utils';
 import type { AcceptanceStatus, Trip, TripAcceptance } from '@/types';
 
 const STATUS_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
@@ -49,8 +49,13 @@ function ApplicantCard({
   const dim = acceptance.status === 'rejected' || acceptance.status === 'withdrawn' || acceptance.status === 'expired';
   return (
     <Card className={`gap-3 ${acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : dim ? 'opacity-70' : ''}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex items-start gap-3">
+        <Link to={`/drivers/${acceptance.driverId}`} aria-label={`${d?.fullName || 'driver'} profile`}>
+          <Avatar className="size-11">
+            <AvatarFallback>{initials(d?.fullName || '?')}</AvatarFallback>
+          </Avatar>
+        </Link>
+        <div className="min-w-0 flex-1">
           <Link to={`/drivers/${acceptance.driverId}`} className="font-bold underline-offset-2 hover:underline">
             {d?.fullName || 'A driver'}
           </Link>
@@ -63,7 +68,7 @@ function ApplicantCard({
             applied {appliedAt(acceptance.appliedAt)}
           </div>
         </div>
-        <Badge variant={meta.variant}>
+        <Badge variant={meta.variant} className="shrink-0">
           {acceptance.status === 'selected' ? <CheckCircle2 className="size-3" aria-hidden /> : null} {meta.label}
         </Badge>
       </div>
@@ -150,35 +155,46 @@ export function ApplicantReviewPage() {
   const { user } = useAuth();
   const tripQuery = useTrip(id);
   const notFound = !id || (tripQuery.isError && tripQuery.error instanceof ApiError && tripQuery.error.status === 404);
+  const trip = tripQuery.data;
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <Button variant="ghost" size="sm" onClick={() => navigate(id ? `/trips/${id}` : '/posted-trips')} className="-ml-2">
-        <ArrowLeft className="size-4" aria-hidden /> Back to the trip
-      </Button>
-
-      {notFound ? (
-        <ErrorState title="Trip not found" message="This trip may have been removed." />
-      ) : tripQuery.isPending ? (
-        <LoadingSkeleton rows={5} />
-      ) : tripQuery.isError ? (
-        <ErrorState title="Couldn't load this trip" message="Check your connection and try again." onRetry={() => void tripQuery.refetch()} />
-      ) : (
-        <>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h1 className="flex items-center gap-1.5 text-xl font-bold">
-                <Star className="size-4 text-secondary" aria-hidden /> Applicants
-              </h1>
-              <p className="text-sm text-secondary">
-                {tripQuery.data.fromCity.name} → {tripQuery.data.toCity.name} · {tripQuery.data.applicantCount} applicant{tripQuery.data.applicantCount === 1 ? '' : 's'}
-              </p>
+    <div className="mx-auto max-w-md">
+      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+        <button type="button" aria-label="Back to the trip" onClick={() => navigate(id ? `/trips/${id}` : '/posted-trips')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <ArrowLeft className="size-5" aria-hidden />
+        </button>
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-semibold">Applicants</h1>
+          {trip ? (
+            <div className="truncate text-xs text-secondary">
+              {trip.fromCity.name} → {trip.toCity.name} · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'}
             </div>
-          </div>
-          <Applicants trip={tripQuery.data} isPoster={user?.id === tripQuery.data.postedByUserId} />
-        </>
-      )}
-    </main>
+          ) : null}
+        </div>
+      </header>
+
+      <div className="space-y-3 p-4">
+        {notFound ? (
+          <ErrorState title="Trip not found" message="This trip may have been removed." />
+        ) : tripQuery.isPending ? (
+          <LoadingSkeleton rows={5} />
+        ) : tripQuery.isError ? (
+          <ErrorState title="Couldn't load this trip" message="Check your connection and try again." onRetry={() => void tripQuery.refetch()} />
+        ) : (
+          <>
+            <Card className="gap-1">
+              <div className="font-bold">
+                {tripQuery.data.fromCity.name} → {tripQuery.data.toCity.name}
+              </div>
+              <div className="text-xs text-secondary">
+                {formatKm(tripQuery.data.expectedDistanceKm)} · {formatINR(tripQuery.data.ratePerKm)}/km · {formatINR(tripQuery.data.totalFare)} fare · {formatINR(tripQuery.data.driverPayout)} driver payout
+              </div>
+            </Card>
+            <Applicants trip={tripQuery.data} isPoster={user?.id === tripQuery.data.postedByUserId} />
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
