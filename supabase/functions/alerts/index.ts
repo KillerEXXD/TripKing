@@ -4,11 +4,17 @@
  * read any). withTiming; verify_jwt = false (the function validates) — mirrors the migration-003
  * RLS "alerts owner read / owner insert/update/delete (+ admin read)" policy.
  *
- *   GET    /alerts        (Bearer) — the caller's alerts (joins from/to city)
+ *   GET    /alerts        (Bearer) — the caller's alerts (joins from/to city + from/to place)
  *   GET    /alerts/:id    (owner/admin; Bearer)
- *   POST   /alerts        (Bearer) — user_id = caller; from_city_id required
- *   PATCH  /alerts/:id    (owner; Bearer) — partial; include is_active/paused_at to pause/resume
+ *   POST   /alerts        (Bearer) — user_id = caller; from_city_id required; from_place_id / to_place_id accepted alongside from_city_id / to_city_id
+ *   PATCH  /alerts/:id    (owner; Bearer) — partial; include from_place_id/to_place_id and/or is_active/paused_at to pause/resume
  *   DELETE /alerts/:id    (owner; Bearer)
+ *
+ * Matching: alerts are evaluated by the `match_alerts_for_trip` / `match_alerts_for_vacancy` SQL
+ * functions (migration 015), called from POST /trips and POST /vacancies — an alert fires an
+ * `alert_match` notification when the new row's from/to points fall within the alert's radii (and
+ * the rate / commission / car-type / pickup-window filters pass). The owner is never notified about
+ * their own post; only the `in_app` channel is delivered today (push/sms/email are future no-ops).
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -18,9 +24,9 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 
 type Db = ReturnType<typeof serviceClient>;
-const ALERT_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*)';
+const ALERT_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*)';
 const WRITABLE = [
-  'name', 'from_city_id', 'from_radius_km', 'to_city_id', 'to_radius_km',
+  'name', 'from_city_id', 'from_place_id', 'from_radius_km', 'to_city_id', 'to_place_id', 'to_radius_km',
   'min_rate_per_km', 'min_commission_pct', 'car_type_ids',
   'pickup_window_start', 'pickup_window_end', 'notify_via', 'is_active', 'paused_at',
 ];

@@ -4,9 +4,10 @@
  * the RLS policies encode). Instrumented with withTiming; verify_jwt = false (we validate).
  *
  * Routes (at the function root, i.e. /functions/v1/trips/...):
- *   GET    /trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&assigned_driver_id=&limit=   (public)
- *                                       — assigned_driver_id accepts a driver uuid OR the literal `me` (Bearer; the trips you're driving)
- *   POST   /trips                       (authed) — total_fare computed if omitted; driver_payout via trigger
+ *   GET    /trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&assigned_driver_id=&near_lat=&near_lng=&radius_km=&limit=   (public)
+ *                                       — assigned_driver_id accepts a driver uuid OR the literal `me` (Bearer; the trips you're driving);
+ *                                         near_lat+near_lng+radius_km restrict to trips whose pickup point (from_place → from_city fallback) is within the radius (nearest first; each row gets distance_km)
+ *   POST   /trips                       (authed) — from_place_id / to_place_id accepted alongside from_city_id / to_city_id; total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification
  *   GET    /trips/applied               (driver; Bearer) — the caller's own trip_acceptances, each with its joined trip ("my applications")
  *   GET    /trips/by-otp/:otp           (public — the OTP is the credential) — the passenger portal; joins assigned driver+vehicle;
  *                                       fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed
@@ -32,16 +33,17 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { parseNearRadius, toKm } from '../_shared/geo.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 
-// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map.
+// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map; from/to place joined alongside the curated cities.
 const TRIP_SELECT =
-  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
+  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
   'assigned_driver:drivers!assigned_driver_id(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at)';
 // for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
 const BY_OTP_SELECT =
-  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
+  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
   'assigned_driver:drivers!assigned_driver_id(id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at), ' +
   'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
@@ -173,11 +175,28 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         q = q.eq('assigned_driver_id', assignedDriver);
       }
     }
+    // Phase D radius filter: trips whose pickup point (from_place → from_city fallback) is within radius_km of (near_lat, near_lng).
+    const near = parseNearRadius(url);
+    let distById: Map<string, number> | null = null;
+    if (near) {
+      const { data: rad, error: radErr } = await db.rpc('trips_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
+      if (radErr) return fail('DB_ERROR', radErr.message, 500);
+      const list = (rad ?? []) as { id: string; distance_m: number }[];
+      if (list.length === 0) return ok([]);
+      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
+      q = q.in('id', [...distById.keys()]);
+    }
     const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.order('pickup_at', { ascending: true }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
+    q = q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
+    if (!near) q = q.order('pickup_at', { ascending: true });
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok((data ?? []).map((r) => enrichTrip(r as Record<string, unknown>)));
+    let rows = (data ?? []).map((r) => enrichTrip(r as Record<string, unknown>));
+    if (distById) {
+      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+    }
+    return ok(rows);
   }
 
   // ── POST /trips/trips ────────────────────────────────────────────────────
@@ -204,6 +223,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       posted_by_phone: (b.posted_by_phone as string | null) ?? null,
       from_city_id: fromCityId,
       to_city_id: toCityId,
+      from_place_id: (typeof b.from_place_id === 'string' && b.from_place_id) ? b.from_place_id : null,
+      to_place_id: (typeof b.to_place_id === 'string' && b.to_place_id) ? b.to_place_id : null,
       pickup_at: b.pickup_at,
       expected_distance_km: distance,
       car_type_id: b.car_type_id,
@@ -226,7 +247,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       status: 'open',
     };
     const { data: created, error } = await db.from('trips').insert(insert).select('id').single();
-    if (error) return pgFail(error);
+    if (error) return pgFail(error); // 23503 (bad from_place_id/to_place_id/from_city_id/…) → 422
+    // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
+    try { await db.rpc('match_alerts_for_trip', { p_trip_id: created.id }); } catch { /* ignore */ }
     return ok(await fullTrip(created.id as string));
   }
 

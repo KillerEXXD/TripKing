@@ -6,7 +6,7 @@
  * write" policy in migration 002). The /agents function is the trip-manager twin
  * (supabase/functions/agents/index.ts).
  *
- *   GET   /drivers              ?current_city_id=&kyc_status=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue)
+ *   GET   /drivers              ?current_city_id=&kyc_status=&near_lat=&near_lng=&radius_km=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue; near_* restricts to drivers within radius_km of (near_lat, near_lng) by their generated geog, ignoring stale positions, nearest first + a distance_km per row)
  *   GET   /drivers/me           (Bearer) — the caller's own driver profile (joined; 404 if none)
  *   POST  /drivers              (Bearer) — create my profile; user_id = caller; body.role='trip_manager'
  *                               makes an agent profile instead; idempotent (returns the existing one if any)
@@ -20,6 +20,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared/geo.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 const DRIVER_SELECT =
@@ -101,14 +102,28 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const kyc = csv(url.searchParams.get('kyc_status'));
     if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
     else if (kyc.length > 1) q = q.in('kyc_status', kyc);
+    // Phase D radius filter: drivers whose (fresh) current position is within radius_km of (near_lat, near_lng).
+    const near = parseNearRadius(url);
+    let distById: Map<string, number> | null = null;
+    if (near) {
+      const { data: rad, error: radErr } = await db.rpc('drivers_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM, p_stale_minutes: DRIVER_LOCATION_STALE_MINUTES });
+      if (radErr) return fail('DB_ERROR', radErr.message, 500);
+      const list = (rad ?? []) as { id: string; distance_m: number }[];
+      if (list.length === 0) return ok([]);
+      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
+      q = q.in('id', [...distById.keys()]);
+    }
     const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q
-      .order('rating_avg', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+    q = q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+    if (!near) q = q.order('rating_avg', { ascending: false }).order('created_at', { ascending: false });
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    let rows = (data ?? []) as Record<string, unknown>[];
+    if (distById) {
+      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+    }
+    return ok(rows);
   }
 
   // ── POST /drivers (create my profile; role='trip_manager' → an agent) ────

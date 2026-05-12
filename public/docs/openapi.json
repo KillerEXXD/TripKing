@@ -579,7 +579,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "List trips — each row carries the assigned driver (with live position). status=in_progress&posted_by_user_id=<me> is a trip manager's live-trips map; assigned_driver_id=me (Bearer) is \"the trips I'm driving\"; in-progress trips also get distance_to_destination_km",
+        "summary": "List trips - each row carries the assigned driver (with live position) + the joined from_place/to_place. status=in_progress&posted_by_user_id=<me> is a trip manager’s live-trips map; assigned_driver_id=me (Bearer) is \"the trips I’m driving\"; in-progress trips also get distance_to_destination_km. When near_lat+near_lng+radius_km are all given, the list is restricted to trips whose pickup point (from_place → from_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "status",
@@ -616,7 +616,30 @@
             "schema": {
               "type": "string"
             },
-            "description": "a driver uuid (public), or the literal \"me\" — needs a Bearer; resolves to the caller's driver profile (the trips assigned to you)"
+            "description": "a driver uuid (public), or the literal \"me\" - needs a Bearer; resolves to the caller’s driver profile (the trips assigned to you)"
+          },
+          {
+            "name": "near_lat",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "near_lng",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius_km",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "maximum": 100
+            },
+            "description": "radius search - all three of near_lat/near_lng/radius_km must be present"
           },
           {
             "name": "limit",
@@ -639,7 +662,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer). Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a trip (Bearer) - from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422); total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -653,7 +676,15 @@
                   "car_type_id",
                   "expected_distance_km",
                   "rate_per_km"
-                ]
+                ],
+                "properties": {
+                  "from_place_id": {
+                    "type": "string"
+                  },
+                  "to_place_id": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }
@@ -1212,7 +1243,7 @@
         "tags": [
           "drivers"
         ],
-        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries; kyc_status accepts a CSV (the admin KYC queue)",
+        "summary": "List driver profiles (public) - joins home/current city + vehicle summaries; kyc_status accepts a CSV (the admin KYC queue). When near_lat+near_lng+radius_km are all given, the list is restricted to drivers whose (non-stale, ≤30 min old) current position is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "current_city_id",
@@ -1227,7 +1258,30 @@
             "schema": {
               "type": "string"
             },
-            "description": "one value or a CSV — e.g. docs_submitted,video_pending"
+            "description": "one value or a CSV - e.g. docs_submitted,video_pending"
+          },
+          {
+            "name": "near_lat",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "near_lng",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius_km",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "maximum": 100
+            },
+            "description": "radius search - all three of near_lat/near_lng/radius_km must be present"
           },
           {
             "name": "limit",
@@ -1589,7 +1643,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "List vacancies (public) — joins driver+vehicle summary, current city, destination cities",
+        "summary": "List vacancies (public) - joins driver+vehicle summary, current_city/current_place, and destination cities + places (vacancy_destinations: [{ city, place }]). When near_lat+near_lng+radius_km are all given, restricted to vacancies whose current point (current_place → current_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "current_city_id",
@@ -1600,6 +1654,13 @@
           },
           {
             "name": "destination_city_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "destination_place_id",
             "in": "query",
             "schema": {
               "type": "string"
@@ -1620,6 +1681,29 @@
             }
           },
           {
+            "name": "near_lat",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "near_lng",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius_km",
+            "in": "query",
+            "schema": {
+              "type": "number",
+              "maximum": 100
+            },
+            "description": "radius search - all three of near_lat/near_lng/radius_km must be present"
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -1637,7 +1721,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "Post a vacancy (driver; Bearer) — driver_id = the caller; destination_city_ids → vacancy_destinations rows. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a vacancy (driver; Bearer) - driver_id = the caller; current_place_id accepted alongside current_city_id; destination_place_ids and/or destination_city_ids → vacancy_destinations rows (a bad place id → 422); matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1651,6 +1735,9 @@
                   "current_city_id": {
                     "type": "string"
                   },
+                  "current_place_id": {
+                    "type": "string"
+                  },
                   "vehicle_id": {
                     "type": "string"
                   },
@@ -1661,6 +1748,12 @@
                     "type": "string"
                   },
                   "destination_city_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "destination_place_ids": {
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -1752,7 +1845,7 @@
         "tags": [
           "alerts"
         ],
-        "summary": "List my alerts (Bearer) — joins from/to city",
+        "summary": "List my alerts (Bearer) - joins from/to city + from/to place",
         "responses": {
           "200": {
             "$ref": "#/components/responses/Envelope"
@@ -1766,7 +1859,7 @@
         "tags": [
           "alerts"
         ],
-        "summary": "Create an alert (Bearer; user_id = caller) — from_city_id required. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Create an alert (Bearer; user_id = caller) - from_city_id required; from_place_id / to_place_id accepted alongside from_city_id / to_city_id (a bad place id → 422). Posting a trip/vacancy inside the alert’s radius (and matching its other filters) fires an alert_match notification to the owner. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1783,10 +1876,16 @@
                   "from_city_id": {
                     "type": "string"
                   },
+                  "from_place_id": {
+                    "type": "string"
+                  },
                   "from_radius_km": {
                     "type": "integer"
                   },
                   "to_city_id": {
+                    "type": "string"
+                  },
+                  "to_place_id": {
                     "type": "string"
                   },
                   "to_radius_km": {
@@ -1820,7 +1919,8 @@
                         "email",
                         "in_app"
                       ]
-                    }
+                    },
+                    "description": "only in_app is delivered today; push/sms/email are recorded but no-op. An alert that doesn’t include in_app gets no notification yet."
                   },
                   "is_active": {
                     "type": "boolean"
@@ -1851,7 +1951,7 @@
         "tags": [
           "alerts"
         ],
-        "summary": "Get an alert (owner/admin; Bearer)",
+        "summary": "Get an alert (owner/admin; Bearer) - joins from/to city + from/to place",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1876,7 +1976,7 @@
         "tags": [
           "alerts"
         ],
-        "summary": "Update an alert (owner; Bearer) — partial; include is_active/paused_at to pause/resume",
+        "summary": "Update an alert (owner; Bearer) - partial; include from_place_id/to_place_id and/or is_active/paused_at to pause/resume (a bad place id → 422)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1887,7 +1987,21 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "from_place_id": {
+                    "type": "string"
+                  },
+                  "to_place_id": {
+                    "type": "string"
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "paused_at": {
+                    "type": "string"
+                  }
+                }
               }
             }
           }

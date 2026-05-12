@@ -4,10 +4,15 @@
  * writes; withTiming; verify_jwt = false (mirrors the migration-003 RLS "vacancies read /
  * owner-or-admin write" policy). Destinations live in the `vacancy_destinations` junction.
  *
- *   GET   /vacancies              ?current_city_id=&destination_city_id=&status=&driver_id=&limit=   (public)
- *   POST  /vacancies              (driver; Bearer) — body incl. destination_city_ids: string[]
- *   GET   /vacancies/:id          (public) — joins driver+vehicle summary, current_city, destination cities
+ *   GET   /vacancies              ?current_city_id=&destination_city_id=&destination_place_id=&status=&driver_id=&near_lat=&near_lng=&radius_km=&limit=   (public)
+ *   POST  /vacancies              (driver; Bearer) — body: current_city_id (required) + current_place_id?; destination_city_ids?: string[] / destination_place_ids?: string[]
+ *   GET   /vacancies/:id          (public) — joins driver+vehicle summary, current_city/current_place, destination cities + places
  *   POST  /vacancies/:id/cancel   (owning driver/admin; Bearer)
+ *
+ * Phase D: when all of ?near_lat&near_lng&radius_km are given, the list is restricted to vacancies
+ * whose current point (place → city fallback) is within the radius (`vacancies_in_radius` SQL fn),
+ * nearest first, each row carrying `distance_km`. After a vacancy is posted, `match_alerts_for_vacancy`
+ * fires `alert_match` notifications for matching active alerts (the owner is never notified about their own).
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -15,12 +20,13 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { parseNearRadius, toKm } from '../_shared/geo.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 const VACANCY_SELECT =
   '*, driver:drivers(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label)), ' +
-  'current_city:cities!current_city_id(*), vacancy_destinations(city:cities(*))';
+  'current_city:cities!current_city_id(*), current_place:places!current_place_id(*), vacancy_destinations(city:cities(*), place:places(*))';
 
 function bearer(req: Request): string | null {
   const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
@@ -85,17 +91,39 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const driverId = url.searchParams.get('driver_id');
     if (driverId) q = q.eq('driver_id', driverId);
     const destCity = url.searchParams.get('destination_city_id');
-    if (destCity) {
-      const { data: rows } = await db.from('vacancy_destinations').select('vacancy_id').eq('city_id', destCity);
-      const ids = (rows ?? []).map((r) => r.vacancy_id as string);
+    const destPlace = url.searchParams.get('destination_place_id');
+    if (destCity || destPlace) {
+      let dq = db.from('vacancy_destinations').select('vacancy_id');
+      if (destCity) dq = dq.eq('city_id', destCity);
+      if (destPlace) dq = dq.eq('place_id', destPlace);
+      const { data: rows } = await dq;
+      const ids = [...new Set((rows ?? []).map((r) => r.vacancy_id as string))];
       if (ids.length === 0) return ok([]);
       q = q.in('id', ids);
     }
+    // Phase D radius filter: vacancies whose current point is within radius_km of (near_lat, near_lng).
+    const near = parseNearRadius(url);
+    let distById: Map<string, number> | null = null;
+    if (near) {
+      const { data: rad, error: radErr } = await db.rpc('vacancies_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
+      if (radErr) return fail('DB_ERROR', radErr.message, 500);
+      const list = (rad ?? []) as { id: string; distance_m: number }[];
+      if (list.length === 0) return ok([]);
+      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
+      q = q.in('id', [...distById.keys()]);
+    }
     const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+    q = near
+      ? q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200))
+      : q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    let rows = (data ?? []) as Record<string, unknown>[];
+    if (distById) {
+      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+    }
+    return ok(rows);
   }
 
   // ── POST /vacancies (driver — post my availability) ──────────────────────
@@ -108,11 +136,14 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const b = await readBody(req);
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);
-    const destIds = strArray(b.destination_city_ids);
+    const currentPlaceId = strOrNull(b.current_place_id);
+    const destCityIds = strArray(b.destination_city_ids);
+    const destPlaceIds = strArray(b.destination_place_ids);
     const insert = {
       driver_id: did,
       vehicle_id: strOrNull(b.vehicle_id),
       current_city_id: currentCityId,
+      current_place_id: currentPlaceId,
       available_from: strOrNull(b.available_from) ?? new Date().toISOString(),
       available_until: strOrNull(b.available_until),
       min_rate_per_km: typeof b.min_rate_per_km === 'number' ? b.min_rate_per_km : null,
@@ -120,15 +151,21 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       status: 'active',
     };
     const { data: created, error } = await db.from('vacancies').insert(insert).select('id').single();
-    if (error) return pgFail(error);
+    if (error) return pgFail(error); // 23503 (bad current_place_id / current_city_id) → 422
     const vacancyId = created.id as string;
-    if (destIds.length > 0) {
-      const { error: destErr } = await db.from('vacancy_destinations').insert(destIds.map((cityId) => ({ vacancy_id: vacancyId, city_id: cityId })));
+    // destination rows: one per destination_place_id (with the parallel destination_city_id if given), else one per destination_city_id.
+    const destRows = destPlaceIds.length > 0
+      ? destPlaceIds.map((placeId, i) => ({ vacancy_id: vacancyId, place_id: placeId, city_id: destCityIds[i] ?? null }))
+      : destCityIds.map((cityId) => ({ vacancy_id: vacancyId, city_id: cityId, place_id: null }));
+    if (destRows.length > 0) {
+      const { error: destErr } = await db.from('vacancy_destinations').insert(destRows);
       if (destErr) {
         await db.from('vacancies').delete().eq('id', vacancyId); // roll back the orphan
         return pgFail(destErr);
       }
     }
+    // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
+    try { await db.rpc('match_alerts_for_vacancy', { p_vacancy_id: vacancyId }); } catch { /* ignore */ }
     return fullVacancy(vacancyId);
   }
 
