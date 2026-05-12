@@ -396,6 +396,10 @@ verify_jwt = false
 [functions.notifications]
 verify_jwt = false
 
+# /vehicles/* — public reads; the function validates the caller's Bearer JWT for owner writes.
+[functions.vehicles]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
