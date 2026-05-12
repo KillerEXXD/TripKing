@@ -86,11 +86,13 @@ describe('TripFeedPage', () => {
     expect(screen.queryByRole('button', { name: /clear filters/i })).toBeNull();
   });
 
-  it('renders a card per trip', () => {
-    setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', fromCity: city('c3', 'Bangalore') })] });
+  it('renders a card per trip and the "Near me" filter; a near-list card shows the distance', () => {
+    setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', fromCity: city('c3', 'Bangalore'), distanceKm: 4.2 })] });
     renderFeed();
     expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
     expect(screen.getByText(/bangalore → chennai/i)).toBeInTheDocument();
+    expect(screen.getByText(/4\.2 km away/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /near me/i })).toBeInTheDocument();
   });
 
   it('the "AC only" toggle hides non-AC trips', () => {

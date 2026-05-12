@@ -98,4 +98,11 @@ describe('VacanciesPage', () => {
     fireEvent.change(screen.getByLabelText(/where the driver is/i), { target: { value: 'c1' } });
     expect(useVacancies).toHaveBeenLastCalledWith({ status: 'active', currentCityId: 'c1', destinationCityId: undefined });
   });
+
+  it('renders the "Near me" filter; a near-list card shows the distance', () => {
+    setVacancies({ data: [makeVacancy({ distanceKm: 3.1 })] });
+    renderVacancies();
+    expect(screen.getByRole('button', { name: /near me/i })).toBeInTheDocument();
+    expect(screen.getByText(/3\.1 km away/i)).toBeInTheDocument();
+  });
 });
