@@ -8,13 +8,24 @@
 
 **Never touch `src/**`** — that's the frontend lane. The only cross-lane contract is the `POST /drivers` / `POST /agents` "create my profile" route below; its shape is fixed here and in `docs/CONTINUE_HERE_FRONTEND.md` — don't change it without updating both docs and pinging the other session.
 
-Push protocol: `git pull --rebase origin main` **immediately before** every `git push origin main`. Disjoint lanes ⇒ the rebase always replays cleanly. A rebase conflict ⇒ you crossed lanes — stop, fix the boundary, don't force.
+### Work from the `C:\Apps\TripKing-backend` worktree
+
+There's a dedicated git worktree for this lane: **`C:\Apps\TripKing-backend`**, on branch **`backend-lane`** (created with `git worktree add -b backend-lane C:\Apps\TripKing-backend origin/main`; `npm ci` already run there). Work from it — its working tree is independent of `C:\Apps\TripKing` (where the *frontend* session works), so the Husky pre-push gate (`tsc --noEmit` + `npm run test:run` + `npm run build`) runs over **your** files only, never the other lane's uncommitted WIP. Push protocol from the worktree:
+
+```bash
+# commit on backend-lane, then:
+git fetch origin
+git rebase origin/main          # bring backend-lane up to the latest main (clean — disjoint files)
+git push origin HEAD:main       # push to remote main; the pre-push gate runs over the clean worktree
+```
+
+A rebase conflict ⇒ you crossed lanes — stop, fix the boundary, don't force. (If you ever end up working in `C:\Apps\TripKing` instead and the pre-push gate fails on the other lane's WIP: `git stash push -u -m "…"` it → push → `git stash pop`.)
 
 ## State (already done, deployed, pushed)
 
-10 edge functions live at `…supabase.co/functions/v1/<name>`: `/admin` (8/8 smoke ✓), `/auth` (phone-OTP, dev-OTP `123456`, real Supabase sessions — 7/7), `/trips` (full lifecycle — 8/8), `/notifications` (6/6), `/vehicles` (CRUD + derived `eligibility_status` — 6/6), `/drivers` + `/agents` (profiles + "create my profile" + location — 22/22, commit `eccde0e`), `/vacancies` (browse with filters + joins / post with destinations / cancel — 22/22), `/alerts` (owner-scoped CRUD of saved searches — 21/21), **`/reviews` (post-trip ratings; published-or-own visibility; trip-completed check; ratee derived; review_received notification; report — 25/25)**. 3 migrations applied (001 reference data; 002 core schema = `users`+`handle_new_user`+`is_admin()`, `drivers`/`trip_managers`/`vehicles`, `trips`/`trip_acceptances`/`trip_executions` with `driver_payout`/`applicant_count` triggers; 003 = `vacancies`+`vacancy_destinations`/`alerts`/`reviews`/`notifications` + admin-write RLS). OpenAPI covers all 10. `supabase/functions/_shared/{cors,timing,supabase}.ts` exist and are reused. The frontend data layer (services/transforms/hooks for all 10 resources) is already in place — your functions must return shapes its transforms accept (joined `select(...)` strings below).
+11 edge functions live at `…supabase.co/functions/v1/<name>`: `/admin` (8/8 smoke ✓), `/auth` (phone-OTP, dev-OTP `123456`, real Supabase sessions — 7/7), `/trips` (full lifecycle — 8/8), `/notifications` (6/6), `/vehicles` (CRUD + derived `eligibility_status` + eligibility-dashboard filters — 22/22), `/drivers` + `/agents` (profiles + "create my profile" + location + admin KYC review — 29/29), `/vacancies` (browse with filters + joins / post with destinations / cancel — 22/22), `/alerts` (owner-scoped CRUD of saved searches — 21/21), `/reviews` (post-trip ratings; published-or-own visibility; trip-completed check; ratee derived; review_received notification; report + admin moderation — 31/31), **`/analytics` (server-computed — `/analytics/admin` platform dashboard, `/analytics/agent` per-agent — over the migration-004 SQL functions — 12/12)**. 4 migrations applied (001 reference data; 002 core schema = `users`+`handle_new_user`+`is_admin()`, `drivers`/`trip_managers`/`vehicles`, `trips`/`trip_acceptances`/`trip_executions` with `driver_payout`/`applicant_count` triggers; 003 = `vacancies`+`vacancy_destinations`/`alerts`/`reviews`/`notifications` + admin-write RLS; **004 = `get_admin_dashboard()` + `get_agent_analytics(uuid)` SECURITY DEFINER analytics functions**). OpenAPI covers all 11. `supabase/functions/_shared/{cors,timing,supabase}.ts` exist and are reused. The frontend data layer (services/transforms/hooks for the 10 marketplace resources) is already in place — your functions must return shapes its transforms accept (joined `select(...)` strings below); the analytics blobs have no frontend transform yet (Phase-5 frontend will add one).
 
-## NEXT STEP → **Phase-5 backend** (analytics endpoints — see below). The core marketplace API (10 edge functions) **and the Phase-4 admin-ops backend are done**. (✅ `/drivers`+`/agents` → `supabase/functions/{drivers,agents}/index.ts` + `scripts/test-drivers.cjs`; ✅ `/vacancies` → `supabase/functions/vacancies/index.ts` + `scripts/test-vacancies.cjs`; ✅ `/alerts` → `supabase/functions/alerts/index.ts` + `scripts/test-alerts.cjs`; ✅ `/reviews` → `supabase/functions/reviews/index.ts` + `scripts/test-reviews.cjs`; ✅ Phase-4 admin-ops — KYC review (`PATCH /drivers/:id/kyc`, `PATCH /agents/:id/kyc`, CSV `?kyc_status=` queue), reviews moderation (`?flagged=true`, `POST /reviews/:id/moderate`), vehicle-eligibility dashboard filters (`?eligibility=`, `?needs_attention=true`), translation manager = the existing `/admin/languages`.) The recipe below still applies to the Phase-5 endpoints.
+## NEXT STEP → **Phase-6 backend (hardening)** — the core marketplace API (10 edge fns) + Phase-4 admin-ops + Phase-5 analytics are all done. (✅ `/drivers`+`/agents` → `supabase/functions/{drivers,agents}/index.ts` + `scripts/test-drivers.cjs`; ✅ `/vacancies` → `supabase/functions/vacancies/index.ts` + `scripts/test-vacancies.cjs`; ✅ `/alerts` → `supabase/functions/alerts/index.ts` + `scripts/test-alerts.cjs`; ✅ `/reviews` → `supabase/functions/reviews/index.ts` + `scripts/test-reviews.cjs`; ✅ Phase-4 admin-ops — KYC review (`PATCH /drivers|/agents/:id/kyc`, CSV `?kyc_status=` queue, `kyc_status_change` notification), reviews moderation (`?flagged=true`, `POST /reviews/:id/moderate`), vehicle-eligibility filters (`?eligibility=`, `?needs_attention=true`); ✅ Phase-5 — `supabase/functions/analytics/index.ts` + `supabase/migrations/004_analytics_functions.sql` + `scripts/test-analytics.cjs`.) The recipe below still applies to the Phase-6 endpoints.
 
 ### The recipe (every remaining edge function — mirror `supabase/functions/trips/index.ts`)
 
@@ -23,7 +34,7 @@ Push protocol: `git pull --rebase origin main` **immediately before** every `git
 3. **OpenAPI** — append the paths to `public/docs/openapi.yaml` (compact one-line `post: { tags: […], summary: …, … }` style) **and** to `public/docs/openapi.json` (a small `node -e "const p=JSON.parse(…); Object.assign(p.paths,{…}); p.tags=p.tags.concat([…]); fs.writeFileSync(…)"` script, like the trips/auth/notifications/vehicles appends). Add a tag for the resource.
 4. **`scripts/test-<name>.cjs`** — Node smoke test mirroring `scripts/test-vehicles.cjs`: read `<NAME>_API_BASE` (skip cleanly + `exit 0` if unset); get a token via `POST /auth/auth/request-otp` then `POST /auth/auth/verify-otp { phone, otp:'123456', display_name, role }`; exercise the routes (a public read → 200+array, a write without auth → 401, a `404` case, a `403` case where applicable); `process.exit(1)` on any failed check.
 5. **Deploy & smoke:** `npx supabase functions deploy <name> --project-ref saxcbebqxgatiktsebxw --no-verify-jwt` then `<NAME>_API_BASE=https://saxcbebqxgatiktsebxw.supabase.co/functions/v1 node scripts/test-<name>.cjs`.
-6. **Commit & push:** `feat(<name>): …` (one logical change; review `git diff --stat` — must be only `supabase/`, `public/docs/`, `scripts/`, `tests/load/`) → `git pull --rebase origin main && git push origin main` (the Husky pre-push runs `tsc --noEmit` + `npm run test:run` + `npm run build` — all green; secret-scanning blocks any literal `sb_secret_…` so never commit one).
+6. **Commit & push (from the `C:\Apps\TripKing-backend` worktree, branch `backend-lane`):** `feat(<name>): …` (one logical change; review `git diff --stat` — must be only `supabase/`, `public/docs/`, `scripts/`, `tests/load/`, and your own bullet in the shared docs) → `git fetch origin && git rebase origin/main && git push origin HEAD:main` (the Husky pre-push runs `tsc --noEmit` + `npm run test:run` + `npm run build` over the clean worktree — all green; secret-scanning blocks any literal `sb_secret_…` so never commit one).
 
 ### Per-resource notes
 
@@ -42,10 +53,17 @@ Implemented as routes on the existing functions (admin-only via a real `role=adm
 
 Smoke coverage extended in `scripts/test-drivers.cjs` (KYC), `scripts/test-reviews.cjs` (moderation), `scripts/test-vehicles.cjs` (eligibility filters + full vehicle CRUD).
 
-### Phase-5 / Phase-6 backend (still backend-lane only — no `src/**`)
+### Phase-5 backend (analytics) — ✅ DONE (commit `feat(analytics): …`)
 
-- **Phase 5 backend** — server-computed analytics endpoints: agent analytics + admin dashboards. Same recipe.
-- **Phase 6 backend** — replace the `X-Admin-Key` stopgap in `supabase/functions/admin/index.ts` with a `role=admin` Bearer check (the Phase-4 admin-ops routes already use that pattern); real SMS provider + an `auth_otps` table for `/auth`; rate limiting; RLS-coverage review.
+`supabase/functions/analytics/index.ts` — thin Bearer-gated wrappers over the migration-004 SQL functions: `GET /analytics/admin` (admin only → `get_admin_dashboard()`, a jsonb blob: users by role, drivers/agents by KYC, vehicles by eligibility, trips by status, completed-fare/commission/payout sums, vacancies by status, active alerts, flagged-review count, unread-notifications count, a 6-month trip series), `GET /analytics/agent` (the caller's own; `?user_id=` is admin-or-self → `get_agent_analytics(uuid)`: trips posted/by-status, fare totals, applicants received, unique drivers used, reviews received + avg score, a 6-month series). `supabase/migrations/004_analytics_functions.sql` (both `stable security definer set search_path = public`, granted to `authenticated`/`anon`/`service_role`). `scripts/test-analytics.cjs` (12 checks ✓). `[functions.analytics] verify_jwt = false` in `config.toml`. No frontend transform yet — Phase-5 frontend will add `useAnalytics` + a transform for the blob shapes.
+
+### Phase-6 backend (hardening) — next
+
+- Replace the `X-Admin-Key` stopgap in `supabase/functions/admin/index.ts` with a `role=admin` Bearer check (the Phase-4 admin-ops routes + `/analytics` already use that pattern via `authUser` → `u.role === 'admin'`).
+- Real SMS provider + an `auth_otps` table for `/auth` (drop dev-OTP).
+- Rate limiting on the auth + write endpoints.
+- RLS-coverage review (every table has policies; the edge functions use the service-role key so the policies are documentation of intent — verify the function-level checks match).
+- Add a `tests/load/` k6 suite (per the TournamentPro "new edge function" checklist) if load-testing is wanted; instrument `api_metrics` persistence in `withTiming` once that table exists.
 
 (The frontend session builds the UIs on these later — coordinate the response shapes via OpenAPI, which you own.)
 

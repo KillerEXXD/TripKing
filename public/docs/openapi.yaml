@@ -22,6 +22,8 @@ tags:
     description: Saved searches that fire a notification on a matching trip/vacancy (owner-scoped).
   - name: reviews
     description: Post-trip ratings (passenger→driver, manager→driver, driver→manager).
+  - name: analytics
+    description: Server-computed analytics — the platform dashboard (admin) and per-agent analytics.
 components:
   schemas:
     ApiError:
@@ -253,3 +255,7 @@ paths:
     post: { tags: [reviews], summary: 'Moderate a review (admin; Bearer) — set is_published and/or clear the flag; records moderated_by/moderated_at', parameters: [{ $ref: '#/components/parameters/id' }], requestBody: { content: { application/json: { schema: { type: object, properties: { is_published: { type: boolean }, clear_flag: { type: boolean } } } } } }, responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' } } }
   /reviews/{id}:
     get: { tags: [reviews], summary: 'Get a review (published, or own, or admin)', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' } } }
+  /analytics/admin:
+    get: { tags: [analytics], summary: 'Platform dashboard (admin; Bearer) — server-computed counts/sums (users by role, drivers by KYC, vehicles by eligibility, trips by status, completed-fare/commission sums, flagged reviews, monthly trip series, …)', responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
+  /analytics/agent:
+    get: { tags: [analytics], summary: 'Agent analytics (Bearer) — the caller''s own, or ?user_id=<id> for admins. Trips posted/by-status, fare totals, applicants received, unique drivers used, reviews received, a 6-month series.', parameters: [{ name: user_id, in: query, schema: { type: string }, description: 'admin only — a specific agent''s user id (defaults to the caller)' }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
