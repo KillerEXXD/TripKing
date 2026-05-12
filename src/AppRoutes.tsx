@@ -25,6 +25,7 @@ const AdministrationPage = lazy(() => import('@/pages/administration/Administrat
 const AdminConfigPage = lazy(() => import('@/pages/administration/AdminConfigPage'));
 const KycReviewPage = lazy(() => import('@/pages/administration/KycReviewPage'));
 const VehicleEligibilityPage = lazy(() => import('@/pages/administration/VehicleEligibilityPage'));
+const ReviewModerationPage = lazy(() => import('@/pages/administration/ReviewModerationPage'));
 // Public marketing pages — no auth, no app layout.
 const WebsitePage = lazy(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazy(() => import('@/pages/ForAgentsPage'));
@@ -65,6 +66,7 @@ export function AppRoutes() {
           <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
           <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
           <Route path="/administration/vehicles" element={<AdminRoute><VehicleEligibilityPage /></AdminRoute>} />
+          <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
         </Route>
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

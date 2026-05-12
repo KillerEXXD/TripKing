@@ -29,7 +29,12 @@ export function AdministrationPage() {
               Vehicle-eligibility dashboard →
             </Link>
           </li>
-          <li className="text-secondary">Translation manager · reviews moderation — coming up.</li>
+          <li>
+            <Link to="/administration/reviews" className="text-primary underline">
+              Reviews moderation →
+            </Link>
+          </li>
+          <li className="text-secondary">Translation manager — coming up.</li>
         </ul>
       </Card>
     </main>
