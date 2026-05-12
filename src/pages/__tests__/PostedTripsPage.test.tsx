@@ -8,6 +8,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn() }));
 import { useTrips } from '@/hooks/useTrips';
+vi.mock('@/components/share/ShareTripModal', () => ({ ShareTripModal: () => <div>share modal</div> }));
 
 const user: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true };
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
@@ -107,5 +108,13 @@ describe('PostedTripsPage', () => {
     expect(screen.getByText(/no cancelled trips/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /show all/i }));
     expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
+  });
+
+  it('opens the share sheet from a card and links a needs-review trip to its applicants', () => {
+    setTrips({ data: [makeTrip({ status: 'has_applicants', applicantCount: 2 })] });
+    renderPosted();
+    expect(screen.getByRole('link', { name: /review applicants/i })).toHaveAttribute('href', '/trips/t1/applicants');
+    fireEvent.click(screen.getByRole('button', { name: /share/i }));
+    expect(screen.getByText('share modal')).toBeInTheDocument();
   });
 });
