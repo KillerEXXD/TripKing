@@ -409,6 +409,10 @@ verify_jwt = false
 [functions.agents]
 verify_jwt = false
 
+# /vacancies/* — public reads; the function validates the caller's Bearer JWT for owner writes.
+[functions.vacancies]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

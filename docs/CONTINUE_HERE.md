@@ -13,7 +13,7 @@
 **Phase 3 — backend ✅** —
 - Migrations 002 & 003 applied (23 tables): `users` (1:1 `auth.users` + `handle_new_user` + `is_admin()`); `drivers`/`trip_managers`/`vehicles` via the FK lookups; `trips`/`trip_acceptances`/`trip_executions` with the `driver_payout` & `applicant_count` triggers; `vacancies`+`vacancy_destinations`/`alerts`/`reviews`/`notifications`; admin-write RLS on the migration-001 tables.
 - The complete typed **data layer for all 10 resources** (`auth`, `admin-config`, `trips`, `drivers`/`agents`, `vehicles`, `vacancies`, `alerts`, `reviews`, `notifications`): `src/types/*`, strict throw-on-missing `src/lib/api/transforms/*` (+ `toApi*` writers), `src/lib/api/services/*` over `apiClient`, React Query `src/hooks/use*` (queries + mutations with invalidation), transform tests — **102 tests passing**.
-- **Edge functions deployed & smoke-verified:** `/admin` (8/8), `/auth` (phone-OTP, dev-OTP `123456`, real Supabase sessions via synthetic-email users — 7/7), `/trips` (full lifecycle: post / browse with joins / apply / withdraw / reject / assign+OTP-gen / start+OTP-verify / complete / cancel — 8/8), `/notifications` (list / mark-read / mark-all — 6/6), `/vehicles` (CRUD + derived `eligibility_status` — 6/6), `/drivers` + `/agents` (profiles + "create my profile" + location; idempotent profile-create syncs `users.role` — 22/22, commit `eccde0e`). OpenAPI (`public/docs/openapi.{yaml,json}`) covers all of them.
+- **Edge functions deployed & smoke-verified:** `/admin` (8/8), `/auth` (phone-OTP, dev-OTP `123456`, real Supabase sessions via synthetic-email users — 7/7), `/trips` (full lifecycle: post / browse with joins / apply / withdraw / reject / assign+OTP-gen / start+OTP-verify / complete / cancel — 8/8), `/notifications` (list / mark-read / mark-all — 6/6), `/vehicles` (CRUD + derived `eligibility_status` — 6/6), `/drivers` + `/agents` (profiles + "create my profile" + location; idempotent profile-create syncs `users.role` — 22/22, commit `eccde0e`), `/vacancies` (browse with filters + joins / post with destinations / cancel — 22/22). OpenAPI (`public/docs/openapi.{yaml,json}`) covers all of them.
 - Dev wiring: `vite.config.ts`'s `/api` proxy → `https://saxcbebqxgatiktsebxw.supabase.co/functions/v1`; the frontend services call resource-prefixed paths (`/auth/*`, `/admin/*`, `/trips/*`, `/notifications/*`, `/vehicles/*`) which route straight to those functions.
 
 ---
@@ -24,7 +24,7 @@ The remaining work is split into two **conflict-free lanes** so two Claude sessi
 
 | Lane | Entry doc | Owns (the only paths it touches) | Scope |
 |---|---|---|---|
-| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | the remaining edge functions (✅ `/drivers`+`/agents` done → next `/vacancies` → `/alerts` → `/reviews`), then Phase-4/5 backend endpoints |
+| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | the remaining edge functions (✅ `/drivers`+`/agents`+`/vacancies` done → next `/alerts` → `/reviews`), then Phase-4/5 backend endpoints |
 | **B — frontend** | **`docs/CONTINUE_HERE_FRONTEND.md`** | `src/**` (pages, components, hooks, lib, types, `AppRoutes.tsx`, `index.css`, `__tests__`) | the ~15 Phase-3 screens on the existing hooks, then Phase-4/5 UIs |
 
 No file appears in both lanes (`package.json`/lockfile is in *neither* — adding a dep needs the user). `CLAUDE.md` and the `CONTINUE_HERE*.md` docs are shared but append-only, each session in its own section.
@@ -37,9 +37,9 @@ No file appears in both lanes (`package.json`/lockfile is in *neither* — addin
 
 ---
 
-## NEXT STEP → the **`/vacancies` edge function** (✅ `/drivers` + `/agents` shipped, commit `eccde0e`)
+## NEXT STEP → the **`/alerts` edge function** (✅ `/drivers` + `/agents` + `/vacancies` shipped)
 
-Then, in order: **`/vacancies`** → **`/alerts`** → **`/reviews`** → then the **screens** → then **Phases 4–6**. *(Running in parallel? See the lane split above — backend = `docs/CONTINUE_HERE_BACKEND.md`, frontend = `docs/CONTINUE_HERE_FRONTEND.md`.)*
+Then, in order: **`/alerts`** → **`/reviews`** → then the **screens** → then **Phases 4–6**. *(Running in parallel? See the lane split above — backend = `docs/CONTINUE_HERE_BACKEND.md`, frontend = `docs/CONTINUE_HERE_FRONTEND.md`.)*
 
 ### The recipe (every remaining edge function — mirror `supabase/functions/trips/index.ts`)
 

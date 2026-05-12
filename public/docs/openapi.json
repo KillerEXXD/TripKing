@@ -38,6 +38,10 @@
     {
       "name": "agents",
       "description": "Agent (trip-manager) profiles."
+    },
+    {
+      "name": "vacancies",
+      "description": "Driver availability posts (driver is in city X, willing to drive to one of these destinations)."
     }
   ],
   "components": {
@@ -1505,6 +1509,166 @@
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/vacancies": {
+      "get": {
+        "tags": [
+          "vacancies"
+        ],
+        "summary": "List vacancies (public) — joins driver+vehicle summary, current city, destination cities",
+        "parameters": [
+          {
+            "name": "current_city_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "destination_city_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "driver_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "vacancies"
+        ],
+        "summary": "Post a vacancy (driver; Bearer) — driver_id = the caller; destination_city_ids → vacancy_destinations rows",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "current_city_id"
+                ],
+                "properties": {
+                  "current_city_id": {
+                    "type": "string"
+                  },
+                  "vehicle_id": {
+                    "type": "string"
+                  },
+                  "available_from": {
+                    "type": "string"
+                  },
+                  "available_until": {
+                    "type": "string"
+                  },
+                  "destination_city_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "min_rate_per_km": {
+                    "type": "number"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/vacancies/{id}": {
+      "get": {
+        "tags": [
+          "vacancies"
+        ],
+        "summary": "Get a vacancy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/vacancies/{id}/cancel": {
+      "post": {
+        "tags": [
+          "vacancies"
+        ],
+        "summary": "Cancel a vacancy (owning driver/admin; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
             "$ref": "#/components/responses/Envelope"
           }
         }
