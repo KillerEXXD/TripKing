@@ -1,11 +1,11 @@
 /** Vehicles service — a driver's cars (owner-managed; readable by all). */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiVehicle, transformVehicle } from '@/lib/api/transforms/vehicle';
 import type { EligibilityStatus, Vehicle, VehicleInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
-  if (d === null || d === undefined) throw new Error('vehicles: empty response body');
+  if (d === null || d === undefined) throw new EmptyResponseError('vehicles');
   return d;
 }
 

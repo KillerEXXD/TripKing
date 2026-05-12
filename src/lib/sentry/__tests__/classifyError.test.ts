@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { classifyError } from '@/lib/sentry/dataErrors';
-import { ApiError } from '@/lib/api/client';
+import { ApiError, EmptyResponseError } from '@/lib/api/client';
 
 class FakeTransformError extends Error {
   constructor() {
@@ -31,8 +31,12 @@ describe('classifyError', () => {
     expect(classifyError(new ApiError('Request timeout', 408))).toBe('timeout');
   });
 
-  it('classifies transform errors by name', () => {
+  it('classifies transform / empty-response errors as transform', () => {
     expect(classifyError(new FakeTransformError())).toBe('transform');
+    const empty = new EmptyResponseError('trips');
+    expect(empty.name).toBe('EmptyResponseError');
+    expect(empty.message).toMatch(/empty response body/i);
+    expect(classifyError(empty)).toBe('transform');
   });
 
   it('classifies chunk-load errors as render', () => {

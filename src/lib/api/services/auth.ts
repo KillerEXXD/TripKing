@@ -1,4 +1,4 @@
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { transformUser, type ApiUser } from '@/lib/api/transforms/user';
 import type { User } from '@/types';
 
@@ -18,7 +18,7 @@ export async function verifyOtp(phone: string, otp: string): Promise<User> {
   const res = await apiClient.post<ApiAuthSession>('/auth/verify-otp', { phone, otp });
   const session = res.data;
   if (!session?.access_token || !session.user) {
-    throw new Error('verify-otp returned no session');
+    throw new EmptyResponseError('verify-otp');
   }
   apiClient.setTokens(session.access_token, session.refresh_token ?? null);
   return transformUser(session.user);
@@ -27,7 +27,7 @@ export async function verifyOtp(phone: string, otp: string): Promise<User> {
 /** Fetch the current session's user (uses the stored access token; the client refreshes on 401). */
 export async function getCurrentUser(): Promise<User> {
   const res = await apiClient.get<ApiUser>('/auth/me');
-  if (!res.data) throw new Error('/auth/me returned no user');
+  if (!res.data) throw new EmptyResponseError('/auth/me');
   return transformUser(res.data);
 }
 

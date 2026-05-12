@@ -41,6 +41,18 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Thrown when a 2xx response that should carry a body has `data: null` — i.e.
+ * the API contract was violated. Distinct from `ApiError` (it's a server bug,
+ * not an HTTP error); `classifyError` treats it like a transform error.
+ */
+export class EmptyResponseError extends Error {
+  constructor(public resource: string) {
+    super(`${resource}: API returned an empty response body`);
+    this.name = 'EmptyResponseError';
+  }
+}
+
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 function isAuthEndpoint(endpoint: string): boolean {
