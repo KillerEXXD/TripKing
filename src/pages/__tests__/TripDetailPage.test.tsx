@@ -72,6 +72,7 @@ function makeVehicle(over: Partial<Vehicle> = {}): Vehicle {
     photoBackUrl: '',
     photoLeftUrl: '',
     photoRightUrl: '',
+    photoPlateUrl: '',
     rcBookUrl: '',
     insuranceUrl: '',
     isPrimary: true,

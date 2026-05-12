@@ -4,11 +4,15 @@ import {
   createMyAgentProfile,
   createMyDriverProfile,
   getAgent,
+  getAgentKycDocs,
   getAgents,
   getDriver,
+  getDriverKycDocs,
   getDrivers,
   getMyAgent,
   getMyDriver,
+  submitAgentKycDocs,
+  submitDriverKycDocs,
   updateAgent,
   updateAgentKyc,
   updateDriver,
@@ -16,7 +20,16 @@ import {
   updateDriverLocation,
   type AgentsQueryParams,
 } from '@/lib/api/services/drivers';
-import type { CreateAgentProfileInput, CreateDriverProfileInput, DriversQueryParams, KycStatus, UpdateDriverInput, UpdateLocationInput } from '@/types';
+import type {
+  CreateAgentProfileInput,
+  CreateDriverProfileInput,
+  DriversQueryParams,
+  KycStatus,
+  SubmitAgentKycDocsInput,
+  SubmitDriverKycDocsInput,
+  UpdateDriverInput,
+  UpdateLocationInput,
+} from '@/types';
 
 export function useDrivers(params?: DriversQueryParams) {
   return useQuery({ queryKey: ['drivers', params ?? {}], queryFn: () => getDrivers(params), staleTime: STALE.profile });
@@ -107,5 +120,35 @@ export function useUpdateAgentKyc() {
   return useMutation({
     mutationFn: ({ id, kycStatus, note }: { id: string; kycStatus: KycStatus; note?: string }) => updateAgentKyc(id, kycStatus, note),
     onSuccess: (_d, v) => invalidate(v.id),
+  });
+}
+
+// ── KYC documents ────────────────────────────────────────────────────────────
+/** Masked numbers + 5-min signed download URLs for a driver's KYC docs (owner or admin). */
+export function useDriverKycDocs(driverId: string | undefined, enabled = true) {
+  return useQuery({ queryKey: ['driver', driverId, 'kyc-docs'], queryFn: () => getDriverKycDocs(driverId as string), enabled: enabled && !!driverId, staleTime: STALE.live });
+}
+export function useAgentKycDocs(agentId: string | undefined, enabled = true) {
+  return useQuery({ queryKey: ['agent', agentId, 'kyc-docs'], queryFn: () => getAgentKycDocs(agentId as string), enabled: enabled && !!agentId, staleTime: STALE.live });
+}
+/** Submit a driver's KYC docs → kyc_status docs_submitted. */
+export function useSubmitDriverKycDocs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ driverId, input }: { driverId: string; input: SubmitDriverKycDocsInput }) => submitDriverKycDocs(driverId, input),
+    onSuccess: (d) => {
+      void qc.invalidateQueries({ queryKey: ['driver', 'me'] });
+      void qc.invalidateQueries({ queryKey: ['driver', d.id] });
+    },
+  });
+}
+export function useSubmitAgentKycDocs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, input }: { agentId: string; input: SubmitAgentKycDocsInput }) => submitAgentKycDocs(agentId, input),
+    onSuccess: (a) => {
+      void qc.invalidateQueries({ queryKey: ['agent', 'me'] });
+      void qc.invalidateQueries({ queryKey: ['agent', a.id] });
+    },
   });
 }

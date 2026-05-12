@@ -7,20 +7,30 @@ import { apiClient } from '@/lib/api/client';
 import {
   toApiCreateAgentProfile,
   toApiCreateDriverProfile,
+  toApiSubmitAgentKycDocs,
+  toApiSubmitDriverKycDocs,
   toApiUpdateDriver,
   toApiUpdateLocation,
   transformAgent,
   transformDriver,
+  transformKycDocs,
+  transformUploadUrl,
 } from '@/lib/api/transforms/driver';
 import type {
   Agent,
+  AgentKycDocType,
   CreateAgentProfileInput,
   CreateDriverProfileInput,
   Driver,
+  DriverKycDocType,
   DriversQueryParams,
+  KycDocs,
   KycStatus,
+  SubmitAgentKycDocsInput,
+  SubmitDriverKycDocsInput,
   UpdateDriverInput,
   UpdateLocationInput,
+  UploadUrlResponse,
 } from '@/types';
 
 type Api = Record<string, unknown>;
@@ -99,4 +109,29 @@ export function updateAgent(
   if (input.businessCityId !== undefined) body.business_city_id = input.businessCityId;
   if (input.profilePhotoUrl !== undefined) body.profile_photo_url = input.profilePhotoUrl;
   return apiClient.patch<Api>(`/agents/${id}`, body).then((r) => transformAgent(unwrap(r.data)));
+}
+
+// ── KYC documents (driver) ───────────────────────────────────────────────────
+/** Mint a short-lived signed PUT URL for one driver KYC doc (`POST /drivers/:id/kyc-doc-upload-url`). */
+export function getDriverKycDocUploadUrl(driverId: string, docType: DriverKycDocType): Promise<UploadUrlResponse> {
+  return apiClient.post<Api>(`/drivers/${driverId}/kyc-doc-upload-url`, { doc_type: docType }).then((r) => transformUploadUrl(unwrap(r.data)));
+}
+/** Submit all KYC docs → `kyc_status` pending|resubmit_required → docs_submitted (`POST /drivers/:id/kyc-docs`). */
+export function submitDriverKycDocs(driverId: string, input: SubmitDriverKycDocsInput): Promise<Driver> {
+  return apiClient.post<Api>(`/drivers/${driverId}/kyc-docs`, toApiSubmitDriverKycDocs(input)).then((r) => transformDriver(unwrap(r.data)));
+}
+/** Masked numbers + 5-min signed download URLs for a driver's KYC docs (owner/admin; `GET /drivers/:id/kyc-docs`). */
+export function getDriverKycDocs(driverId: string): Promise<KycDocs> {
+  return apiClient.get<Api>(`/drivers/${driverId}/kyc-docs`).then((r) => transformKycDocs(unwrap(r.data)));
+}
+
+// ── KYC documents (agent / trip-manager) ─────────────────────────────────────
+export function getAgentKycDocUploadUrl(agentId: string, docType: AgentKycDocType): Promise<UploadUrlResponse> {
+  return apiClient.post<Api>(`/agents/${agentId}/kyc-doc-upload-url`, { doc_type: docType }).then((r) => transformUploadUrl(unwrap(r.data)));
+}
+export function submitAgentKycDocs(agentId: string, input: SubmitAgentKycDocsInput): Promise<Agent> {
+  return apiClient.post<Api>(`/agents/${agentId}/kyc-docs`, toApiSubmitAgentKycDocs(input)).then((r) => transformAgent(unwrap(r.data)));
+}
+export function getAgentKycDocs(agentId: string): Promise<KycDocs> {
+  return apiClient.get<Api>(`/agents/${agentId}/kyc-docs`).then((r) => transformKycDocs(unwrap(r.data)));
 }

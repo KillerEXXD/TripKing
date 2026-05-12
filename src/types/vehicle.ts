@@ -1,5 +1,8 @@
 export type EligibilityStatus = 'eligible' | 'expiring_soon' | 'expired';
 
+/** Slots for `POST /vehicles/:id/photo-upload-url`. `plate` = a close-up of the registration number plate. */
+export type VehiclePhotoSlot = 'front' | 'back' | 'left' | 'right' | 'plate' | 'interior' | 'rc' | 'insurance' | 'permit';
+
 /** A driver's vehicle. `eligibilityStatus` is server-derived (year vs app_settings.min_vehicle_year). */
 export interface Vehicle {
   id: string;
@@ -20,6 +23,7 @@ export interface Vehicle {
   photoBackUrl: string;
   photoLeftUrl: string;
   photoRightUrl: string;
+  photoPlateUrl: string;
   photoInteriorUrl?: string;
   rcBookUrl: string;
   insuranceUrl: string;
@@ -44,6 +48,7 @@ export interface VehicleInput {
   photoBackUrl?: string;
   photoLeftUrl?: string;
   photoRightUrl?: string;
+  photoPlateUrl?: string;
   photoInteriorUrl?: string | null;
   rcBookUrl?: string;
   insuranceUrl?: string;
