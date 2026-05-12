@@ -1,34 +1,28 @@
-import * as Sentry from '@sentry/react';
-import { APP_VERSION } from '@/version';
-import { logger } from '@/lib/logger';
+/**
+ * Sentry hub — `import { … } from '@/lib/sentry'`.
+ *
+ *  - `initSentry()`            — one-time bootstrap (called from `main.tsx`)
+ *  - `setSentryUser` / `clearSentryUser` — user context (called from `AuthContext`)
+ *  - `captureDataError`, `addDataBreadcrumb`, `classifyError`, `withErrorTracking`,
+ *    `captureDataPerformanceIssue`, `startDataTransaction`, `getSentryDebugIds` — the
+ *    data-layer reporting surface (apiClient, React Query caches, ErrorBoundary, …)
+ *  - `markReported` / `isReported` — the "report once" marker shared by every layer
+ *  - `messageForError` — friendly user-facing text for a thrown error
+ */
 
-let initialized = false;
-
-/** Init Sentry if `VITE_SENTRY_DSN` is set (no-op otherwise). Called once from `main.tsx`. */
-export function initSentry(): void {
-  const dsn = import.meta.env.VITE_SENTRY_DSN;
-  if (!dsn || initialized) return;
-  Sentry.init({
-    dsn,
-    release: `tripking@${APP_VERSION}`,
-    environment: import.meta.env.MODE,
-    integrations: [Sentry.browserTracingIntegration(), Sentry.replayIntegration()],
-    tracesSampleRate: 0.1,
-    replaysSessionSampleRate: 0,
-    replaysOnErrorSampleRate: 1.0,
-  });
-  initialized = true;
-}
-
-/** Report a data-layer / render error with a feature tag. Safe to call before init (logs only). */
-export function captureDataError(feature: string, error: unknown, context?: Record<string, unknown>): void {
-  logger.debug(`[dataError:${feature}]`, error, context);
-  if (!initialized) return;
-  Sentry.captureException(error, { tags: { feature }, extra: context });
-}
-
-/** Associate the current user with subsequent events. */
-export function setSentryUser(user: { id: string; role?: string } | null): void {
-  if (!initialized) return;
-  Sentry.setUser(user ? { id: user.id, role: user.role } : null);
-}
+export { initSentry, isSentryInitialized } from './init';
+export { setSentryUser, clearSentryUser, type SentryUserInfo } from './user';
+export {
+  captureDataError,
+  addDataBreadcrumb,
+  captureDataPerformanceIssue,
+  startDataTransaction,
+  withErrorTracking,
+  classifyError,
+  getSentryDebugIds,
+  type ErrorCategory,
+  type DataErrorContext,
+  type SentryDebugIds,
+} from './dataErrors';
+export { markReported, isReported } from './report';
+export { messageForError, ERROR_MESSAGES } from './messages';

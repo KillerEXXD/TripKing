@@ -34,3 +34,13 @@ export function identifyUser(id: string, props?: Record<string, unknown>): void 
 export function resetUser(): void {
   if (initialized) posthog.reset();
 }
+
+/** Current PostHog session id (for cross-linking a Sentry event to its replay). `''` if unavailable. */
+export function getPostHogSessionId(): string {
+  if (!initialized) return '';
+  try {
+    return posthog.get_session_id() || '';
+  } catch {
+    return '';
+  }
+}
