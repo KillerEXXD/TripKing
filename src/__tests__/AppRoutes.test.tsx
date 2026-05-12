@@ -7,8 +7,9 @@ import type { User } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
-// Onboarding's data hooks are exercised in OnboardingPage.test.tsx — here we only check routing.
+// These pages' data hooks are exercised in their own tests — here we only check routing.
 vi.mock('@/pages/OnboardingPage', () => ({ default: () => <div>onboarding screen</div> }));
+vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
 const driver: User = { ...admin, id: 'd', role: 'driver', displayName: 'Driver' };
@@ -66,6 +67,12 @@ describe('AppRoutes', () => {
     setAuth(null);
     renderAt('/onboarding');
     expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
+  });
+
+  it('/trips renders the trip feed for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/trips');
+    expect(await screen.findByText(/trip feed/i)).toBeInTheDocument();
   });
 
   it('/administration renders the admin hub for an admin', async () => {
