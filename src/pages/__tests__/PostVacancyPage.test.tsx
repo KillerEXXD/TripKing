@@ -9,6 +9,16 @@ import { usePostVacancy } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// Stub the place-search panel so this test doesn't pull in the React Query stack — it just
+// renders a button that "picks" a fixed place when clicked.
+const fakePlace = { id: 'p1', provider: 'nominatim', providerPlaceId: 'N1', name: 'Katpadi, Vellore', formattedAddress: null, state: 'TN', country: 'IN', lat: 12.97, lng: 79.13, cityId: null, isActive: true, createdAt: '2026-05-12T00:00:00Z' };
+vi.mock('@/components/location/LocationSearchPanel', () => ({
+  LocationSearchPanel: ({ onPick }: { onPick: (p: typeof fakePlace) => void }) => (
+    <button type="button" onClick={() => onPick(fakePlace)}>
+      mock-pick-place
+    </button>
+  ),
+}));
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 
@@ -113,6 +123,27 @@ describe('PostVacancyPage', () => {
         }),
       ),
     );
+    expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
+  });
+
+  it('pinning an exact spot shows a removable place chip and sends currentPlaceId on submit', async () => {
+    const mutateAsync = setPost();
+    renderPost();
+    fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
+    // pin a place via the (stubbed) search panel
+    fireEvent.click(screen.getByRole('button', { name: /pin your exact spot/i }));
+    fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i })); // "picks" Katpadi, Vellore
+    const chip = screen.getByRole('button', { name: /remove the pinned location katpadi/i });
+    expect(chip).toBeInTheDocument();
+    // the chip removes the pin
+    fireEvent.click(chip);
+    expect(screen.getByRole('button', { name: /pin your exact spot/i })).toBeInTheDocument();
+    // re-pin, add a destination, submit
+    fireEvent.click(screen.getByRole('button', { name: /pin your exact spot/i }));
+    fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
+    fireEvent.click(screen.getByRole('button', { name: /^post availability$/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ currentCityId: 'c1', currentPlaceId: 'p1', destinationCityIds: ['c2'] })));
     expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
   });
 

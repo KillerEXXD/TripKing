@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MapPin, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy } from '@/hooks/useVacancies';
 import { cityHooks } from '@/hooks/useAdminConfig';
+import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatShortDate } from '@/lib/utils';
-import type { PostVacancyInput } from '@/types';
+import type { Place, PostVacancyInput } from '@/types';
 
 const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
 const HOUR_MS = 3_600_000;
@@ -54,6 +55,8 @@ export function PostVacancyPage() {
   const citiesQuery = cityHooks.useList();
 
   const [currentCityId, setCurrentCityId] = useState('');
+  const [currentPlace, setCurrentPlace] = useState<Place | null>(null);
+  const [placePickerOpen, setPlacePickerOpen] = useState(false);
   const [startLocal, setStartLocal] = useState(() => toDatetimeLocalValue(new Date()));
   const [hours, setHours] = useState(DEFAULT_HOURS);
   const [destinationCityIds, setDestinationCityIds] = useState<string[]>([]);
@@ -78,6 +81,7 @@ export function PostVacancyPage() {
     }
     const input: PostVacancyInput = {
       currentCityId,
+      currentPlaceId: currentPlace?.id,
       availableFrom: startDate.toISOString(),
       availableUntil: new Date(startDate.getTime() + hours * HOUR_MS).toISOString(),
       destinationCityIds,
@@ -123,17 +127,33 @@ export function PostVacancyPage() {
       <FlowHeader onBack={() => navigate('/vacancies')} />
       <div className="space-y-3 p-4">
       <Card className="gap-3">
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Where are you?</span>
-          <select className={selectClass} value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)}>
-            <option value="">Select your current city</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-1.5">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Where are you?</span>
+            <select className={selectClass} value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)}>
+              <option value="">Select your current city</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {currentPlace ? (
+            <button
+              type="button"
+              onClick={() => setCurrentPlace(null)}
+              aria-label={`Remove the pinned location ${currentPlace.name}`}
+              className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+            >
+              <MapPin className="size-3" aria-hidden /> {currentPlace.name} <X className="size-3" aria-hidden />
+            </button>
+          ) : (
+            <button type="button" onClick={() => setPlacePickerOpen(true)} className="inline-flex items-center gap-1 text-xs text-secondary underline underline-offset-2">
+              <MapPin className="size-3" aria-hidden /> Pin your exact spot <span className="font-normal">(optional)</span>
+            </button>
+          )}
+        </div>
 
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-3">
@@ -238,6 +258,18 @@ export function PostVacancyPage() {
         </Button>
       </div>
       </div>
+
+      {placePickerOpen ? (
+        <LocationSearchPanel
+          title="Pin your exact location"
+          placeholder="Search a town, area, or landmark…"
+          onPick={(p) => {
+            setCurrentPlace(p);
+            setPlacePickerOpen(false);
+          }}
+          onClose={() => setPlacePickerOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }
