@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 // These pages' data hooks are exercised in their own tests — here we only check routing.
 vi.mock('@/pages/OnboardingPage', () => ({ default: () => <div>onboarding screen</div> }));
 vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }));
+vi.mock('@/pages/TripDetailPage', () => ({ default: () => <div>trip detail</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
 const driver: User = { ...admin, id: 'd', role: 'driver', displayName: 'Driver' };
@@ -73,6 +74,12 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/trips');
     expect(await screen.findByText(/trip feed/i)).toBeInTheDocument();
+  });
+
+  it('/trips/:id renders the trip detail for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/trips/abc123');
+    expect(await screen.findByText(/trip detail/i)).toBeInTheDocument();
   });
 
   it('/administration renders the admin hub for an admin', async () => {
