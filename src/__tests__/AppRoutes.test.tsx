@@ -13,6 +13,7 @@ vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }))
 vi.mock('@/pages/PostTripPage', () => ({ default: () => <div>post trip</div> }));
 vi.mock('@/pages/PostedTripsPage', () => ({ default: () => <div>posted trips</div> }));
 vi.mock('@/pages/TripDetailPage', () => ({ default: () => <div>trip detail</div> }));
+vi.mock('@/pages/DriverProfilePage', () => ({ default: () => <div>driver profile</div> }));
 vi.mock('@/pages/NotificationsPage', () => ({ default: () => <div>notifications page</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
@@ -95,6 +96,12 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/posted-trips');
     expect(await screen.findByText(/posted trips/i)).toBeInTheDocument();
+  });
+
+  it('/drivers/:id renders the driver profile for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/drivers/abc');
+    expect(await screen.findByText(/driver profile/i)).toBeInTheDocument();
   });
 
   it('/notifications renders the notifications page for a signed-in user', async () => {

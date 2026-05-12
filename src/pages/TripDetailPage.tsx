@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Car, Info, MapPin, Users, Wallet } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Calendar, Car, Info, MapPin, User, Users, Wallet } from 'lucide-react';
 import { useTrip } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge, Button, Card } from '@/components/ui';
@@ -62,6 +62,14 @@ function TripDetail({ trip, isDriver }: { trip: Trip; isDriver: boolean }) {
         </div>
         <Badge variant={badge.variant}>{badge.label}</Badge>
       </div>
+
+      {trip.assignedDriverId ? (
+        <Card>
+          <Link to={`/drivers/${trip.assignedDriverId}`} className="flex items-center gap-2 text-sm font-medium text-primary">
+            <User className="size-4" aria-hidden /> View the assigned driver&apos;s profile →
+          </Link>
+        </Card>
+      ) : null}
 
       <Card className="gap-3">
         <Row icon={<MapPin />} label="Route" value={`${trip.fromCity.name} → ${trip.toCity.name} · ${formatKm(trip.expectedDistanceKm)}`} />
