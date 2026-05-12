@@ -36,7 +36,7 @@ async function signIn(role) {
   return { token: auth.json?.data?.access_token, userId: auth.json?.data?.user?.id };
 }
 async function postTrip(agentToken, cityA, cityB, carTypeId) {
-  return j('POST', '/trips', { token: agentToken, body: { from_city_id: cityA, to_city_id: cityB, pickup_at: new Date(Date.now() + 86400000).toISOString(), car_type_id: carTypeId, expected_distance_km: 120, rate_per_km: 14, passenger_name: 'Smoke Pax', passenger_phone: '+910000000000' } });
+  return j('POST', '/trips', { token: agentToken, body: { from_city_id: cityA, to_city_id: cityB, pickup_at: new Date(Date.now() + 86400000).toISOString(), car_type_id: carTypeId, expected_distance_km: 120, rate_per_km: 14, passenger_name: 'Smoke Pax', passenger_phone: '+910000000000', passenger_count: 1, hide_passenger_phone: false } });
 }
 
 (async () => {

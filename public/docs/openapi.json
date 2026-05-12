@@ -579,7 +579,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "List trips - each row carries the assigned driver (with live position) + the joined from_place/to_place. status=in_progress&posted_by_user_id=<me> is a trip manager’s live-trips map; assigned_driver_id=me (Bearer) is \"the trips I’m driving\"; in-progress trips also get distance_to_destination_km. When near_lat+near_lng+radius_km are all given, the list is restricted to trips whose pickup point (from_place → from_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
+        "summary": "List trips (Bearer required). Each trip is redacted to the caller's relationship: rows you posted -> full (passenger name+phone, poster phone, the assigned driver's live position, distance_to_destination_km, passenger_otp); rows assigned to your driver profile -> passenger name + poster phone + your own live position (passenger phone only when the trip's hide_passenger_phone is false); everything else -> browse-safe (route/fare/car-type/pickup/passenger_count/applicant_count/posted_by_name/from_place/to_place - no passenger PII, no driver positions). status=in_progress&posted_by_user_id=<me> is a trip manager's live-trips map; assigned_driver_id=me is \"the trips I'm driving\". near_lat+near_lng+radius_km (all three; radius capped at 100km) restricts to trips whose pickup point (from_place -> from_city fallback) is within range, nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "status",
@@ -616,7 +616,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "a driver uuid (public), or the literal \"me\" - needs a Bearer; resolves to the caller’s driver profile (the trips assigned to you)"
+            "description": "a driver uuid, or the literal \"me\" - resolves to the caller's driver profile (the trips assigned to you)"
           },
           {
             "name": "near_lat",
@@ -662,7 +662,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer) - from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422); total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a trip (Bearer) - hide_passenger_phone (true|false) and passenger_count (>=1) are REQUIRED. from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id -> 422). total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -675,9 +675,19 @@
                   "pickup_at",
                   "car_type_id",
                   "expected_distance_km",
-                  "rate_per_km"
+                  "rate_per_km",
+                  "hide_passenger_phone",
+                  "passenger_count"
                 ],
                 "properties": {
+                  "hide_passenger_phone": {
+                    "type": "boolean",
+                    "description": "whether to hide the passenger phone from the assigned driver (the poster always sees it)"
+                  },
+                  "passenger_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
                   "from_place_id": {
                     "type": "string"
                   },
@@ -726,7 +736,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Get a trip — joined (assigned driver with live position; distance_to_destination_km when in_progress). passenger_otp_hash is always stripped; the plaintext passenger_otp is echoed ONLY when the caller is the trip poster (Bearer; auth.uid() = posted_by_user_id) or an admin — so the poster can re-open the passenger-portal link any time.",
+        "summary": "Get a trip (Bearer required) - redacted to the caller's relationship: the poster (or an admin) sees passenger name+phone, poster phone, the assigned driver's live position, distance_to_destination_km, and the plaintext passenger_otp (so they can re-open the passenger-portal link); the assigned driver sees passenger name + poster phone + their own live position (and passenger phone ONLY when the trip's hide_passenger_phone is false; never the OTP); anyone else sees browse-safe fields only (no passenger PII, no driver position). passenger_otp_hash is never returned.",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -734,6 +744,9 @@
         ],
         "responses": {
           "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
             "$ref": "#/components/responses/Envelope"
           },
           "404": {
@@ -2633,7 +2646,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Get the trip for a passenger OTP (public — the passenger portal) — joins the assigned driver (with live position) + vehicle; distance_to_destination_km when in_progress; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed",
+        "summary": "Get the trip for a passenger OTP (public - the OTP is the credential; the passenger portal). The passenger's own view: their data + the assigned driver (with live position + phone, to track/reach the ride) + vehicle; distance_to_destination_km when in_progress; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash / passenger_otp never echoed.",
         "parameters": [
           {
             "name": "otp",
