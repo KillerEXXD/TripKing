@@ -7,3 +7,4 @@
  * the API (see CLAUDE.md §"Administration").
  */
 export * from './api';
+export * from './user';
