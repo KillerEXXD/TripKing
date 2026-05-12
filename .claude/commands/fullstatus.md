@@ -1,5 +1,5 @@
 ---
-description: TripKing full health check — runs /metrics, /dbperf, /smokeall, the Vercel deploy status, and GitHub health, then a unified action summary
+description: TripKing full health check — runs /metrics, /dbperf, /smokeall, /sentry, /posthog, the Vercel deploy status, and GitHub health, then a unified action summary
 ---
 
 Run a comprehensive TripKing health check by executing each diagnostic **in full** (the complete report for each, exactly as if run individually — don't abbreviate within a section), then end with a consolidated action summary.
@@ -8,8 +8,10 @@ Output order:
 1. Full `/metrics` report
 2. Full `/dbperf` report
 3. Full `/smokeall` report
-4. Frontend deploy status (Vercel)
-5. Unified action summary
+4. Full `/sentry` report
+5. Full `/posthog` report
+6. Frontend deploy status (Vercel)
+7. Unified action summary
 
 ---
 
@@ -25,7 +27,15 @@ Execute the complete `/dbperf` workflow (see `.claude/commands/dbperf.md`): `npx
 
 Execute the complete `/smokeall` workflow (see `.claude/commands/smokeall.md`): run every `scripts/test-*.cjs` against `https://saxcbebqxgatiktsebxw.supabase.co` (via `VITE_API_BASE_URL`), present the per-suite pass/fail table, and diagnose any failures.
 
-## Step 4 — Frontend deploy status (Vercel)
+## Step 4 — Sentry — full report
+
+Execute the complete `/sentry` workflow (see `.claude/commands/sentry.md`): unresolved issues for `hudr/trip-king` (token from `.env.development`), categorised, high-impact issues investigated, synthetic/transient ones auto-resolved. Present the FULL report with all tables (bucket table, issues table, high-impact details, resolved-this-run, assessment).
+
+## Step 5 — PostHog — full report
+
+Execute the complete `/posthog` workflow (see `.claude/commands/posthog.md`): the HogQL queries (volume, daily activity, top pages, top visitors, geo/device/browser, custom events, client-side errors, rage clicks) for project `420735` (key from `.env.development`). Present the FULL report with all tables + the daily-activity bar chart.
+
+## Step 6 — Frontend deploy status (Vercel)
 
 TripKing's frontend is deployed at **`trip-king.vercel.app`**. Check the latest deployment:
 
@@ -46,7 +56,7 @@ Present:
 
 ---
 
-## Step 5 — Unified action summary
+## Step 7 — Unified action summary
 
 ```
 ---
@@ -59,25 +69,26 @@ Present:
 | API (api_metrics, 24h) | OK/WARN/CRITICAL | Avg Xms · Errors X% · p95 Xms | … |
 | Database | OK/WARN/CRITICAL | Cache X% · api_metrics N rows · rate_limits N | … |
 | Edge-function smokes | X/12 green | [failing suites] | OK if 12/12 |
+| Sentry (trip-king) | X real issues | Y events, Z users | OK if 0 real |
+| PostHog (trip-king) | X visitors | Y events | INFO |
 | Frontend (Vercel) | READY/ERROR | built <hash> | OK/CRITICAL |
 | GitHub | X PRs, Y issues | Z failed workflows (24h) | … |
 
 ### Action items (need attention — severity-sorted)
-1. [CRITICAL] … (errors for users now: 500s, a failing smoke, an ERROR deploy)
-2. [WARNING] … (degrading p95, rising error rate, api_metrics with no cleanup cron and growing, stale main not yet deployed)
-3. [INFO] … (housekeeping — ANALYZE after a migration, an unused index, etc.)
+1. [CRITICAL] … (errors for users now: 500s, a failing smoke, an ERROR deploy, a recurring Sentry error)
+2. [WARNING] … (degrading p95, rising error rate, api_metrics with no cleanup cron and growing, stale main not yet deployed, a data/parse Sentry issue → an API contract mismatch)
+3. [INFO] … (housekeeping — ANALYZE after a migration, an unused index, a synthetic Sentry issue to delete, etc.)
 
 ### Done this run
-[anything fixed proactively — e.g. re-deployed a stale edge fn, re-ran a flaky smoke that then passed]
+[anything fixed proactively — re-deployed a stale edge fn, re-ran a flaky smoke that then passed, auto-resolved a synthetic/transient Sentry issue]
 
 ### Reminders / known TODOs
 - The one remaining Phase-6 backend item: real SMS + `auth_otps` for `/auth` (needs a provider decision) — `/auth` is a dev placeholder (`otp:'12345'`, dev-only `role:'admin'` self-signup).
-- Sentry / PostHog aren't wired for TripKing yet (only `.env.example` placeholders) — no `/sentry` or `/posthog` skill yet.
 ```
 
 ### Rules
-- **CRITICAL** = anything causing errors for users right now (5xx, a red smoke, an `ERROR` Vercel deploy, site down).
-- **WARNING** = degradation trends / things about to break (rising p95 or error rate, `api_metrics` growing unbounded, `main` ahead of the last Vercel build, the `rate-limits-cleanup` cron not running).
-- **INFO** = housekeeping.
+- **CRITICAL** = anything causing errors for users right now (5xx, a red smoke, an `ERROR` Vercel deploy, site down, a recurring Sentry error hitting real users).
+- **WARNING** = degradation trends / things about to break (rising p95 or error rate, `api_metrics` growing unbounded, `main` ahead of the last Vercel build, the `rate-limits-cleanup` cron not running, a Sentry data/parse issue pointing at an API contract problem).
+- **INFO** = housekeeping (incl. synthetic Sentry test issues to delete).
 - If everything's healthy: "All systems healthy — no action required."
 - Always show "Done this run" so the user sees what was fixed proactively.
