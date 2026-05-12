@@ -36,6 +36,8 @@ tags:
     description: Driver/manager video-call verification — slot booking, the call record, and the admin finalize.
   - name: places
     description: Maps-backed locations — a server-side geocoder proxy (search) and find-or-create for a `places` row.
+  - name: debug
+    description: Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See `docs/EXCEPTION_HANDLING.md`.
 components:
   schemas:
     ApiError:
@@ -324,3 +326,11 @@ paths:
     get: { tags: [places], summary: 'Geocoder search (public) — server-side proxy to the configured provider (PLACES_PROVIDER + PLACES_API_KEY; biased to India). Does not persist. Per-IP rate-limited; responses carry Cache-Control. data is an array of { provider, providerPlaceId, name, formattedAddress, state, lat, lng }. Returns [] when the provider is unconfigured or upstream is unavailable; q shorter than 2 chars → [].', parameters: [{ name: q, in: query, required: true, schema: { type: string }, description: 'free-text query (≥ 2 chars)' }, { name: near_lat, in: query, schema: { type: number }, description: 'optional proximity bias (with near_lng)' }, { name: near_lng, in: query, schema: { type: number } }, { name: limit, in: query, schema: { type: integer, default: 6, minimum: 1, maximum: 10 } }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '429': { $ref: '#/components/responses/Envelope' } } }
   /places:
     post: { tags: [places], summary: 'Find-or-create a place (public) — match by (provider, providerPlaceId), else by a ~5dp lat/lng + provider match; otherwise insert. Returns the stored Place (snake_case row, incl. id). Per-IP rate-limited.', requestBody: { required: true, content: { application/json: { schema: { type: object, required: [provider, name, lat, lng], properties: { provider: { type: string }, providerPlaceId: { type: string }, name: { type: string }, formattedAddress: { type: string }, state: { type: string }, lat: { type: number }, lng: { type: number }, cityId: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Envelope' }, '422': { $ref: '#/components/responses/Envelope' }, '429': { $ref: '#/components/responses/Envelope' } } }
+  /debug:
+    get: { tags: [debug], summary: 'List the debug routes (admin; Bearer) — data is { routes: [...] }', responses: { '200': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
+  /debug/throw:
+    get: { tags: [debug], summary: 'Deliberately throw an uncaught error (admin; Bearer) — withTiming reports it to Sentry (tags: source=edge-fn, fn=debug) and returns { code: "INTERNAL" } with status 500 (never a raw runtime error). Exercises the L5 edge-function error boundary.', responses: { '500': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
+  /debug/fail:
+    get: { tags: [debug], summary: 'Return a fail(code, …) envelope (admin; Bearer) — ?code=<CODE> picks the code (default CONFLICT) and a sensible HTTP status; no Sentry event.', parameters: [{ name: code, in: query, schema: { type: string, enum: [VALIDATION, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, DB_ERROR, INTERNAL] } }], responses: { '400': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' }, '409': { $ref: '#/components/responses/Envelope' }, '422': { $ref: '#/components/responses/Envelope' }, '429': { $ref: '#/components/responses/Envelope' }, '500': { $ref: '#/components/responses/Envelope' } } }
+  /debug/slow:
+    get: { tags: [debug], summary: 'Sleep then return 200 (admin; Bearer) — ?ms=<n> (default 1000, max 10000); data is { slept_ms }.', parameters: [{ name: ms, in: query, schema: { type: integer, default: 1000, minimum: 0, maximum: 10000 } }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
