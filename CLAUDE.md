@@ -213,8 +213,8 @@ Work in PR-sized commits; pause for review after each.
 | Project ref | `saxcbebqxgatiktsebxw` |
 | URL | `https://saxcbebqxgatiktsebxw.supabase.co` |
 | Dashboard | https://supabase.com/dashboard/project/saxcbebqxgatiktsebxw |
-| Anon / publishable key | `sb_publishable_PRH2LiqnVjxAN7FYBVVQjA_TOWdFS0U` |
-| Service-role / secret key | **TODO — not yet provided** (needed for admin/seed scripts + edge-function deploys) |
+| Anon / publishable key | `sb_publishable_PRH2LiqnVjxAN7FYBVVQjA_TOWdFS0U` (legacy anon JWT also available via the dashboard) |
+| Service-role / secret key | `sb_secret_<redacted>` — bypasses RLS; for admin/seed scripts + edge-function runtime. (Dashboard → Project Settings → API Keys → "Secret keys"; or `GET /v1/projects/<ref>/api-keys?reveal=true` via the Management API.) NEVER ship to the browser. |
 | Postgres password | `DCCn6OIdwk0ENwzE` |
 | Direct Postgres URL (IPv6-only) | `postgresql://postgres:DCCn6OIdwk0ENwzE@db.saxcbebqxgatiktsebxw.supabase.co:5432/postgres` |
 
