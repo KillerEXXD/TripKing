@@ -75,7 +75,7 @@ async function tokenFor(role) {
   ck('double-book → 409', (await j('POST', '/video-verifications', { token: dt, body: { slot_at: slots.json?.data?.[1]?.slot_at } })).status === 409);
 
   // KYC gating while unverified
-  const postTripUnv = await j('POST', '/trips', { token: dt, body: { from_city_id: cityId, to_city_id: cityId, pickup_at: new Date(Date.now() + 172800000).toISOString(), car_type_id: ctId, expected_distance_km: 120, rate_per_km: 14 } });
+  const postTripUnv = await j('POST', '/trips', { token: dt, body: { from_city_id: cityId, to_city_id: cityId, pickup_at: new Date(Date.now() + 172800000).toISOString(), car_type_id: ctId, expected_distance_km: 120, rate_per_km: 14, hide_passenger_phone: false, passenger_count: 1 } });
   ck('post trip while unverified → 403 KYC_REQUIRED', postTripUnv.status === 403 && postTripUnv.json?.error?.code === 'KYC_REQUIRED', JSON.stringify(postTripUnv.json?.error));
   ck('post vacancy while unverified → 403 KYC_REQUIRED', (await j('POST', '/vacancies', { token: dt, body: { current_city_id: cityId } })).status === 403);
 
@@ -87,7 +87,7 @@ async function tokenFor(role) {
   ck('driver kyc → approved (step done)', me2.json?.data?.verification?.kyc_status === 'approved' && me2.json?.data?.verification?.steps?.video_call === 'done');
   const notifs = await j('GET', '/notifications', { token: dt });
   ck('kyc_status_change notification fired', (notifs.json?.data || []).some((n) => n.type === 'kyc_status_change'));
-  ck('post trip after approval → 200', (await j('POST', '/trips', { token: dt, body: { from_city_id: cityId, to_city_id: cityId, pickup_at: new Date(Date.now() + 172800000).toISOString(), car_type_id: ctId, expected_distance_km: 120, rate_per_km: 14 } })).status === 200);
+  ck('post trip after approval → 200', (await j('POST', '/trips', { token: dt, body: { from_city_id: cityId, to_city_id: cityId, pickup_at: new Date(Date.now() + 172800000).toISOString(), car_type_id: ctId, expected_distance_km: 120, rate_per_km: 14, hide_passenger_phone: false, passenger_count: 1 } })).status === 200);
   ck('admin console list (status=completed)', (await j('GET', '/video-verifications?status=completed', { token: at })).status === 200);
 
   // manager KYC
