@@ -10,6 +10,9 @@ const HomePage = lazy(() => import('@/pages/HomePage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazy(() => import('@/pages/administration/AdministrationPage'));
 const AdminConfigPage = lazy(() => import('@/pages/administration/AdminConfigPage'));
+// Public marketing pages — no auth, no app layout.
+const WebsitePage = lazy(() => import('@/pages/WebsitePage'));
+const ForAgentsPage = lazy(() => import('@/pages/ForAgentsPage'));
 
 function PageFallback() {
   return (
@@ -24,6 +27,9 @@ export function AppRoutes() {
     <Suspense fallback={<PageFallback />}>
       <Routes>
         <Route path="/signin" element={<SignInPage />} />
+        {/* Public marketing pages */}
+        <Route path="/website" element={<WebsitePage />} />
+        <Route path="/for-agents" element={<ForAgentsPage />} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/" element={<HomePage />} />
           <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
