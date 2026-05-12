@@ -28,15 +28,20 @@ const AGENT_NAV: NavItem[] = [
   { id: 'find', label: 'Find driver', Icon: Users, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
 ];
 
+/** Flow / detail screens are full-screen with their own back-bar + (sometimes) sticky CTA — no bottom nav. */
+const HIDE_NAV = /^\/(trips\/(new|[^/]+)|drivers\/[^/]+|alerts\/(new|[^/]+)|vacancies\/new)$|^\/trips\/[^/]+\/applicants$/;
+
 /**
- * The app's bottom navigation — fixed to the viewport bottom on every authed
- * screen (rendered by `AppLayout`). The active tab is derived from the current
- * path; the tab set follows the signed-in user's role.
+ * The app's bottom navigation — fixed to the viewport bottom on the tab screens
+ * (rendered by `AppLayout`). Hidden on flow / detail screens (post-trip wizard,
+ * trip detail, applicant review, alerts new/detail, post-vacancy, driver
+ * profile). The active tab and the tab set follow the path and the user's role.
  */
 export function BottomNav() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  if (HIDE_NAV.test(pathname)) return null;
   const items = user?.role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
   const activeId = items.find((it) => it.match(pathname))?.id;
 

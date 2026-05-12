@@ -39,7 +39,7 @@ function renderPost() {
     <MemoryRouter initialEntries={['/trips/new']}>
       <Routes>
         <Route path="/trips/new" element={<PostTripPage />} />
-        <Route path="/trips" element={<div>trip feed</div>} />
+        <Route path="/" element={<div>home</div>} />
         <Route path="/trips/:id" element={<div>trip detail</div>} />
       </Routes>
     </MemoryRouter>,
@@ -51,19 +51,16 @@ function set(container: HTMLElement, name: string, value: string) {
   if (!el) throw new Error(`no control [name="${name}"]`);
   fireEvent.change(el, { target: { value } });
 }
-function fillValid(container: HTMLElement, over: Record<string, string> = {}) {
-  const v: Record<string, string> = {
-    fromCityId: 'c1',
-    toCityId: 'c2',
-    pickupAt: '2099-06-01T09:00',
-    expectedDistanceKm: '140',
-    carTypeId: 'ct1',
-    ratePerKm: '15',
-    passengerName: 'Passenger P',
-    passengerPhone: '+919999999999',
-    ...over,
-  };
-  for (const [k, val] of Object.entries(v)) set(container, k, val);
+
+/** Fill the step-1 form (route + vehicle) and advance to step 2. */
+async function completeStep1(container: HTMLElement) {
+  set(container, 'fromCityId', 'c1');
+  set(container, 'toCityId', 'c2');
+  set(container, 'pickupAt', '2099-06-01T09:00');
+  set(container, 'expectedDistanceKm', '140');
+  fireEvent.click(screen.getByRole('button', { name: 'Sedan' }));
+  fireEvent.click(screen.getByRole('button', { name: /next: price/i }));
+  await screen.findByRole('button', { name: /^post trip$/i });
 }
 
 describe('PostTripPage', () => {
@@ -92,34 +89,48 @@ describe('PostTripPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders the form with the city + car-type options', () => {
+  it('starts on step 1 — route + vehicle, with the city + car-type choices', () => {
     renderPost();
     expect(screen.getByRole('heading', { name: /post a trip/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^post trip$/i })).toBeInTheDocument();
+    expect(screen.getByText(/step 1 of 2/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /next: price/i })).toBeInTheDocument();
     // "Vellore" appears in both the From and To selects
     expect(screen.getAllByRole('option', { name: 'Vellore' }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('option', { name: 'Sedan' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sedan' })).toBeInTheDocument();
   });
 
-  it('the Cancel button returns to the trip feed', () => {
+  it('the back arrow leaves the wizard from step 1', () => {
     renderPost();
-    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
-    expect(screen.getByText('trip feed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(screen.getByText('home')).toBeInTheDocument();
   });
 
-  it('blocks posting when the pickup and drop-off cities are the same', async () => {
-    const mutateAsync = setPostTrip();
+  it('keeps "Next" disabled until step 1 is valid (and when the cities match)', () => {
     const { container } = renderPost();
-    fillValid(container, { toCityId: 'c1' }); // same as fromCityId
-    fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
+    set(container, 'fromCityId', 'c1');
+    set(container, 'toCityId', 'c1'); // same as pickup
+    set(container, 'pickupAt', '2099-06-01T09:00');
+    set(container, 'expectedDistanceKm', '140');
+    fireEvent.click(screen.getByRole('button', { name: 'Sedan' }));
+    expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
+  });
+
+  it('advances to step 2 and the back arrow returns to step 1', async () => {
+    const { container } = renderPost();
+    await completeStep1(container);
+    expect(screen.getByText(/step 2 of 2/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(screen.getByText(/step 1 of 2/i)).toBeInTheDocument();
   });
 
   it('posts a valid trip, opens the share modal, then navigates to the new trip', async () => {
     const mutateAsync = setPostTrip();
     const { container } = renderPost();
-    fillValid(container);
+    await completeStep1(container);
+    set(container, 'ratePerKm', '15');
+    set(container, 'passengerName', 'Passenger P');
+    set(container, 'passengerPhone', '+919999999999');
     fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatINR } from '@/lib/utils';
+import { cn, formatINR } from '@/lib/utils';
 import type { PostTripInput, Trip } from '@/types';
 
 interface PostTripForm {
@@ -52,6 +53,10 @@ const DEFAULTS: PostTripForm = {
   hidePassengerPhone: false,
 };
 
+const STEP1_FIELDS = ['fromCityId', 'toCityId', 'pickupAt', 'expectedDistanceKm', 'carTypeId', 'seatsRequired', 'acRequired'] as const;
+const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
+const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-secondary';
+
 function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block space-y-1">
@@ -63,14 +68,15 @@ function Field({ label, error, hint, children }: { label: string; error?: string
   );
 }
 
-const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
-
 /**
- * `/trips/new` — post a trip. The poster sets the route, schedule, distance,
- * vehicle requirements, rate, bata and passenger details; the total fare is
- * `distance × rate`; commission / GST / driver payout are computed server-side.
+ * `/trips/new` — post a trip, as a 2-step wizard mirroring the prototype:
+ *   Step 1 · "where & when" — route (from / to cities, distance, pickup time)
+ *            + vehicle requirements (car type, seats, AC).
+ *   Step 2 · "price & details" — rate / bata (total fare = distance × rate;
+ *            commission, GST and the driver payout are computed server-side),
+ *            passenger details, visibility.
  * Dropdowns + the bata default come from `useAdminConfig`. On success the new
- * trip is shown (sharing it lands with the share-card step).
+ * trip's share card opens, then we go to the trip.
  */
 export function PostTripPage() {
   const navigate = useNavigate();
@@ -78,13 +84,12 @@ export function PostTripPage() {
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
   const appSettings = useAppSettings();
+  const [step, setStep] = useState<1 | 2>(1);
   const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
 
-  const { register, handleSubmit, watch, setValue, getValues, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
+  const { register, handleSubmit, watch, setValue, getValues, trigger, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
 
-  // Seed bata + driver instructions from the platform defaults once they load,
-  // unless the poster has already typed something.
   useEffect(() => {
     const s = appSettings.data;
     if (!s) return;
@@ -93,13 +98,27 @@ export function PostTripPage() {
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
-  const distance = Number(watch('expectedDistanceKm')) || 0;
-  const rate = Number(watch('ratePerKm')) || 0;
+  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm']);
+  const distance = Number(distanceWatch) || 0;
+  const rate = Number(rateWatch) || 0;
   const totalFare = distance > 0 && rate > 0 ? Math.round(distance * rate) : 0;
+  const cityName = (id: string) => citiesQuery.data?.find((c) => c.id === id)?.name;
+  const carTypeName = (id: string) => carTypesQuery.data?.find((c) => c.id === id)?.label;
+
+  async function onNext() {
+    const ok = await trigger([...STEP1_FIELDS]);
+    if (!ok) return;
+    if (getValues('fromCityId') === getValues('toCityId')) {
+      toast.error('Pickup and drop-off cities must be different');
+      return;
+    }
+    setStep(2);
+  }
 
   async function onSubmit(values: PostTripForm) {
     if (values.fromCityId === values.toCityId) {
       toast.error('Pickup and drop-off cities must be different');
+      setStep(1);
       return;
     }
     const input: PostTripInput = {
@@ -126,7 +145,7 @@ export function PostTripPage() {
       hidePassengerPhone: values.hidePassengerPhone,
     };
     try {
-      const trip: Trip = await postTrip.mutateAsync(input);
+      const trip = await postTrip.mutateAsync(input);
       toast.success('Trip posted — share it with drivers');
       setPostedTrip(trip);
     } catch {
@@ -136,153 +155,181 @@ export function PostTripPage() {
 
   if (citiesQuery.isPending || carTypesQuery.isPending) {
     return (
-      <main className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-xl font-bold">Post a trip</h1>
+      <div className="mx-auto max-w-md p-4">
+        <h1 className="mb-3 text-xl font-bold">Post a trip</h1>
         <LoadingSkeleton rows={6} />
-      </main>
+      </div>
     );
   }
   if (citiesQuery.isError || carTypesQuery.isError) {
     return (
-      <main className="mx-auto max-w-md space-y-4 p-4">
-        <h1 className="text-xl font-bold">Post a trip</h1>
-        <ErrorState
-          title="Couldn't load the form"
-          message="We need the city + car-type lists to post a trip."
-          onRetry={() => {
-            void citiesQuery.refetch();
-            void carTypesQuery.refetch();
-          }}
-        />
-      </main>
+      <div className="mx-auto max-w-md p-4">
+        <h1 className="mb-3 text-xl font-bold">Post a trip</h1>
+        <ErrorState title="Couldn't load the form" message="We need the city + car-type lists to post a trip." onRetry={() => { void citiesQuery.refetch(); void carTypesQuery.refetch(); }} />
+      </div>
     );
   }
 
   const cities = citiesQuery.data ?? [];
-  const carTypes = carTypesQuery.data ?? [];
+  const carTypes = (carTypesQuery.data ?? []).filter((c) => c.isActive);
   const submitting = isSubmitting || postTrip.isPending;
+  const step1Ready = !!fromCityId && !!toCityId && fromCityId !== toCityId && !!getValues('pickupAt') && distance >= 1 && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
+  const summary = [cityName(fromCityId) && cityName(toCityId) ? `${cityName(fromCityId)} → ${cityName(toCityId)}` : null, distance > 0 ? `${distance} km` : null, carTypeName(carTypeId) ?? null, acRequired ? 'AC' : null].filter(Boolean).join(' · ');
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <h1 className="text-xl font-bold">Post a trip</h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <Card className="gap-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Route &amp; schedule</div>
-          <Field label="From (pickup city)" error={errors.fromCityId?.message}>
-            <select className={selectClass} {...register('fromCityId', { required: 'Pick a pickup city' })}>
-              <option value="">Select a city</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="To (drop-off city)" error={errors.toCityId?.message}>
-            <select className={selectClass} {...register('toCityId', { required: 'Pick a drop-off city' })}>
-              <option value="">Select a city</option>
-              {cities.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Pickup date &amp; time" error={errors.pickupAt?.message}>
-            <Input type="datetime-local" {...register('pickupAt', { required: 'Set the pickup time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Pickup must be in the future' })} />
-          </Field>
-          <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message}>
-            <Input type="number" min={1} step={1} inputMode="numeric" {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter the distance in km' })} />
-          </Field>
-        </Card>
-
-        <Card className="gap-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Vehicle &amp; fare</div>
-          <Field label="Car type required" error={errors.carTypeId?.message}>
-            <select className={selectClass} {...register('carTypeId', { required: 'Pick a car type' })}>
-              <option value="">Select a car type</option>
-              {carTypes.map((ct) => (
-                <option key={ct.id} value={ct.id}>
-                  {ct.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Seats required" error={errors.seatsRequired?.message}>
-              <Input type="number" min={1} max={50} step={1} inputMode="numeric" {...register('seatsRequired', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 50) || '1–50 seats' })} />
-            </Field>
-            <label className="flex items-center gap-2 pt-7 text-sm font-medium">
-              <input type="checkbox" {...register('acRequired')} /> AC required
-            </label>
+    <div className="mx-auto flex min-h-dvh max-w-md flex-col">
+      <header className="sticky top-0 z-10 border-b bg-white">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <button type="button" aria-label="Back" onClick={() => (step === 1 ? navigate('/') : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+            <ArrowLeft className="size-5" aria-hidden />
+          </button>
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold">Post a trip · {step === 1 ? 'where & when' : 'price & details'}</h1>
+            <div className="text-xs text-secondary">Step {step} of 2</div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Rate per km (₹)" error={errors.ratePerKm?.message}>
-              <Input type="number" min={1} step={1} inputMode="numeric" {...register('ratePerKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter a rate per km' })} />
-            </Field>
-            <Field label="Driver bata (₹)" error={errors.driverBata?.message} hint="Paid straight to the driver">
-              <Input type="number" min={0} step={1} inputMode="numeric" {...register('driverBata', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
-            </Field>
-          </div>
-          <div className="rounded-lg bg-muted px-3 py-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-secondary">Total fare ({distance > 0 ? distance : '—'} km × {formatINR(rate)}/km)</span>
-              <span className="font-bold">{totalFare > 0 ? formatINR(totalFare) : '—'}</span>
-            </div>
-            <p className="mt-1 text-xs text-secondary">Platform commission, GST and the driver payout are calculated by TripKing — you&apos;ll see the final payout on the trip.</p>
-          </div>
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" {...register('extrasPaidByPassenger')} /> Packing / toll / permit extras paid by the passenger
-          </label>
-        </Card>
-
-        <Card className="gap-3">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Passenger</div>
-          <Field label="Passenger name" error={errors.passengerName?.message}>
-            <Input {...register('passengerName', { required: 'Enter the passenger name' })} placeholder="Full name" />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Passenger phone" error={errors.passengerPhone?.message}>
-              <Input inputMode="tel" {...register('passengerPhone', { required: 'Enter a phone number' })} placeholder="+91…" />
-            </Field>
-            <Field label="Headcount" error={errors.passengerCount?.message}>
-              <Input type="number" min={1} max={20} step={1} inputMode="numeric" {...register('passengerCount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 20) || '1–20 passengers' })} />
-            </Field>
-          </div>
-          <Field label="Luggage notes (optional)">
-            <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('luggageNotes')} />
-          </Field>
-          <Field label="Special requests (optional)">
-            <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('specialRequests')} />
-          </Field>
-          <Field label="Instructions for the driver (optional)">
-            <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('driverInstructions')} />
-          </Field>
-        </Card>
-
-        <Card className="gap-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Visibility</div>
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" {...register('showFareToPassenger')} /> Show the fare to the passenger
-          </label>
-          <label className="flex items-center gap-2 text-sm font-medium">
-            <input type="checkbox" {...register('hidePassengerPhone')} /> Hide the passenger&apos;s phone from drivers until assigned
-          </label>
-        </Card>
-
-        {postTrip.isError ? <p className="text-sm text-red-700">Couldn&apos;t post the trip — please try again.</p> : null}
-        <div className="flex gap-3">
-          <Button type="button" variant="outline" onClick={() => navigate('/trips')} disabled={submitting}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="full" disabled={submitting}>
-            {submitting ? 'Posting…' : 'Post trip'}
-          </Button>
         </div>
+        <div className="h-1 bg-muted">
+          <div className="h-full bg-primary transition-all" style={{ width: step === 1 ? '50%' : '100%' }} />
+        </div>
+      </header>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-3 p-4 pb-28">
+        {step === 1 ? (
+          <>
+            <Card className="gap-3">
+              <div className={sectionLabel}>Route &amp; schedule</div>
+              <Field label="From (pickup city)" error={errors.fromCityId?.message}>
+                <select className={selectClass} {...register('fromCityId', { required: 'Pick a pickup city' })}>
+                  <option value="">Select a city</option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="To (drop-off city)" error={errors.toCityId?.message}>
+                <select className={selectClass} {...register('toCityId', { required: 'Pick a drop-off city' })}>
+                  <option value="">Select a city</option>
+                  {cities.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Pickup date &amp; time" error={errors.pickupAt?.message}>
+                <Input type="datetime-local" {...register('pickupAt', { required: 'Set the pickup time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Pickup must be in the future' })} />
+              </Field>
+              <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message}>
+                <Input type="number" min={1} step={1} inputMode="numeric" {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter the distance in km' })} />
+              </Field>
+            </Card>
+
+            <Card className="gap-3">
+              <div className={sectionLabel}>Vehicle requirements</div>
+              <div className="space-y-1">
+                <span className="text-sm font-medium">Car type required</span>
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {carTypes.map((ct) => (
+                    <button key={ct.id} type="button" onClick={() => setValue('carTypeId', ct.id, { shouldValidate: true })} className={cn('shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition-colors', carTypeId === ct.id ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-white hover:border-primary/40')}>
+                      {ct.label}
+                    </button>
+                  ))}
+                </div>
+                <input type="hidden" {...register('carTypeId', { required: 'Pick a car type' })} />
+                {errors.carTypeId ? <span className="block text-xs text-red-700">{errors.carTypeId.message}</span> : null}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Seats" error={errors.seatsRequired?.message}>
+                  <Input type="number" min={1} max={50} step={1} inputMode="numeric" {...register('seatsRequired', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 50) || '1–50 seats' })} />
+                </Field>
+                <div className="space-y-1">
+                  <span className="text-sm font-medium">AC required</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setValue('acRequired', true)} className={cn('h-11 flex-1 rounded-lg border text-sm font-semibold', acRequired ? 'border-blue-300 bg-blue-100 text-blue-800' : 'border-input bg-white')}>Yes</button>
+                    <button type="button" onClick={() => setValue('acRequired', false)} className={cn('h-11 flex-1 rounded-lg border text-sm font-semibold', !acRequired ? 'border-blue-300 bg-blue-100 text-blue-800' : 'border-input bg-white')}>No</button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Card className="gap-3">
+              <div className={sectionLabel}>Pricing</div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Rate per km (₹)" error={errors.ratePerKm?.message}>
+                  <Input type="number" min={1} step={1} inputMode="numeric" {...register('ratePerKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter a rate per km' })} />
+                </Field>
+                <Field label="Driver bata (₹)" error={errors.driverBata?.message} hint="Paid straight to the driver">
+                  <Input type="number" min={0} step={1} inputMode="numeric" {...register('driverBata', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
+                </Field>
+              </div>
+              <div className="rounded-lg bg-muted px-3 py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-secondary">Total fare ({distance > 0 ? distance : '—'} km × {formatINR(rate)}/km)</span>
+                  <span className="font-bold">{totalFare > 0 ? formatINR(totalFare) : '—'}</span>
+                </div>
+                <p className="mt-1 text-xs text-secondary">Platform commission, GST and the driver payout are calculated by TripKing — you&apos;ll see the final payout on the trip.</p>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" {...register('extrasPaidByPassenger')} /> Packing / toll / permit extras paid by the passenger
+              </label>
+            </Card>
+
+            <Card className="gap-3">
+              <div className={sectionLabel}>Passenger</div>
+              <Field label="Passenger name" error={errors.passengerName?.message}>
+                <Input {...register('passengerName', { required: 'Enter the passenger name' })} placeholder="Full name" />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Passenger phone" error={errors.passengerPhone?.message}>
+                  <Input inputMode="tel" {...register('passengerPhone', { required: 'Enter a phone number' })} placeholder="+91…" />
+                </Field>
+                <Field label="Headcount" error={errors.passengerCount?.message}>
+                  <Input type="number" min={1} max={20} step={1} inputMode="numeric" {...register('passengerCount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 20) || '1–20 passengers' })} />
+                </Field>
+              </div>
+              <Field label="Luggage notes (optional)">
+                <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('luggageNotes')} />
+              </Field>
+              <Field label="Special requests (optional)">
+                <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('specialRequests')} />
+              </Field>
+              <Field label="Instructions for the driver (optional)">
+                <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('driverInstructions')} />
+              </Field>
+            </Card>
+
+            <Card className="gap-2">
+              <div className={sectionLabel}>Visibility</div>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" {...register('showFareToPassenger')} /> Show the fare to the passenger
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" {...register('hidePassengerPhone')} /> Hide the passenger&apos;s phone from drivers until assigned
+              </label>
+            </Card>
+
+            {postTrip.isError ? <p className="text-sm text-red-700">Couldn&apos;t post the trip — please try again.</p> : null}
+          </>
+        )}
       </form>
 
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t bg-white px-4 py-3">
+        {step === 1 ? (
+          <>
+            {summary ? <p className="mb-2 truncate text-center text-xs text-secondary">{summary}</p> : null}
+            <Button type="button" variant="full" disabled={!step1Ready} onClick={() => void onNext()}>
+              Next: price &amp; details →
+            </Button>
+          </>
+        ) : (
+          <Button type="button" variant="full" disabled={submitting} onClick={() => void handleSubmit(onSubmit)()}>
+            {submitting ? 'Posting…' : 'Post trip'}
+          </Button>
+        )}
+      </div>
+
       {postedTrip ? <ShareTripModal trip={postedTrip} onClose={() => navigate(`/trips/${postedTrip.id}`)} /> : null}
-    </main>
+    </div>
   );
 }
 
