@@ -13,6 +13,7 @@ const PostTripPage = lazy(() => import('@/pages/PostTripPage'));
 const PostedTripsPage = lazy(() => import('@/pages/PostedTripsPage'));
 const TripDetailPage = lazy(() => import('@/pages/TripDetailPage'));
 const DriverProfilePage = lazy(() => import('@/pages/DriverProfilePage'));
+const VacanciesPage = lazy(() => import('@/pages/VacanciesPage'));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazy(() => import('@/pages/administration/AdministrationPage'));
@@ -46,6 +47,7 @@ export function AppRoutes() {
           <Route path="/trips/:id" element={<TripDetailPage />} />
           <Route path="/posted-trips" element={<PostedTripsPage />} />
           <Route path="/drivers/:id" element={<DriverProfilePage />} />
+          <Route path="/vacancies" element={<VacanciesPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
           <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
