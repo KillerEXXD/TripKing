@@ -429,6 +429,10 @@ verify_jwt = false
 [functions.places]
 verify_jwt = false
 
+# /debug/* — deliberate-failure endpoints to exercise the exception pipeline; the function requires an admin Bearer.
+[functions.debug]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
