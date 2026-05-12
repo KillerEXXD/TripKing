@@ -19,7 +19,7 @@ function pickupLabel(iso: string): string {
 function TripCard({ trip }: { trip: Trip }) {
   return (
     <Link to={`/trips/${trip.id}`} className="block">
-      <Card className="gap-3 transition-colors hover:border-primary/40">
+      <Card className="gap-2 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="font-bold">
@@ -34,7 +34,7 @@ function TripCard({ trip }: { trip: Trip }) {
             <div className="text-[10px] text-secondary">payout · {formatINR(trip.driverBata)} bata incl.</div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
           {trip.carTypeLabel ? <Badge variant="outline">{trip.carTypeLabel}</Badge> : null}
           {trip.acRequired ? <Badge variant="outline">AC</Badge> : null}
           <Badge variant="muted">{formatINR(trip.ratePerKm)}/km</Badge>
@@ -50,11 +50,14 @@ function TripCard({ trip }: { trip: Trip }) {
   );
 }
 
+const chipClass = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
+
 /**
  * `/trips` — the open-trip feed. Drivers browse trips that are still `open` or
- * `has_applicants` (filter by pickup city / car type / AC); each card links to
- * the trip detail (`/trips/:id`). Data from `useTrips`; filter options from
- * `useAdminConfig`. The apply flow lives on the detail screen.
+ * `has_applicants`, filtered by pickup city / car type / AC; each card links to
+ * the trip detail. Data from `useTrips`; filter options from `useAdminConfig`.
+ * Prototype layout: a white header strip, a white filter strip, then the cards
+ * on the page background.
  */
 export function TripFeedPage() {
   const [fromCityId, setFromCityId] = useState('');
@@ -69,17 +72,17 @@ export function TripFeedPage() {
   const filtered = trips.filter((t) => (carTypeId === '' || t.carTypeId === carTypeId) && (!acOnly || t.acRequired));
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-bold">Open trips</h1>
-        <p className="text-sm text-secondary">{tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'} you can apply to` : 'Trips that still need a driver'}</p>
+    <div className="mx-auto max-w-md">
+      <header className="border-b bg-white px-4 py-3">
+        <h1 className="text-base font-semibold">Open trips</h1>
+        <p className="text-xs text-secondary">{tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'} you can apply to` : 'Trips that still need a driver'}</p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
         <label className="sr-only" htmlFor="feed-city">
           Filter by pickup city
         </label>
-        <select id="feed-city" value={fromCityId} onChange={(e) => setFromCityId(e.target.value)} className="h-9 rounded-full border border-input bg-background px-3 text-sm">
+        <select id="feed-city" value={fromCityId} onChange={(e) => setFromCityId(e.target.value)} className={chipClass}>
           <option value="">All pickup cities</option>
           {(citiesQuery.data ?? []).map((c) => (
             <option key={c.id} value={c.id}>
@@ -90,7 +93,7 @@ export function TripFeedPage() {
         <label className="sr-only" htmlFor="feed-cartype">
           Filter by car type
         </label>
-        <select id="feed-cartype" value={carTypeId} onChange={(e) => setCarTypeId(e.target.value)} className="h-9 rounded-full border border-input bg-background px-3 text-sm">
+        <select id="feed-cartype" value={carTypeId} onChange={(e) => setCarTypeId(e.target.value)} className={chipClass}>
           <option value="">All car types</option>
           {(carTypesQuery.data ?? []).map((ct) => (
             <option key={ct.id} value={ct.id}>
@@ -102,45 +105,43 @@ export function TripFeedPage() {
           type="button"
           onClick={() => setAcOnly((v) => !v)}
           aria-pressed={acOnly}
-          className={`flex h-9 items-center gap-1 rounded-full border px-3 text-sm font-medium ${acOnly ? 'border-blue-300 bg-blue-100 text-blue-800' : 'border-input bg-background'}`}
+          className={`flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-medium ${acOnly ? 'border-blue-300 bg-blue-100 text-blue-800' : 'border-input bg-white'}`}
         >
           <Snowflake className="size-3.5" aria-hidden /> AC only
         </button>
       </div>
 
-      {tripsQuery.isPending ? (
-        <LoadingSkeleton rows={5} />
-      ) : tripsQuery.isError ? (
-        <ErrorState title="Couldn't load trips" message="Check your connection and try again." onRetry={() => void tripsQuery.refetch()} />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={<MapPin className="size-7" />}
-          title={trips.length === 0 ? 'No open trips right now' : 'No trips match your filters'}
-          message={trips.length === 0 ? 'New trips from your area will show up here.' : 'Try clearing the car-type / AC filter or picking a different pickup city.'}
-          action={
-            trips.length > 0 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setCarTypeId('');
-                  setAcOnly(false);
-                  setFromCityId('');
-                }}
-              >
-                Clear filters
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <div className="space-y-3">
-          {filtered.map((t) => (
-            <TripCard key={t.id} trip={t} />
-          ))}
-        </div>
-      )}
-    </main>
+      <div className="space-y-3 p-4">
+        {tripsQuery.isPending ? (
+          <LoadingSkeleton rows={5} />
+        ) : tripsQuery.isError ? (
+          <ErrorState title="Couldn't load trips" message="Check your connection and try again." onRetry={() => void tripsQuery.refetch()} />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon={<MapPin className="size-7" />}
+            title={trips.length === 0 ? 'No open trips right now' : 'No trips match your filters'}
+            message={trips.length === 0 ? 'New trips from your area will show up here.' : 'Try clearing the car-type / AC filter or picking a different pickup city.'}
+            action={
+              trips.length > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCarTypeId('');
+                    setAcOnly(false);
+                    setFromCityId('');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          filtered.map((t) => <TripCard key={t.id} trip={t} />)
+        )}
+      </div>
+    </div>
   );
 }
 
