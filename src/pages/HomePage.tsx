@@ -1,5 +1,6 @@
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 
 /** Placeholder home — the role-specific driver/agent hubs land in Phase 3. */
@@ -13,9 +14,16 @@ export function HomePage() {
           Signed in as <strong>{user?.displayName || user?.phone}</strong> ({user?.role}).
         </p>
         <p className="mt-2 text-sm text-secondary">
-          Marketplace screens (post / browse / apply / assign / OTP) arrive in Phase 3 — see{' '}
-          <code>docs/PLATFORM_AND_ADMIN_REQUIREMENTS.md</code>.
+          More of the role-specific home hub arrives soon — for now, browse open trips or post one.
         </p>
+        <div className="mt-3 flex gap-2">
+          <Button asChild variant="full" className="flex-1">
+            <Link to="/trips/new">Post a trip</Link>
+          </Button>
+          <Button asChild variant="outline" className="flex-1">
+            <Link to="/trips">Browse trips</Link>
+          </Button>
+        </div>
       </Card>
       <InstallAppCard dismissable />
     </main>
