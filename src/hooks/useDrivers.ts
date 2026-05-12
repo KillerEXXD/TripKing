@@ -78,11 +78,13 @@ export function useUpdateDriver() {
     onSuccess: (_d, v) => invalidate(v.id),
   });
 }
+/** Best-effort geolocation ping for the assigned driver — failures are expected (flaky mobile network), so they aren't reported/toasted. */
 export function useUpdateDriverLocation() {
   const invalidate = useInvalidateDriver();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateLocationInput }) => updateDriverLocation(id, input),
     onSuccess: (_d, v) => invalidate(v.id),
+    meta: { silent: true },
   });
 }
 export function useUpdateAgent() {

@@ -16,7 +16,7 @@
  */
 
 import { API_CONFIG } from '@/config/api';
-import { captureDataError } from '@/lib/sentry';
+import { addDataBreadcrumb, captureDataError } from '@/lib/sentry';
 import { captureEvent } from '@/lib/posthog';
 import type { ApiErrorBody, ApiResponse } from '@/types';
 
@@ -217,13 +217,15 @@ class ApiClient {
         return this.request<T>(endpoint, init, { ...state, attempt: attempt + 1 });
       }
       const apiError = new ApiError(isTimeout ? 'Request timeout' : (error as Error).message || 'Network error', isTimeout ? 408 : 0);
-      this.reportError(apiError, endpoint, method, durationMs);
+      addDataBreadcrumb('request failed', { feature: `api:${featureFor(endpoint)}`, endpoint, method, durationMs, retryAttempt: attempt }, 'error');
+      this.reportError(apiError, endpoint, method, durationMs, undefined, attempt);
       throw apiError;
     }
     clearTimeout(timeoutId);
 
     const durationMs = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
     const body = await safeJson(response);
+    addDataBreadcrumb('request', { feature: `api:${featureFor(endpoint)}`, endpoint, method, status: response.status, durationMs }, response.ok ? 'info' : 'warning');
 
     if (response.ok) {
       if (durationMs > 2000) {
@@ -250,18 +252,19 @@ class ApiClient {
     const apiError = new ApiError(message, response.status, code, body);
     // 401 (bad creds / expired) and 404 (stale link) are user errors, not bugs.
     if (response.status !== 401 && response.status !== 404) {
-      this.reportError(apiError, endpoint, method, durationMs, body);
+      this.reportError(apiError, endpoint, method, durationMs, body, attempt);
     }
     captureEvent('api_error', { endpoint, method, status: response.status, duration_ms: durationMs, message: message.slice(0, 200) });
     throw apiError;
   }
 
-  private reportError(error: ApiError, endpoint: string, method: HttpMethod, durationMs: number, body?: unknown): void {
+  private reportError(error: ApiError, endpoint: string, method: HttpMethod, durationMs: number, body?: unknown, retryAttempt?: number): void {
     captureDataError(`api:${featureFor(endpoint)}`, error, {
       endpoint,
       method,
       status: error.status,
       durationMs,
+      retryAttempt,
       body: body ? JSON.stringify(body).slice(0, 500) : undefined,
     });
   }
