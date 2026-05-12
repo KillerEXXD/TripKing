@@ -2533,7 +2533,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "Post a vacancy (driver; Bearer; must be KYC-verified — 403 KYC_REQUIRED otherwise) — driver_id = the caller; current_place_id accepted alongside current_city_id; destination_place_ids and/or destination_city_ids → vacancy_destinations rows (a bad place id → 422); matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a vacancy (driver; Bearer; must be KYC-verified — 403 KYC_REQUIRED otherwise) — driver_id = the caller; current_place_id accepted alongside current_city_id; destinations: [{ cityId?, placeId? }] (each entry may be a curated city, a precise place, or both — at least one id required; or the legacy parallel destination_place_ids / destination_city_ids) → vacancy_destinations rows (a bad place id → 422); matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2558,6 +2558,20 @@
                   },
                   "available_until": {
                     "type": "string"
+                  },
+                  "destinations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cityId": {
+                          "type": "string"
+                        },
+                        "placeId": {
+                          "type": "string"
+                        }
+                      }
+                    }
                   },
                   "destination_city_ids": {
                     "type": "array",

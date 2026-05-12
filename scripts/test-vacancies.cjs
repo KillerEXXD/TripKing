@@ -43,13 +43,19 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
 
   const driverToken = await tokenFor('driver');
   const otherToken = await tokenFor('trip_manager'); // a user with no driver profile
+  const adminToken = await tokenFor('admin'); // to bump the driver's KYC (posting a vacancy needs an approved driver)
   check('driver auth token obtained', !!driverToken);
   check('other auth token obtained', !!otherToken);
-  if (!driverToken || !otherToken) process.exit(1);
+  check('admin auth token obtained', !!adminToken);
+  if (!driverToken || !otherToken || !adminToken) process.exit(1);
 
   const created = await j('POST', '/drivers', { token: driverToken, body: { full_name: 'Vacancy Smoke Driver' } });
   const driverId = created.json?.data?.id;
   check('driver profile created', created.status === 200 && !!driverId, `status=${created.status}`);
+  if (driverId) {
+    const kycSet = await j('PATCH', `/drivers/${driverId}/kyc`, { token: adminToken, body: { kyc_status: 'approved', note: 'smoke' } });
+    check('driver KYC set to approved (so POST /vacancies is allowed)', kycSet.status === 200 && kycSet.json?.data?.kyc_status === 'approved', `status=${kycSet.status} ${JSON.stringify(kycSet.json?.error || '')}`);
+  }
 
   const cities = await j('GET', '/admin/cities');
   const cityList = cities.json?.data || [];
@@ -95,6 +101,20 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('POST /vacancies joins destination places (vacancy_destinations[].place)', destPlaces.some((pl) => pl && pl.id === placeBId), `dests=${JSON.stringify(destPlaces.map((p) => p.id))}`);
   const badPlace = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, current_place_id: NONE } });
   check('POST /vacancies with a bad current_place_id → 422', badPlace.status === 422, `status=${badPlace.status}`);
+
+  // ── unified `destinations` array — mix a curated city, a precise place, and both ─
+  const vac3 = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destinations: [{ cityId: dest1 }, { placeId: placeBId }, { cityId: dest2, placeId: placeAId }] } });
+  const vac3Id = vac3.json?.data?.id;
+  check('POST /vacancies with a `destinations` array → 200 + id', vac3.status === 200 && !!vac3Id, `status=${vac3.status} ${JSON.stringify(vac3.json?.error || '')}`);
+  const vds3 = vac3.json?.data?.vacancy_destinations || [];
+  const dbg3 = `vds=${JSON.stringify(vds3.map((v) => ({ c: v.city?.id, p: v.place?.id })))}`;
+  check('`destinations` → one junction row per entry (3)', vds3.length === 3, `n=${vds3.length}`);
+  check('`destinations` city-only entry joined the city', vds3.some((vd) => vd.city?.id === dest1 && !vd.place), dbg3);
+  check('`destinations` place-only entry joined the place', vds3.some((vd) => vd.place?.id === placeBId && !vd.city), dbg3);
+  check('`destinations` both-ids entry joined city + place', vds3.some((vd) => vd.city?.id === dest2 && vd.place?.id === placeAId), dbg3);
+  const badDest = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destinations: [{}] } });
+  check('POST /vacancies with an empty `destinations` entry → 422', badDest.status === 422, `status=${badDest.status}`);
+
   const nearHit = await j('GET', '/vacancies?near_lat=12.97&near_lng=77.59&radius_km=5');
   const hit = (nearHit.json?.data || []).find((v) => v.id === vac2Id);
   check('GET /vacancies?near_lat&near_lng&radius_km → contains the place-based vacancy + numeric distance_km ≤ radius', nearHit.status === 200 && !!hit && typeof hit.distance_km === 'number' && hit.distance_km <= 5, `status=${nearHit.status} hit=${JSON.stringify(hit && { id: hit.id, distance_km: hit.distance_km })}`);
