@@ -30,9 +30,23 @@ export function useTrips(params?: TripsQueryParams) {
 export function useTrip(id: string | undefined) {
   return useQuery({ queryKey: ['trip', id], queryFn: () => getTrip(id as string), enabled: !!id, staleTime: STALE.live });
 }
-/** Public passenger-portal lookup — `GET /trips/by-otp/:otp` (the OTP is the credential). */
+/**
+ * Public passenger-portal lookup — `GET /trips/by-otp/:otp` (the OTP is the
+ * credential). Polls every 12 s while the trip is `assigned`/`in_progress` so the
+ * passenger sees the driver's position + ETA update; stops once it's done/cancelled.
+ */
 export function useTripByOtp(otp: string | undefined) {
-  return useQuery({ queryKey: ['trip', 'by-otp', otp], queryFn: () => getTripByOtp(otp as string), enabled: !!otp, retry: false, staleTime: STALE.live });
+  return useQuery({
+    queryKey: ['trip', 'by-otp', otp],
+    queryFn: () => getTripByOtp(otp as string),
+    enabled: !!otp,
+    retry: false,
+    staleTime: STALE.live,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'assigned' || status === 'in_progress' ? 12_000 : false;
+    },
+  });
 }
 export function useTripApplicants(tripId: string | undefined) {
   return useQuery({ queryKey: ['trip', tripId, 'applicants'], queryFn: () => getTripApplicants(tripId as string), enabled: !!tripId, staleTime: STALE.live });

@@ -6,6 +6,7 @@
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import type {
   AcceptanceStatus,
+  AssignedDriver,
   CityRow,
   DriverSummary,
   PosterRole,
@@ -45,6 +46,9 @@ function reqStr(v: unknown, code: TripTransformErrorCode, ctx: Api): string {
 }
 function num(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v)) ? Number(v) : fallback;
+}
+function numOpt(v: unknown): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v)) ? Number(v) : undefined;
 }
 function reqNum(v: unknown, code: TripTransformErrorCode, ctx: Api): number {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
@@ -95,12 +99,35 @@ export function transformTrip(api: Api): Trip {
     assignedVehicleId: str(api.assigned_vehicle_id),
     assignedAcceptanceId: str(api.assigned_acceptance_id),
     assignedAt: str(api.assigned_at),
+    assignedDriver: assignedDriverOf(api.assigned_driver),
+    distanceToDestinationKm: numOpt(api.distance_to_destination_km),
     showFareToPassenger: bool(api.show_fare_to_passenger, true),
     hidePassengerPhone: bool(api.hide_passenger_phone, false),
     cancelledAt: str(api.cancelled_at),
     cancelReasonId: str(api.cancel_reason_id),
     applicantCount: num(api.applicant_count, 0),
     createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
+    passengerOtp: str(api.passenger_otp),
+  };
+}
+
+/** The `assigned_driver:drivers!...(...)` join on a trip row → an {@link AssignedDriver}, or `undefined` when no driver is assigned. */
+function assignedDriverOf(v: unknown): AssignedDriver | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const a = v as Api;
+  const id = str(a.id);
+  if (!id) return undefined;
+  return {
+    id,
+    fullName: str(a.full_name) ?? '',
+    phone: str(a.phone),
+    profilePhotoUrl: str(a.profile_photo_url) ?? '',
+    ratingAvg: num(a.rating_avg, 0),
+    ratingCount: num(a.rating_count, 0),
+    totalTripsCompleted: num(a.total_trips_completed, 0),
+    currentLat: numOpt(a.current_lat),
+    currentLng: numOpt(a.current_lng),
+    currentLocationAt: str(a.current_location_at),
   };
 }
 

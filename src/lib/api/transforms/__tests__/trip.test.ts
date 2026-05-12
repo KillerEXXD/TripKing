@@ -54,6 +54,25 @@ describe('transformTrip', () => {
     expect(() => transformTrip({ ...fullTrip, driver_payout: undefined })).toThrow(/MISSING_PAYOUT/);
     expect(() => transformTrip({ ...fullTrip, status: undefined })).toThrow(/MISSING_STATUS/);
   });
+  it('surfaces the assigned-driver join, distance-to-destination and the passenger OTP when present', () => {
+    const t = transformTrip({
+      ...fullTrip,
+      status: 'in_progress',
+      assigned_driver_id: 'd1',
+      assigned_driver: { id: 'd1', full_name: 'Ravi', phone: '+918888888888', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: 12.97, current_lng: 79.16, current_location_at: '2026-06-01T10:30:00Z' },
+      distance_to_destination_km: 42,
+      passenger_otp: '123456',
+    });
+    expect(t.assignedDriver).toMatchObject({ id: 'd1', fullName: 'Ravi', phone: '+918888888888', currentLat: 12.97, currentLng: 79.16 });
+    expect(t.distanceToDestinationKm).toBe(42);
+    expect(t.passengerOtp).toBe('123456');
+  });
+  it('leaves the new fields undefined when the API omits them', () => {
+    const t = transformTrip(fullTrip);
+    expect(t.assignedDriver).toBeUndefined();
+    expect(t.distanceToDestinationKm).toBeUndefined();
+    expect(t.passengerOtp).toBeUndefined();
+  });
 });
 
 describe('transformTripAcceptance', () => {

@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Car, KeyRound, MapPin, MessageCircle, Phone, ShieldCheck, Wallet } from 'lucide-react';
 import { useTripByOtp } from '@/hooks/useTrips';
-import { useDriver } from '@/hooks/useDrivers';
+import { TripTracking } from '@/components/trip/TripTracking';
 import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR, formatKm, initials } from '@/lib/utils';
-import type { Driver, Trip, TripStatus } from '@/types';
+import type { Trip, TripStatus } from '@/types';
 
 const STATUS_LABEL: Partial<Record<TripStatus, { label: string; variant: 'success' | 'info' | 'muted' | 'destructive' }>> = {
   assigned: { label: 'Confirmed', variant: 'success' },
@@ -68,10 +68,8 @@ function ContactCard({ title, name, sub, phone, callLabel }: { title: string; na
 }
 
 function TripView({ trip, otp }: { trip: Trip; otp: string }) {
-  const driverQuery = useDriver(trip.assignedDriverId);
-  const driver: Driver | undefined = driverQuery.data;
+  const driver = trip.assignedDriver;
   const status = STATUS_LABEL[trip.status] ?? { label: 'Confirmed', variant: 'success' as const };
-  const driverVehicle = driver?.vehicles[0];
   const firstName = trip.passengerName.trim().split(/\s+/)[0] || 'there';
 
   return (
@@ -94,56 +92,43 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
         </div>
       </Card>
 
-      {trip.assignedDriverId ? (
-        driverQuery.isPending ? (
-          <Card>
-            <LoadingSkeleton rows={2} />
-          </Card>
-        ) : driver ? (
-          <Card className="gap-3">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Your driver</div>
-            <div className="flex items-center gap-3">
-              <Avatar className="size-14">
-                <AvatarFallback className="text-base">{initials(driver.fullName || '?')}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-bold">{driver.fullName || 'Driver'}</div>
-                {driver.ratingCount > 0 ? (
-                  <div className="text-sm font-semibold text-amber-600">
-                    ★ {driver.ratingAvg.toFixed(1)} <span className="font-normal text-secondary">· {driver.totalTripsCompleted} trips</span>
-                  </div>
-                ) : (
-                  <div className="text-xs text-secondary">{driver.totalTripsCompleted} trips</div>
-                )}
-                {driverVehicle ? (
-                  <div className="mt-0.5 text-xs text-secondary">
-                    {[driverVehicle.makeLabel, driverVehicle.modelName].filter(Boolean).join(' ') || driverVehicle.carTypeLabel || 'Car'}
-                    {driverVehicle.year ? ` ${driverVehicle.year}` : ''} · {driverVehicle.seats} seats{driverVehicle.ac ? ' · AC' : ''}
-                  </div>
-                ) : null}
-              </div>
+      <TripTracking trip={trip} />
+
+      {driver ? (
+        <Card className="gap-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Your driver</div>
+          <div className="flex items-center gap-3">
+            <Avatar className="size-14">
+              <AvatarFallback className="text-base">{initials(driver.fullName || '?')}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-bold">{driver.fullName || 'Driver'}</div>
+              {driver.ratingCount > 0 ? (
+                <div className="text-sm font-semibold text-amber-600">
+                  ★ {driver.ratingAvg.toFixed(1)} <span className="font-normal text-secondary">· {driver.totalTripsCompleted} trips</span>
+                </div>
+              ) : (
+                <div className="text-xs text-secondary">{driver.totalTripsCompleted} trips</div>
+              )}
+              <div className="mt-0.5 text-xs text-secondary">{trip.carTypeLabel ?? 'Car'}{trip.acRequired ? ' · AC' : ''}</div>
             </div>
-            {driver.phone ? (
-              <div className="flex gap-2">
-                <Button asChild size="sm" className="flex-1">
-                  <a href={telHref(driver.phone)} aria-label={`Call ${driver.fullName}`}>
-                    <Phone className="size-4" aria-hidden /> Call driver
-                  </a>
-                </Button>
-                <Button asChild size="sm" variant="outline" className="flex-1">
-                  <a href={smsHref(driver.phone)} aria-label={`Message ${driver.fullName}`}>
-                    <MessageCircle className="size-4" aria-hidden /> Message
-                  </a>
-                </Button>
-              </div>
-            ) : null}
-            <p className="text-[11px] italic text-secondary">Share your OTP with the driver only when they arrive — it confirms you&apos;re the right passenger.</p>
-          </Card>
-        ) : (
-          <Card>
-            <p className="text-sm text-secondary">Couldn&apos;t load the driver&apos;s details right now.</p>
-          </Card>
-        )
+          </div>
+          {driver.phone ? (
+            <div className="flex gap-2">
+              <Button asChild size="sm" className="flex-1">
+                <a href={telHref(driver.phone)} aria-label={`Call ${driver.fullName}`}>
+                  <Phone className="size-4" aria-hidden /> Call driver
+                </a>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="flex-1">
+                <a href={smsHref(driver.phone)} aria-label={`Message ${driver.fullName}`}>
+                  <MessageCircle className="size-4" aria-hidden /> Message
+                </a>
+              </Button>
+            </div>
+          ) : null}
+          <p className="text-[11px] italic text-secondary">Share your OTP with the driver only when they arrive — it confirms you&apos;re the right passenger.</p>
+        </Card>
       ) : (
         <Card className="border-amber-200 bg-amber-50">
           <p className="text-sm text-amber-900">A driver hasn&apos;t been assigned to this trip yet. Their details will show up here as soon as the trip manager picks one.</p>

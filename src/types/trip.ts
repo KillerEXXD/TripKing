@@ -39,12 +39,33 @@ export interface Trip {
   assignedVehicleId?: string;
   assignedAcceptanceId?: string;
   assignedAt?: string;
+  /** The assigned driver, joined server-side (with live position). Present once a driver is assigned. */
+  assignedDriver?: AssignedDriver;
+  /** Server-computed straight-line km from the assigned driver's last position to the drop-off city (in-progress trips only). */
+  distanceToDestinationKm?: number;
   showFareToPassenger: boolean;
   hidePassengerPhone: boolean;
   cancelledAt?: string;
   cancelReasonId?: string;
   applicantCount: number;
   createdAt: string;
+  /** The passenger OTP — echoed only to the trip poster / admin (or returned by `POST /trips/:id/assign`). Used to build the passenger-portal link. */
+  passengerOtp?: string;
+}
+
+/** The assigned driver as embedded on a `Trip` (joined `drivers` row + last reported position). */
+export interface AssignedDriver {
+  id: string;
+  fullName: string;
+  /** Present on `GET /trips/:id` and the passenger-portal lookup (not on the public list). */
+  phone?: string;
+  profilePhotoUrl: string;
+  ratingAvg: number;
+  ratingCount: number;
+  totalTripsCompleted: number;
+  currentLat?: number;
+  currentLng?: number;
+  currentLocationAt?: string;
 }
 
 /** Lightweight driver summary embedded in an applicant card / assigned-trip card. */
