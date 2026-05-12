@@ -1,0 +1,119 @@
+import { describe, it, expect } from 'vitest';
+import { TripTransformError, toApiPostTrip, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
+import type { PostTripInput } from '@/types';
+
+const city = (id: string, name: string) => ({ id, name, state: 'Tamil Nadu', lat: 12.9, lng: 79.1, sort_order: 10, is_active: true });
+
+const fullTrip = {
+  id: 't1',
+  posted_by_user_id: 'u1',
+  posted_by_role: 'trip_manager',
+  posted_by_name: 'Agent A',
+  posted_by_phone: '+919999999999',
+  from_city: city('c1', 'Vellore'),
+  to_city: city('c2', 'Chennai'),
+  pickup_at: '2026-06-01T08:00:00Z',
+  expected_distance_km: 140,
+  car_type_id: 'ct1',
+  car_type: { label: 'Sedan' },
+  seats_required: 4,
+  ac_required: true,
+  rate_per_km: 14,
+  total_fare: 1960,
+  commission_pct: 10,
+  gst_amount: 98,
+  driver_bata: 300,
+  extras_paid_by_passenger: true,
+  driver_instructions: '1. Call before arrival',
+  driver_payout: 1966,
+  passenger_name: 'Pax',
+  passenger_phone: '+918888888888',
+  passenger_count: 2,
+  status: 'open',
+  show_fare_to_passenger: true,
+  hide_passenger_phone: false,
+  applicant_count: 0,
+  created_at: '2026-05-20T10:00:00Z',
+};
+
+describe('transformTrip', () => {
+  it('maps a full trip with joined cities + car_type', () => {
+    const t = transformTrip(fullTrip);
+    expect(t.id).toBe('t1');
+    expect(t.fromCity.name).toBe('Vellore');
+    expect(t.toCity.name).toBe('Chennai');
+    expect(t.carTypeLabel).toBe('Sedan');
+    expect(t.driverPayout).toBe(1966);
+    expect(t.status).toBe('open');
+    expect(t.driverBata).toBe(300);
+  });
+  it('throws on missing id / from_city / total_fare / driver_payout / status', () => {
+    expect(() => transformTrip({ ...fullTrip, id: undefined })).toThrow(TripTransformError);
+    expect(() => transformTrip({ ...fullTrip, from_city: undefined })).toThrow(/MISSING_FROM_CITY/);
+    expect(() => transformTrip({ ...fullTrip, total_fare: undefined })).toThrow(/MISSING_FARE/);
+    expect(() => transformTrip({ ...fullTrip, driver_payout: undefined })).toThrow(/MISSING_PAYOUT/);
+    expect(() => transformTrip({ ...fullTrip, status: undefined })).toThrow(/MISSING_STATUS/);
+  });
+});
+
+describe('transformTripAcceptance', () => {
+  const acc = {
+    id: 'a1',
+    trip_id: 't1',
+    driver_id: 'd1',
+    driver: { id: 'd1', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.8, rating_count: 12, total_trips_completed: 30, top_tags: ['Punctual'], current_city: city('c1', 'Vellore') },
+    vehicle_id: 'v1',
+    vehicle: { id: 'v1', make: { name: 'Toyota' }, model: { name: 'Innova Crysta' }, year: 2021, car_type: { label: 'Innova' }, seats: 7, ac: true },
+    status: 'applied',
+    applicant_quoted_rate_per_km: 13.5,
+    applied_at: '2026-05-21T09:00:00Z',
+  };
+  it('maps an acceptance with embedded driver + vehicle', () => {
+    const a = transformTripAcceptance(acc);
+    expect(a.driver.fullName).toBe('Ravi');
+    expect(a.driver.currentCity?.name).toBe('Vellore');
+    expect(a.vehicle?.makeLabel).toBe('Toyota');
+    expect(a.vehicle?.carTypeLabel).toBe('Innova');
+    expect(a.applicantQuotedRatePerKm).toBe(13.5);
+  });
+  it('throws when the embedded driver is missing', () => {
+    expect(() => transformTripAcceptance({ ...acc, driver: undefined })).toThrow(/no driver/i);
+  });
+});
+
+describe('toApiPostTrip', () => {
+  it('converts camelCase → snake_case', () => {
+    const input: PostTripInput = {
+      fromCityId: 'c1',
+      toCityId: 'c2',
+      pickupAt: '2026-06-01T08:00:00Z',
+      expectedDistanceKm: 140,
+      carTypeId: 'ct1',
+      seatsRequired: 4,
+      acRequired: true,
+      ratePerKm: 14,
+      totalFare: 1960,
+      commissionPct: 10,
+      gstAmount: 98,
+      driverBata: 300,
+      extrasPaidByPassenger: true,
+      passengerName: 'Pax',
+      passengerPhone: '+91',
+      passengerCount: 2,
+      showFareToPassenger: true,
+      hidePassengerPhone: false,
+    };
+    expect(toApiPostTrip(input)).toMatchObject({
+      from_city_id: 'c1',
+      to_city_id: 'c2',
+      pickup_at: '2026-06-01T08:00:00Z',
+      car_type_id: 'ct1',
+      rate_per_km: 14,
+      total_fare: 1960,
+      driver_bata: 300,
+      extras_paid_by_passenger: true,
+      show_fare_to_passenger: true,
+      driver_instructions: null,
+    });
+  });
+});

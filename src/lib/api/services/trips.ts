@@ -1,0 +1,86 @@
+/**
+ * Trips service — the trip lifecycle (post / browse / apply / assign / OTP-start /
+ * complete / cancel). Thin functions over `apiClient`; transforms validate strictly.
+ * (The matching `/trips/*` edge functions land in a later commit.)
+ */
+import { apiClient } from '@/lib/api/client';
+import { toApiPostTrip, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
+import type { ApplyToTripInput, PostTripInput, Trip, TripAcceptance, TripsQueryParams } from '@/types';
+
+type Api = Record<string, unknown>;
+function unwrap<T>(d: T | null): T {
+  if (d === null || d === undefined) throw new Error('trips: empty response body');
+  return d;
+}
+
+export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
+  const q: Record<string, unknown> = {};
+  if (params?.status) q.status = Array.isArray(params.status) ? params.status.join(',') : params.status;
+  if (params?.fromCityId) q.from_city_id = params.fromCityId;
+  if (params?.toCityId) q.to_city_id = params.toCityId;
+  if (params?.postedByUserId) q.posted_by_user_id = params.postedByUserId;
+  if (params?.page) q.page = params.page;
+  if (params?.limit) q.limit = params.limit;
+  if (params?.sort) q.sort = params.sort;
+  return apiClient.get<Api[]>('/trips', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformTrip));
+}
+
+export function getTrip(id: string): Promise<Trip> {
+  return apiClient.get<Api>(`/trips/${id}`).then((r) => transformTrip(unwrap(r.data)));
+}
+
+export function getTripApplicants(tripId: string): Promise<TripAcceptance[]> {
+  return apiClient.get<Api[]>(`/trips/${tripId}/applicants`).then((r) => (r.data ?? []).map(transformTripAcceptance));
+}
+
+export function postTrip(input: PostTripInput): Promise<Trip> {
+  return apiClient.post<Api>('/trips', toApiPostTrip(input)).then((r) => transformTrip(unwrap(r.data)));
+}
+
+export function applyToTrip(tripId: string, input: ApplyToTripInput): Promise<TripAcceptance> {
+  return apiClient
+    .post<Api>(`/trips/${tripId}/applicants`, {
+      vehicle_id: input.vehicleId,
+      applicant_quoted_rate_per_km: input.quotedRatePerKm ?? null,
+      applicant_message: input.message ?? null,
+    })
+    .then((r) => transformTripAcceptance(unwrap(r.data)));
+}
+
+export function withdrawApplication(tripId: string, acceptanceId: string): Promise<void> {
+  return apiClient.delete<unknown>(`/trips/${tripId}/applicants/${acceptanceId}`).then(() => undefined);
+}
+
+export function rejectApplicant(tripId: string, acceptanceId: string, note?: string): Promise<TripAcceptance> {
+  return apiClient
+    .post<Api>(`/trips/${tripId}/applicants/${acceptanceId}/reject`, { decision_note: note ?? null })
+    .then((r) => transformTripAcceptance(unwrap(r.data)));
+}
+
+export function assignDriver(tripId: string, acceptanceId: string): Promise<Trip> {
+  return apiClient.post<Api>(`/trips/${tripId}/assign`, { acceptance_id: acceptanceId }).then((r) => transformTrip(unwrap(r.data)));
+}
+
+export function startTrip(tripId: string, input: { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number }): Promise<Trip> {
+  return apiClient
+    .post<Api>(`/trips/${tripId}/start`, {
+      passenger_otp: input.passengerOtp,
+      start_odo_url: input.startOdoUrl ?? null,
+      start_odo_reading: input.startOdoReading ?? null,
+    })
+    .then((r) => transformTrip(unwrap(r.data)));
+}
+
+export function completeTrip(tripId: string, input?: { endOdoUrl?: string; endOdoReading?: number; driverNotes?: string }): Promise<Trip> {
+  return apiClient
+    .post<Api>(`/trips/${tripId}/complete`, {
+      end_odo_url: input?.endOdoUrl ?? null,
+      end_odo_reading: input?.endOdoReading ?? null,
+      driver_notes: input?.driverNotes ?? null,
+    })
+    .then((r) => transformTrip(unwrap(r.data)));
+}
+
+export function cancelTrip(tripId: string, cancelReasonId: string): Promise<Trip> {
+  return apiClient.post<Api>(`/trips/${tripId}/cancel`, { cancel_reason_id: cancelReasonId }).then((r) => transformTrip(unwrap(r.data)));
+}
