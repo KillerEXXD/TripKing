@@ -26,8 +26,8 @@ export async function verifyOtp(phone: string, otp: string): Promise<User> {
 
 /** Fetch the current session's user (uses the stored access token; the client refreshes on 401). */
 export async function getCurrentUser(): Promise<User> {
-  const res = await apiClient.get<ApiUser>('/me');
-  if (!res.data) throw new Error('/me returned no user');
+  const res = await apiClient.get<ApiUser>('/auth/me');
+  if (!res.data) throw new Error('/auth/me returned no user');
   return transformUser(res.data);
 }
 

@@ -6,9 +6,11 @@ import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
 
 // Mirrors hudr-pwa/vite.config.ts. See CLAUDE.md §"Caching" for the Workbox strategy
-// and §"API" for the dev proxy. Dev: requests to /api/* are proxied to the real host
-// (CORS-free). Prod: the app calls VITE_API_BASE_URL directly.
-const DEV_API_TARGET = 'https://api.tripking.in';
+// and §"API" for the dev proxy. Dev: requests to /api/* are proxied to the Supabase
+// Edge Functions host (CORS-free); resources are function-name-prefixed (/auth/*, /admin/*,
+// later /trips/* …). Prod: the app calls VITE_API_BASE_URL directly (point it at the same
+// /functions/v1 base, or at an api.tripking.in gateway in front of it).
+const DEV_API_TARGET = 'https://saxcbebqxgatiktsebxw.supabase.co/functions/v1';
 
 export default defineConfig({
   plugins: [
