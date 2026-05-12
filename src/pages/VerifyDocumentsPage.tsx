@@ -1,0 +1,127 @@
+/**
+ * `/verify/documents` — step 2 of the driver "Get verified" checklist. Upload Aadhaar (front &
+ * back), driving licence and a selfie + the masked Aadhaar last-4, the licence number/expiry, and
+ * accept the document-upload consent. Submitting moves `kyc_status` → docs_submitted.
+ */
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { toast } from 'sonner';
+import { useMyDriver, useSubmitDriverKycDocs } from '@/hooks/useDrivers';
+import { getDriverKycDocUploadUrl } from '@/lib/api/services/drivers';
+import { Button, Card, Input } from '@/components/ui';
+import { FileUpload } from '@/components/form';
+import { ErrorState, LoadingSkeleton } from '@/components/feedback';
+import type { DriverKycDocType } from '@/types';
+
+function Header({ onBack }: { onBack: () => void }) {
+  return (
+    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+        <ArrowLeft className="size-5" aria-hidden />
+      </button>
+      <h1 className="text-base font-semibold">Identity documents</h1>
+    </header>
+  );
+}
+
+export function VerifyDocumentsPage() {
+  const navigate = useNavigate();
+  const driverQuery = useMyDriver();
+  const submit = useSubmitDriverKycDocs();
+
+  const [paths, setPaths] = useState<Partial<Record<DriverKycDocType, string>>>({});
+  const [last4, setLast4] = useState('');
+  const [dlNumber, setDlNumber] = useState('');
+  const [dlExpiry, setDlExpiry] = useState('');
+  const [consent, setConsent] = useState(false);
+
+  if (driverQuery.isPending) return <div className="p-6"><LoadingSkeleton rows={6} /></div>;
+  if (driverQuery.isError || !driverQuery.data) return <div className="p-6"><ErrorState title="Couldn't load your profile" onRetry={() => driverQuery.refetch()} /></div>;
+  const driver = driverQuery.data;
+  const docs = driver.verification?.steps.documents;
+  const set = (t: DriverKycDocType) => (path: string) => setPaths((p) => ({ ...p, [t]: path }));
+  const uploadUrlFor = (t: DriverKycDocType) => () => getDriverKycDocUploadUrl(driver.id, t);
+
+  const last4ok = /^\d{4}$/.test(last4);
+  const ready = !!paths.aadhaar_front && !!paths.aadhaar_back && !!paths.driver_license && !!paths.selfie && last4ok && dlNumber.trim().length > 0 && consent && !submit.isPending;
+
+  async function onSubmit() {
+    try {
+      await submit.mutateAsync({
+        driverId: driver.id,
+        input: {
+          aadhaarFrontPath: paths.aadhaar_front as string,
+          aadhaarBackPath: paths.aadhaar_back as string,
+          aadhaarLast4: last4,
+          driverLicensePath: paths.driver_license as string,
+          driverLicenseNumber: dlNumber.trim(),
+          driverLicenseExpiry: dlExpiry || undefined,
+          selfiePath: paths.selfie as string,
+          consent: true,
+        },
+      });
+      toast.success('Documents submitted — we’ll review them shortly.');
+      navigate('/profile');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not submit your documents');
+    }
+  }
+
+  return (
+    <div>
+      <Header onBack={() => navigate(-1)} />
+      <div className="space-y-4 px-4 py-4">
+        {docs === 'done' && (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            <ShieldCheck className="size-4" aria-hidden /> You’ve already submitted your documents. You can re-upload below if asked.
+          </div>
+        )}
+        <p className="text-sm text-secondary">
+          We use these to confirm you’re a real, licensed driver. <strong>Only admins</strong> see them during review, and your full Aadhaar number is never stored — only the last 4 digits.
+        </p>
+
+        <Card className="gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <FileUpload label="Aadhaar — front" required value={undefined} getUploadUrl={uploadUrlFor('aadhaar_front')} onUploaded={set('aadhaar_front')} />
+            <FileUpload label="Aadhaar — back" required value={undefined} getUploadUrl={uploadUrlFor('aadhaar_back')} onUploaded={set('aadhaar_back')} />
+          </div>
+          <div className="space-y-1.5">
+            <label htmlFor="last4" className="text-sm font-medium">Aadhaar — last 4 digits<span className="text-destructive"> *</span></label>
+            <Input id="last4" inputMode="numeric" maxLength={4} placeholder="1234" value={last4} onChange={(e) => setLast4(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+            {last4.length > 0 && !last4ok && <p className="text-xs text-destructive">Enter exactly the last 4 digits.</p>}
+          </div>
+        </Card>
+
+        <Card className="gap-4">
+          <FileUpload label="Driving licence" required allowPdf value={undefined} getUploadUrl={uploadUrlFor('driver_license')} onUploaded={set('driver_license')} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label htmlFor="dln" className="text-sm font-medium">Licence number<span className="text-destructive"> *</span></label>
+              <Input id="dln" placeholder="TN09 20200001234" value={dlNumber} onChange={(e) => setDlNumber(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <label htmlFor="dlx" className="text-sm font-medium">Expiry date</label>
+              <Input id="dlx" type="date" value={dlExpiry} onChange={(e) => setDlExpiry(e.target.value)} />
+            </div>
+          </div>
+        </Card>
+
+        <Card className="gap-3">
+          <FileUpload label="Selfie" hint="A clear photo of your face — we match it on the video call." required capture="user" value={undefined} getUploadUrl={uploadUrlFor('selfie')} onUploaded={set('selfie')} />
+        </Card>
+
+        <label className="flex items-start gap-2 text-xs text-secondary">
+          <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" />
+          <span>I consent to TripKing storing these documents securely for KYC verification, in line with UIDAI guidelines for Aadhaar.</span>
+        </label>
+
+        <Button variant="full" size="lg" disabled={!ready} onClick={onSubmit}>
+          {submit.isPending ? 'Submitting…' : 'Submit for verification'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export default VerifyDocumentsPage;

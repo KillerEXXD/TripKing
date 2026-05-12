@@ -7,6 +7,7 @@ import { useMyAgent, useMyDriver, useUpdateAgent, useUpdateDriver } from '@/hook
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card, Input } from '@/components/ui';
+import { DriverVerificationChecklist } from '@/components/driver';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatRating, initials } from '@/lib/utils';
@@ -145,26 +146,43 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
         )}
       </Card>
 
+      {driver.verification ? (
+        <div id="get-verified" className="scroll-mt-4">
+          <DriverVerificationChecklist verification={driver.verification} primaryVehicleId={(vehiclesQuery.data ?? []).find((v) => v.isPrimary)?.id ?? (vehiclesQuery.data ?? [])[0]?.id} />
+        </div>
+      ) : null}
+
       <Card className="gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Your vehicles</div>
+        <div className="flex items-center justify-between">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Your vehicles</div>
+          <Link to="/vehicles/new" className="text-xs font-medium text-primary hover:underline">+ Add vehicle</Link>
+        </div>
         {vehiclesQuery.isPending ? (
           <LoadingSkeleton rows={2} />
         ) : vehiclesQuery.isError ? (
           <p className="text-sm text-secondary">Couldn&apos;t load your vehicles.</p>
         ) : (vehiclesQuery.data ?? []).length === 0 ? (
-          <p className="text-sm text-secondary">No vehicles added yet.</p>
+          <p className="text-sm text-secondary">No vehicles added yet. <Link to="/vehicles/new" className="font-medium text-primary underline">Add one</Link> to get verified.</p>
         ) : (
-          <div className="space-y-1.5">
-            {(vehiclesQuery.data ?? []).map((v) => (
-              <div key={v.id} className="flex items-center gap-2 text-sm">
-                <Car className="size-4 shrink-0 text-secondary" aria-hidden />
-                <span className="font-medium">
-                  {[v.makeLabel, v.modelName].filter(Boolean).join(' ') || 'Vehicle'}
-                  {v.year ? ` ${v.year}` : ''}
-                </span>
-                <span className="text-secondary">· {v.carTypeLabel ?? 'Car'} · {v.seats} seats · {v.ac ? 'AC' : 'Non-AC'}{v.isPrimary ? ' · primary' : ''}</span>
-              </div>
-            ))}
+          <div className="space-y-2">
+            {(vehiclesQuery.data ?? []).map((v) => {
+              const photosDone = !!v.photoFrontUrl && !!v.photoBackUrl && !!v.photoLeftUrl && !!v.photoRightUrl && !!v.photoPlateUrl && !!v.rcBookUrl && !!v.insuranceUrl;
+              return (
+                <div key={v.id} className="rounded-lg border px-3 py-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Car className="size-4 shrink-0 text-secondary" aria-hidden />
+                    <span className="font-medium">{[v.makeLabel, v.modelName].filter(Boolean).join(' ') || 'Vehicle'}{v.year ? ` ${v.year}` : ''}</span>
+                    {v.isPrimary ? <Badge variant="muted">primary</Badge> : null}
+                  </div>
+                  <div className="mt-0.5 text-xs text-secondary">{v.carTypeLabel ?? 'Car'} · {v.seats} seats · {v.ac ? 'AC' : 'Non-AC'}{v.fuelTypeLabel ? ` · ${v.fuelTypeLabel}` : ''}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}</div>
+                  <div className="mt-1.5 flex items-center gap-3 text-xs">
+                    <Badge variant={photosDone ? 'success' : 'warning'}>{photosDone ? 'Photos complete' : 'Photos needed'}</Badge>
+                    <Link to={`/vehicles/${v.id}/photos`} className="font-medium text-primary hover:underline">{photosDone ? 'View photos' : 'Add photos'}</Link>
+                    <Link to={`/vehicles/${v.id}/edit`} className="font-medium text-primary hover:underline">Edit</Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>

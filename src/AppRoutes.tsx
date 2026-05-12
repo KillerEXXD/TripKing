@@ -15,6 +15,10 @@ const TripDetailPage = lazy(() => import('@/pages/TripDetailPage'));
 const ApplicantReviewPage = lazy(() => import('@/pages/ApplicantReviewPage'));
 const DriverProfilePage = lazy(() => import('@/pages/DriverProfilePage'));
 const ProfilePage = lazy(() => import('@/pages/ProfilePage'));
+const VerifyDocumentsPage = lazy(() => import('@/pages/VerifyDocumentsPage'));
+const VehicleFormPage = lazy(() => import('@/pages/VehicleFormPage'));
+const VehiclePhotosPage = lazy(() => import('@/pages/VehiclePhotosPage'));
+const BookVideoCallPage = lazy(() => import('@/pages/BookVideoCallPage'));
 const VacanciesPage = lazy(() => import('@/pages/VacanciesPage'));
 const PostVacancyPage = lazy(() => import('@/pages/PostVacancyPage'));
 const AlertsPage = lazy(() => import('@/pages/AlertsPage'));
@@ -64,6 +68,11 @@ export function AppRoutes() {
           <Route path="/posted-trips" element={<PostedTripsPage />} />
           <Route path="/drivers/:id" element={<DriverProfilePage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/verify/documents" element={<VerifyDocumentsPage />} />
+          <Route path="/verify/video-call" element={<BookVideoCallPage />} />
+          <Route path="/vehicles/new" element={<VehicleFormPage />} />
+          <Route path="/vehicles/:id/edit" element={<VehicleFormPage />} />
+          <Route path="/vehicles/:id/photos" element={<VehiclePhotosPage />} />
           <Route path="/vacancies" element={<VacanciesPage />} />
           <Route path="/vacancies/new" element={<PostVacancyPage />} />
           <Route path="/alerts" element={<AlertsPage />} />

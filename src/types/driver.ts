@@ -16,7 +16,7 @@ export interface VerificationSummary {
   steps: Partial<Record<DriverVerificationStepKey, VerificationStepStatus>>;
   stepsDone: number;
   stepsTotal: number;
-  videoVerification?: { id: string; status: VideoVerificationStatus; scheduledAt?: string; meetingUrl?: string; outcome?: VideoOutcome } | null;
+  videoVerification?: { id: string; status: VideoVerificationStatus; scheduledAt: string; meetingUrl: string; outcome?: VideoOutcome } | null;
   kycRejectionReason?: string | null;
 }
 

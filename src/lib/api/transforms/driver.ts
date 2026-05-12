@@ -62,8 +62,8 @@ function transformVerification(v: unknown): VerificationSummary | undefined {
       ? {
           id: str(vvRaw.id) ?? '',
           status: ((typeof vvRaw.status === 'string' && (VV_STATUSES as string[]).includes(vvRaw.status) ? vvRaw.status : 'scheduled') as VideoVerificationStatus),
-          scheduledAt: str(vvRaw.scheduled_at),
-          meetingUrl: str(vvRaw.meeting_url),
+          scheduledAt: str(vvRaw.scheduled_at) ?? '',
+          meetingUrl: str(vvRaw.meeting_url) ?? '',
           outcome: typeof vvRaw.outcome === 'string' && (VV_OUTCOMES as string[]).includes(vvRaw.outcome) ? (vvRaw.outcome as VideoOutcome) : undefined,
         }
       : null,

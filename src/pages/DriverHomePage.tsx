@@ -8,6 +8,7 @@ import { useVacancies } from '@/hooks/useVacancies';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card } from '@/components/ui';
+import { GetVerifiedBanner } from '@/components/driver';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -135,6 +136,7 @@ function DriverHome({ driver }: { driver: Driver }) {
       </header>
 
       <div className="space-y-3 px-4 pb-4 pt-3">
+        {driver.verification && <GetVerifiedBanner verification={driver.verification} primaryVehicleId={driver.vehicles[0]?.id} />}
         {nearCity ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 py-1.5 pl-3 pr-2 text-sm text-emerald-700">
             <MapPin className="size-3.5" aria-hidden />
