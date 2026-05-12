@@ -20,6 +20,8 @@ tags:
     description: Driver availability posts (driver is in city X, willing to drive to one of these destinations).
   - name: alerts
     description: Saved searches that fire a notification on a matching trip/vacancy (owner-scoped).
+  - name: reviews
+    description: Post-trip ratings (passenger→driver, manager→driver, driver→manager).
 components:
   schemas:
     ApiError:
@@ -238,3 +240,10 @@ paths:
     get: { tags: [alerts], summary: 'Get an alert (owner/admin; Bearer)', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' } } }
     patch: { tags: [alerts], summary: 'Update an alert (owner; Bearer) — partial; include is_active/paused_at to pause/resume', parameters: [{ $ref: '#/components/parameters/id' }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' }, '422': { $ref: '#/components/responses/Envelope' } } }
     delete: { tags: [alerts], summary: 'Delete an alert (owner; Bearer)', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' } } }
+  /reviews:
+    get: { tags: [reviews], summary: 'List reviews (published rows + the caller''s own when authed; admins see all)', parameters: [{ name: trip_id, in: query, schema: { type: string } }, { name: ratee_user_id, in: query, schema: { type: string } }, { name: direction, in: query, schema: { type: string, enum: [passenger_to_driver, manager_to_driver, driver_to_manager] } }, { name: limit, in: query, schema: { type: integer } }], responses: { '200': { $ref: '#/components/responses/Envelope' } } }
+    post: { tags: [reviews], summary: 'Post a review (Bearer; rater_user_id = caller) — the trip must be completed; unique (trip_id, direction); ratee_user_id derived from the trip if omitted; fires a review_received notification', requestBody: { required: true, content: { application/json: { schema: { type: object, required: [trip_id, direction, score], properties: { trip_id: { type: string }, direction: { type: string, enum: [passenger_to_driver, manager_to_driver, driver_to_manager] }, score: { type: integer, minimum: 1, maximum: 5 }, comment: { type: string }, tag_ids: { type: array, items: { type: string } }, ratee_user_id: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' }, '409': { $ref: '#/components/responses/Envelope' }, '422': { $ref: '#/components/responses/Envelope' } } }
+  /reviews/{id}/report:
+    post: { tags: [reviews], summary: 'Report a review (any authed user; Bearer) — sets is_flagged + flag_reason', parameters: [{ $ref: '#/components/parameters/id' }], requestBody: { content: { application/json: { schema: { type: object, properties: { flag_reason: { type: string } } } } } }, responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' } } }
+  /reviews/{id}:
+    get: { tags: [reviews], summary: 'Get a review (published, or own, or admin)', parameters: [{ $ref: '#/components/parameters/id' }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' } } }

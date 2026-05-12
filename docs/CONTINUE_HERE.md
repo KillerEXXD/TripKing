@@ -13,7 +13,7 @@
 **Phase 3 — backend ✅** —
 - Migrations 002 & 003 applied (23 tables): `users` (1:1 `auth.users` + `handle_new_user` + `is_admin()`); `drivers`/`trip_managers`/`vehicles` via the FK lookups; `trips`/`trip_acceptances`/`trip_executions` with the `driver_payout` & `applicant_count` triggers; `vacancies`+`vacancy_destinations`/`alerts`/`reviews`/`notifications`; admin-write RLS on the migration-001 tables.
 - The complete typed **data layer for all 10 resources** (`auth`, `admin-config`, `trips`, `drivers`/`agents`, `vehicles`, `vacancies`, `alerts`, `reviews`, `notifications`): `src/types/*`, strict throw-on-missing `src/lib/api/transforms/*` (+ `toApi*` writers), `src/lib/api/services/*` over `apiClient`, React Query `src/hooks/use*` (queries + mutations with invalidation), transform tests — **102 tests passing**.
-- **Edge functions deployed & smoke-verified:** `/admin` (8/8), `/auth` (phone-OTP, dev-OTP `123456`, real Supabase sessions via synthetic-email users — 7/7), `/trips` (full lifecycle: post / browse with joins / apply / withdraw / reject / assign+OTP-gen / start+OTP-verify / complete / cancel — 8/8), `/notifications` (list / mark-read / mark-all — 6/6), `/vehicles` (CRUD + derived `eligibility_status` — 6/6), `/drivers` + `/agents` (profiles + "create my profile" + location; idempotent profile-create syncs `users.role` — 22/22, commit `eccde0e`), `/vacancies` (browse with filters + joins / post with destinations / cancel — 22/22), `/alerts` (owner-scoped saved-search CRUD — 21/21). OpenAPI (`public/docs/openapi.{yaml,json}`) covers all of them.
+- **Edge functions deployed & smoke-verified:** `/admin` (8/8), `/auth` (phone-OTP, dev-OTP `123456`, real Supabase sessions via synthetic-email users — 7/7), `/trips` (full lifecycle: post / browse with joins / apply / withdraw / reject / assign+OTP-gen / start+OTP-verify / complete / cancel — 8/8), `/notifications` (list / mark-read / mark-all — 6/6), `/vehicles` (CRUD + derived `eligibility_status` — 6/6), `/drivers` + `/agents` (profiles + "create my profile" + location; idempotent profile-create syncs `users.role` — 22/22, commit `eccde0e`), `/vacancies` (browse with filters + joins / post with destinations / cancel — 22/22), `/alerts` (owner-scoped saved-search CRUD — 21/21), `/reviews` (post-trip ratings; published-or-own visibility; trip-completed check; ratee derived; review_received notification; report — 25/25). OpenAPI (`public/docs/openapi.{yaml,json}`) covers all of them. **All 10 marketplace edge functions are now live** — the backend lane's core scope is complete.
 - Dev wiring: `vite.config.ts`'s `/api` proxy → `https://saxcbebqxgatiktsebxw.supabase.co/functions/v1`; the frontend services call resource-prefixed paths (`/auth/*`, `/admin/*`, `/trips/*`, `/notifications/*`, `/vehicles/*`) which route straight to those functions.
 
 ---
@@ -24,10 +24,12 @@ The remaining work is split into two **conflict-free lanes** so two Claude sessi
 
 | Lane | Entry doc | Owns (the only paths it touches) | Scope |
 |---|---|---|---|
-| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | the remaining edge functions (✅ `/drivers`+`/agents`+`/vacancies`+`/alerts` done → next `/reviews`), then Phase-4/5 backend endpoints |
+| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | ✅ all 10 marketplace edge functions done (`/drivers`+`/agents`+`/vacancies`+`/alerts`+`/reviews` shipped this round) → next is **Phase-4/5 backend endpoints** |
 | **B — frontend** | **`docs/CONTINUE_HERE_FRONTEND.md`** | `src/**` (pages, components, hooks, lib, types, `AppRoutes.tsx`, `index.css`, `__tests__`) | the ~15 Phase-3 screens on the existing hooks, then Phase-4/5 UIs |
 
 No file appears in both lanes (`package.json`/lockfile is in *neither* — adding a dep needs the user). `CLAUDE.md` and the `CONTINUE_HERE*.md` docs are shared but append-only, each session in its own section.
+
+**Shared-working-tree gotcha:** if both sessions run in the *same* checkout (rather than separate `git worktree`s), the Husky pre-push runs the *whole* test suite — including the other lane's uncommitted WIP. If your `git push` fails on a test/file you don't own, `git stash push -u -m "..."` your counterpart's WIP → `git push` → `git stash pop`. (Cleaner: `git worktree add ../TripKing-backend` so each lane has its own checkout.)
 
 **The one cross-lane contract:** the `POST /drivers` / `POST /agents` "create my profile" route — backend implements it (commit 1), frontend consumes it via a new `createMyDriverProfile`/`createMyAgentProfile` in `src/lib/api/services/drivers.ts`+`src/hooks/useDrivers.ts`. Shape: `{ full_name, role:'driver'|'trip_manager', home_city_id, … }`. Neither side changes it without updating both lane docs.
 
@@ -37,9 +39,9 @@ No file appears in both lanes (`package.json`/lockfile is in *neither* — addin
 
 ---
 
-## NEXT STEP → the **`/reviews` edge function** (✅ `/drivers` + `/agents` + `/vacancies` + `/alerts` shipped)
+## NEXT STEP → **Phase-4/5 backend endpoints** (✅ all 10 marketplace edge functions shipped — `/admin`, `/auth`, `/trips`, `/notifications`, `/vehicles`, `/drivers`, `/agents`, `/vacancies`, `/alerts`, `/reviews`)
 
-Then: **`/reviews`** → then the **screens** → then **Phases 4–6**. *(Running in parallel? See the lane split above — backend = `docs/CONTINUE_HERE_BACKEND.md`, frontend = `docs/CONTINUE_HERE_FRONTEND.md`.)*
+Backend lane: Phase-4 admin-ops endpoints (KYC-queue actions, vehicle-eligibility dashboard data, translation-manager backend, reviews-moderation) → Phase-5 analytics endpoints — same recipe (see `docs/CONTINUE_HERE_BACKEND.md`). Frontend lane: the **screens** (see `docs/CONTINUE_HERE_FRONTEND.md`) → then **Phases 4–6** UIs. *(Running in parallel? See the lane split above.)*
 
 ### The recipe (every remaining edge function — mirror `supabase/functions/trips/index.ts`)
 

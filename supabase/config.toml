@@ -417,6 +417,10 @@ verify_jwt = false
 [functions.alerts]
 verify_jwt = false
 
+# /reviews/* — public reads (published rows); the function validates the caller's Bearer JWT for posting/reporting.
+[functions.reviews]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
