@@ -1,0 +1,49 @@
+# TripKing — security review (Phase 6, backend lane)
+
+> Living doc. Started when the `/admin` `X-Admin-Key` stopgap was replaced with a `role=admin` Bearer check (commit `feat(admin): …`). Owned by the backend lane; update it as Phase-6 items land.
+
+## Threat model in one paragraph
+
+The browser never touches Postgres directly — every request goes through the Supabase Edge Functions (`/functions/v1/<name>`), which run with the **service-role key** (RLS-bypassing) and therefore **must enforce access control themselves**. Each function validates the caller's Bearer access token via GoTrue (`db.auth.getUser(token)` → `auth.uid()`), looks up `public.users.role`, and then applies owner / poster / assigned-driver / `role==='admin'` rules that **mirror the RLS policies in migrations 002/003** (the RLS policies are now "documentation of intent" + a defence-in-depth net if a query ever runs under the anon key). Public reference/content reads (`/admin/<list>` GET, `/drivers`, `/vacancies`, published `/reviews`, …) are intentionally unauthenticated.
+
+## RLS-coverage audit — edge-function check ↔ RLS policy
+
+| Resource (function) | Migration RLS policy | Function-level enforcement | Verdict |
+|---|---|---|---|
+| `users` (via `/auth`) | self insert; self/admin update; authed read | `verify-otp` upserts the caller's own row; no edit endpoint beyond profile sub-resources | ✓ matches |
+| `drivers` / `trip_managers` (`/drivers`, `/agents`) | public read; owner insert; owner/admin update | GET = public; `POST /drivers` `user_id = auth.uid()`; `PATCH /:id` = owner or `role==='admin'`; `PATCH /:id/location` = owner only; **`PATCH /:id/kyc` = `role==='admin'` only** (RLS says owner-or-admin can update *any* column — the function is stricter for the KYC column on purpose) | ✓ matches (KYC stricter by design) |
+| `vehicles` (`/vehicles`) | public read; owning-driver insert; owning-driver/admin update+delete | GET = public (+ `?eligibility=`/`?needs_attention=` filters, post-derive); `POST` = caller must have a `drivers` row; `PATCH`/`DELETE` = `owns_driver` or `role==='admin'`; `driver_id` can't be reassigned | ✓ matches |
+| `trips` (`/trips`) | public read; poster insert; poster/assigned-driver/admin update | GET = public; `POST` `posted_by_user_id = auth.uid()`; applicants list = poster/admin; apply = caller's `drivers` row; withdraw = owning driver/admin; reject/assign/cancel = poster/admin; start/complete = assigned driver/admin | ✓ matches |
+| `trip_acceptances` (`/trips/.../applicants`) | visible to applying driver / trip poster / admin; driver insert; driver/poster/admin update | GET applicants = poster/admin; POST = caller's `drivers` row; withdraw = owning driver/admin; reject = poster/admin | ✓ matches |
+| `trip_executions` (`/trips/.../start|complete`) | assigned-driver/poster/admin | start/complete = assigned driver/admin | ✓ matches |
+| `vacancies` (+ `vacancy_destinations`) (`/vacancies`) | public read; owning-driver insert; owning-driver/admin update+delete | GET = public; `POST` = caller's `drivers` row (inserts the vacancy + junction rows, rollback on junction failure); `POST /:id/cancel` = owning driver or `role==='admin'` | ✓ matches |
+| `alerts` (`/alerts`) | owner read (+ admin read); owner insert/update/delete | every route Bearer-required; GET list = `user_id = caller`; GET/:id = owner or `role==='admin'`; POST `user_id = caller`; PATCH/DELETE = owner only | ✓ matches |
+| `reviews` (`/reviews`) | published-or-own-or-admin read; rater insert; admin update/delete | GET = published OR `rater_user_id`/`ratee_user_id` == caller (PostgREST `.or`), admins see all; `POST` `rater_user_id = caller`, requires `trip.status='completed'`, unique `(trip_id,direction)`; `POST /:id/report` = any authed user (intentionally broader than the RLS update policy — a report is a flag, not an edit); **`POST /:id/moderate` = `role==='admin'` only** (matches "admin update") | ✓ matches (report intentionally broader) |
+| `notifications` (`/notifications`) | owner read+update | every route Bearer-required; scoped to `user_id = caller`. Inserts come from triggers / other functions running under service-role (e.g. `kyc_status_change`, `review_received`) — there's no public insert endpoint | ✓ matches |
+| `admin_audit_log` (`/admin/*` mutations) | admin read only | written by `/admin/*` mutations (service-role); no read endpoint exposed yet | ✓ matches |
+| migration-001 lookup tables (`/admin/<list>`) | public read; admin-only write | GET = public; POST/PATCH/DELETE/reorder + `PUT /admin/app-settings` = **`role==='admin'` Bearer** (was `X-Admin-Key` — replaced); every mutation writes an `admin_audit_log` row with `actor_user_id` | ✓ matches (stopgap removed) |
+| `get_admin_dashboard()` / `get_agent_analytics()` (`/analytics`) | SECURITY DEFINER SQL fns (no RLS) | `GET /analytics/admin` = `role==='admin'`; `GET /analytics/agent` = self, or `?user_id=` if `role==='admin'` | ✓ |
+
+**No gaps found** in the function-level checks vs the RLS intent. Two intentional divergences (driver KYC column is admin-only despite owner-update RLS; review *report* is open to any authed user despite admin-only update RLS) are noted above and are by design.
+
+## Authentication notes
+
+- **Bearer everywhere for writes.** Access token from `POST /auth/verify-otp` (~1 h), refresh token (~30 d), 401 → single-flight `POST /auth/refresh` in the `apiClient`. The `apiClient` carries `Authorization: Bearer …` when signed in; otherwise `X-API-Key` for public reads.
+- **`/admin/*` now requires `role==='admin'`** (not the old `X-Admin-Key` env secret). The `ADMIN_API_KEY` env secret on the `admin` function and in `.env.development` is now unused (safe to remove). This also **fixes the `/administration/config` UI** — its writes now succeed when an admin is signed in (the `apiClient` already sends the Bearer).
+
+## Remaining Phase-6 hardening (TODO)
+
+| Item | Why / what | Notes |
+|---|---|---|
+| **`/auth` must reject `role:'admin'` self-signup in production** | `verify-otp` currently honours `body.role === 'admin'` (handy for dev + the smoke tests, which create throwaway admins). In prod anyone could self-promote. | Gate behind a `TRIPKING_DEV_MODE` (or similar) env flag, or only allow `admin` when the caller is already an admin / via a separate admin-provisioning path. **Do this together with replacing dev-OTP** — both are "lock down `/auth` for prod". |
+| **Real SMS provider + `auth_otps` table** | `/auth` is in dev mode: `request-otp` returns the code, `verify-otp` accepts `123456` (any 6-digit). | Needs a provider decision (Twilio / MSG91 / …) + creds. Then: an `auth_otps(phone, code_hash, expires_at, attempts)` table, send via the provider, verify against the hash, rate-limit per phone. |
+| **Rate limiting** on `/auth` (`request-otp`/`verify-otp`) and the write endpoints | Abuse / SMS-cost / brute-force protection. GoTrue rate-limits its own ops (`auth.rate_limit` in `config.toml`), but the synthetic-email `admin.createUser`/`signInWithPassword` path partially bypasses that. | A small `rate_limits(key, window_start, count)` table + a `_shared/rateLimit.ts` helper (fixed-window per IP and/or per phone). Adds one DB round-trip to the limited routes. |
+| **`api_metrics` persistence** | `withTiming` currently only logs; the `_shared/timing.ts` has a "TODO once that table exists" note. | Migration for an `api_metrics` table + fire-and-forget insert from `withTiming` (the TournamentPro pattern). Observability, not strictly security. |
+| **Load tests** (`tests/load/` k6) | Per the "new edge function" checklist; none exist yet. | Optional; set up a k6 scaffold with per-endpoint thresholds if load-testing is wanted. |
+| **a11y audit / perf pass** | Frontend lane (Phase-6 UI work) — not the backend lane. | — |
+
+## How to verify (this round)
+
+- `npx supabase functions deploy admin --project-ref saxcbebqxgatiktsebxw --no-verify-jwt`
+- `ADMIN_API_BASE=https://saxcbebqxgatiktsebxw.supabase.co/functions/v1 node scripts/test-admin-config.cjs` — 11 checks: public reads, 404, unauth mutation → 401, non-admin mutation → 403, admin create/disable/delete round-trip. ✓
+- The `/administration/config` UI: sign in as an admin (in dev: `verify-otp` with `role:'admin'`) → master-data CRUD works; signed in as a driver/agent → mutations 403.

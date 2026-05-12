@@ -14,12 +14,12 @@
  * Lists: car-types · fuel-types · vehicle-makes · vehicle-models · seat-options ·
  * cities · languages · review-tags · cancel-reasons.
  *
- * Auth: every mutating call requires the `X-Admin-Key` header to match the
- * `ADMIN_API_KEY` env secret — this is a documented STOPGAP until `public.users`
- * + an auth backend land, at which point it becomes a proper `role=admin` check.
- * Every mutation writes an `admin_audit_log` row. Reads are public (the reference
- * data is public content; the frontend `useAdminConfig` queries it). Instrumented
- * with `withTiming`.
+ * Auth: every mutating call requires a Bearer access token whose `users.role === 'admin'`
+ * (validated via GoTrue; the actor's id is recorded on each `admin_audit_log` row). Reads
+ * are public (the reference data is public content; the frontend `useAdminConfig` queries
+ * it). Instrumented with `withTiming`; verify_jwt = false (the function validates).
+ * (Until Phase-6 hardening, the `/auth` function lets a dev sign up with role:'admin'; in
+ * production admins must be provisioned out-of-band — see docs/SECURITY_REVIEW.md.)
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -48,15 +48,20 @@ const LISTS: Record<string, ListCfg> = {
 
 type Db = ReturnType<typeof serviceClient>;
 
-function requireAdmin(req: Request): Response | null {
-  const expected = Deno.env.get('ADMIN_API_KEY');
-  if (!expected) return fail('CONFIG_ERROR', 'ADMIN_API_KEY not configured', 500);
-  if (req.headers.get('x-admin-key') !== expected) return fail('FORBIDDEN', 'Admin key required', 403);
-  return null;
+/** Validates the Bearer token and requires `users.role === 'admin'`. Returns the admin's id, or an error Response. */
+async function requireAdmin(db: Db, req: Request): Promise<{ id: string } | Response> {
+  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
+  const token = h && h.startsWith('Bearer ') ? h.slice(7) : null;
+  if (!token) return fail('UNAUTHORIZED', 'Sign in as an administrator', 401);
+  const { data, error } = await db.auth.getUser(token);
+  if (error || !data?.user) return fail('UNAUTHORIZED', 'Invalid or expired session', 401);
+  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
+  if (!u || u.role !== 'admin') return fail('FORBIDDEN', 'Administrator role required', 403);
+  return { id: u.id as string };
 }
 
-async function audit(db: Db, action: string, entity: string, entityId: string | null, before: unknown, after: unknown): Promise<void> {
-  await db.from('admin_audit_log').insert({ action, entity, entity_id: entityId, before_json: before ?? null, after_json: after ?? null });
+async function audit(db: Db, actorId: string, action: string, entity: string, entityId: string | null, before: unknown, after: unknown): Promise<void> {
+  await db.from('admin_audit_log').insert({ actor_user_id: actorId, action, entity, entity_id: entityId, before_json: before ?? null, after_json: after ?? null });
 }
 
 async function readBody(req: Request): Promise<Record<string, unknown>> {
@@ -93,13 +98,13 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       return ok(data);
     }
     if (req.method === 'PUT' || req.method === 'PATCH') {
-      const adminErr = requireAdmin(req);
-      if (adminErr) return adminErr;
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
       const body = await readBody(req);
       const { data: before } = await db.from('app_settings').select('*').eq('id', 1).single();
       const { data, error } = await db.from('app_settings').update(body).eq('id', 1).select('*').single();
       if (error) return pgFail(error);
-      await audit(db, 'update', 'app_settings', '1', before, data);
+      await audit(db, a.id, 'update', 'app_settings', '1', before, data);
       return ok(data);
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/app-settings`, 405);
@@ -128,21 +133,21 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
 
   // POST /admin/<list>
   if (segments.length === 1 && req.method === 'POST') {
-    const adminErr = requireAdmin(req);
-    if (adminErr) return adminErr;
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
     const body = await readBody(req);
     const { data, error } = await db.from(cfg.table).insert(body).select('*').single();
     if (error) return pgFail(error);
     const id = String((data as Record<string, unknown> | null)?.[cfg.pk] ?? '');
-    await audit(db, 'create', cfg.table, id, null, data);
+    await audit(db, a.id, 'create', cfg.table, id, null, data);
     return ok(data);
   }
 
   // PATCH /admin/<list>/reorder
   if (segments.length === 2 && segments[1] === 'reorder' && req.method === 'PATCH') {
     if (!cfg.reorderable) return fail('BAD_REQUEST', `${listKey} cannot be reordered`, 400);
-    const adminErr = requireAdmin(req);
-    if (adminErr) return adminErr;
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
     const body = await readBody(req);
     const ids = Array.isArray(body.ids) ? body.ids : null;
     if (!ids) return fail('BAD_REQUEST', 'ids array required', 400);
@@ -150,7 +155,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       const { error } = await db.from(cfg.table).update({ [cfg.orderBy]: (i + 1) * 10 }).eq(cfg.pk, ids[i]);
       if (error) return pgFail(error);
     }
-    await audit(db, 'reorder', cfg.table, null, null, { ids });
+    await audit(db, a.id, 'reorder', cfg.table, null, null, { ids });
     return ok({ reordered: ids.length });
   }
 
@@ -158,24 +163,24 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
   if (segments.length === 2) {
     const id = decodeURIComponent(segments[1]);
     if (req.method === 'PATCH' || req.method === 'PUT') {
-      const adminErr = requireAdmin(req);
-      if (adminErr) return adminErr;
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
       const body = await readBody(req);
       const { data: before } = await db.from(cfg.table).select('*').eq(cfg.pk, id).maybeSingle();
       if (!before) return fail('NOT_FOUND', `${listKey} "${id}" not found`, 404);
       const { data, error } = await db.from(cfg.table).update(body).eq(cfg.pk, id).select('*').single();
       if (error) return pgFail(error);
-      await audit(db, 'update', cfg.table, id, before, data);
+      await audit(db, a.id, 'update', cfg.table, id, before, data);
       return ok(data);
     }
     if (req.method === 'DELETE') {
-      const adminErr = requireAdmin(req);
-      if (adminErr) return adminErr;
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
       const { data: before } = await db.from(cfg.table).select('*').eq(cfg.pk, id).maybeSingle();
       if (!before) return fail('NOT_FOUND', `${listKey} "${id}" not found`, 404);
       const { error } = await db.from(cfg.table).delete().eq(cfg.pk, id);
       if (error) return pgFail(error);
-      await audit(db, 'delete', cfg.table, id, before, null);
+      await audit(db, a.id, 'delete', cfg.table, id, before, null);
       return ok({ deleted: id });
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);

@@ -123,11 +123,11 @@
       }
     },
     "securitySchemes": {
-      "AdminKey": {
-        "type": "apiKey",
-        "in": "header",
-        "name": "X-Admin-Key",
-        "description": "Required on every mutating /admin/* call. STOPGAP — becomes a role=admin bearer check once public.users + the auth backend land."
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase access token from POST /auth/verify-otp. Authenticated endpoints validate it; every mutating /admin/* call additionally requires users.role === 'admin'."
       }
     },
     "responses": {
@@ -200,7 +200,7 @@
         "summary": "Create a row",
         "security": [
           {
-            "AdminKey": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
@@ -243,7 +243,7 @@
         "summary": "Update a row (partial; include is_active to enable/disable)",
         "security": [
           {
-            "AdminKey": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
@@ -286,7 +286,7 @@
         "summary": "Delete a row — 409 IN_USE if it is referenced (disable it instead)",
         "security": [
           {
-            "AdminKey": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
@@ -318,7 +318,7 @@
         "summary": "Reorder a list — sets sort_order = (index + 1) * 10",
         "security": [
           {
-            "AdminKey": []
+            "BearerAuth": []
           }
         ],
         "parameters": [
@@ -376,7 +376,7 @@
         "summary": "Update the platform config (partial)",
         "security": [
           {
-            "AdminKey": []
+            "BearerAuth": []
           }
         ],
         "requestBody": {
