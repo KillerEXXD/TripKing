@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import {
+  createMyAgentProfile,
+  createMyDriverProfile,
   getAgent,
   getDriver,
   getDrivers,
@@ -8,7 +10,7 @@ import {
   updateDriver,
   updateDriverLocation,
 } from '@/lib/api/services/drivers';
-import type { DriversQueryParams, UpdateDriverInput, UpdateLocationInput } from '@/types';
+import type { CreateAgentProfileInput, CreateDriverProfileInput, DriversQueryParams, UpdateDriverInput, UpdateLocationInput } from '@/types';
 
 export function useDrivers(params?: DriversQueryParams) {
   return useQuery({ queryKey: ['drivers', params ?? {}], queryFn: () => getDrivers(params), staleTime: STALE.profile });
@@ -26,6 +28,23 @@ function useInvalidateDriver() {
     void qc.invalidateQueries({ queryKey: ['driver', id] });
     void qc.invalidateQueries({ queryKey: ['drivers'] });
   };
+}
+
+/** Create the signed-in user's driver profile (onboarding). */
+export function useCreateMyDriverProfile() {
+  const invalidate = useInvalidateDriver();
+  return useMutation({
+    mutationFn: (input: CreateDriverProfileInput) => createMyDriverProfile(input),
+    onSuccess: (d) => invalidate(d.id),
+  });
+}
+/** Create the signed-in user's agent (trip_manager) profile (onboarding). */
+export function useCreateMyAgentProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateAgentProfileInput) => createMyAgentProfile(input),
+    onSuccess: (a) => void qc.invalidateQueries({ queryKey: ['agent', a.id] }),
+  });
 }
 
 export function useUpdateDriver() {

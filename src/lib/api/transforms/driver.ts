@@ -3,7 +3,7 @@
  * vehicles are joined server-side). Never compute reputation/eligibility here.
  */
 import { transformCity } from '@/lib/api/transforms/adminConfig';
-import type { Agent, Driver, KycStatus, VehicleSummary } from '@/types';
+import type { Agent, CreateAgentProfileInput, CreateDriverProfileInput, Driver, KycStatus, VehicleSummary } from '@/types';
 
 export type DriverTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID';
 export class DriverTransformError extends Error {
@@ -105,5 +105,19 @@ export function toApiUpdateLocation(input: { cityId?: string; lat?: number; lng?
   if (input.lat !== undefined) out.current_lat = input.lat;
   if (input.lng !== undefined) out.current_lng = input.lng;
   out.current_location_at = new Date().toISOString();
+  return out;
+}
+
+/** `POST /drivers` body for a new driver profile (role discriminator + snake_case; drops undefined). */
+export function toApiCreateDriverProfile(input: CreateDriverProfileInput): Record<string, unknown> {
+  const out: Record<string, unknown> = { role: 'driver', full_name: input.fullName, home_city_id: input.homeCityId };
+  if (input.email !== undefined) out.email = input.email;
+  return out;
+}
+/** `POST /drivers` body for a new agent (trip_manager) profile (role discriminator + snake_case; drops undefined). */
+export function toApiCreateAgentProfile(input: CreateAgentProfileInput): Record<string, unknown> {
+  const out: Record<string, unknown> = { role: 'trip_manager', full_name: input.fullName, business_city_id: input.businessCityId };
+  if (input.email !== undefined) out.email = input.email;
+  if (input.businessName !== undefined) out.business_name = input.businessName;
   return out;
 }

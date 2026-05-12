@@ -1,15 +1,40 @@
 /**
- * Drivers + agents service — public profiles + owner-only updates.
- * (The matching `/drivers/*` and `/agents/*` edge functions land later.)
+ * Drivers + agents service — public profiles, "create my profile" (`POST /drivers`,
+ * the one cross-lane contract), and owner-only updates.
+ * (The `/drivers/*` GET/PATCH and `/agents/*` edge functions land with the backend lane.)
  */
 import { apiClient } from '@/lib/api/client';
-import { toApiUpdateDriver, toApiUpdateLocation, transformAgent, transformDriver } from '@/lib/api/transforms/driver';
-import type { Agent, Driver, DriversQueryParams, UpdateDriverInput, UpdateLocationInput } from '@/types';
+import {
+  toApiCreateAgentProfile,
+  toApiCreateDriverProfile,
+  toApiUpdateDriver,
+  toApiUpdateLocation,
+  transformAgent,
+  transformDriver,
+} from '@/lib/api/transforms/driver';
+import type {
+  Agent,
+  CreateAgentProfileInput,
+  CreateDriverProfileInput,
+  Driver,
+  DriversQueryParams,
+  UpdateDriverInput,
+  UpdateLocationInput,
+} from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
   if (d === null || d === undefined) throw new Error('drivers: empty response body');
   return d;
+}
+
+/** Create the signed-in user's driver profile (`POST /drivers`, `role:'driver'`; `user_id = auth.uid()`). */
+export function createMyDriverProfile(input: CreateDriverProfileInput): Promise<Driver> {
+  return apiClient.post<Api>('/drivers', toApiCreateDriverProfile(input)).then((r) => transformDriver(unwrap(r.data)));
+}
+/** Create the signed-in user's agent (trip_manager) profile (`POST /drivers`, `role:'trip_manager'`). */
+export function createMyAgentProfile(input: CreateAgentProfileInput): Promise<Agent> {
+  return apiClient.post<Api>('/drivers', toApiCreateAgentProfile(input)).then((r) => transformAgent(unwrap(r.data)));
 }
 
 export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {

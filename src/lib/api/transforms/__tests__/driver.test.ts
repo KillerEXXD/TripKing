@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { DriverTransformError, toApiUpdateDriver, transformAgent, transformDriver } from '@/lib/api/transforms/driver';
+import {
+  DriverTransformError,
+  toApiCreateAgentProfile,
+  toApiCreateDriverProfile,
+  toApiUpdateDriver,
+  transformAgent,
+  transformDriver,
+} from '@/lib/api/transforms/driver';
 
 const city = (id: string, name: string) => ({ id, name, state: 'Tamil Nadu', lat: 12.9, lng: 79.1, sort_order: 10, is_active: true });
 
@@ -56,5 +63,30 @@ describe('toApiUpdateDriver', () => {
   it('converts camelCase → snake_case and drops undefined', () => {
     expect(toApiUpdateDriver({ fullName: 'New Name', currentCityId: 'c9' })).toEqual({ full_name: 'New Name', current_city_id: 'c9' });
     expect(toApiUpdateDriver({})).toEqual({});
+  });
+});
+
+describe('toApiCreateDriverProfile', () => {
+  it('always sends role/full_name/home_city_id; email only when supplied', () => {
+    expect(toApiCreateDriverProfile({ fullName: 'Ravi', homeCityId: 'c1' })).toEqual({ role: 'driver', full_name: 'Ravi', home_city_id: 'c1' });
+    expect(toApiCreateDriverProfile({ fullName: 'Ravi', homeCityId: 'c1', email: 'r@x.com' })).toEqual({
+      role: 'driver',
+      full_name: 'Ravi',
+      home_city_id: 'c1',
+      email: 'r@x.com',
+    });
+  });
+});
+
+describe('toApiCreateAgentProfile', () => {
+  it('sends role:trip_manager + business_city_id; email/business_name only when supplied', () => {
+    expect(toApiCreateAgentProfile({ fullName: 'Agent A', businessCityId: 'c1' })).toEqual({ role: 'trip_manager', full_name: 'Agent A', business_city_id: 'c1' });
+    expect(toApiCreateAgentProfile({ fullName: 'Agent A', businessCityId: 'c1', email: 'a@x.com', businessName: 'A Travels' })).toEqual({
+      role: 'trip_manager',
+      full_name: 'Agent A',
+      business_city_id: 'c1',
+      email: 'a@x.com',
+      business_name: 'A Travels',
+    });
   });
 });
