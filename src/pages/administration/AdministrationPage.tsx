@@ -1,12 +1,12 @@
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui';
 
-/** Admin hub. KYC queue, vehicle eligibility, translations, reviews moderation land in Phase 4. */
+/** Admin hub — reference data + operations (KYC, vehicle eligibility, translations, reviews moderation). */
 export function AdministrationPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <h1 className="text-2xl font-bold">Administration</h1>
-      <Card>
+      <Card className="gap-1">
         <h2 className="font-semibold">Reference data</h2>
         <p className="text-sm text-secondary">
           Car types · fuel types · vehicle makes &amp; models · seat options · cities · languages · review tags ·
@@ -16,7 +16,17 @@ export function AdministrationPage() {
           Open the configuration manager →
         </Link>
       </Card>
-      <p className="text-sm text-secondary">KYC queue · vehicle eligibility · translation manager · reviews moderation — Phase 4.</p>
+      <Card className="gap-1">
+        <h2 className="font-semibold">Operations</h2>
+        <ul className="mt-1 space-y-1 text-sm">
+          <li>
+            <Link to="/administration/kyc" className="text-primary underline">
+              KYC review queue →
+            </Link>
+          </li>
+          <li className="text-secondary">Vehicle eligibility · translation manager · reviews moderation — coming up.</li>
+        </ul>
+      </Card>
     </main>
   );
 }
