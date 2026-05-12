@@ -1,0 +1,96 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TripKing API",
+    "version": "0.1.0",
+    "description": "Outstation cab marketplace REST API. Wire format is snake_case; every response uses the envelope { success, data, meta?, error } (meta on lists, error non-null on failure). This document currently covers the /admin/* master-data endpoints (Phase 2); the marketplace endpoints follow in Phase 3."
+  },
+  "servers": [{ "url": "https://api.tripking.in" }],
+  "tags": [{ "name": "admin", "description": "Administration master-data (the configurable lookup tables — see §7 of the spec)." }],
+  "components": {
+    "schemas": {
+      "ApiError": { "type": "object", "properties": { "code": { "type": "string" }, "message": { "type": "string" } } },
+      "Envelope": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean" },
+          "data": {},
+          "meta": { "type": "object", "nullable": true },
+          "error": { "nullable": true, "allOf": [{ "$ref": "#/components/schemas/ApiError" }] }
+        }
+      }
+    },
+    "parameters": {
+      "list": {
+        "name": "list", "in": "path", "required": true, "description": "Which master-data list.",
+        "schema": { "type": "string", "enum": ["car-types", "fuel-types", "vehicle-makes", "vehicle-models", "seat-options", "cities", "languages", "review-tags", "cancel-reasons"] }
+      },
+      "id": { "name": "id", "in": "path", "required": true, "description": "Row key — uuid for most lists, the value int for seat-options, the BCP-47 code for languages.", "schema": { "type": "string" } }
+    },
+    "securitySchemes": {
+      "AdminKey": { "type": "apiKey", "in": "header", "name": "X-Admin-Key", "description": "Required on every mutating /admin/* call. STOPGAP — becomes a role=admin bearer check once public.users + the auth backend land." }
+    },
+    "responses": {
+      "Envelope": { "description": "Standard envelope response.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Envelope" } } } }
+    }
+  },
+  "paths": {
+    "/admin/{list}": {
+      "get": {
+        "tags": ["admin"], "summary": "List a master-data list (active rows by default)",
+        "parameters": [
+          { "$ref": "#/components/parameters/list" },
+          { "name": "include_inactive", "in": "query", "schema": { "type": "boolean" }, "description": "include soft-disabled rows (admin view)" },
+          { "name": "make_id", "in": "query", "schema": { "type": "string" }, "description": "vehicle-models only — filter to a make" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "review-tags only — filter to a vocabulary" },
+          { "name": "applies_to", "in": "query", "schema": { "type": "string" }, "description": "cancel-reasons only" }
+        ],
+        "responses": { "200": { "$ref": "#/components/responses/Envelope" } }
+      },
+      "post": {
+        "tags": ["admin"], "summary": "Create a row", "security": [{ "AdminKey": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/list" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "description": "the row's columns (snake_case)" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Envelope" }, "409": { "$ref": "#/components/responses/Envelope" }, "422": { "$ref": "#/components/responses/Envelope" }, "403": { "$ref": "#/components/responses/Envelope" } }
+      }
+    },
+    "/admin/{list}/{id}": {
+      "patch": {
+        "tags": ["admin"], "summary": "Update a row (partial; include is_active to enable/disable)", "security": [{ "AdminKey": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/list" }, { "$ref": "#/components/parameters/id" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Envelope" }, "404": { "$ref": "#/components/responses/Envelope" }, "409": { "$ref": "#/components/responses/Envelope" }, "422": { "$ref": "#/components/responses/Envelope" } }
+      },
+      "delete": {
+        "tags": ["admin"], "summary": "Delete a row — 409 IN_USE if it is referenced (disable it instead)", "security": [{ "AdminKey": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/list" }, { "$ref": "#/components/parameters/id" }],
+        "responses": { "200": { "$ref": "#/components/responses/Envelope" }, "404": { "$ref": "#/components/responses/Envelope" }, "409": { "$ref": "#/components/responses/Envelope" } }
+      }
+    },
+    "/admin/{list}/reorder": {
+      "patch": {
+        "tags": ["admin"], "summary": "Reorder a list — sets sort_order = (index + 1) * 10", "security": [{ "AdminKey": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/list" }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["ids"], "properties": { "ids": { "type": "array", "items": { "type": "string" } } } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Envelope" }, "400": { "$ref": "#/components/responses/Envelope" } }
+      }
+    },
+    "/admin/app-settings": {
+      "get": { "tags": ["admin"], "summary": "Get the single-row platform config", "responses": { "200": { "$ref": "#/components/responses/Envelope" } } },
+      "put": {
+        "tags": ["admin"], "summary": "Update the platform config (partial)", "security": [{ "AdminKey": [] }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": {
+          "min_vehicle_year": { "type": "integer" },
+          "vehicle_expiry_warning_days": { "type": "integer" },
+          "default_alert_radius_km": { "type": "integer" },
+          "default_commission_pct": { "type": "number" },
+          "default_gst_pct": { "type": "number", "description": "a percentage" },
+          "default_driver_bata": { "type": "number", "description": "flat ₹ amount" },
+          "default_extras_paid_by_passenger": { "type": "boolean" },
+          "default_driver_instructions": { "type": "string" }
+        } } } } },
+        "responses": { "200": { "$ref": "#/components/responses/Envelope" }, "422": { "$ref": "#/components/responses/Envelope" } }
+      }
+    }
+  }
+}
