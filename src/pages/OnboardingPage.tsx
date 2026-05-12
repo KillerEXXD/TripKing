@@ -23,12 +23,18 @@ const DRIVER_CARDS: IntroCard[] = [
   { emoji: '🔔', title: 'Trips come to you', body: 'Trips from your city show up in your feed automatically. No more scrolling through WhatsApp groups looking for work.' },
   { emoji: '👆', title: 'Apply in one tap', body: "Every trip shows the route, distance, and exactly what you'll take home — fare plus your bata. Tap Apply. No typing." },
   { emoji: '🚗', title: 'Drive & get paid', body: "When the agent picks you, start the trip with the passenger's OTP, finish it, and your payout (with bata) is queued — every time." },
+  {
+    emoji: '🛡️',
+    title: 'Get verified to start earning',
+    body: 'Browse straight away — but to apply you’ll need to verify: upload your Aadhaar, licence and a selfie, add your car (with photos, RC & insurance), and do a quick video call. There’s a checklist on your profile that walks you through it.',
+  },
   { emoji: '📤', title: "Got a trip you can't take?", body: 'Post it for another driver — we pre-fill the route, time and fare. You become the agent for that one ride.' },
 ];
 
 // An agent only posts and shepherds trips — they never drive.
 const AGENT_CARDS: IntroCard[] = [
   { emoji: '➕', title: 'Post a trip in two steps', body: "Route & time, then price — that's it. Then share it to WhatsApp or Telegram in one tap so drivers see it instantly." },
+  { emoji: '🛡️', title: 'Get verified to start posting', body: 'To post trips you’ll first verify your account — upload your Aadhaar and a selfie, then do a quick video call. Your profile has a checklist for it.' },
   { emoji: '👥', title: 'Drivers come to you', body: 'Applicants land with their rating, recent trips and any counter-quote. Pick the one you trust — no group chasing.' },
   { emoji: '🔑', title: 'Track it to the finish', body: 'Assign a driver and an OTP is generated for the passenger. Watch the trip move open → assigned → in progress → done.' },
 ];
