@@ -18,6 +18,7 @@ import type {
   CreateDriverProfileInput,
   Driver,
   DriversQueryParams,
+  KycStatus,
   UpdateDriverInput,
   UpdateLocationInput,
 } from '@/types';
@@ -55,9 +56,29 @@ export function updateDriver(id: string, input: UpdateDriverInput): Promise<Driv
 export function updateDriverLocation(id: string, input: UpdateLocationInput): Promise<Driver> {
   return apiClient.patch<Api>(`/drivers/${id}/location`, toApiUpdateLocation(input)).then((r) => transformDriver(unwrap(r.data)));
 }
+/** Admin KYC workflow transition for a driver (`PATCH /drivers/:id/kyc`). */
+export function updateDriverKyc(id: string, kycStatus: KycStatus, note?: string): Promise<Driver> {
+  return apiClient.patch<Api>(`/drivers/${id}/kyc`, { kyc_status: kycStatus, ...(note ? { note } : {}) }).then((r) => transformDriver(unwrap(r.data)));
+}
 
+export interface AgentsQueryParams {
+  businessCityId?: string;
+  kycStatus?: KycStatus;
+  limit?: number;
+}
+export function getAgents(params?: AgentsQueryParams): Promise<Agent[]> {
+  const q: Record<string, unknown> = {};
+  if (params?.businessCityId) q.business_city_id = params.businessCityId;
+  if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.limit) q.limit = params.limit;
+  return apiClient.get<Api[]>('/agents', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformAgent));
+}
 export function getAgent(id: string): Promise<Agent> {
   return apiClient.get<Api>(`/agents/${id}`).then((r) => transformAgent(unwrap(r.data)));
+}
+/** Admin KYC workflow transition for an agent (`PATCH /agents/:id/kyc`). */
+export function updateAgentKyc(id: string, kycStatus: KycStatus, note?: string): Promise<Agent> {
+  return apiClient.patch<Api>(`/agents/${id}/kyc`, { kyc_status: kycStatus, ...(note ? { note } : {}) }).then((r) => transformAgent(unwrap(r.data)));
 }
 export function updateAgent(
   id: string,

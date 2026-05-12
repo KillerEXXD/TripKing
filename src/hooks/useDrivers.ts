@@ -4,13 +4,17 @@ import {
   createMyAgentProfile,
   createMyDriverProfile,
   getAgent,
+  getAgents,
   getDriver,
   getDrivers,
   updateAgent,
+  updateAgentKyc,
   updateDriver,
+  updateDriverKyc,
   updateDriverLocation,
+  type AgentsQueryParams,
 } from '@/lib/api/services/drivers';
-import type { CreateAgentProfileInput, CreateDriverProfileInput, DriversQueryParams, UpdateDriverInput, UpdateLocationInput } from '@/types';
+import type { CreateAgentProfileInput, CreateDriverProfileInput, DriversQueryParams, KycStatus, UpdateDriverInput, UpdateLocationInput } from '@/types';
 
 export function useDrivers(params?: DriversQueryParams) {
   return useQuery({ queryKey: ['drivers', params ?? {}], queryFn: () => getDrivers(params), staleTime: STALE.profile });
@@ -21,12 +25,22 @@ export function useDriver(id: string | undefined) {
 export function useAgent(id: string | undefined) {
   return useQuery({ queryKey: ['agent', id], queryFn: () => getAgent(id as string), enabled: !!id, staleTime: STALE.profile });
 }
+export function useAgents(params?: AgentsQueryParams) {
+  return useQuery({ queryKey: ['agents', params ?? {}], queryFn: () => getAgents(params), staleTime: STALE.profile });
+}
 
 function useInvalidateDriver() {
   const qc = useQueryClient();
   return (id: string) => {
     void qc.invalidateQueries({ queryKey: ['driver', id] });
     void qc.invalidateQueries({ queryKey: ['drivers'] });
+  };
+}
+function useInvalidateAgent() {
+  const qc = useQueryClient();
+  return (id: string) => {
+    void qc.invalidateQueries({ queryKey: ['agent', id] });
+    void qc.invalidateQueries({ queryKey: ['agents'] });
   };
 }
 
@@ -62,10 +76,26 @@ export function useUpdateDriverLocation() {
   });
 }
 export function useUpdateAgent() {
-  const qc = useQueryClient();
+  const invalidate = useInvalidateAgent();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: { fullName?: string; email?: string; businessName?: string; businessCityId?: string; profilePhotoUrl?: string } }) =>
       updateAgent(id, input),
-    onSuccess: (_d, v) => void qc.invalidateQueries({ queryKey: ['agent', v.id] }),
+    onSuccess: (_d, v) => invalidate(v.id),
+  });
+}
+/** Admin KYC transition for a driver. */
+export function useUpdateDriverKyc() {
+  const invalidate = useInvalidateDriver();
+  return useMutation({
+    mutationFn: ({ id, kycStatus, note }: { id: string; kycStatus: KycStatus; note?: string }) => updateDriverKyc(id, kycStatus, note),
+    onSuccess: (_d, v) => invalidate(v.id),
+  });
+}
+/** Admin KYC transition for an agent. */
+export function useUpdateAgentKyc() {
+  const invalidate = useInvalidateAgent();
+  return useMutation({
+    mutationFn: ({ id, kycStatus, note }: { id: string; kycStatus: KycStatus; note?: string }) => updateAgentKyc(id, kycStatus, note),
+    onSuccess: (_d, v) => invalidate(v.id),
   });
 }

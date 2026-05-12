@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { addVehicle, deleteVehicle, getDriverVehicles, getVehicle, setVehicleActive, updateVehicle } from '@/lib/api/services/vehicles';
+import { addVehicle, deleteVehicle, getAdminVehicles, getDriverVehicles, getVehicle, setVehicleActive, updateVehicle, type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
 import type { VehicleInput } from '@/types';
 
 export function useDriverVehicles(driverId: string | undefined) {
@@ -8,6 +8,10 @@ export function useDriverVehicles(driverId: string | undefined) {
 }
 export function useVehicle(id: string | undefined) {
   return useQuery({ queryKey: ['vehicle', id], queryFn: () => getVehicle(id as string), enabled: !!id, staleTime: STALE.profile });
+}
+/** Admin eligibility dashboard — vehicles across all drivers. */
+export function useAdminVehicles(params?: AdminVehiclesQueryParams) {
+  return useQuery({ queryKey: ['vehicles', 'admin', params ?? {}], queryFn: () => getAdminVehicles(params), staleTime: STALE.profile });
 }
 
 function useInvalidateVehicles() {

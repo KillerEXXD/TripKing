@@ -1,7 +1,7 @@
 /** Vehicles service — a driver's cars (owner-managed; readable by all). */
 import { apiClient } from '@/lib/api/client';
 import { toApiVehicle, transformVehicle } from '@/lib/api/transforms/vehicle';
-import type { Vehicle, VehicleInput } from '@/types';
+import type { EligibilityStatus, Vehicle, VehicleInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -11,6 +11,22 @@ function unwrap<T>(d: T | null): T {
 
 export function getDriverVehicles(driverId: string): Promise<Vehicle[]> {
   return apiClient.get<Api[]>('/vehicles', { driver_id: driverId }).then((r) => (r.data ?? []).map(transformVehicle));
+}
+
+export interface AdminVehiclesQueryParams {
+  /** CSV of eligible | expiring_soon | expired. */
+  eligibility?: EligibilityStatus[];
+  /** `true` ⇒ only vehicles whose eligibility ≠ eligible (the admin dashboard). */
+  needsAttention?: boolean;
+  includeInactive?: boolean;
+}
+/** Admin eligibility dashboard — vehicles across all drivers (server-derived `eligibilityStatus`). */
+export function getAdminVehicles(params?: AdminVehiclesQueryParams): Promise<Vehicle[]> {
+  const q: Record<string, unknown> = {};
+  if (params?.eligibility?.length) q.eligibility = params.eligibility.join(',');
+  if (params?.needsAttention) q.needs_attention = true;
+  if (params?.includeInactive) q.include_inactive = true;
+  return apiClient.get<Api[]>('/vehicles', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformVehicle));
 }
 export function getVehicle(id: string): Promise<Vehicle> {
   return apiClient.get<Api>(`/vehicles/${id}`).then((r) => transformVehicle(unwrap(r.data)));

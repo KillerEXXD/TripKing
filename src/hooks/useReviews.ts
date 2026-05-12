@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { createReview, getReviews, reportReview } from '@/lib/api/services/reviews';
+import { createReview, getReviews, moderateReview, reportReview } from '@/lib/api/services/reviews';
 import type { ReviewInput, ReviewsQueryParams } from '@/types';
 
 export function useReviews(params?: ReviewsQueryParams) {
@@ -13,6 +13,10 @@ export function useDriverReviews(rateeUserId: string | undefined, params?: Omit<
     enabled: !!rateeUserId,
     staleTime: STALE.profile,
   });
+}
+/** Admin moderation queue — flagged reviews. */
+export function useFlaggedReviews() {
+  return useQuery({ queryKey: ['reviews', 'flagged'], queryFn: () => getReviews({ flagged: true }), staleTime: STALE.live });
 }
 
 export function useCreateReview() {
@@ -29,6 +33,14 @@ export function useReportReview() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reason }: { id: string; reason?: string }) => reportReview(id, reason),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['reviews'] }),
+  });
+}
+/** Admin moderation action (clear the flag, or hide the review). */
+export function useModerateReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...opts }: { id: string; isPublished?: boolean; clearFlag?: boolean }) => moderateReview(id, opts),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['reviews'] }),
   });
 }

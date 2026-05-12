@@ -31,6 +31,8 @@ export interface ReviewsQueryParams {
   tripId?: string;
   rateeUserId?: string;
   direction?: ReviewDirection;
+  /** Admin moderation queue — `?flagged=true` (only honoured for admins). */
+  flagged?: boolean;
   page?: number;
   limit?: number;
 }

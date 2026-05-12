@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiClient } from '@/lib/api/client';
-import { createMyAgentProfile, createMyDriverProfile, getDriver } from '@/lib/api/services/drivers';
+import { createMyAgentProfile, createMyDriverProfile, getAgents, getDriver, updateAgentKyc, updateDriverKyc } from '@/lib/api/services/drivers';
 
 function ok<T>(data: T) {
   return Promise.resolve({ success: true, data, error: null } as const);
@@ -41,5 +41,28 @@ describe('drivers service', () => {
     const driver = await getDriver('d9');
     expect(get).toHaveBeenCalledWith('/drivers/d9');
     expect(driver.id).toBe('d9');
+  });
+
+  it('getAgents({ kycStatus }) → GET /agents?kyc_status=', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockReturnValue(ok([{ id: 'a1', user_id: 'u1', kyc_status: 'docs_submitted' }]) as never);
+    const agents = await getAgents({ kycStatus: 'docs_submitted' });
+    expect(get).toHaveBeenCalledWith('/agents', { kyc_status: 'docs_submitted' });
+    expect(agents[0]?.id).toBe('a1');
+  });
+
+  it('updateDriverKyc → PATCH /drivers/:id/kyc { kyc_status, note? }', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 'd1', user_id: 'u1', kyc_status: 'approved' }) as never);
+    const driver = await updateDriverKyc('d1', 'approved');
+    expect(patch).toHaveBeenCalledWith('/drivers/d1/kyc', { kyc_status: 'approved' });
+    expect(driver.kycStatus).toBe('approved');
+    await updateDriverKyc('d1', 'rejected', 'docs unclear');
+    expect(patch).toHaveBeenLastCalledWith('/drivers/d1/kyc', { kyc_status: 'rejected', note: 'docs unclear' });
+  });
+
+  it('updateAgentKyc → PATCH /agents/:id/kyc', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 'a1', user_id: 'u1', kyc_status: 'approved' }) as never);
+    const agent = await updateAgentKyc('a1', 'approved');
+    expect(patch).toHaveBeenCalledWith('/agents/a1/kyc', { kyc_status: 'approved' });
+    expect(agent.kycStatus).toBe('approved');
   });
 });

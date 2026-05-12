@@ -14,6 +14,7 @@ export function getReviews(params?: ReviewsQueryParams): Promise<Review[]> {
   if (params?.tripId) q.trip_id = params.tripId;
   if (params?.rateeUserId) q.ratee_user_id = params.rateeUserId;
   if (params?.direction) q.direction = params.direction;
+  if (params?.flagged) q.flagged = true;
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   return apiClient.get<Api[]>('/reviews', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformReview));
@@ -23,4 +24,11 @@ export function createReview(input: ReviewInput): Promise<Review> {
 }
 export function reportReview(id: string, reason?: string): Promise<void> {
   return apiClient.post<unknown>(`/reviews/${id}/report`, { flag_reason: reason ?? null }).then(() => undefined);
+}
+/** Admin moderation action — `clearFlag` keeps the review (false alarm); `isPublished:false` hides it. */
+export function moderateReview(id: string, opts: { isPublished?: boolean; clearFlag?: boolean }): Promise<Review> {
+  const body: Record<string, unknown> = {};
+  if (opts.isPublished !== undefined) body.is_published = opts.isPublished;
+  if (opts.clearFlag !== undefined) body.clear_flag = opts.clearFlag;
+  return apiClient.post<Api>(`/reviews/${id}/moderate`, body).then((r) => transformReview(unwrap(r.data)));
 }
