@@ -1,13 +1,15 @@
 /**
- * `/verify/video-call` — step 5 of the driver "Get verified" checklist. If a call is scheduled,
- * show the time + a Join link + cancel/reschedule; otherwise (once documents are submitted) pick a
- * free 15-min slot to book one. Booking moves `kyc_status` → video_pending; an admin runs the call.
+ * `/verify/video-call` — the video-verification step of the "Get verified" checklist (drivers and
+ * trip managers alike). If a call is scheduled, show the time + a Join link + cancel/reschedule;
+ * otherwise (once documents are submitted) pick a free 15-min slot to book one. Booking moves
+ * `kyc_status` → video_pending; an admin runs the call.
  */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CalendarClock, ShieldCheck, Video } from 'lucide-react';
 import { toast } from 'sonner';
-import { useMyDriver } from '@/hooks/useDrivers';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useAvailableVideoSlots, useBookVideoCall, useCancelVideoCall, useRescheduleVideoCall, useVideoVerification } from '@/hooks/useVideoVerification';
 import { Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -66,20 +68,24 @@ function SlotPicker({ onPick, disabled }: { onPick: (iso: string) => void; disab
 
 export function BookVideoCallPage() {
   const navigate = useNavigate();
-  const driverQuery = useMyDriver();
+  const { user } = useAuth();
+  const isAgent = user?.role === 'trip_manager';
+  const driverQuery = useMyDriver(!isAgent);
+  const agentQuery = useMyAgent(isAgent);
+  const profileQuery = isAgent ? agentQuery : driverQuery;
   const book = useBookVideoCall();
   const cancel = useCancelVideoCall();
   const reschedule = useRescheduleVideoCall();
   const [rescheduling, setRescheduling] = useState(false);
 
-  const vvId = driverQuery.data?.verification?.videoVerification?.id;
+  const vvId = profileQuery.data?.verification?.videoVerification?.id;
   const vvQuery = useVideoVerification(vvId);
 
-  if (driverQuery.isPending) return <div className="p-6"><LoadingSkeleton rows={6} /></div>;
-  if (driverQuery.isError || !driverQuery.data) return <div className="p-6"><ErrorState title="Couldn't load your profile" onRetry={() => driverQuery.refetch()} /></div>;
+  if (profileQuery.isPending) return <div className="p-6"><LoadingSkeleton rows={6} /></div>;
+  if (profileQuery.isError || !profileQuery.data) return <div className="p-6"><ErrorState title="Couldn't load your profile" onRetry={() => profileQuery.refetch()} /></div>;
 
-  const kyc = driverQuery.data.verification?.kycStatus ?? 'pending';
-  const vv = vvQuery.data ?? driverQuery.data.verification?.videoVerification ?? null;
+  const kyc = profileQuery.data.verification?.kycStatus ?? 'pending';
+  const vv = vvQuery.data ?? profileQuery.data.verification?.videoVerification ?? null;
   const busy = book.isPending || cancel.isPending || reschedule.isPending;
 
   async function onBook(iso: string) {
@@ -107,7 +113,7 @@ export function BookVideoCallPage() {
         {(kyc === 'pending' || kyc === 'resubmit_required') && (
           <Card className="gap-2">
             <div className="text-sm font-medium">Submit your documents first</div>
-            <p className="text-sm text-secondary">You can book the video call once your Aadhaar, licence and selfie are uploaded.</p>
+            <p className="text-sm text-secondary">You can book the video call once your {isAgent ? 'Aadhaar and selfie are' : 'Aadhaar, licence and selfie are'} uploaded.</p>
             <Button variant="full" asChild><Link to="/verify/documents">Go to documents</Link></Button>
           </Card>
         )}
