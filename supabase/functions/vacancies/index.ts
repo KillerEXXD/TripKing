@@ -5,7 +5,7 @@
  * owner-or-admin write" policy). Destinations live in the `vacancy_destinations` junction.
  *
  *   GET   /vacancies              ?current_city_id=&destination_city_id=&destination_place_id=&status=&driver_id=&near_lat=&near_lng=&radius_km=&limit=   (public)
- *   POST  /vacancies              (driver; Bearer) — body: current_city_id (required) + current_place_id?; destination_city_ids?: string[] / destination_place_ids?: string[]
+ *   POST  /vacancies              (driver; Bearer) — body: current_city_id (required) + current_place_id?; destinations?: [{ cityId?, placeId? }]  (or the legacy parallel destination_city_ids?: string[] / destination_place_ids?: string[])
  *   GET   /vacancies/:id          (public) — joins driver+vehicle summary, current_city/current_place, destination cities + places
  *   POST  /vacancies/:id/cancel   (owning driver/admin; Bearer)
  *
@@ -58,6 +58,14 @@ function pgFail(error: { code?: string; message: string }): Response {
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 function strArray(v: unknown): string[] {
   return Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0) : [];
+}
+/** One `destinations: [{ cityId?, placeId? }]` entry → a { city_id, place_id } pair, or null if neither id is present. */
+function parseDestEntry(e: unknown): { city_id: string | null; place_id: string | null } | null {
+  if (!e || typeof e !== 'object') return null;
+  const o = e as Record<string, unknown>;
+  const city_id = strOrNull(o.cityId ?? o.city_id);
+  const place_id = strOrNull(o.placeId ?? o.place_id);
+  return city_id || place_id ? { city_id, place_id } : null;
 }
 
 const handler = withTiming('vacancies', async (req: Request): Promise<Response> => {
@@ -139,8 +147,20 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);
     const currentPlaceId = strOrNull(b.current_place_id);
-    const destCityIds = strArray(b.destination_city_ids);
-    const destPlaceIds = strArray(b.destination_place_ids);
+    // Destinations — prefer the unified `destinations: [{ cityId?, placeId? }]` array (each entry may be a
+    // curated city, a precise place, or both); fall back to the legacy parallel `destination_*_ids` arrays.
+    let destPairs: { city_id: string | null; place_id: string | null }[];
+    if (Array.isArray(b.destinations) && b.destinations.length > 0) {
+      const parsed = (b.destinations as unknown[]).map(parseDestEntry);
+      if (parsed.some((p) => p === null)) return fail('VALIDATION', 'each `destinations` entry needs a cityId or a placeId', 422);
+      destPairs = parsed as { city_id: string | null; place_id: string | null }[];
+    } else {
+      const destCityIds = strArray(b.destination_city_ids);
+      const destPlaceIds = strArray(b.destination_place_ids);
+      destPairs = destPlaceIds.length > 0
+        ? destPlaceIds.map((placeId, i) => ({ place_id: placeId, city_id: destCityIds[i] ?? null }))
+        : destCityIds.map((cityId) => ({ city_id: cityId, place_id: null }));
+    }
     const insert = {
       driver_id: did,
       vehicle_id: strOrNull(b.vehicle_id),
@@ -155,12 +175,8 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const { data: created, error } = await db.from('vacancies').insert(insert).select('id').single();
     if (error) return pgFail(error); // 23503 (bad current_place_id / current_city_id) → 422
     const vacancyId = created.id as string;
-    // destination rows: one per destination_place_id (with the parallel destination_city_id if given), else one per destination_city_id.
-    const destRows = destPlaceIds.length > 0
-      ? destPlaceIds.map((placeId, i) => ({ vacancy_id: vacancyId, place_id: placeId, city_id: destCityIds[i] ?? null }))
-      : destCityIds.map((cityId) => ({ vacancy_id: vacancyId, city_id: cityId, place_id: null }));
-    if (destRows.length > 0) {
-      const { error: destErr } = await db.from('vacancy_destinations').insert(destRows);
+    if (destPairs.length > 0) {
+      const { error: destErr } = await db.from('vacancy_destinations').insert(destPairs.map((p) => ({ vacancy_id: vacancyId, ...p })));
       if (destErr) {
         await db.from('vacancies').delete().eq('id', vacancyId); // roll back the orphan
         return pgFail(destErr);
