@@ -9,6 +9,16 @@ vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carT
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
+vi.mock('@/components/share/ShareTripModal', () => ({
+  ShareTripModal: ({ onClose }: { onClose: () => void }) => (
+    <div>
+      share modal
+      <button type="button" onClick={onClose}>
+        close share
+      </button>
+    </div>
+  ),
+}));
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 const carType = (id: string, label: string) => ({ id, label, sortOrder: 1, isActive: true });
@@ -106,7 +116,7 @@ describe('PostTripPage', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('posts a valid trip and navigates to the new trip', async () => {
+  it('posts a valid trip, opens the share modal, then navigates to the new trip', async () => {
     const mutateAsync = setPostTrip();
     const { container } = renderPost();
     fillValid(container);
@@ -116,6 +126,8 @@ describe('PostTripPage', () => {
         expect.objectContaining({ fromCityId: 'c1', toCityId: 'c2', carTypeId: 'ct1', expectedDistanceKm: 140, ratePerKm: 15, totalFare: 2100, passengerName: 'Passenger P' }),
       ),
     );
+    expect(await screen.findByText('share modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /close share/i }));
     expect(await screen.findByText('trip detail')).toBeInTheDocument();
   });
 });

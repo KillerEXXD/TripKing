@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
+import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR } from '@/lib/utils';
@@ -77,6 +78,7 @@ export function PostTripPage() {
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
   const appSettings = useAppSettings();
+  const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
 
   const { register, handleSubmit, watch, setValue, getValues, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
@@ -125,8 +127,8 @@ export function PostTripPage() {
     };
     try {
       const trip: Trip = await postTrip.mutateAsync(input);
-      toast.success('Trip posted');
-      navigate(`/trips/${trip.id}`);
+      toast.success('Trip posted — share it with drivers');
+      setPostedTrip(trip);
     } catch {
       toast.error("Couldn't post the trip — try again.");
     }
@@ -278,6 +280,8 @@ export function PostTripPage() {
           </Button>
         </div>
       </form>
+
+      {postedTrip ? <ShareTripModal trip={postedTrip} onClose={() => navigate(`/trips/${postedTrip.id}`)} /> : null}
     </main>
   );
 }
