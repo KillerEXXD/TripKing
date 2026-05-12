@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, MapPin, X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy } from '@/hooks/useVacancies';
 import { cityHooks } from '@/hooks/useAdminConfig';
-import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
+import { PlacePinField } from '@/components/location/PlacePinField';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatShortDate } from '@/lib/utils';
@@ -56,7 +56,6 @@ export function PostVacancyPage() {
 
   const [currentCityId, setCurrentCityId] = useState('');
   const [currentPlace, setCurrentPlace] = useState<Place | null>(null);
-  const [placePickerOpen, setPlacePickerOpen] = useState(false);
   const [startLocal, setStartLocal] = useState(() => toDatetimeLocalValue(new Date()));
   const [hours, setHours] = useState(DEFAULT_HOURS);
   const [destinationCityIds, setDestinationCityIds] = useState<string[]>([]);
@@ -139,20 +138,7 @@ export function PostVacancyPage() {
               ))}
             </select>
           </label>
-          {currentPlace ? (
-            <button
-              type="button"
-              onClick={() => setCurrentPlace(null)}
-              aria-label={`Remove the pinned location ${currentPlace.name}`}
-              className="inline-flex items-center gap-1 rounded-full border border-primary bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
-            >
-              <MapPin className="size-3" aria-hidden /> {currentPlace.name} <X className="size-3" aria-hidden />
-            </button>
-          ) : (
-            <button type="button" onClick={() => setPlacePickerOpen(true)} className="inline-flex items-center gap-1 text-xs text-secondary underline underline-offset-2">
-              <MapPin className="size-3" aria-hidden /> Pin your exact spot <span className="font-normal">(optional)</span>
-            </button>
-          )}
+          <PlacePinField value={currentPlace} onChange={setCurrentPlace} pinLabel="Pin your exact spot" pickerTitle="Pin your exact location" />
         </div>
 
         <div className="space-y-2">
@@ -258,18 +244,6 @@ export function PostVacancyPage() {
         </Button>
       </div>
       </div>
-
-      {placePickerOpen ? (
-        <LocationSearchPanel
-          title="Pin your exact location"
-          placeholder="Search a town, area, or landmark…"
-          onPick={(p) => {
-            setCurrentPlace(p);
-            setPlacePickerOpen(false);
-          }}
-          onClose={() => setPlacePickerOpen(false)}
-        />
-      ) : null}
     </div>
   );
 }

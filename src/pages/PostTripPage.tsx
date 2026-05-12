@@ -6,10 +6,11 @@ import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
+import { PlacePinField } from '@/components/location/PlacePinField';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR } from '@/lib/utils';
-import type { PostTripInput, Trip } from '@/types';
+import type { Place, PostTripInput, Trip } from '@/types';
 
 interface PostTripForm {
   fromCityId: string;
@@ -86,6 +87,8 @@ export function PostTripPage() {
   const appSettings = useAppSettings();
   const [step, setStep] = useState<1 | 2>(1);
   const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
+  const [fromPlace, setFromPlace] = useState<Place | null>(null);
+  const [toPlace, setToPlace] = useState<Place | null>(null);
 
   const { register, handleSubmit, watch, setValue, getValues, trigger, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
@@ -124,6 +127,8 @@ export function PostTripPage() {
     const input: PostTripInput = {
       fromCityId: values.fromCityId,
       toCityId: values.toCityId,
+      fromPlaceId: fromPlace?.id,
+      toPlaceId: toPlace?.id,
       pickupAt: new Date(values.pickupAt).toISOString(),
       expectedDistanceKm: Number(values.expectedDistanceKm),
       carTypeId: values.carTypeId,
@@ -198,22 +203,28 @@ export function PostTripPage() {
           <>
             <Card className="gap-3">
               <div className={sectionLabel}>Route &amp; schedule</div>
-              <Field label="From (pickup city)" error={errors.fromCityId?.message}>
-                <select className={selectClass} {...register('fromCityId', { required: 'Pick a pickup city' })}>
-                  <option value="">Select a city</option>
-                  {cities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="To (drop-off city)" error={errors.toCityId?.message}>
-                <select className={selectClass} {...register('toCityId', { required: 'Pick a drop-off city' })}>
-                  <option value="">Select a city</option>
-                  {cities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </Field>
+              <div className="space-y-1.5">
+                <Field label="From (pickup city)" error={errors.fromCityId?.message}>
+                  <select className={selectClass} {...register('fromCityId', { required: 'Pick a pickup city' })}>
+                    <option value="">Select a city</option>
+                    {cities.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <PlacePinField value={fromPlace} onChange={setFromPlace} pinLabel="Pin the exact pickup point" pickerTitle="Pickup location" />
+              </div>
+              <div className="space-y-1.5">
+                <Field label="To (drop-off city)" error={errors.toCityId?.message}>
+                  <select className={selectClass} {...register('toCityId', { required: 'Pick a drop-off city' })}>
+                    <option value="">Select a city</option>
+                    {cities.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </Field>
+                <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact drop-off point" pickerTitle="Drop-off location" />
+              </div>
               <Field label="Pickup date &amp; time" error={errors.pickupAt?.message}>
                 <Input type="datetime-local" {...register('pickupAt', { required: 'Set the pickup time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Pickup must be in the future' })} />
               </Field>
