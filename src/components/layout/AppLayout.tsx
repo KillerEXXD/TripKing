@@ -1,33 +1,17 @@
-import { Outlet, Link } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui';
+import { Outlet } from 'react-router-dom';
+import { BottomNav } from '@/components/layout/BottomNav';
 
 /**
- * Shell for authed routes — a slim top bar over `<Outlet/>`.
- * The driver/agent bottom-nav and role-specific chrome land with the
- * marketplace screens (Phase 3).
+ * Shell for authed routes — the prototype's app frame: a soft-grey page over
+ * `<Outlet/>` with the fixed bottom nav. Pages render their own headers
+ * (greeting + bell on the home, a back bar on detail screens). Sign-out and
+ * the admin entry live on the Profile screen.
  */
 export function AppLayout() {
-  const { user, logout } = useAuth();
   return (
-    <div className="min-h-dvh">
-      <header className="flex items-center justify-between border-b px-4 py-3">
-        <Link to="/" className="font-bold">
-          TripKing
-        </Link>
-        <div className="flex items-center gap-3 text-sm">
-          {user?.role === 'admin' ? (
-            <Link to="/administration" className="text-secondary underline">
-              Admin
-            </Link>
-          ) : null}
-          <span className="text-secondary">{user?.displayName || user?.phone}</span>
-          <Button size="sm" variant="ghost" onClick={() => void logout()}>
-            Sign out
-          </Button>
-        </div>
-      </header>
+    <div className="min-h-dvh bg-gray-50 pb-20">
       <Outlet />
+      <BottomNav />
     </div>
   );
 }

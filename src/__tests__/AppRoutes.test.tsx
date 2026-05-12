@@ -15,6 +15,7 @@ vi.mock('@/pages/PostedTripsPage', () => ({ default: () => <div>posted trips</di
 vi.mock('@/pages/TripDetailPage', () => ({ default: () => <div>trip detail</div> }));
 vi.mock('@/pages/ApplicantReviewPage', () => ({ default: () => <div>applicant review</div> }));
 vi.mock('@/pages/DriverProfilePage', () => ({ default: () => <div>driver profile</div> }));
+vi.mock('@/pages/ProfilePage', () => ({ default: () => <div>my profile page</div> }));
 vi.mock('@/pages/VacanciesPage', () => ({ default: () => <div>vacancies page</div> }));
 vi.mock('@/pages/PostVacancyPage', () => ({ default: () => <div>post vacancy page</div> }));
 vi.mock('@/pages/AlertsPage', () => ({ default: () => <div>alerts page</div> }));
@@ -118,6 +119,12 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/drivers/abc');
     expect(await screen.findByText(/driver profile/i)).toBeInTheDocument();
+  });
+
+  it('/profile renders the account page for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/profile');
+    expect(await screen.findByText(/my profile page/i)).toBeInTheDocument();
   });
 
   it('/vacancies renders the available-drivers feed for a signed-in user', async () => {
