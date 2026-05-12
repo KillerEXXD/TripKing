@@ -1,6 +1,7 @@
 export * from './api';
 export * from './user';
 export * from './adminConfig';
+export * from './place';
 export * from './trip';
 export * from './driver';
 export * from './vehicle';
