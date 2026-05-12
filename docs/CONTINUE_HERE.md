@@ -18,9 +18,28 @@
 
 ---
 
+## Running two sessions in parallel — lane ownership
+
+The remaining work is split into two **conflict-free lanes** so two Claude sessions can run concurrently. Each session opens its own handoff doc and **only ever edits files in its lane**:
+
+| Lane | Entry doc | Owns (the only paths it touches) | Scope |
+|---|---|---|---|
+| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | the 4 remaining edge functions (`/drivers`+`/agents` → `/vacancies` → `/alerts` → `/reviews`), then Phase-4/5 backend endpoints |
+| **B — frontend** | **`docs/CONTINUE_HERE_FRONTEND.md`** | `src/**` (pages, components, hooks, lib, types, `AppRoutes.tsx`, `index.css`, `__tests__`) | the ~15 Phase-3 screens on the existing hooks, then Phase-4/5 UIs |
+
+No file appears in both lanes (`package.json`/lockfile is in *neither* — adding a dep needs the user). `CLAUDE.md` and the `CONTINUE_HERE*.md` docs are shared but append-only, each session in its own section.
+
+**The one cross-lane contract:** the `POST /drivers` / `POST /agents` "create my profile" route — backend implements it (commit 1), frontend consumes it via a new `createMyDriverProfile`/`createMyAgentProfile` in `src/lib/api/services/drivers.ts`+`src/hooks/useDrivers.ts`. Shape: `{ full_name, role:'driver'|'trip_manager', home_city_id, … }`. Neither side changes it without updating both lane docs.
+
+**Push protocol (both sessions):** `git pull --rebase origin main` **immediately before** every `git push origin main`. Disjoint lanes ⇒ the rebase always replays cleanly. A rebase conflict ⇒ a lane was crossed — stop, fix the boundary, don't force. Edge-function changes don't affect the `tsc/test/build` pre-push gate (`supabase/`, `public/docs/`, `scripts/`, `tests/load/` are outside the app build), so the lanes never break each other's gate.
+
+> The rest of this doc is the full map for both lanes. If you're a parallel session, your lane doc above is the focused view — read it first; come back here only for the per-resource notes (which it copies anyway).
+
+---
+
 ## NEXT STEP → the **`/drivers` (+`/agents`) edge function**
 
-Then, in order: **`/drivers`** → **`/vacancies`** → **`/alerts`** → **`/reviews`** → then the **screens** → then **Phases 4–6**.
+Then, in order: **`/drivers`** → **`/vacancies`** → **`/alerts`** → **`/reviews`** → then the **screens** → then **Phases 4–6**. *(Running in parallel? See the lane split above — backend = `docs/CONTINUE_HERE_BACKEND.md`, frontend = `docs/CONTINUE_HERE_FRONTEND.md`.)*
 
 ### The recipe (every remaining edge function — mirror `supabase/functions/trips/index.ts`)
 
