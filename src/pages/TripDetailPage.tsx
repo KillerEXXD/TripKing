@@ -1,9 +1,10 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ClipboardList, Clock, MapPin, MessageCircle, Phone, User, Users, Wallet } from 'lucide-react';
-import { useApplyToTrip, useCompleteTrip, useStartTrip, useTrip, useWithdrawApplication } from '@/hooks/useTrips';
+import { ArrowLeft, CheckCircle2, ClipboardList, Clock, MapPin, MessageCircle, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
+import { useApplyToTrip, useCancelTrip, useCompleteTrip, useStartTrip, useTrip, useWithdrawApplication } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
+import { cancelReasonHooks } from '@/hooks/useAdminConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/myApplicationsStore';
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
@@ -226,6 +227,71 @@ function AssignedDriverBar({ trip }: { trip: Trip }) {
   );
 }
 
+/** Poster-only: cancel a still-open/assigned trip with a reason (applicants get notified). */
+function CancelTripCard({ trip }: { trip: Trip }) {
+  const cancelMutation = useCancelTrip();
+  const reasonsQuery = cancelReasonHooks.useList();
+  const [open, setOpen] = useState(false);
+  const [reasonId, setReasonId] = useState('');
+  const reasons = (reasonsQuery.data ?? []).filter((r) => r.isActive && (r.appliesTo === 'agent' || r.appliesTo === 'both'));
+
+  async function onConfirm() {
+    if (!reasonId) {
+      toast.error('Pick a reason for cancelling.');
+      return;
+    }
+    try {
+      await cancelMutation.mutateAsync({ tripId: trip.id, cancelReasonId: reasonId });
+      toast.success('Trip cancelled.');
+      // the trip query invalidates → status flips to "cancelled" → this card stops rendering.
+    } catch {
+      toast.error("Couldn't cancel the trip — please try again.");
+    }
+  }
+
+  if (!open) {
+    return (
+      <Card className="gap-1.5">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Cancel</div>
+        <p className="text-xs text-secondary">If this trip can no longer run, cancel it — anyone who applied is notified.</p>
+        <Button variant="ghost" size="sm" className="w-fit text-destructive hover:text-destructive" onClick={() => setOpen(true)}>
+          <XCircle className="size-4" aria-hidden /> Cancel this trip
+        </Button>
+      </Card>
+    );
+  }
+  return (
+    <Card className="gap-2 border-destructive/30">
+      <div className="text-sm font-semibold text-destructive">Cancel this trip?</div>
+      {reasonsQuery.isPending ? (
+        <p className="text-xs text-secondary">Loading reasons…</p>
+      ) : reasonsQuery.isError ? (
+        <ErrorState title="Couldn't load cancellation reasons" message="Check your connection and try again." onRetry={() => void reasonsQuery.refetch()} />
+      ) : (
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Reason</span>
+          <select className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base" value={reasonId} onChange={(e) => setReasonId(e.target.value)} aria-label="Cancellation reason">
+            <option value="">Pick a reason</option>
+            {reasons.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="flex gap-2 pt-1">
+        <Button variant="destructive" size="sm" disabled={!reasonId || cancelMutation.isPending} onClick={() => void onConfirm()}>
+          {cancelMutation.isPending ? 'Cancelling…' : 'Confirm cancellation'}
+        </Button>
+        <Button variant="outline" size="sm" disabled={cancelMutation.isPending} onClick={() => { setOpen(false); setReasonId(''); }}>
+          Keep the trip
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function PostedBy({ trip }: { trip: Trip }) {
   const isAgentPost = trip.postedByRole !== 'driver';
   const phone = trip.postedByPhone?.trim();
@@ -276,6 +342,7 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
   const showAssignedBar = viewer.isAssignedDriver && (trip.status === 'assigned' || trip.status === 'in_progress');
   const showTracking = viewer.isPoster || viewer.isAssignedDriver;
   const canSharePassengerLink = viewer.isPoster && !!trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress');
+  const canCancel = viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants' || trip.status === 'assigned');
   const myApplication: MyApplication | undefined = useMyApplicationsStore().byTrip[trip.id];
   const [showShareLink, setShowShareLink] = useState(false);
 
@@ -383,6 +450,8 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
         </Card>
       ) : null}
 
+      {canCancel ? <CancelTripCard trip={trip} /> : null}
+
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
       {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
@@ -395,9 +464,11 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
 /**
  * `/trips/:id` — full trip detail, laid out like the prototype: route card,
  * payout breakdown, driver instructions, "Posted by" with Call / Message CTAs,
- * applicant prompts, a fixed Apply / Withdraw bar (drivers, on open trips) and a
+ * applicant prompts, a fixed Apply / Withdraw bar (drivers, on open trips), a
  * Start / Complete bar (the assigned driver — Start verifies the passenger's
- * OTP). Read via `useTrip`; the caller's driver id comes from `useMyDriver`.
+ * OTP), and a Cancel-this-trip card (the poster, while the trip is still
+ * open / has-applicants / assigned). Read via `useTrip`; the caller's driver id
+ * comes from `useMyDriver`.
  */
 export function TripDetailPage() {
   const { id } = useParams<{ id: string }>();

@@ -5,12 +5,14 @@ import { TripDetailPage } from '@/pages/TripDetailPage';
 import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
 
-vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn() }));
-import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn() }));
+import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip } from '@/hooks/useTrips';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
 import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
 import { useDriverVehicles } from '@/hooks/useVehicles';
+vi.mock('@/hooks/useAdminConfig', () => ({ cancelReasonHooks: { useList: vi.fn() } }));
+import { cancelReasonHooks } from '@/hooks/useAdminConfig';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/stores/myApplicationsStore', () => ({ useMyApplicationsStore: vi.fn(), timeAgo: () => 'just now' }));
@@ -95,15 +97,25 @@ let applyMutateAsync: ReturnType<typeof vi.fn>;
 let withdrawMutateAsync: ReturnType<typeof vi.fn>;
 let startMutateAsync: ReturnType<typeof vi.fn>;
 let completeMutateAsync: ReturnType<typeof vi.fn>;
+let cancelMutateAsync: ReturnType<typeof vi.fn>;
 function setMutations() {
   applyMutateAsync = vi.fn().mockResolvedValue({ id: 'a1', appliedAt: '2099-05-31T00:00:00.000Z' });
   withdrawMutateAsync = vi.fn().mockResolvedValue(undefined);
   startMutateAsync = vi.fn().mockResolvedValue({});
   completeMutateAsync = vi.fn().mockResolvedValue({});
+  cancelMutateAsync = vi.fn().mockResolvedValue({});
   vi.mocked(useApplyToTrip).mockReturnValue({ mutateAsync: applyMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync: withdrawMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useStartTrip).mockReturnValue({ mutateAsync: startMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useCompleteTrip).mockReturnValue({ mutateAsync: completeMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useCancelTrip).mockReturnValue({ mutateAsync: cancelMutateAsync, isPending: false, isError: false } as never);
+}
+const CANCEL_REASONS = [
+  { id: 'cr1', label: 'Passenger no longer needs the ride', appliesTo: 'both', sortOrder: 1, isActive: true },
+  { id: 'cr2', label: 'Driver-only reason', appliesTo: 'driver', sortOrder: 2, isActive: true },
+];
+function setCancelReasons(over: { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void } = {}) {
+  vi.mocked(cancelReasonHooks.useList).mockReturnValue({ isPending: false, isError: false, data: CANCEL_REASONS, refetch: vi.fn(), ...over } as never);
 }
 let storeState: { byTrip: Record<string, unknown>; recordApplication: ReturnType<typeof vi.fn>; clearApplication: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn> };
 function setStore(byTrip: Record<string, unknown> = {}) {
@@ -133,6 +145,9 @@ describe('TripDetailPage', () => {
     vi.mocked(useWithdrawApplication).mockReset();
     vi.mocked(useStartTrip).mockReset();
     vi.mocked(useCompleteTrip).mockReset();
+    vi.mocked(useCancelTrip).mockReset();
+    vi.mocked(cancelReasonHooks.useList).mockReset();
+    setCancelReasons();
     vi.mocked(useUpdateDriverLocation).mockReset().mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     vi.mocked(useMyApplicationsStore).mockReset();
     vi.mocked(useAuth).mockReset().mockReturnValue({ user: driver, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
@@ -259,5 +274,30 @@ describe('TripDetailPage', () => {
     expect(screen.getByText(/share the trip with your passenger/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /share the passenger link/i }));
     expect(screen.getByText(/\/passenger\/123456/)).toBeInTheDocument();
+  });
+
+  it('lets the poster cancel an open trip with a reason', async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'open' }) });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /cancel this trip/i }));
+    const select = screen.getByRole('combobox', { name: /cancellation reason/i });
+    // agent-only / "both" reasons appear; driver-only ones don't
+    expect(screen.getByRole('option', { name: /passenger no longer needs the ride/i })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /driver-only reason/i })).toBeNull();
+    fireEvent.change(select, { target: { value: 'cr1' } });
+    fireEvent.click(screen.getByRole('button', { name: /confirm cancellation/i }));
+    await waitFor(() => expect(cancelMutateAsync).toHaveBeenCalledWith({ tripId: 't1', cancelReasonId: 'cr1' }));
+  });
+
+  it("doesn't show the cancel card to a non-poster, or once the trip is in progress", () => {
+    setTrip({ data: makeTrip({ status: 'open' }) }); // default user is the driver, not the poster
+    const { unmount } = renderDetail();
+    expect(screen.queryByRole('button', { name: /cancel this trip/i })).toBeNull();
+    unmount();
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'in_progress' }) });
+    renderDetail();
+    expect(screen.queryByRole('button', { name: /cancel this trip/i })).toBeNull();
   });
 });
