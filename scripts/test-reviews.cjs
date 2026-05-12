@@ -125,6 +125,22 @@ async function postTrip(agentToken, cityA, cityB, carTypeId) {
   const reported = await j('POST', `/reviews/${reviewId}/report`, { token: stranger.token, body: { flag_reason: 'inappropriate' } });
   check('POST /reviews/:id/report (any authed user) → 200 + is_flagged', reported.status === 200 && reported.json?.data?.is_flagged === true, `status=${reported.status} ${JSON.stringify(reported.json?.error || '')}`);
 
+  // ── admin moderation ───────────────────────────────────────────────────
+  const admin = await signIn('admin');
+  check('admin auth token obtained', !!admin.token);
+  const modNoAuth = await j('POST', `/reviews/${reviewId}/moderate`, { body: { clear_flag: true } });
+  check('POST /reviews/:id/moderate without auth → 401', modNoAuth.status === 401, `status=${modNoAuth.status}`);
+  const modNotAdmin = await j('POST', `/reviews/${reviewId}/moderate`, { token: stranger.token, body: { clear_flag: true } });
+  check('POST /reviews/:id/moderate by a non-admin → 403', modNotAdmin.status === 403, `status=${modNotAdmin.status}`);
+  if (admin.token) {
+    const flaggedQueue = await j('GET', '/reviews?flagged=true', { token: admin.token });
+    check('GET /reviews?flagged=true (admin) → contains the flagged review', flaggedQueue.status === 200 && (flaggedQueue.json?.data || []).some((r) => r.id === reviewId), `len=${flaggedQueue.json?.data?.length}`);
+    const moderated = await j('POST', `/reviews/${reviewId}/moderate`, { token: admin.token, body: { clear_flag: true, is_published: true } });
+    check('POST /reviews/:id/moderate (admin) → 200 + flag cleared', moderated.status === 200 && moderated.json?.data?.is_flagged === false && moderated.json?.data?.is_published === true, `status=${moderated.status} ${JSON.stringify(moderated.json?.error || moderated.json?.data || '')}`);
+    const mod404 = await j('POST', `/reviews/${NONE}/moderate`, { token: admin.token, body: { clear_flag: true } });
+    check('POST /reviews/<nonexistent>/moderate → 404', mod404.status === 404, `status=${mod404.status}`);
+  }
+
   if (failures) { console.error(`[test-reviews] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-reviews] all checks passed');
 })().catch((e) => { console.error('[test-reviews] error:', e); process.exit(1); });

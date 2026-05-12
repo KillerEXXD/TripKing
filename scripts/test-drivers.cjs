@@ -109,6 +109,24 @@ async function tokenFor(role) {
   const viaDriversRoute = await j('POST', '/drivers', { token, body: { role: 'trip_manager', full_name: 'Driver Turned Agent', business_name: 'Crossover Cabs' } });
   check('POST /drivers { role: trip_manager } → 200 + agent id + user_id', viaDriversRoute.status === 200 && !!viaDriversRoute.json?.data?.id && !!viaDriversRoute.json?.data?.user_id, `status=${viaDriversRoute.status} ${JSON.stringify(viaDriversRoute.json?.error || '')}`);
 
+  // ── admin KYC workflow ─────────────────────────────────────────────────
+  const adminToken = await tokenFor('admin');
+  check('admin auth token obtained', !!adminToken);
+  const kycNoAuth = await j('PATCH', `/drivers/${driverId}/kyc`, { body: { kyc_status: 'docs_submitted' } });
+  check('PATCH /drivers/:id/kyc without auth → 401', kycNoAuth.status === 401, `status=${kycNoAuth.status}`);
+  const kycNotAdmin = await j('PATCH', `/drivers/${driverId}/kyc`, { token, body: { kyc_status: 'docs_submitted' } });
+  check('PATCH /drivers/:id/kyc by a non-admin → 403', kycNotAdmin.status === 403, `status=${kycNotAdmin.status}`);
+  if (adminToken) {
+    const kycBad = await j('PATCH', `/drivers/${driverId}/kyc`, { token: adminToken, body: { kyc_status: 'unicorn' } });
+    check('PATCH /drivers/:id/kyc with a bad status → 422', kycBad.status === 422, `status=${kycBad.status}`);
+    const kycOk = await j('PATCH', `/drivers/${driverId}/kyc`, { token: adminToken, body: { kyc_status: 'docs_submitted', note: 'smoke' } });
+    check('PATCH /drivers/:id/kyc (admin) → 200 + kyc_status updated', kycOk.status === 200 && kycOk.json?.data?.kyc_status === 'docs_submitted', `status=${kycOk.status} ${JSON.stringify(kycOk.json?.error || '')}`);
+    const queue = await j('GET', '/drivers?kyc_status=docs_submitted,video_pending');
+    check('GET /drivers?kyc_status=<csv> → contains the driver', queue.status === 200 && (queue.json?.data || []).some((d) => d.id === driverId), `len=${queue.json?.data?.length}`);
+    const agentKyc = await j('PATCH', `/agents/${agentId}/kyc`, { token: adminToken, body: { kyc_status: 'approved' } });
+    check('PATCH /agents/:id/kyc (admin) → 200 + kyc_status updated', agentKyc.status === 200 && agentKyc.json?.data?.kyc_status === 'approved', `status=${agentKyc.status} ${JSON.stringify(agentKyc.json?.error || '')}`);
+  }
+
   if (failures) { console.error(`[test-drivers] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-drivers] all checks passed');
 })().catch((e) => { console.error('[test-drivers] error:', e); process.exit(1); });

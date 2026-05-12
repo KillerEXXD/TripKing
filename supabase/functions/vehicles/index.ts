@@ -4,7 +4,8 @@
  * "vehicles read / owner-or-admin write" policy). `eligibility_status` is DERIVED here
  * (year vs app_settings.min_vehicle_year), never stored.
  *
- *   GET    /vehicles            ?driver_id=&include_inactive=
+ *   GET    /vehicles            ?driver_id=&include_inactive=&eligibility=&needs_attention=true
+ *                               (eligibility = CSV of eligible|expiring_soon|expired; needs_attention=true ⇒ eligibility_status≠eligible — the admin eligibility dashboard)
  *   GET    /vehicles/:id
  *   POST   /vehicles            (driver) — driver_id = the caller's driver
  *   PATCH  /vehicles/:id         (owning driver/admin) — include {is_active} to enable/disable
@@ -89,10 +90,14 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     const driverId = url.searchParams.get('driver_id');
     if (driverId) q = q.eq('driver_id', driverId);
     if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
-    q = q.limit(200);
+    q = q.limit(500);
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(await eligibilityFor(db, (data ?? []) as Record<string, unknown>[]));
+    let rows = await eligibilityFor(db, (data ?? []) as Record<string, unknown>[]);
+    const elig = (url.searchParams.get('eligibility') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+    if (elig.length) rows = rows.filter((v) => elig.includes(String(v.eligibility_status)));
+    else if (url.searchParams.get('needs_attention') === 'true') rows = rows.filter((v) => v.eligibility_status !== 'eligible');
+    return ok(rows);
   }
 
   // POST /vehicles (create — caller must be a driver)

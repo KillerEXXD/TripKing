@@ -1004,7 +1004,7 @@
         "tags": [
           "vehicles"
         ],
-        "summary": "List vehicles (eligibility_status derived)",
+        "summary": "List vehicles (eligibility_status derived) — eligibility / needs_attention drive the admin eligibility dashboard",
         "parameters": [
           {
             "name": "driver_id",
@@ -1019,6 +1019,22 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "eligibility",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "CSV of eligible|expiring_soon|expired"
+          },
+          {
+            "name": "needs_attention",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true ⇒ only vehicles whose eligibility_status ≠ eligible"
           }
         ],
         "responses": {
@@ -1151,7 +1167,7 @@
         "tags": [
           "drivers"
         ],
-        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries",
+        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries; kyc_status accepts a CSV (the admin KYC queue)",
         "parameters": [
           {
             "name": "current_city_id",
@@ -1165,7 +1181,8 @@
             "in": "query",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "one value or a CSV — e.g. docs_submitted,video_pending"
           },
           {
             "name": "limit",
@@ -1873,7 +1890,7 @@
         "tags": [
           "reviews"
         ],
-        "summary": "List reviews (published rows + the caller's own when authed; admins see all)",
+        "summary": "List reviews (published rows + the caller's own when authed; admins see all). flagged=true (admin) = the moderation queue",
         "parameters": [
           {
             "name": "trip_id",
@@ -1900,6 +1917,14 @@
                 "driver_to_manager"
               ]
             }
+          },
+          {
+            "name": "flagged",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "admin only — return is_flagged rows (the moderation queue)"
           },
           {
             "name": "limit",
@@ -2035,6 +2060,168 @@
         ],
         "responses": {
           "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/{id}/kyc": {
+      "patch": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Move a driver through the KYC workflow (admin; Bearer) — fires a kyc_status_change notification",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kyc_status"
+                ],
+                "properties": {
+                  "kyc_status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "docs_submitted",
+                      "video_pending",
+                      "approved",
+                      "rejected",
+                      "resubmit_required"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/agents/{id}/kyc": {
+      "patch": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Move an agent through the KYC workflow (admin; Bearer) — fires a kyc_status_change notification",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kyc_status"
+                ],
+                "properties": {
+                  "kyc_status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "docs_submitted",
+                      "video_pending",
+                      "approved",
+                      "rejected",
+                      "resubmit_required"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/reviews/{id}/moderate": {
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "summary": "Moderate a review (admin; Bearer) — set is_published and/or clear the flag; records moderated_by/moderated_at",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "is_published": {
+                    "type": "boolean"
+                  },
+                  "clear_flag": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
             "$ref": "#/components/responses/Envelope"
           },
           "404": {

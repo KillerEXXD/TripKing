@@ -6,10 +6,11 @@
  * passenger reviews (rater_user_id null) are out of scope here — they'd come via a passenger-portal
  * function with the service role.
  *
- *   GET   /reviews              ?trip_id=&ratee_user_id=&direction=&limit=   (optional Bearer)
+ *   GET   /reviews              ?trip_id=&ratee_user_id=&direction=&flagged=true&limit=   (optional Bearer; flagged=true = the admin moderation queue)
  *   GET   /reviews/:id          (optional Bearer)
  *   POST  /reviews              (Bearer) — rater_user_id = caller; requires the trip to be completed; unique (trip_id, direction)
  *   POST  /reviews/:id/report   (Bearer; any authed user) — set is_flagged + flag_reason
+ *   POST  /reviews/:id/moderate (admin; Bearer) — { is_published?, clear_flag? } — moderation action; sets moderated_by/moderated_at
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -82,6 +83,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     if (ratee) q = q.eq('ratee_user_id', ratee);
     const direction = url.searchParams.get('direction');
     if (direction) q = q.eq('direction', direction);
+    if (url.searchParams.get('flagged') === 'true' && isAdmin(u)) q = q.eq('is_flagged', true); // the admin moderation queue
     if (visibilityOr) q = q.or(visibilityOr);
     const limit = Number(url.searchParams.get('limit') ?? '50');
     q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
@@ -150,6 +152,24 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     if (!rev) return fail('NOT_FOUND', 'Review not found', 404);
     const b = await readBody(req);
     const { error } = await db.from('reviews').update({ is_flagged: true, flag_reason: strOrNull(b.flag_reason) }).eq('id', id);
+    if (error) return pgFail(error);
+    return fullReview(id);
+  }
+
+  // ── POST /reviews/:id/moderate (admin — the moderation queue action) ─────
+  if (sub === 'moderate' && req.method === 'POST') {
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const { data: rev } = await db.from('reviews').select('id').eq('id', id).maybeSingle();
+    if (!rev) return fail('NOT_FOUND', 'Review not found', 404);
+    const b = await readBody(req);
+    const update: Record<string, unknown> = { moderated_by: u.id, moderated_at: new Date().toISOString() };
+    if (typeof b.is_published === 'boolean') update.is_published = b.is_published;
+    if (b.clear_flag === true || b.clear_flag === 'true') {
+      update.is_flagged = false;
+      update.flag_reason = null;
+    }
+    const { error } = await db.from('reviews').update(update).eq('id', id);
     if (error) return pgFail(error);
     return fullReview(id);
   }

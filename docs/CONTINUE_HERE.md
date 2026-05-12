@@ -24,7 +24,7 @@ The remaining work is split into two **conflict-free lanes** so two Claude sessi
 
 | Lane | Entry doc | Owns (the only paths it touches) | Scope |
 |---|---|---|---|
-| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | ✅ all 10 marketplace edge functions done (`/drivers`+`/agents`+`/vacancies`+`/alerts`+`/reviews` shipped this round) → next is **Phase-4/5 backend endpoints** |
+| **A — backend** | **`docs/CONTINUE_HERE_BACKEND.md`** | `supabase/**` (functions, `config.toml`, migrations) · `public/docs/openapi.yaml`+`.json` · `scripts/test-*.cjs`+`scripts/db.cjs` · `tests/load/**` | ✅ all 10 marketplace edge functions + the **Phase-4 admin-ops backend** done (KYC review · reviews moderation · vehicle-eligibility filters) → next is **Phase-5 backend** (analytics endpoints) |
 | **B — frontend** | **`docs/CONTINUE_HERE_FRONTEND.md`** | `src/**` (pages, components, hooks, lib, types, `AppRoutes.tsx`, `index.css`, `__tests__`) | the ~15 Phase-3 screens on the existing hooks, then Phase-4/5 UIs |
 
 No file appears in both lanes (`package.json`/lockfile is in *neither* — adding a dep needs the user). `CLAUDE.md` and the `CONTINUE_HERE*.md` docs are shared but append-only, each session in its own section.
@@ -39,9 +39,9 @@ No file appears in both lanes (`package.json`/lockfile is in *neither* — addin
 
 ---
 
-## NEXT STEP → **Phase-4/5 backend endpoints** (✅ all 10 marketplace edge functions shipped — `/admin`, `/auth`, `/trips`, `/notifications`, `/vehicles`, `/drivers`, `/agents`, `/vacancies`, `/alerts`, `/reviews`)
+## NEXT STEP → **Phase-5 backend** (analytics endpoints) (✅ all 10 marketplace edge functions + the Phase-4 admin-ops backend shipped)
 
-Backend lane: Phase-4 admin-ops endpoints (KYC-queue actions, vehicle-eligibility dashboard data, translation-manager backend, reviews-moderation) → Phase-5 analytics endpoints — same recipe (see `docs/CONTINUE_HERE_BACKEND.md`). Frontend lane: the **screens** (see `docs/CONTINUE_HERE_FRONTEND.md`) → then **Phases 4–6** UIs. *(Running in parallel? See the lane split above.)*
+Backend lane: Phase-4 admin-ops backend is **done** — KYC review (`PATCH /drivers|agents/:id/kyc`, CSV `?kyc_status=` queue, `kyc_status_change` notification) · reviews moderation (`?flagged=true`, `POST /reviews/:id/moderate`) · vehicle-eligibility dashboard filters (`?eligibility=`, `?needs_attention=true`) · translation manager = the existing `/admin/languages`. Next = Phase-5 server-computed analytics endpoints — same recipe (see `docs/CONTINUE_HERE_BACKEND.md`). Frontend lane: the **screens** (see `docs/CONTINUE_HERE_FRONTEND.md`) → then **Phases 4–6** UIs (the Phase-4 admin-ops UIs can be built now — their backend is live). *(Running in parallel? See the lane split above.)*
 
 ### The recipe (every remaining edge function — mirror `supabase/functions/trips/index.ts`)
 

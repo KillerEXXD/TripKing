@@ -52,6 +52,10 @@ function pick(src: Record<string, unknown>, keys: string[]): Record<string, unkn
 }
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
+const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'approved', 'rejected', 'resubmit_required'] as const;
+function csv(v: string | null): string[] {
+  return v ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
 
 const handler = withTiming('agents', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);
@@ -59,7 +63,9 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
   const db = serviceClient();
   const url = new URL(req.url);
   const m = url.pathname.match(/\/agents(?:\/(.+))?$/);
-  const id = (m && m[1] ? m[1] : '').split('/').filter(Boolean)[0];
+  const segs = (m && m[1] ? m[1] : '').split('/').filter(Boolean);
+  const id = segs[0];
+  const sub = segs[1]; // 'kyc'
 
   async function fullAgent(agentId: string): Promise<Response> {
     const { data, error } = await db.from('trip_managers').select(AGENT_SELECT).eq('id', agentId).maybeSingle();
@@ -77,8 +83,9 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     let q = db.from('trip_managers').select(AGENT_SELECT);
     const city = url.searchParams.get('business_city_id');
     if (city) q = q.eq('business_city_id', city);
-    const kyc = url.searchParams.get('kyc_status');
-    if (kyc) q = q.eq('kyc_status', kyc);
+    const kyc = csv(url.searchParams.get('kyc_status'));
+    if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
+    else if (kyc.length > 1) q = q.in('kyc_status', kyc);
     const limit = Number(url.searchParams.get('limit') ?? '50');
     q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
     const { data, error } = await q;
@@ -117,13 +124,34 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
   const { data: tm } = await db.from('trip_managers').select('id, user_id').eq('id', id).maybeSingle();
 
   // ── GET /agents/:id ──────────────────────────────────────────────────────
-  if (req.method === 'GET') {
+  if (!sub && req.method === 'GET') {
     if (!tm) return fail('NOT_FOUND', 'Agent not found', 404);
     return fullAgent(id);
   }
 
+  // ── PATCH /agents/:id/kyc (admin — the KYC review workflow) ──────────────
+  if (sub === 'kyc' && (req.method === 'PATCH' || req.method === 'PUT' || req.method === 'POST')) {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    if (!tm) return fail('NOT_FOUND', 'Agent not found', 404);
+    const b = await readBody(req);
+    const next = str(b.kyc_status);
+    if (!(KYC_STATES as readonly string[]).includes(next)) return fail('VALIDATION', `kyc_status must be one of ${KYC_STATES.join(', ')}`, 422);
+    const { error } = await db.from('trip_managers').update({ kyc_status: next }).eq('id', id);
+    if (error) return pgFail(error);
+    await db.from('notifications').insert({
+      user_id: tm.user_id as string,
+      type: 'kyc_status_change',
+      title: 'KYC update',
+      body: next === 'approved' ? 'Your KYC has been approved.' : next === 'rejected' ? 'Your KYC was rejected.' : next === 'resubmit_required' ? 'Please re-submit your KYC documents.' : `Your KYC status is now "${next}".`,
+      payload_json: { kyc_status: next, kind: 'agent', ...(strOrNull(b.note) ? { note: strOrNull(b.note) } : {}) },
+    });
+    return fullAgent(id);
+  }
+
   // ── PATCH /agents/:id (owner/admin) ──────────────────────────────────────
-  if (req.method === 'PATCH' || req.method === 'PUT') {
+  if (!sub && (req.method === 'PATCH' || req.method === 'PUT')) {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', '', 401);
     if (!tm) return fail('NOT_FOUND', 'Agent not found', 404);

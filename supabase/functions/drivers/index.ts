@@ -6,12 +6,13 @@
  * write" policy in migration 002). The /agents function is the trip-manager twin
  * (supabase/functions/agents/index.ts).
  *
- *   GET   /drivers              ?current_city_id=&kyc_status=&limit=     (public)
+ *   GET   /drivers              ?current_city_id=&kyc_status=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue)
  *   POST  /drivers              (Bearer) — create my profile; user_id = caller; body.role='trip_manager'
  *                               makes an agent profile instead; idempotent (returns the existing one if any)
  *   GET   /drivers/:id          (public) — joins home/current city + vehicle summaries
  *   PATCH /drivers/:id          (owner/admin; Bearer) — full_name, email, home_city_id, current_city_id, profile_photo_url
  *   PATCH /drivers/:id/location (owner; Bearer) — current_city_id, current_lat, current_lng, current_location_at
+ *   PATCH /drivers/:id/kyc      (admin; Bearer) — { kyc_status, note? } — moves the KYC workflow + fires a kyc_status_change notification
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -59,6 +60,10 @@ function pick(src: Record<string, unknown>, keys: string[]): Record<string, unkn
 }
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
+const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'approved', 'rejected', 'resubmit_required'] as const;
+function csv(v: string | null): string[] {
+  return v ? v.split(',').map((s) => s.trim()).filter(Boolean) : [];
+}
 
 const handler = withTiming('drivers', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);
@@ -92,8 +97,9 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     let q = db.from('drivers').select(DRIVER_SELECT);
     const city = url.searchParams.get('current_city_id');
     if (city) q = q.eq('current_city_id', city);
-    const kyc = url.searchParams.get('kyc_status');
-    if (kyc) q = q.eq('kyc_status', kyc);
+    const kyc = csv(url.searchParams.get('kyc_status'));
+    if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
+    else if (kyc.length > 1) q = q.in('kyc_status', kyc);
     const limit = Number(url.searchParams.get('limit') ?? '50');
     q = q
       .order('rating_avg', { ascending: false })
@@ -175,6 +181,26 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (!('current_location_at' in patch)) patch.current_location_at = new Date().toISOString();
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    return fullDriver(id);
+  }
+
+  // ── PATCH /drivers/:id/kyc (admin — the KYC review workflow) ─────────────
+  if (sub === 'kyc' && (req.method === 'PATCH' || req.method === 'PUT' || req.method === 'POST')) {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const b = await readBody(req);
+    const next = str(b.kyc_status);
+    if (!(KYC_STATES as readonly string[]).includes(next)) return fail('VALIDATION', `kyc_status must be one of ${KYC_STATES.join(', ')}`, 422);
+    const { error } = await db.from('drivers').update({ kyc_status: next }).eq('id', id);
+    if (error) return pgFail(error);
+    await db.from('notifications').insert({
+      user_id: ownerId,
+      type: 'kyc_status_change',
+      title: 'KYC update',
+      body: next === 'approved' ? 'Your KYC has been approved.' : next === 'rejected' ? 'Your KYC was rejected.' : next === 'resubmit_required' ? 'Please re-submit your KYC documents.' : `Your KYC status is now "${next}".`,
+      payload_json: { kyc_status: next, kind: 'driver', ...(strOrNull(b.note) ? { note: strOrNull(b.note) } : {}) },
+    });
     return fullDriver(id);
   }
 
