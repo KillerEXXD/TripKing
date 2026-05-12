@@ -9,6 +9,19 @@ vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carT
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
+// Stub the place-pin affordance: a button that "pins" a fixed place (or removes it).
+vi.mock('@/components/location/PlacePinField', () => ({
+  PlacePinField: ({ value, onChange, pinLabel }: { value: { id: string; name: string } | null; onChange: (p: { id: string; name: string } | null) => void; pinLabel?: string }) =>
+    value ? (
+      <button type="button" aria-label={`Remove ${value.name}`} onClick={() => onChange(null)}>
+        {value.name}
+      </button>
+    ) : (
+      <button type="button" onClick={() => onChange({ id: 'p1', name: 'Katpadi, Vellore' })}>
+        {pinLabel ?? 'pin'}
+      </button>
+    ),
+}));
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 const carType = (id: string, label: string) => ({ id, label, sortOrder: 1, isActive: true });
@@ -80,12 +93,13 @@ describe('CreateAlertPage', () => {
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
-  it('creates the alert with the chosen city, default radius and in-app channel, then navigates back', async () => {
+  it('creates the alert with the chosen city, a pinned exact pickup point, default radius and in-app channel, then navigates back', async () => {
     const mutateAsync = setCreate();
     renderCreate();
     pickCity(/pickup city/i, 'c1');
+    fireEvent.click(screen.getByRole('button', { name: /pin the exact pickup point/i })); // sets fromPlace = p1 (stubbed)
     fireEvent.click(screen.getByRole('button', { name: /^create alert$/i }));
-    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ fromCityId: 'c1', fromRadiusKm: 25, notifyVia: ['in_app'], isActive: true })));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ fromCityId: 'c1', fromPlaceId: 'p1', fromRadiusKm: 25, notifyVia: ['in_app'], isActive: true })));
     expect(await screen.findByText('alerts list')).toBeInTheDocument();
   });
 

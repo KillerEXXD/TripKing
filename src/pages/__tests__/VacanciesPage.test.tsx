@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { VacanciesPage } from '@/pages/VacanciesPage';
+import { formatClockTime } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
 vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
@@ -21,6 +22,7 @@ function makeVacancy(over: Partial<Vacancy> = {}): Vacancy {
     availableFrom: '2099-06-01T00:00:00.000Z',
     availableUntil: '2099-06-05T00:00:00.000Z',
     destinationCities: [city('c2', 'Chennai'), city('c3', 'Bangalore')],
+    destinationPlaces: [],
     minRatePerKm: 18,
     notes: 'Long trips welcome.',
     status: 'active',
@@ -79,11 +81,28 @@ describe('VacanciesPage', () => {
     expect(screen.getByRole('link', { name: /ravi kumar/i })).toHaveAttribute('href', '/drivers/d1');
   });
 
+  it('shows the availability time window on the card', () => {
+    const from = '2099-06-01T09:00:00.000Z';
+    const to = '2099-06-01T13:00:00.000Z';
+    setVacancies({ data: [makeVacancy({ availableFrom: from, availableUntil: to })] });
+    renderVacancies();
+    const t0 = formatClockTime(new Date(from));
+    const t1 = formatClockTime(new Date(to));
+    expect(screen.getAllByText((txt) => txt.includes(t0) && txt.includes(t1)).length).toBeGreaterThan(0);
+  });
+
   it('always requests active vacancies and re-requests when a city filter changes', () => {
     setVacancies({ data: [] });
     renderVacancies();
     expect(useVacancies).toHaveBeenCalledWith({ status: 'active', currentCityId: undefined, destinationCityId: undefined });
     fireEvent.change(screen.getByLabelText(/where the driver is/i), { target: { value: 'c1' } });
     expect(useVacancies).toHaveBeenLastCalledWith({ status: 'active', currentCityId: 'c1', destinationCityId: undefined });
+  });
+
+  it('renders the "Near me" filter; a near-list card shows the distance', () => {
+    setVacancies({ data: [makeVacancy({ distanceKm: 3.1 })] });
+    renderVacancies();
+    expect(screen.getByRole('button', { name: /near me/i })).toBeInTheDocument();
+    expect(screen.getByText(/3\.1 km away/i)).toBeInTheDocument();
   });
 });

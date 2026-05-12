@@ -10,6 +10,10 @@
  *   PATCH  /admin/<list>/reorder         body = { ids: [...] } → sets sort_order = (i+1)*10
  *   GET    /admin/app-settings
  *   PUT|PATCH /admin/app-settings        partial update
+ *   GET    /admin/places[?city_id=&provider=&q=&active=true|false&limit=]   (admin) — browse the geocoded places (incl. inactive)
+ *   PATCH  /admin/places/<id>            (admin) — { is_active?, city_id?, name?, formatted_address?, state? }
+ *   POST   /admin/places/<id>/merge      (admin) — { into } → repoint every *_place_id FK from <id> to <into>, then delete <id> (dedupe)
+ *   DELETE /admin/places/<id>            (admin) — 409 IN_USE if referenced (deactivate or merge instead)
  *
  * Lists: car-types · fuel-types · vehicle-makes · vehicle-models · seat-options ·
  * cities · languages · review-tags · cancel-reasons.
@@ -108,6 +112,77 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       return ok(data);
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/app-settings`, 405);
+  }
+
+  // ── /admin/places — curate the geocoded places (browse / edit / merge-dedupe / delete) ──
+  if (segments[0] === 'places') {
+    const PLACE_WRITABLE = ['is_active', 'city_id', 'name', 'formatted_address', 'state'];
+    // GET /admin/places — list/filter (admin sees inactive too)
+    if (segments.length === 1 && req.method === 'GET') {
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
+      let q = db.from('places').select('*');
+      const cityId = url.searchParams.get('city_id');
+      if (cityId) q = q.eq('city_id', cityId);
+      const provider = url.searchParams.get('provider');
+      if (provider) q = q.eq('provider', provider);
+      const active = url.searchParams.get('active');
+      if (active === 'true') q = q.eq('is_active', true);
+      else if (active === 'false') q = q.eq('is_active', false);
+      const query = (url.searchParams.get('q') ?? '').trim();
+      if (query) q = q.ilike('name', `%${query.replace(/[%,]/g, '')}%`);
+      const limit = Number(url.searchParams.get('limit') ?? '100');
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 100, 500));
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data ?? []);
+    }
+    // POST /admin/places/<id>/merge — dedupe: repoint every *_place_id FK from <id> to {into}, delete <id>
+    if (segments.length === 3 && segments[2] === 'merge' && req.method === 'POST') {
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
+      const loser = decodeURIComponent(segments[1]);
+      const body = await readBody(req);
+      const winner = typeof body.into === 'string' ? body.into.trim() : '';
+      if (!winner) return fail('VALIDATION', '`into` (the place id to keep) is required', 422);
+      if (winner === loser) return fail('VALIDATION', 'cannot merge a place into itself', 422);
+      const { data: pair } = await db.from('places').select('id').in('id', [loser, winner]);
+      if (!pair || pair.length !== 2) return fail('NOT_FOUND', 'one of the two place ids does not exist', 404);
+      const { data: before } = await db.from('places').select('*').eq('id', loser).maybeSingle();
+      const { data: n, error } = await db.rpc('merge_places', { p_loser: loser, p_winner: winner });
+      if (error) return fail('DB_ERROR', error.message, 400);
+      await audit(db, a.id, 'merge', 'places', loser, before, { merged_into: winner, fk_rows_repointed: n });
+      return ok({ merged: loser, into: winner, fk_rows_repointed: n });
+    }
+    // PATCH /admin/places/<id> · DELETE /admin/places/<id>
+    if (segments.length === 2) {
+      const id = decodeURIComponent(segments[1]);
+      if (req.method === 'PATCH' || req.method === 'PUT') {
+        const a = await requireAdmin(db, req);
+        if (a instanceof Response) return a;
+        const body = await readBody(req);
+        const patch: Record<string, unknown> = {};
+        for (const k of PLACE_WRITABLE) if (body[k] !== undefined) patch[k] = body[k];
+        if (Object.keys(patch).length === 0) return fail('VALIDATION', `nothing to update — allowed: ${PLACE_WRITABLE.join(', ')}`, 422);
+        const { data: before } = await db.from('places').select('*').eq('id', id).maybeSingle();
+        if (!before) return fail('NOT_FOUND', `place "${id}" not found`, 404);
+        const { data, error } = await db.from('places').update(patch).eq('id', id).select('*').single();
+        if (error) return pgFail(error);
+        await audit(db, a.id, 'update', 'places', id, before, data);
+        return ok(data);
+      }
+      if (req.method === 'DELETE') {
+        const a = await requireAdmin(db, req);
+        if (a instanceof Response) return a;
+        const { data: before } = await db.from('places').select('*').eq('id', id).maybeSingle();
+        if (!before) return fail('NOT_FOUND', `place "${id}" not found`, 404);
+        const { error } = await db.from('places').delete().eq('id', id);
+        if (error) return pgFail(error); // 23503 → 409 IN_USE (referenced — deactivate or merge instead)
+        await audit(db, a.id, 'delete', 'places', id, before, null);
+        return ok({ deleted: id });
+      }
+      return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/places/<id>`, 405);
+    }
+    return fail('NOT_FOUND', 'No such /admin/places route', 404);
   }
 
   // ── /admin/<list>... ─────────────────────────────────────────────────────

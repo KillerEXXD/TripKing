@@ -1,5 +1,6 @@
-/** Alert transforms — strict on id / user_id / from_city; cities joined server-side. */
+/** Alert transforms — strict on id / user_id / from_city; cities + places joined server-side. */
 import { transformCity } from '@/lib/api/transforms/adminConfig';
+import { maybePlace } from '@/lib/api/transforms/place';
 import type { Alert, AlertInput, CityRow, NotifyChannel } from '@/types';
 
 export type AlertTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID' | 'MISSING_FROM_CITY';
@@ -36,8 +37,10 @@ export function transformAlert(api: Api): Alert {
     userId: reqStr(api.user_id, 'MISSING_USER_ID', ctx),
     name: str(api.name) ?? '',
     fromCity: reqCity(api.from_city, ctx),
+    fromPlace: maybePlace(api.from_place),
     fromRadiusKm: num(api.from_radius_km) ?? 25,
     toCity: api.to_city && typeof api.to_city === 'object' ? transformCity(api.to_city as Api) : undefined,
+    toPlace: maybePlace(api.to_place),
     toRadiusKm: num(api.to_radius_km),
     minRatePerKm: num(api.min_rate_per_km),
     minCommissionPct: num(api.min_commission_pct),
@@ -55,8 +58,10 @@ export function toApiAlert(input: Partial<AlertInput>): Record<string, unknown> 
   const out: Record<string, unknown> = {};
   if (input.name !== undefined) out.name = input.name;
   if (input.fromCityId !== undefined) out.from_city_id = input.fromCityId;
+  if (input.fromPlaceId !== undefined) out.from_place_id = input.fromPlaceId;
   if (input.fromRadiusKm !== undefined) out.from_radius_km = input.fromRadiusKm;
   if (input.toCityId !== undefined) out.to_city_id = input.toCityId;
+  if (input.toPlaceId !== undefined) out.to_place_id = input.toPlaceId;
   if (input.toRadiusKm !== undefined) out.to_radius_km = input.toRadiusKm;
   if (input.minRatePerKm !== undefined) out.min_rate_per_km = input.minRatePerKm;
   if (input.minCommissionPct !== undefined) out.min_commission_pct = input.minCommissionPct;

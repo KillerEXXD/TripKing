@@ -256,3 +256,20 @@ npx supabase functions deploy <name>
 ```
 
 Pre-push (Husky) auto-runs `tsc --noEmit` → `npm run test:run` → `npm run build`; pre-commit runs `tsc --noEmit`.
+
+---
+
+## Slash commands (`.claude/commands/`)
+
+| Command | What |
+|---|---|
+| `/fullstatus` | full health check — runs `/metrics` + `/dbperf` + `/smokeall` + `/sentry` + `/posthog` + the Vercel deploy status + GitHub health, then a unified action summary |
+| `/metrics [hours]` | API perf from `api_metrics` (via `get_api_metrics_summary`) — per-endpoint avg/p95/errors, slowest requests, instrumentation gaps, GitHub health |
+| `/dbperf` | DB health — `supabase inspect db` (cache hits, slow queries, seq scans, unused indexes, table sizes) + the housekeeping-table sizes + the cron jobs + an `ANALYZE` reminder |
+| `/smokeall` | run every `scripts/test-*.cjs` against the deployed edge functions; report pass/fail + diagnose failures |
+| `/sentry` | unresolved Sentry issues for the `trip-king` project (`hudr` org) — categorised, high-impact ones investigated, synthetic/transient ones auto-resolved |
+| `/posthog` | PostHog analytics for the `trip-king` project (id `420735`) via HogQL — traffic, top pages, top visitors, custom events, client-side errors |
+| `/grant-admin <phone> [role]` | set `users.role` for a phone (default `admin`) — manual admin provisioning until the prod path exists; optionally also creates driver+agent profiles for the role switcher |
+| `/sessionsummary` | what was built / deployed / pushed this session |
+
+(Sentry + PostHog are wired — project `trip-king` / `420735` in the `hudr` org; the tokens live in `.env.development` (`SENTRY_AUTH_TOKEN`, `POSTHOG_PERSONAL_API_KEY`), gitignored. No `/bug` — no `bug_reports` table; no `/cl` — no console-log file.)

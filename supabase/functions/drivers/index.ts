@@ -6,12 +6,13 @@
  * write" policy in migration 002). The /agents function is the trip-manager twin
  * (supabase/functions/agents/index.ts).
  *
- *   GET   /drivers                  ?current_city_id=&kyc_status=&limit=   (public; kyc_status accepts a CSV — the admin KYC queue)
- *   GET   /drivers/me               (Bearer) — the caller's own driver profile (joined; +verification block; 404 if none)
- *   POST  /drivers                  (Bearer) — create my profile; user_id = caller; body.role='trip_manager' → an agent; idempotent
- *   GET   /drivers/:id              (public) — joins home/current city + vehicle summaries (private KYC fields stripped unless owner/admin)
- *   PATCH /drivers/:id              (owner/admin; Bearer) — full_name, email, home_city_id, current_city_id, profile_photo_url
- *   PATCH /drivers/:id/location     (owner; Bearer) — current_city_id, current_lat, current_lng, current_location_at
+ *   GET   /drivers              ?current_city_id=&kyc_status=&near_lat=&near_lng=&radius_km=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue; near_* restricts to drivers within radius_km of (near_lat, near_lng) by their generated geog, ignoring stale positions, nearest first + a distance_km per row; private KYC fields stripped unless admin)
+ *   GET   /drivers/me           (Bearer) — the caller's own driver profile (joined; +verification block; 404 if none)
+ *   POST  /drivers              (Bearer) — create my profile; user_id = caller; body.role='trip_manager'
+ *                               makes an agent profile instead; idempotent (returns the existing one if any)
+ *   GET   /drivers/:id          (public) — joins home/current city + vehicle summaries (private KYC fields stripped unless owner/admin)
+ *   PATCH /drivers/:id          (owner/admin; Bearer) — full_name, email, home_city_id, current_city_id, profile_photo_url
+ *   PATCH /drivers/:id/location (owner; Bearer) — current_city_id, current_lat, current_lng, current_location_at
  *   POST  /drivers/:id/kyc-doc-upload-url (owner; Bearer) — { doc_type } → short-lived signed UPLOAD url into the private 'driver-kyc' bucket
  *   POST  /drivers/:id/kyc-docs     (owner; Bearer) — { aadhaar_front_path, aadhaar_back_path, aadhaar_last4, driver_license_path, driver_license_number, driver_license_expiry, selfie_path, consent } → kyc_status pending|resubmit_required → docs_submitted
  *   GET   /drivers/:id/kyc-docs     (owner/admin; Bearer) — 5-min signed download urls for Aadhaar f/b, DL, selfie + masked-4 + DL number/expiry
@@ -22,6 +23,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared/geo.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -172,13 +174,29 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const kyc = csv(url.searchParams.get('kyc_status'));
     if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
     else if (kyc.length > 1) q = q.in('kyc_status', kyc);
+    // Phase D radius filter: drivers whose (fresh) current position is within radius_km of (near_lat, near_lng).
+    const near = parseNearRadius(url);
+    let distById: Map<string, number> | null = null;
+    if (near) {
+      const { data: rad, error: radErr } = await db.rpc('drivers_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM, p_stale_minutes: DRIVER_LOCATION_STALE_MINUTES });
+      if (radErr) return fail('DB_ERROR', radErr.message, 500);
+      const list = (rad ?? []) as { id: string; distance_m: number }[];
+      if (list.length === 0) return ok([]);
+      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
+      q = q.in('id', [...distById.keys()]);
+    }
     const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.order('rating_avg', { ascending: false }).order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+    q = q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+    if (!near) q = q.order('rating_avg', { ascending: false }).order('created_at', { ascending: false });
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
+    let rows = (data ?? []) as Row[];
+    if (distById) {
+      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+    }
     // the admin KYC queue passes a kyc_status filter + Bearer — give admins the full rows
     const u = await authUser(db, req);
-    const rows = (data ?? []) as Row[];
     return ok(isAdmin(u) ? rows : rows.map(stripPrivateKyc));
   }
 

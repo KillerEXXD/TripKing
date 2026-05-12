@@ -85,6 +85,13 @@ async function tokenFor(role) {
   const locatedNotOwner = await j('PATCH', `/drivers/${driverId}/location`, { token: token2, body: { current_city_id: cityId } });
   check('PATCH /drivers/:id/location by a non-owner → 403', locatedNotOwner.status === 403, `status=${locatedNotOwner.status}`);
 
+  // ── radius search (Phase D) — the driver just pinged their position, so they're "online" near (12.916, 79.132) ──
+  const nearHit = await j('GET', '/drivers?near_lat=12.916&near_lng=79.132&radius_km=5');
+  const drvHit = (nearHit.json?.data || []).find((d) => d.id === driverId);
+  check('GET /drivers?near_lat&near_lng&radius_km → contains the just-located driver + numeric distance_km ≤ radius', nearHit.status === 200 && !!drvHit && typeof drvHit.distance_km === 'number' && drvHit.distance_km <= 5, `status=${nearHit.status} hit=${JSON.stringify(drvHit && { id: drvHit.id, distance_km: drvHit.distance_km })}`);
+  const nearMiss = await j('GET', '/drivers?near_lat=28.6&near_lng=77.2&radius_km=5');
+  check('GET /drivers?near=<far away> → does not contain the just-located driver', nearMiss.status === 200 && !(nearMiss.json?.data || []).some((d) => d.id === driverId), `len=${nearMiss.json?.data?.length}`);
+
   // ── agents twin ────────────────────────────────────────────────────────
   const agentsList = await j('GET', '/agents');
   check('GET /agents → 200 + array', agentsList.status === 200 && Array.isArray(agentsList.json?.data), `status=${agentsList.status}`);

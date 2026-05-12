@@ -3,12 +3,24 @@
  * JWT via GoTrue, then writes with the service-role client enforcing the same ownership rules
  * the RLS policies encode). Instrumented with withTiming; verify_jwt = false (we validate).
  *
+ * PII / data minimisation: `GET /trips` and `GET /trips/:id` require a Bearer. Each trip is redacted
+ * to the caller's relationship (`redactTrip`): the poster (and admins) see passenger name+phone, poster
+ * phone, the assigned driver's live position and `distance_to_destination_km`, and the plaintext
+ * passenger OTP; the *assigned* driver sees passenger name + poster phone + their own live position
+ * (and passenger phone ONLY when the trip's `hide_passenger_phone` is false); everyone else (incl. an
+ * applicant who hasn't been assigned yet) sees only the browse-safe fields — no passenger PII, no driver
+ * positions. `passenger_otp_hash` is never returned. `GET /trips/by-otp/:otp` stays public (the OTP IS
+ * the credential) — it's the passenger's own view (their data + the assigned driver's position/phone to track/reach the ride).
+ *
  * Routes (at the function root, i.e. /functions/v1/trips/...):
- *   GET    /trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&limit=   (public)
- *   POST   /trips                       (authed) — total_fare computed if omitted; driver_payout via trigger
+ *   GET    /trips                       (Bearer) ?status=&from_city_id=&to_city_id=&posted_by_user_id=&assigned_driver_id=&near_lat=&near_lng=&radius_km=&limit=
+ *                                       — assigned_driver_id accepts a driver uuid OR the literal `me` (the trips you're driving);
+ *                                         near_lat+near_lng+radius_km restrict to trips whose pickup point (from_place → from_city fallback) is within the radius (nearest first; each row gets distance_km)
+ *   POST   /trips                       (Bearer) — from_place_id / to_place_id accepted alongside from_city_id / to_city_id; hide_passenger_phone (bool) + passenger_count (int≥1) are REQUIRED; total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification
+ *   GET    /trips/applied               (driver; Bearer) — the caller's own trip_acceptances, each with its joined trip ("my applications") — the joined trip is browse-safe (the caller is an applicant, not assigned)
  *   GET    /trips/by-otp/:otp           (public — the OTP is the credential) — the passenger portal; joins assigned driver+vehicle;
- *                                       fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed
- *   GET    /trips/:id                   (public) — joined; passenger_otp_hash stripped
+ *                                       fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash / passenger_otp never echoed
+ *   GET    /trips/:id                   (Bearer) — joined; redacted per the caller's relationship (see "PII" above)
  *   GET    /trips/:id/applicants        (poster/admin) — joins driver+vehicle
  *   POST   /trips/:id/applicants        (driver) — apply; bumps trip → has_applicants
  *   DELETE /trips/:id/applicants/:aid   (owning driver/admin) — withdraw
@@ -30,16 +42,17 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { parseNearRadius, toKm } from '../_shared/geo.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 
-// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map.
+// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map; from/to place joined alongside the curated cities.
 const TRIP_SELECT =
-  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
+  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
   'assigned_driver:drivers!assigned_driver_id(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at)';
 // for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
 const BY_OTP_SELECT =
-  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
+  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
   'assigned_driver:drivers!assigned_driver_id(id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at), ' +
   'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
@@ -78,7 +91,6 @@ function pgFail(error: { code?: string; message: string }, fallbackStatus = 400)
   if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
   return fail('DB_ERROR', error.message, fallbackStatus);
 }
-// ── trip-row enrichment (applied to every trip that leaves the API) ──────────
 function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
 }
@@ -90,22 +102,71 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-/** Strip the passenger-OTP hash (SHA-256 of a 6-digit OTP — brute-forceable) and, for an in-progress
- *  trip with a known assigned-driver position + destination coords, attach `distance_to_destination_km`. */
-function enrichTrip(row: Record<string, unknown>): Record<string, unknown> {
-  delete row.passenger_otp_hash;
-  if (row.status === 'in_progress') {
-    const d = row.assigned_driver as Record<string, unknown> | null | undefined;
-    const dest = row.to_city as Record<string, unknown> | null | undefined;
-    const dLat = num(d?.current_lat);
-    const dLng = num(d?.current_lng);
-    const tLat = num(dest?.lat);
-    const tLng = num(dest?.lng);
-    if (dLat != null && dLng != null && tLat != null && tLng != null) {
-      row.distance_to_destination_km = Math.round(haversineKm(dLat, dLng, tLat, tLng) * 10) / 10;
-    }
+/** For an in-progress trip with a known assigned-driver position + destination coords, the haversine km to go. */
+function distanceToDest(raw: Record<string, unknown>): number | null {
+  if (raw.status !== 'in_progress') return null;
+  const d = raw.assigned_driver as Record<string, unknown> | null | undefined;
+  const dest = raw.to_city as Record<string, unknown> | null | undefined;
+  const dLat = num(d?.current_lat), dLng = num(d?.current_lng), tLat = num(dest?.lat), tLng = num(dest?.lng);
+  if (dLat == null || dLng == null || tLat == null || tLng == null) return null;
+  return Math.round(haversineKm(dLat, dLng, tLat, tLng) * 10) / 10;
+}
+
+// ── PII redaction ────────────────────────────────────────────────────────────
+// PII / sensitive trip columns — stripped from every response by default; re-attached per viewer
+// relationship in redactTrip(). IF YOU ADD A PII COLUMN TO public.trips, ADD IT TO BOTH HERE.
+const TRIP_PII_COLS = ['passenger_name', 'passenger_phone', 'posted_by_phone', 'passenger_otp'] as const;
+const DRIVER_POSITION_COLS = ['current_lat', 'current_lng', 'current_location_at'] as const;
+type ViewerRel = 'owner' | 'admin' | 'assigned' | 'browse';
+
+/** Who is `u` to this trip? owner (the poster) | admin | assigned (the assigned driver) | browse (anyone else). */
+function relationshipFor(raw: Record<string, unknown>, u: { id: string; role: string } | null, myDriverId: string | null): ViewerRel {
+  if (!u) return 'browse';
+  if (u.role === 'admin') return 'admin';
+  if (raw.posted_by_user_id === u.id) return 'owner';
+  if (myDriverId && raw.assigned_driver_id === myDriverId) return 'assigned';
+  return 'browse';
+}
+function withoutKeys(o: Record<string, unknown> | null | undefined, keys: readonly string[]): Record<string, unknown> | null {
+  if (!o) return (o ?? null) as null;
+  const c = { ...o };
+  for (const k of keys) delete c[k];
+  return c;
+}
+/**
+ * Strip passenger/poster PII and the assigned driver's precise position from a raw trip row, then
+ * re-attach exactly what this viewer is allowed to see:
+ *   - owner / admin: everything — passenger name + phone, poster phone, driver live position,
+ *     `distance_to_destination_km` (in-progress), and the plaintext `passenger_otp` (so the poster can
+ *     re-open the passenger-portal link). `passenger_otp_hash` is never returned to anyone.
+ *   - assigned driver: passenger name + poster phone always; passenger phone ONLY when the trip's
+ *     `hide_passenger_phone` is false; their own live position + `distance_to_destination_km`. (Never
+ *     the OTP — they verify what the passenger tells them.)
+ *   - browse (any other authed user — incl. an applicant who isn't assigned yet): none of the above —
+ *     route / fare / car type / pickup / passenger_count / applicant_count / posted_by_name / etc. only.
+ */
+function redactTrip(raw: Record<string, unknown>, rel: ViewerRel): Record<string, unknown> {
+  const out = { ...raw };
+  delete out.passenger_otp_hash;            // never anyone
+  for (const k of TRIP_PII_COLS) delete out[k];
+  out.assigned_driver = withoutKeys(raw.assigned_driver as Record<string, unknown> | null, DRIVER_POSITION_COLS);
+  if (rel === 'owner' || rel === 'admin') {
+    out.passenger_name = raw.passenger_name;
+    out.passenger_phone = raw.passenger_phone;
+    out.posted_by_phone = raw.posted_by_phone;
+    out.assigned_driver = (raw.assigned_driver as Record<string, unknown> | null) ?? null;
+    if (typeof raw.passenger_otp === 'string' && raw.passenger_otp) out.passenger_otp = raw.passenger_otp;
+    const dist = distanceToDest(raw);
+    if (dist != null) out.distance_to_destination_km = dist;
+  } else if (rel === 'assigned') {
+    out.passenger_name = raw.passenger_name;
+    out.posted_by_phone = raw.posted_by_phone;
+    if (!raw.hide_passenger_phone) out.passenger_phone = raw.passenger_phone;
+    out.assigned_driver = (raw.assigned_driver as Record<string, unknown> | null) ?? null; // their own position
+    const dist = distanceToDest(raw);
+    if (dist != null) out.distance_to_destination_km = dist;
   }
-  return row;
+  return out;
 }
 
 const handler = withTiming('trips', async (req: Request): Promise<Response> => {
@@ -134,16 +195,24 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
     return (data?.id as string | undefined) ?? null;
   }
-  async function fullTrip(id: string) {
+  /** Re-fetch a trip joined + redacted for the viewer `u` (used by POST/assign/start/complete/cancel). */
+  async function fullTrip(id: string, u: { id: string; role: string }): Promise<Record<string, unknown>> {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', id).single();
     if (error) throw new Error(error.message);
-    return enrichTrip(data as Record<string, unknown>);
+    const raw = data as Record<string, unknown>;
+    const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
+    return redactTrip(raw, relationshipFor(raw, u, myDriverId));
   }
 
-  // ── GET /trips (list) ────────────────────────────────────────────────────
-  // Trip-manager "live map": GET /trips?status=in_progress&posted_by_user_id=<me> — each row carries
-  // the assigned driver's position + distance_to_destination_km.
+  // ── GET /trips (list) — Bearer required ──────────────────────────────────
+  // Always browse-safe per row, except: rows the caller posted (→ owner view, with passenger PII +
+  // the assigned driver's live position — this is the trip-manager "live map":
+  // GET /trips?status=in_progress&posted_by_user_id=<me>) and rows assigned to the caller's driver
+  // profile (→ assigned-driver view, e.g. GET /trips?assigned_driver_id=me). Everyone else: no PII,
+  // no driver positions.
   if (!tripId && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to browse trips', 401);
     let q = db.from('trips').select(TRIP_SELECT);
     const status = url.searchParams.get('status');
     if (status) {
@@ -157,11 +226,40 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (toCity) q = q.eq('to_city_id', toCity);
     const postedBy = url.searchParams.get('posted_by_user_id');
     if (postedBy) q = q.eq('posted_by_user_id', postedBy);
+    const assignedDriver = url.searchParams.get('assigned_driver_id');
+    if (assignedDriver) {
+      if (assignedDriver === 'me') {
+        const did = await driverIdFor(u.id);
+        if (!did) return ok([]); // no driver profile ⇒ nothing assigned to you
+        q = q.eq('assigned_driver_id', did);
+      } else {
+        q = q.eq('assigned_driver_id', assignedDriver);
+      }
+    }
+    // Phase D radius filter: trips whose pickup point (from_place → from_city fallback) is within radius_km of (near_lat, near_lng).
+    const near = parseNearRadius(url);
+    let distById: Map<string, number> | null = null;
+    if (near) {
+      const { data: rad, error: radErr } = await db.rpc('trips_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
+      if (radErr) return fail('DB_ERROR', radErr.message, 500);
+      const list = (rad ?? []) as { id: string; distance_m: number }[];
+      if (list.length === 0) return ok([]);
+      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
+      q = q.in('id', [...distById.keys()]);
+    }
     const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.order('pickup_at', { ascending: true }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
+    q = q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
+    if (!near) q = q.order('pickup_at', { ascending: true });
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok((data ?? []).map((r) => enrichTrip(r as Record<string, unknown>)));
+    const rawRows = (data ?? []) as Record<string, unknown>[];
+    const myDriverId = (u.role !== 'admin' && rawRows.some((r) => r.assigned_driver_id && r.posted_by_user_id !== u.id)) ? await driverIdFor(u.id) : null;
+    let rows = rawRows.map((r) => redactTrip(r, relationshipFor(r, u, myDriverId)));
+    if (distById) {
+      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+    }
+    return ok(rows);
   }
 
   // ── POST /trips/trips ────────────────────────────────────────────────────
@@ -178,6 +276,13 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!Number.isFinite(distance) || !Number.isFinite(rate) || !b.pickup_at || !b.car_type_id) {
       return fail('VALIDATION', 'pickup_at, car_type_id, expected_distance_km, rate_per_km are required', 422);
     }
+    if (typeof b.hide_passenger_phone !== 'boolean') {
+      return fail('VALIDATION', 'hide_passenger_phone (true|false) is required — choose whether the assigned driver may see the passenger phone', 422);
+    }
+    const passengerCount = Number(b.passenger_count);
+    if (!Number.isInteger(passengerCount) || passengerCount < 1) {
+      return fail('VALIDATION', 'passenger_count (a positive integer) is required', 422);
+    }
     const totalFare = b.total_fare !== undefined && b.total_fare !== null ? Number(b.total_fare) : Math.round(distance * rate);
     const { data: usr } = await db.from('users').select('display_name, role').eq('id', u.id).maybeSingle();
     const posterRole = usr?.role === 'driver' ? 'driver' : 'trip_manager';
@@ -192,6 +297,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       posted_by_phone: (b.posted_by_phone as string | null) ?? null,
       from_city_id: fromCityId,
       to_city_id: toCityId,
+      from_place_id: (typeof b.from_place_id === 'string' && b.from_place_id) ? b.from_place_id : null,
+      to_place_id: (typeof b.to_place_id === 'string' && b.to_place_id) ? b.to_place_id : null,
       pickup_at: b.pickup_at,
       expected_distance_km: distance,
       car_type_id: b.car_type_id,
@@ -206,16 +313,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       driver_instructions: (b.driver_instructions as string | null) ?? null,
       passenger_name: b.passenger_name ?? '',
       passenger_phone: b.passenger_phone ?? '',
-      passenger_count: b.passenger_count ?? 1,
+      passenger_count: passengerCount,
       luggage_notes: (b.luggage_notes as string | null) ?? null,
       special_requests: (b.special_requests as string | null) ?? null,
       show_fare_to_passenger: b.show_fare_to_passenger ?? true,
-      hide_passenger_phone: b.hide_passenger_phone ?? false,
+      hide_passenger_phone: b.hide_passenger_phone,
       status: 'open',
     };
     const { data: created, error } = await db.from('trips').insert(insert).select('id').single();
-    if (error) return pgFail(error);
-    return ok(await fullTrip(created.id as string));
+    if (error) return pgFail(error); // 23503 (bad from_place_id/to_place_id/from_city_id/…) → 422
+    // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
+    try { await db.rpc('match_alerts_for_trip', { p_trip_id: created.id }); } catch { /* ignore */ }
+    return ok(await fullTrip(created.id as string, u));
   }
 
   if (!tripId) return fail('NOT_FOUND', 'No such route', 404);
@@ -232,19 +341,49 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (error) return fail('DB_ERROR', error.message, 500);
     const row = (data ?? [])[0] as Record<string, unknown> | undefined;
     if (!row) return fail('NOT_FOUND', 'No trip matches that OTP', 404);
-    enrichTrip(row); // strips passenger_otp_hash + adds distance_to_destination_km when in_progress
+    // The passenger's own view: their data + the assigned driver (with live position + phone, to track/reach the ride).
+    delete row.passenger_otp_hash;
+    delete row.passenger_otp; // the OTP is already in the URL — no need to echo the stored copy
+    const dist = distanceToDest(row);
+    if (dist != null) row.distance_to_destination_km = dist;
     if (!row.show_fare_to_passenger) {
       for (const k of ['total_fare', 'rate_per_km', 'driver_payout', 'commission_pct', 'gst_amount', 'driver_bata']) row[k] = null;
     }
     return ok(row);
   }
 
-  // ── GET /trips/:id ───────────────────────────────────────────────────────
+  // ── GET /trips/applied (the caller's own applications — driver-scoped) ────
+  if (tripId === 'applied' && !sub && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to see your applications', 401);
+    const did = await driverIdFor(u.id);
+    if (!did) return ok([]); // no driver profile ⇒ no applications
+    const { data, error } = await db
+      .from('trip_acceptances')
+      .select('*, trip:trips!trip_id(*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label))')
+      .eq('driver_id', did)
+      .order('applied_at', { ascending: false });
+    if (error) return fail('DB_ERROR', error.message, 500);
+    const rows = (data ?? []).map((r) => {
+      const rec = r as Record<string, unknown>;
+      const t = rec.trip as Record<string, unknown> | null;
+      // the caller is an applicant (not yet assigned) on these trips ⇒ browse-safe trip detail (no PII)
+      if (t) { delete t.passenger_otp_hash; delete t.passenger_otp; for (const k of TRIP_PII_COLS) delete t[k]; }
+      return rec;
+    });
+    return ok(rows);
+  }
+
+  // ── GET /trips/:id — Bearer required ─────────────────────────────────────
   if (!sub && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to view a trip', 401);
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', tripId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
-    return ok(enrichTrip(data as Record<string, unknown>));
+    const raw = data as Record<string, unknown>;
+    const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
+    return ok(redactTrip(raw, relationshipFor(raw, u, myDriverId)));
   }
 
   // ── /trips/:id/applicants ────────────────────────────────────────────────
@@ -318,11 +457,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await db.from('trip_acceptances').update({ status: 'selected', decision_at: now }).eq('id', aid);
     const { error } = await db
       .from('trips')
-      .update({ status: 'assigned', assigned_driver_id: acc.driver_id, assigned_vehicle_id: (acc.vehicle_id as string | null) ?? null, assigned_acceptance_id: aid, assigned_at: now, passenger_otp_hash: otpHash })
+      .update({ status: 'assigned', assigned_driver_id: acc.driver_id, assigned_vehicle_id: (acc.vehicle_id as string | null) ?? null, assigned_acceptance_id: aid, assigned_at: now, passenger_otp_hash: otpHash, passenger_otp: otp })
       .eq('id', tripId);
     if (error) return pgFail(error);
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
-    const t = await fullTrip(tripId);
+    const t = await fullTrip(tripId, u!);
     // OTP is delivered out-of-band by the agent; included here for dev convenience (the Trip transform ignores it).
     return ok({ ...(t as Record<string, unknown>), passenger_otp: otp });
   }
@@ -344,7 +483,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       { trip_id: tripId, started_at: now, start_odo_url: (b.start_odo_url as string | null) ?? null, start_odo_reading: (b.start_odo_reading as number | null) ?? null, start_odo_at: b.start_odo_url ? now : null },
       { onConflict: 'trip_id' },
     );
-    return ok(await fullTrip(tripId));
+    return ok(await fullTrip(tripId, u!));
   }
 
   // ── POST /trips/trips/:id/complete ───────────────────────────────────────
@@ -366,7 +505,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const { data: d } = await db.from('drivers').select('total_trips_completed').eq('id', trip.assigned_driver_id).maybeSingle();
       if (d) await db.from('drivers').update({ total_trips_completed: (Number(d.total_trips_completed) || 0) + 1 }).eq('id', trip.assigned_driver_id);
     }
-    return ok(await fullTrip(tripId));
+    return ok(await fullTrip(tripId, u!));
   }
 
   // ── POST /trips/trips/:id/cancel ─────────────────────────────────────────
@@ -380,7 +519,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const now = new Date().toISOString();
     await db.from('trips').update({ status: 'cancelled', cancelled_at: now, cancel_reason_id: (b.cancel_reason_id as string | null) ?? null }).eq('id', tripId);
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).in('status', ['applied', 'selected']);
-    return ok(await fullTrip(tripId));
+    return ok(await fullTrip(tripId, u!));
   }
 
   return fail('NOT_FOUND', 'No such trips route', 404);

@@ -4,6 +4,7 @@
  * acceptances it joins driver (+ its current_city) and vehicle.
  */
 import { transformCity } from '@/lib/api/transforms/adminConfig';
+import { maybePlace } from '@/lib/api/transforms/place';
 import type {
   AcceptanceStatus,
   AssignedDriver,
@@ -75,6 +76,8 @@ export function transformTrip(api: Api): Trip {
     postedByPhone: str(api.posted_by_phone),
     fromCity: joinedCity(api.from_city, 'MISSING_FROM_CITY', ctx),
     toCity: joinedCity(api.to_city, 'MISSING_TO_CITY', ctx),
+    fromPlace: maybePlace(api.from_place),
+    toPlace: maybePlace(api.to_place),
     pickupAt: reqStr(api.pickup_at, 'MISSING_PICKUP', ctx),
     expectedDistanceKm: reqNum(api.expected_distance_km, 'MISSING_FIELD', ctx),
     carTypeId: reqStr(api.car_type_id, 'MISSING_CAR_TYPE', ctx),
@@ -108,6 +111,7 @@ export function transformTrip(api: Api): Trip {
     applicantCount: num(api.applicant_count, 0),
     createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
     passengerOtp: str(api.passenger_otp),
+    distanceKm: numOpt(api.distance_km),
   };
 }
 
@@ -182,6 +186,8 @@ export function toApiPostTrip(input: PostTripInput): Record<string, unknown> {
   return {
     from_city_id: input.fromCityId,
     to_city_id: input.toCityId,
+    from_place_id: input.fromPlaceId ?? null,
+    to_place_id: input.toPlaceId ?? null,
     pickup_at: input.pickupAt,
     expected_distance_km: input.expectedDistanceKm,
     car_type_id: input.carTypeId,

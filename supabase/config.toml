@@ -425,6 +425,10 @@ verify_jwt = false
 [functions.analytics]
 verify_jwt = false
 
+# /places/* — public geocoder proxy + find-or-create; the function doesn't require auth.
+[functions.places]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

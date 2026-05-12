@@ -69,6 +69,7 @@ function featureFor(endpoint: string): string {
   if (endpoint.startsWith('/trip-acceptances') || endpoint.includes('/applicants')) return 'acceptances';
   if (endpoint.startsWith('/trips')) return 'trips';
   if (endpoint.startsWith('/vacancies')) return 'vacancies';
+  if (endpoint.startsWith('/places')) return 'places';
   if (endpoint.startsWith('/drivers')) return 'drivers';
   if (endpoint.startsWith('/trip-managers') || endpoint.startsWith('/agents')) return 'agents';
   if (endpoint.startsWith('/vehicles')) return 'vehicles';

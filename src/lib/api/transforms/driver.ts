@@ -3,6 +3,7 @@
  * vehicles are joined server-side). Never compute reputation/eligibility here.
  */
 import { transformCity } from '@/lib/api/transforms/adminConfig';
+import { maybePlace } from '@/lib/api/transforms/place';
 import type {
   Agent, CreateAgentProfileInput, CreateDriverProfileInput, Driver, KycDocs, KycStatus,
   SubmitAgentKycDocsInput, SubmitDriverKycDocsInput, UploadUrlResponse, VehicleSummary,
@@ -141,9 +142,12 @@ export function transformDriver(api: Api): Driver {
     phone: str(api.phone) ?? '',
     email: str(api.email),
     homeCity: maybeCity(api.home_city),
+    homePlace: maybePlace(api.home_place),
     currentCity: maybeCity(api.current_city),
+    currentPlace: maybePlace(api.current_place),
     currentLat: typeof api.current_lat === 'number' ? api.current_lat : undefined,
     currentLng: typeof api.current_lng === 'number' ? api.current_lng : undefined,
+    distanceKm: typeof api.distance_km === 'number' ? api.distance_km : undefined,
     profilePhotoUrl: str(api.profile_photo_url) ?? '',
     kycStatus: (str(api.kyc_status) ?? 'pending') as KycStatus,
     ratingAvg: num(api.rating_avg, 0),

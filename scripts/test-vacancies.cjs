@@ -5,7 +5,10 @@
  * Skips cleanly (exit 0) if VACANCIES_API_BASE is unset.
  *
  * Covers: public list (200 + array) + filters, 404, unauth write (401), no-driver-profile (403),
- * post-my-availability happy path (driver + destinations joined), GET/:id, cancel (owner / non-owner / unauth).
+ * post-my-availability happy path (driver + destinations joined), current_place_id + destination_place_ids
+ * (Phase C-2 — joined current_place + vacancy_destinations[].place; a bad place id → 422), the
+ * ?near_lat&near_lng&radius_km radius filter (Phase D — distance_km, in-radius vs far-away), GET/:id,
+ * cancel (owner / non-owner / unauth).
  */
 const BASE = (process.env.VACANCIES_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) {
@@ -78,6 +81,25 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   const destCities = (posted.json?.data?.vacancy_destinations || []).map((vd) => vd.city).filter(Boolean);
   check('POST /vacancies joins destination cities', hasCity(destCities, dest1), `dests=${JSON.stringify(destCities.map((c) => c.id))}`);
   if (!vacancyId) process.exit(1);
+
+  // ── place_id plumbing (Phase C-2) + radius search (Phase D) ────────────
+  const ppid = `vac-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+  const placeA = await j('POST', '/places', { body: { provider: 'smoketest', providerPlaceId: `${ppid}-a`, name: 'Vac Place A', lat: 12.97, lng: 77.59 } });
+  const placeB = await j('POST', '/places', { body: { provider: 'smoketest', providerPlaceId: `${ppid}-b`, name: 'Vac Place B', lat: 13.34, lng: 77.10 } });
+  const placeAId = placeA.json?.data?.id, placeBId = placeB.json?.data?.id;
+  check('POST /places → two places created', placeA.status === 200 && !!placeAId && placeB.status === 200 && !!placeBId, `a=${placeAId} b=${placeBId}`);
+  const vac2 = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, current_place_id: placeAId, destination_place_ids: [placeBId] } });
+  const vac2Id = vac2.json?.data?.id;
+  check('POST /vacancies with current_place_id → 200 + joined current_place', vac2.status === 200 && !!vac2Id && vac2.json?.data?.current_place?.id === placeAId, `status=${vac2.status} ${JSON.stringify(vac2.json?.data?.current_place || vac2.json?.error || '')}`);
+  const destPlaces = (vac2.json?.data?.vacancy_destinations || []).map((vd) => vd.place).filter(Boolean);
+  check('POST /vacancies joins destination places (vacancy_destinations[].place)', destPlaces.some((pl) => pl && pl.id === placeBId), `dests=${JSON.stringify(destPlaces.map((p) => p.id))}`);
+  const badPlace = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, current_place_id: NONE } });
+  check('POST /vacancies with a bad current_place_id → 422', badPlace.status === 422, `status=${badPlace.status}`);
+  const nearHit = await j('GET', '/vacancies?near_lat=12.97&near_lng=77.59&radius_km=5');
+  const hit = (nearHit.json?.data || []).find((v) => v.id === vac2Id);
+  check('GET /vacancies?near_lat&near_lng&radius_km → contains the place-based vacancy + numeric distance_km ≤ radius', nearHit.status === 200 && !!hit && typeof hit.distance_km === 'number' && hit.distance_km <= 5, `status=${nearHit.status} hit=${JSON.stringify(hit && { id: hit.id, distance_km: hit.distance_km })}`);
+  const nearMiss = await j('GET', '/vacancies?near_lat=28.6&near_lng=77.2&radius_km=5');
+  check('GET /vacancies?near=<far away> → does not contain it', nearMiss.status === 200 && !(nearMiss.json?.data || []).some((v) => v.id === vac2Id), `len=${nearMiss.json?.data?.length}`);
 
   // ── reads + filters ────────────────────────────────────────────────────
   const gotOne = await j('GET', `/vacancies/${vacancyId}`);

@@ -4,9 +4,10 @@ import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCreateAlert } from '@/hooks/useAlerts';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
+import { PlacePinField } from '@/components/location/PlacePinField';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import type { AlertInput, NotifyChannel } from '@/types';
+import type { AlertInput, NotifyChannel, Place } from '@/types';
 
 const CHANNELS: { value: NotifyChannel; label: string }[] = [
   { value: 'in_app', label: 'In-app' },
@@ -42,8 +43,10 @@ export function CreateAlertPage() {
 
   const [name, setName] = useState('');
   const [fromCityId, setFromCityId] = useState('');
+  const [fromPlace, setFromPlace] = useState<Place | null>(null);
   const [fromRadiusKm, setFromRadiusKm] = useState<number | ''>('');
   const [toCityId, setToCityId] = useState('');
+  const [toPlace, setToPlace] = useState<Place | null>(null);
   const [minRatePerKm, setMinRatePerKm] = useState<number | ''>('');
   const [carTypeIds, setCarTypeIds] = useState<string[]>([]);
   const [notifyVia, setNotifyVia] = useState<NotifyChannel[]>(['in_app']);
@@ -69,10 +72,12 @@ export function CreateAlertPage() {
       return;
     }
     const input: AlertInput = {
-      name: name.trim() || `${citiesQuery.data?.find((c) => c.id === fromCityId)?.name ?? 'Trips'} alert`,
+      name: name.trim() || `${fromPlace?.name ?? citiesQuery.data?.find((c) => c.id === fromCityId)?.name ?? 'Trips'} alert`,
       fromCityId,
+      fromPlaceId: fromPlace?.id ?? null,
       fromRadiusKm: effectiveRadius,
       toCityId: toCityId || null,
+      toPlaceId: toPlace?.id ?? null,
       minRatePerKm: minRatePerKm === '' ? null : Math.max(0, Number(minRatePerKm)),
       carTypeIds: carTypeIds.length ? carTypeIds : undefined,
       notifyVia,
@@ -120,36 +125,42 @@ export function CreateAlertPage() {
           <span className="text-sm font-medium">Alert name (optional)</span>
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Vellore → Chennai" />
         </label>
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">Pickup city</span>
-          <select className={selectClass} value={fromCityId} onChange={(e) => setFromCityId(e.target.value)}>
-            <option value="">Select a city</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-1.5">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">Pickup city</span>
+            <select className={selectClass} value={fromCityId} onChange={(e) => setFromCityId(e.target.value)}>
+              <option value="">Select a city</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <PlacePinField value={fromPlace} onChange={setFromPlace} pinLabel="Pin the exact pickup point" pickerTitle="Pickup location" />
+        </div>
         <label className="block space-y-1">
           <span className="text-sm font-medium">
             Pickup radius (km) <span className="font-normal text-secondary">— default {defaultRadius}</span>
           </span>
           <Input type="number" min={1} step={1} inputMode="numeric" value={fromRadiusKm} onChange={(e) => setFromRadiusKm(e.target.value === '' ? '' : Number(e.target.value))} placeholder={String(defaultRadius)} />
         </label>
-        <label className="block space-y-1">
-          <span className="text-sm font-medium">
-            Destination city <span className="font-normal text-secondary">(optional)</span>
-          </span>
-          <select className={selectClass} value={toCityId} onChange={(e) => setToCityId(e.target.value)}>
-            <option value="">Any destination</option>
-            {cities.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="space-y-1.5">
+          <label className="block space-y-1">
+            <span className="text-sm font-medium">
+              Destination city <span className="font-normal text-secondary">(optional)</span>
+            </span>
+            <select className={selectClass} value={toCityId} onChange={(e) => setToCityId(e.target.value)}>
+              <option value="">Any destination</option>
+              {cities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact destination" pickerTitle="Destination location" />
+        </div>
         <label className="block space-y-1">
           <span className="text-sm font-medium">
             Minimum ₹ per km <span className="font-normal text-secondary">(optional)</span>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, formatINR, formatKm, formatRating, isValidUUID, initials, haversineKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatRating, formatClockTime, formatShortDate, isValidUUID, initials, haversineKm } from '@/lib/utils';
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -25,6 +25,23 @@ describe('money / distance formatters', () => {
     expect(formatRating(4.84)).toBe('★ 4.8');
     expect(formatRating(4.86)).toBe('★ 4.9');
     expect(formatRating(5)).toBe('★ 5.0');
+  });
+});
+
+describe('date / time formatters', () => {
+  it('formats a short date without the year', () => {
+    // month is 0-indexed → 4 = May; constructed in local time so the formatter (also local) is TZ-stable
+    expect(formatShortDate(new Date(2026, 4, 12))).toBe('12 May');
+  });
+  it('formats a clock time as h:mm with am/pm', () => {
+    const t = formatClockTime(new Date(2026, 4, 12, 18, 46));
+    expect(t).toContain('6:46');
+    expect(t.toLowerCase()).toMatch(/p\.?m/);
+  });
+  it('zero-pads the minutes', () => {
+    const t = formatClockTime(new Date(2026, 4, 12, 9, 5));
+    expect(t).toContain('9:05');
+    expect(t.toLowerCase()).toMatch(/a\.?m/);
   });
 });
 
