@@ -17,6 +17,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { rateLimitOk } from '../_shared/rateLimit.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 const DIRECTIONS = ['passenger_to_driver', 'manager_to_driver', 'driver_to_manager'] as const;
@@ -95,6 +96,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
   // ── POST /reviews (the rater) ────────────────────────────────────────────
   if (!id && req.method === 'POST') {
     if (!u) return fail('UNAUTHORIZED', 'Sign in to leave a review', 401);
+    if (!(await rateLimitOk(db, `post-review:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many reviews — try again shortly', 429);
     const b = await readBody(req);
     const tripId = strOrNull(b.trip_id);
     const direction = strOrNull(b.direction);

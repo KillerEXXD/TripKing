@@ -15,6 +15,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { rateLimitOk } from '../_shared/rateLimit.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 const ALERT_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*)';
@@ -85,6 +86,7 @@ const handler = withTiming('alerts', async (req: Request): Promise<Response> => 
 
   // ── POST /alerts ─────────────────────────────────────────────────────────
   if (!id && req.method === 'POST') {
+    if (!(await rateLimitOk(db, `post-alert:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many alerts created — try again shortly', 429);
     const b = await readBody(req);
     const insert = { ...pick(b, WRITABLE), user_id: u.id };
     if (!insert.from_city_id || typeof insert.from_city_id !== 'string') return fail('VALIDATION', 'from_city_id is required', 422);

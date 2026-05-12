@@ -5,7 +5,8 @@
  * Skips cleanly (exit 0) if ANALYTICS_API_BASE is unset.
  *
  * Covers: every route needs auth (401); /admin is admin-only (403 for non-admin) and returns the
- * dashboard blob; /agent returns the caller's analytics (and ?user_id is admin-or-self).
+ * dashboard blob; /agent returns the caller's analytics (and ?user_id is admin-or-self);
+ * /api-metrics is admin-only and returns the per-endpoint latency/error rollup.
  */
 const BASE = (process.env.ANALYTICS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) {
@@ -70,6 +71,17 @@ const isNum = (v) => typeof v === 'number';
   check('GET /analytics/agent?user_id=<agent> by admin → 200 + matching agent_user_id', asAdmin.status === 200 && asAdmin.json?.data?.agent_user_id === agent.userId, `status=${asAdmin.status}`);
   const selfViaParam = await j('GET', `/analytics/agent?user_id=${agent.userId}`, { token: agent.token });
   check('GET /analytics/agent?user_id=<self> by self → 200', selfViaParam.status === 200, `status=${selfViaParam.status}`);
+
+  // ── /analytics/api-metrics ─────────────────────────────────────────────
+  const metricsNoAuth = await j('GET', '/analytics/api-metrics');
+  check('GET /analytics/api-metrics without auth → 401', metricsNoAuth.status === 401, `status=${metricsNoAuth.status}`);
+  const metricsForbidden = await j('GET', '/analytics/api-metrics', { token: agent.token });
+  check('GET /analytics/api-metrics by a non-admin → 403', metricsForbidden.status === 403, `status=${metricsForbidden.status}`);
+  const metrics = await j('GET', '/analytics/api-metrics?hours=24', { token: admin.token });
+  const mm = metrics.json?.data || {};
+  check('GET /analytics/api-metrics (admin) → 200 + rollup blob', metrics.status === 200 && isNum(mm.total) && isNum(mm.errors) && Array.isArray(mm.endpoints) && typeof mm.since === 'string', `status=${metrics.status} keys=${Object.keys(mm).join(',')}`);
+  check('GET /analytics/api-metrics → endpoint rows have count/avg_ms/p95_ms', mm.endpoints.length === 0 || (isNum(mm.endpoints[0].count) && isNum(mm.endpoints[0].avg_ms) && isNum(mm.endpoints[0].p95_ms) && typeof mm.endpoints[0].endpoint === 'string'), JSON.stringify(mm.endpoints?.[0]));
+  check('GET /analytics/api-metrics → hours echoed (24)', mm.hours === 24, `hours=${mm.hours}`);
 
   if (failures) { console.error(`[test-analytics] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-analytics] all checks passed');

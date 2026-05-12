@@ -14,6 +14,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { rateLimitOk } from '../_shared/rateLimit.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 const VACANCY_SELECT =
@@ -101,6 +102,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
   if (!id && req.method === 'POST') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to post a vacancy', 401);
+    if (!(await rateLimitOk(db, `post-vacancy:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many vacancies posted — try again shortly', 429);
     const did = await driverIdFor(u.id);
     if (!did) return fail('FORBIDDEN', 'You need a driver profile to post a vacancy', 403);
     const b = await readBody(req);

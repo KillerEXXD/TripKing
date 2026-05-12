@@ -29,6 +29,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { rateLimitOk } from '../_shared/rateLimit.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 
@@ -167,6 +168,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   if (!tripId && req.method === 'POST') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to post a trip', 401);
+    if (!(await rateLimitOk(db, `post-trip:${u.id}`, 60, 60))) return fail('RATE_LIMITED', 'Too many trips posted — try again shortly', 429);
     const b = await readBody(req);
     const fromCityId = String(b.from_city_id ?? '');
     const toCityId = String(b.to_city_id ?? '');
@@ -255,6 +257,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!acceptanceId && req.method === 'POST') {
       const u = await authUser(db, req);
       if (!u) return fail('UNAUTHORIZED', 'Sign in to apply', 401);
+      if (!(await rateLimitOk(db, `apply-trip:${u.id}`, 120, 60))) return fail('RATE_LIMITED', 'Too many applications — try again shortly', 429);
       const did = await driverIdFor(u.id);
       if (!did) return fail('FORBIDDEN', 'You need a driver profile to apply', 403);
       const b = await readBody(req);

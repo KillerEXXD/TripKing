@@ -53,7 +53,7 @@
     },
     {
       "name": "analytics",
-      "description": "Server-computed analytics — the platform dashboard (admin) and per-agent analytics."
+      "description": "Server-computed analytics — the platform dashboard (admin), per-agent analytics, and the API-metrics rollup (admin)."
     }
   ],
   "components": {
@@ -624,7 +624,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer)",
+        "summary": "Post a trip (Bearer). Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -651,6 +651,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -701,7 +704,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Apply to a trip (driver)",
+        "summary": "Apply to a trip (driver) — per-user rate-limited (429 RATE_LIMITED on excess)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -711,10 +714,16 @@
           "200": {
             "$ref": "#/components/responses/Envelope"
           },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
           "403": {
             "$ref": "#/components/responses/Envelope"
           },
           "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -1597,7 +1606,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "Post a vacancy (driver; Bearer) — driver_id = the caller; destination_city_ids → vacancy_destinations rows",
+        "summary": "Post a vacancy (driver; Bearer) — driver_id = the caller; destination_city_ids → vacancy_destinations rows. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1648,6 +1657,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -1723,7 +1735,7 @@
         "tags": [
           "alerts"
         ],
-        "summary": "Create an alert (Bearer; user_id = caller) — from_city_id required",
+        "summary": "Create an alert (Bearer; user_id = caller) — from_city_id required. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1795,6 +1807,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -1949,7 +1964,7 @@
         "tags": [
           "reviews"
         ],
-        "summary": "Post a review (Bearer; rater_user_id = caller) — the trip must be completed; unique (trip_id, direction); ratee_user_id derived from the trip if omitted; fires a review_received notification",
+        "summary": "Post a review (Bearer; rater_user_id = caller) — the trip must be completed; unique (trip_id, direction); ratee_user_id derived from the trip if omitted; fires a review_received notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2009,6 +2024,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -2268,6 +2286,37 @@
               "type": "string"
             },
             "description": "admin only — a specific agent's user id (defaults to the caller)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/analytics/api-metrics": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "API metrics rollup (admin; Bearer) — per-endpoint request count, error count (status >= 500), avg/max/p95 latency over the last `hours` (default 24, max 720), plus the window bounds.",
+        "parameters": [
+          {
+            "name": "hours",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "minimum": 1,
+              "maximum": 720
+            }
           }
         ],
         "responses": {

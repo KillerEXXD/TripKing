@@ -3,9 +3,10 @@
  * functions in migration 004 (`get_admin_dashboard()`, `get_agent_analytics(uuid)`); all the
  * counting/summing happens in Postgres. Bearer-required; withTiming; verify_jwt = false.
  *
- *   GET /analytics/admin           (admin; Bearer)               — platform-wide dashboard blob
- *   GET /analytics/agent           (Bearer)                      — the caller's own agent analytics
- *   GET /analytics/agent?user_id=  (admin, or user_id == caller) — a specific agent's analytics
+ *   GET /analytics/admin             (admin; Bearer)               — platform-wide dashboard blob
+ *   GET /analytics/agent             (Bearer)                      — the caller's own agent analytics
+ *   GET /analytics/agent?user_id=    (admin, or user_id == caller) — a specific agent's analytics
+ *   GET /analytics/api-metrics?hours=24  (admin; Bearer)           — per-endpoint latency/error rollup
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -36,7 +37,7 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
   const db = serviceClient();
   const url = new URL(req.url);
   const m = url.pathname.match(/\/analytics(?:\/(.+))?$/);
-  const resource = (m && m[1] ? m[1] : '').split('/').filter(Boolean)[0]; // 'admin' | 'agent'
+  const resource = (m && m[1] ? m[1] : '').split('/').filter(Boolean)[0]; // 'admin' | 'agent' | 'api-metrics'
 
   const u = await authUser(db, req);
   if (!u) return fail('UNAUTHORIZED', 'Sign in to view analytics', 401);
@@ -58,7 +59,17 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
     return ok(data);
   }
 
-  return fail('NOT_FOUND', 'Use /analytics/admin or /analytics/agent', 404);
+  // ── GET /analytics/api-metrics?hours=24 (per-endpoint latency/error rollup) ──
+  if (resource === 'api-metrics') {
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const raw = parseInt(url.searchParams.get('hours') ?? '24', 10);
+    const hours = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 720) : 24;
+    const { data, error } = await db.rpc('get_api_metrics_summary', { p_hours: hours });
+    if (error) return fail('DB_ERROR', error.message, 500);
+    return ok(data);
+  }
+
+  return fail('NOT_FOUND', 'Use /analytics/admin, /analytics/agent or /analytics/api-metrics', 404);
 });
 
 serve(handler);
