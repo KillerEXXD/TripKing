@@ -31,6 +31,9 @@ export function HomePage() {
           <Link to="/vacancies" className="text-primary underline">
             Available drivers
           </Link>
+          <Link to="/alerts" className="text-primary underline">
+            Trip alerts
+          </Link>
           <Link to="/notifications" className="text-primary underline">
             Notifications
           </Link>

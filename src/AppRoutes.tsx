@@ -14,6 +14,9 @@ const PostedTripsPage = lazy(() => import('@/pages/PostedTripsPage'));
 const TripDetailPage = lazy(() => import('@/pages/TripDetailPage'));
 const DriverProfilePage = lazy(() => import('@/pages/DriverProfilePage'));
 const VacanciesPage = lazy(() => import('@/pages/VacanciesPage'));
+const AlertsPage = lazy(() => import('@/pages/AlertsPage'));
+const CreateAlertPage = lazy(() => import('@/pages/CreateAlertPage'));
+const AlertDetailPage = lazy(() => import('@/pages/AlertDetailPage'));
 const NotificationsPage = lazy(() => import('@/pages/NotificationsPage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazy(() => import('@/pages/administration/AdministrationPage'));
@@ -48,6 +51,9 @@ export function AppRoutes() {
           <Route path="/posted-trips" element={<PostedTripsPage />} />
           <Route path="/drivers/:id" element={<DriverProfilePage />} />
           <Route path="/vacancies" element={<VacanciesPage />} />
+          <Route path="/alerts" element={<AlertsPage />} />
+          <Route path="/alerts/new" element={<CreateAlertPage />} />
+          <Route path="/alerts/:id" element={<AlertDetailPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
           <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />

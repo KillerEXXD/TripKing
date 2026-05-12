@@ -15,6 +15,9 @@ vi.mock('@/pages/PostedTripsPage', () => ({ default: () => <div>posted trips</di
 vi.mock('@/pages/TripDetailPage', () => ({ default: () => <div>trip detail</div> }));
 vi.mock('@/pages/DriverProfilePage', () => ({ default: () => <div>driver profile</div> }));
 vi.mock('@/pages/VacanciesPage', () => ({ default: () => <div>vacancies page</div> }));
+vi.mock('@/pages/AlertsPage', () => ({ default: () => <div>alerts page</div> }));
+vi.mock('@/pages/CreateAlertPage', () => ({ default: () => <div>create alert page</div> }));
+vi.mock('@/pages/AlertDetailPage', () => ({ default: () => <div>alert detail page</div> }));
 vi.mock('@/pages/NotificationsPage', () => ({ default: () => <div>notifications page</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
@@ -109,6 +112,24 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/vacancies');
     expect(await screen.findByText(/vacancies page/i)).toBeInTheDocument();
+  });
+
+  it('/alerts renders the alerts list for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/alerts');
+    expect(await screen.findByText(/^alerts page$/i)).toBeInTheDocument();
+  });
+
+  it('/alerts/new renders the create-alert page for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/alerts/new');
+    expect(await screen.findByText(/create alert page/i)).toBeInTheDocument();
+  });
+
+  it('/alerts/:id renders the alert detail for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/alerts/abc');
+    expect(await screen.findByText(/alert detail page/i)).toBeInTheDocument();
   });
 
   it('/notifications renders the notifications page for a signed-in user', async () => {
