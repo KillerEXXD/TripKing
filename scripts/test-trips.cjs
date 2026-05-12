@@ -42,13 +42,13 @@ async function j(method, path, { body, token } = {}) {
   const carTypeId = (carTypes.json?.data || [])[0]?.id;
   check('have ≥2 cities + a car type', cityIds.length >= 2 && !!carTypeId, `cities=${cityIds.length} carType=${carTypeId}`);
 
-  const list0 = await j('GET', '/trips/trips');
-  check('GET /trips/trips (public) → 200 + array', list0.status === 200 && Array.isArray(list0.json?.data), `status=${list0.status} ${JSON.stringify(list0.json?.error || '')}`);
+  const list0 = await j('GET', '/trips');
+  check('GET /trips (public) → 200 + array', list0.status === 200 && Array.isArray(list0.json?.data), `status=${list0.status} ${JSON.stringify(list0.json?.error || '')}`);
 
-  const noAuth = await j('POST', '/trips/trips', { body: { from_city_id: cityIds[0] } });
-  check('POST /trips/trips without auth → 401', noAuth.status === 401, `status=${noAuth.status}`);
+  const noAuth = await j('POST', '/trips', { body: { from_city_id: cityIds[0] } });
+  check('POST /trips without auth → 401', noAuth.status === 401, `status=${noAuth.status}`);
 
-  const post = await j('POST', '/trips/trips', {
+  const post = await j('POST', '/trips', {
     token,
     body: {
       from_city_id: cityIds[0],
@@ -66,7 +66,7 @@ async function j(method, path, { body, token } = {}) {
     },
   });
   check(
-    'POST /trips/trips (authed) → 200 + joined cities + driver_payout',
+    'POST /trips (authed) → 200 + joined cities + driver_payout',
     post.status === 200 && post.json?.data?.id && post.json?.data?.from_city?.name && typeof post.json?.data?.driver_payout === 'number',
     `status=${post.status} ${JSON.stringify(post.json?.error || post.json?.data || '')}`,
   );
@@ -74,12 +74,12 @@ async function j(method, path, { body, token } = {}) {
 
   const tid = post.json?.data?.id;
   if (tid) {
-    const get = await j('GET', `/trips/trips/${tid}`);
-    check('GET /trips/trips/:id → 200', get.status === 200 && get.json?.data?.id === tid, `status=${get.status}`);
+    const get = await j('GET', `/trips/${tid}`);
+    check('GET /trips/:id → 200', get.status === 200 && get.json?.data?.id === tid, `status=${get.status}`);
     const reasons = await j('GET', '/admin/cancel-reasons');
     const rid = (reasons.json?.data || []).find((r) => r.applies_to === 'agent' || r.applies_to === 'both')?.id;
-    const cancel = await j('POST', `/trips/trips/${tid}/cancel`, { token, body: { cancel_reason_id: rid || null } });
-    check('POST /trips/trips/:id/cancel (poster) → 200, status=cancelled', cancel.status === 200 && cancel.json?.data?.status === 'cancelled', `status=${cancel.status} ${JSON.stringify(cancel.json?.error || '')}`);
+    const cancel = await j('POST', `/trips/${tid}/cancel`, { token, body: { cancel_reason_id: rid || null } });
+    check('POST /trips/:id/cancel (poster) → 200, status=cancelled', cancel.status === 200 && cancel.json?.data?.status === 'cancelled', `status=${cancel.status} ${JSON.stringify(cancel.json?.error || '')}`);
   }
 
   if (failures) { console.error(`[test-trips] ${failures} check(s) failed`); process.exit(1); }

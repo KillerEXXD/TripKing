@@ -68,13 +68,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   if (pre) return pre;
   const db = serviceClient();
   const url = new URL(req.url);
-  const m = url.pathname.match(/\/trips\/(.+)$/);
-  const segs = (m ? m[1] : '').split('/').filter(Boolean);
-  if (segs[0] !== 'trips') return fail('NOT_FOUND', 'routes are under /trips/trips...', 404);
-  const tripId = segs[1];
-  const sub = segs[2]; // applicants | assign | start | complete | cancel
-  const acceptanceId = segs[3];
-  const subsub = segs[4]; // reject
+  // path after the function name `trips`: [] (list) | [id] | [id, 'applicants'] | [id, 'applicants', aid] |
+  // [id, 'applicants', aid, 'reject'] | [id, 'assign'|'start'|'complete'|'cancel']
+  const m = url.pathname.match(/\/trips(?:\/(.+))?$/);
+  const segs = (m && m[1] ? m[1] : '').split('/').filter(Boolean);
+  const tripId = segs[0];
+  const sub = segs[1]; // applicants | assign | start | complete | cancel
+  const acceptanceId = segs[2];
+  const subsub = segs[3]; // reject
 
   async function loadTrip(id: string) {
     const { data } = await db
