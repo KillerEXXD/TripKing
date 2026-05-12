@@ -31,6 +31,8 @@ const TranslationManagerPage = lazy(() => import('@/pages/administration/Transla
 // Public marketing pages — no auth, no app layout.
 const WebsitePage = lazy(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazy(() => import('@/pages/ForAgentsPage'));
+// Public passenger portal — the trip OTP is the credential, no login.
+const PassengerPage = lazy(() => import('@/pages/PassengerPage'));
 
 function PageFallback() {
   return (
@@ -48,6 +50,9 @@ export function AppRoutes() {
         {/* Public marketing pages */}
         <Route path="/website" element={<WebsitePage />} />
         <Route path="/for-agents" element={<ForAgentsPage />} />
+        {/* Public passenger portal — OTP is the credential */}
+        <Route path="/passenger" element={<PassengerPage />} />
+        <Route path="/passenger/:otp" element={<PassengerPage />} />
         {/* Post-sign-in onboarding/KYC — auth required, but full-screen (no app shell). */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

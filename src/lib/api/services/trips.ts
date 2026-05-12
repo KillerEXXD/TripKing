@@ -29,6 +29,19 @@ export function getTrip(id: string): Promise<Trip> {
   return apiClient.get<Api>(`/trips/${id}`).then((r) => transformTrip(unwrap(r.data)));
 }
 
+/**
+ * `GET /trips/by-otp/:otp` — the public passenger portal. The OTP is the
+ * credential (no auth header). The backend nulls the fare fields when
+ * `show_fare_to_passenger` is false, so we coerce those to 0 before the strict
+ * transform — the passenger UI reads `showFareToPassenger` to decide what to show.
+ */
+export function getTripByOtp(otp: string): Promise<Trip> {
+  return apiClient.get<Api>(`/trips/by-otp/${encodeURIComponent(otp)}`).then((r) => {
+    const row = unwrap(r.data);
+    return transformTrip({ ...row, total_fare: row.total_fare ?? 0, rate_per_km: row.rate_per_km ?? 0, driver_payout: row.driver_payout ?? 0, driver_bata: row.driver_bata ?? 0 });
+  });
+}
+
 export function getTripApplicants(tripId: string): Promise<TripAcceptance[]> {
   return apiClient.get<Api[]>(`/trips/${tripId}/applicants`).then((r) => (r.data ?? []).map(transformTripAcceptance));
 }

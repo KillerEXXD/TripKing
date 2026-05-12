@@ -7,6 +7,7 @@ import {
   completeTrip,
   getTrip,
   getTripApplicants,
+  getTripByOtp,
   getTrips,
   postTrip,
   rejectApplicant,
@@ -28,6 +29,10 @@ export function useTrips(params?: TripsQueryParams) {
 }
 export function useTrip(id: string | undefined) {
   return useQuery({ queryKey: ['trip', id], queryFn: () => getTrip(id as string), enabled: !!id, staleTime: STALE.live });
+}
+/** Public passenger-portal lookup — `GET /trips/by-otp/:otp` (the OTP is the credential). */
+export function useTripByOtp(otp: string | undefined) {
+  return useQuery({ queryKey: ['trip', 'by-otp', otp], queryFn: () => getTripByOtp(otp as string), enabled: !!otp, retry: false, staleTime: STALE.live });
 }
 export function useTripApplicants(tripId: string | undefined) {
   return useQuery({ queryKey: ['trip', tripId, 'applicants'], queryFn: () => getTripApplicants(tripId as string), enabled: !!tripId, staleTime: STALE.live });
