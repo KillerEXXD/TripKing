@@ -40,8 +40,18 @@ components:
   schemas:
     ApiError:
       type: object
+      description: >-
+        Returned inside the envelope's `error` on any non-2xx response. Every error —
+        including unhandled exceptions — is delivered in this shape; an unhandled
+        exception yields `{ code: "INTERNAL" }` with status 500 (never a raw runtime error)
+        and is reported to Sentry (`source=edge-fn`).
       properties:
-        code: { type: string }
+        code:
+          type: string
+          description: >-
+            Machine-readable code. Standard values: VALIDATION (400/422), UNAUTHORIZED (401),
+            FORBIDDEN (403), NOT_FOUND (404), CONFLICT (409), RATE_LIMITED (429), DB_ERROR (4xx),
+            INTERNAL (500). Some endpoints add specific codes (e.g. INVALID_OTP, BAD_JSON).
         message: { type: string }
     Envelope:
       type: object

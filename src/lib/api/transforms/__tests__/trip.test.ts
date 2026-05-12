@@ -87,6 +87,32 @@ describe('transformTrip', () => {
     expect(t.toPlace?.name).toBe('Tambaram');
     expect(t.distanceKm).toBe(3.5);
   });
+  it('keeps the assigned driver but leaves the position fields undefined when the API sends them as null', () => {
+    const t = transformTrip({
+      ...fullTrip,
+      status: 'assigned',
+      assigned_driver_id: 'd1',
+      assigned_driver: { id: 'd1', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: null, current_lng: null, current_location_at: null },
+    });
+    expect(t.assignedDriver?.id).toBe('d1');
+    expect(t.assignedDriver?.currentLat).toBeUndefined();
+    expect(t.assignedDriver?.currentLng).toBeUndefined();
+    expect(t.assignedDriver?.currentLocationAt).toBeUndefined();
+    expect(t.distanceToDestinationKm).toBeUndefined();
+  });
+  it('passes the driver position + last-seen timestamp through for an in-progress trip', () => {
+    const t = transformTrip({
+      ...fullTrip,
+      status: 'in_progress',
+      assigned_driver_id: 'd1',
+      assigned_driver: { id: 'd1', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: 13.05, current_lng: 80.2, current_location_at: '2026-06-01T10:30:00Z' },
+      distance_to_destination_km: 37.2,
+    });
+    expect(t.assignedDriver?.currentLat).toBe(13.05);
+    expect(t.assignedDriver?.currentLng).toBe(80.2);
+    expect(t.assignedDriver?.currentLocationAt).toBe('2026-06-01T10:30:00Z');
+    expect(t.distanceToDestinationKm).toBe(37.2);
+  });
 });
 
 describe('transformTripAcceptance', () => {

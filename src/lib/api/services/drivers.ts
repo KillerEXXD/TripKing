@@ -3,7 +3,7 @@
  * the one cross-lane contract), and owner-only updates.
  * (The `/drivers/*` GET/PATCH and `/agents/*` edge functions land with the backend lane.)
  */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import {
   toApiCreateAgentProfile,
   toApiCreateDriverProfile,
@@ -35,7 +35,7 @@ import type {
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
-  if (d === null || d === undefined) throw new Error('drivers: empty response body');
+  if (d === null || d === undefined) throw new EmptyResponseError('drivers');
   return d;
 }
 

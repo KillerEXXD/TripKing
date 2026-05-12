@@ -10,7 +10,11 @@ vi.mock('@/lib/api/services/auth', () => ({
   getCurrentUser: vi.fn(),
   logout: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('@/lib/sentry', () => ({ setSentryUser: vi.fn(), clearSentryUser: vi.fn(), captureDataError: vi.fn() }));
+vi.mock('@/lib/posthog', () => ({ identifyUser: vi.fn(), resetUser: vi.fn(), captureEvent: vi.fn() }));
 import { getCurrentUser, verifyOtp, logout } from '@/lib/api/services/auth';
+import { setSentryUser, clearSentryUser } from '@/lib/sentry';
+import { identifyUser, resetUser } from '@/lib/posthog';
 
 const driver: User = {
   id: 'u1',
@@ -43,6 +47,7 @@ function renderAuth() {
 describe('AuthContext', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
     vi.mocked(getCurrentUser).mockReset();
     vi.mocked(verifyOtp).mockReset();
     vi.mocked(logout).mockReset().mockResolvedValue(undefined);
@@ -82,5 +87,22 @@ describe('AuthContext', () => {
 
     fireEvent.click(screen.getByText('logout'));
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('out'));
+  });
+
+  it('wires Sentry + PostHog user context on login and clears it on logout', async () => {
+    vi.spyOn(apiClient, 'getAccessToken').mockReturnValue(null);
+    vi.mocked(verifyOtp).mockResolvedValue(driver);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('out'));
+
+    fireEvent.click(screen.getByText('verify'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('in:Ravi'));
+    expect(setSentryUser).toHaveBeenCalledWith({ id: 'u1', role: 'driver', name: 'Ravi' });
+    expect(identifyUser).toHaveBeenCalledWith('u1', { role: 'driver' });
+
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('out'));
+    expect(clearSentryUser).toHaveBeenCalled();
+    expect(resetUser).toHaveBeenCalled();
   });
 });

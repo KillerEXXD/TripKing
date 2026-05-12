@@ -3,13 +3,13 @@
  * complete / cancel). Thin functions over `apiClient`; transforms validate strictly.
  * (The matching `/trips/*` edge functions land in a later commit.)
  */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiPostTrip, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
 import type { ApplyToTripInput, PostTripInput, Trip, TripAcceptance, TripsQueryParams } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
-  if (d === null || d === undefined) throw new Error('trips: empty response body');
+  if (d === null || d === undefined) throw new EmptyResponseError('trips');
   return d;
 }
 

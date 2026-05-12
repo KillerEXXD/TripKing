@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { apiClient } from '@/lib/api/client';
 import { getCurrentUser, logout as logoutService, requestOtp as requestOtpService, verifyOtp as verifyOtpService } from '@/lib/api/services/auth';
 import { logger } from '@/lib/logger';
+import { setSentryUser, clearSentryUser } from '@/lib/sentry';
+import { identifyUser, resetUser } from '@/lib/posthog';
 import type { User } from '@/types';
 
 interface AuthContextValue {
@@ -17,6 +19,17 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/** Tell Sentry + PostHog who the user is (or that there is no user). */
+function identifyObservability(user: User | null): void {
+  if (user) {
+    setSentryUser({ id: user.id, role: user.role, name: user.displayName });
+    identifyUser(user.id, { role: user.role });
+  } else {
+    clearSentryUser();
+    resetUser();
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     // The API client tells us when a 401 + refresh failed (dead session).
     apiClient.onAuthFailure(() => {
-      if (!cancelled) setUser(null);
+      if (cancelled) return;
+      setUser(null);
+      identifyObservability(null);
     });
 
     void (async () => {
@@ -35,11 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       try {
         const me = await getCurrentUser();
-        if (!cancelled) setUser(me);
+        if (!cancelled) {
+          setUser(me);
+          identifyObservability(me);
+        }
       } catch (error) {
         logger.debug('session restore failed:', error);
         apiClient.clearTokens();
-        if (!cancelled) setUser(null);
+        if (!cancelled) {
+          setUser(null);
+          identifyObservability(null);
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -59,11 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifyOtp: async (phone, otp) => {
         const u = await verifyOtpService(phone, otp);
         setUser(u);
+        identifyObservability(u);
         return u;
       },
       logout: async () => {
         await logoutService();
         setUser(null);
+        identifyObservability(null);
       },
     }),
     [user, isLoading],

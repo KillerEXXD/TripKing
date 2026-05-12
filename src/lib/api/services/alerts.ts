@@ -1,11 +1,11 @@
 /** Alerts service — saved searches. (The `/alerts/*` edge functions land later.) */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiAlert, transformAlert } from '@/lib/api/transforms/alert';
 import type { Alert, AlertInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
-  if (d === null || d === undefined) throw new Error('alerts: empty response body');
+  if (d === null || d === undefined) throw new EmptyResponseError('alerts');
   return d;
 }
 

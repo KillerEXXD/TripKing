@@ -1,11 +1,17 @@
 /**
- * Performance instrumentation wrapper for edge functions (the TournamentPro pattern):
- * times the handler, logs `METHOD path -> status ms`, sets a `Server-Timing` header, and
- * fire-and-forget-persists one row per request to `api_metrics` (migration 005). The persist
- * is non-blocking and best-effort — on Deno Deploy the isolate may terminate before it lands
- * (~90% persist rate observed elsewhere); never await it, never let it affect the response.
+ * Performance instrumentation + outermost error boundary for edge functions
+ * (the TournamentPro pattern, extended): times the handler, logs
+ * `METHOD path -> status ms`, sets a `Server-Timing` header, fire-and-forget-persists
+ * one row per request to `api_metrics` (migration 005), and — if the handler throws —
+ * reports the exception to Sentry (`source=edge-fn`) and returns a `fail('INTERNAL', …, 500)`
+ * envelope rather than re-throwing, so the client always gets the `{ success, error }`
+ * shape (never a raw runtime 500). The metrics persist is best-effort — on Deno Deploy the
+ * isolate may terminate before it lands; never await it, never let it affect the response.
  */
 import { serviceClient } from './supabase.ts';
+import { fail } from './cors.ts';
+import { ERROR_CODES } from './codes.ts';
+import { captureServerException } from './sentry.ts';
 
 // memoized per-isolate (each Deno Deploy isolate gets fresh module scope; reused isolates reuse this)
 let _metrics: ReturnType<typeof serviceClient> | null | undefined;
@@ -49,8 +55,17 @@ export function withTiming(name: string, handler: (req: Request) => Promise<Resp
     } catch (err) {
       const ms = Math.round(performance.now() - started);
       console.error(`[${name}] ${req.method} ${path} -> threw after ${ms}ms`, err);
-      if (req.method !== 'OPTIONS') persist(name, req.method, 500, ms);
-      throw err;
+      if (req.method !== 'OPTIONS') {
+        persist(name, req.method, 500, ms);
+        captureServerException(err, { fn: name, method: req.method, path, status: 500 });
+      }
+      const res = fail(ERROR_CODES.INTERNAL, 'Something went wrong on our side. We have been notified — please try again.', 500);
+      try {
+        res.headers.set('Server-Timing', `total;dur=${ms};desc="${name}"`);
+      } catch {
+        /* ignore */
+      }
+      return res;
     }
   };
 }

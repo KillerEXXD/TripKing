@@ -1,11 +1,11 @@
 /** Reviews service — post-trip ratings (driver↔agent + passenger→driver). */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiReview, transformReview } from '@/lib/api/transforms/review';
 import type { Review, ReviewInput, ReviewsQueryParams } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
-  if (d === null || d === undefined) throw new Error('reviews: empty response body');
+  if (d === null || d === undefined) throw new EmptyResponseError('reviews');
   return d;
 }
 

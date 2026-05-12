@@ -1,11 +1,11 @@
 /** Vacancies service — driver availability posts. (The `/vacancies/*` edge functions land later.) */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiPostVacancy, transformVacancy } from '@/lib/api/transforms/vacancy';
 import type { PostVacancyInput, Vacancy, VacanciesQueryParams } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
-  if (d === null || d === undefined) throw new Error('vacancies: empty response body');
+  if (d === null || d === undefined) throw new EmptyResponseError('vacancies');
   return d;
 }
 
