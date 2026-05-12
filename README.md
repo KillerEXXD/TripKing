@@ -21,7 +21,7 @@ Inter-city cab & trip marketplace PWA for India. One phone-registered account: a
 | Backend SDK | @supabase/supabase-js *(not yet wired; data layer still returns mocks)* |
 | Errors / analytics | @sentry/react · posthog-js |
 | Testing | Vitest + Testing Library + Playwright *(installed; no tests yet — see TODO #4)* |
-| Hosting | Vercel |
+| Hosting | Vercel — deployed at **https://trip-king.vercel.app** (prod build resolves the API via `VITE_API_BASE_URL`, which must point at the Supabase functions base since there's no dev `/api` proxy in prod) |
 
 ---
 
@@ -102,7 +102,7 @@ These are the things to do before/while building real features (in priority orde
 5. **Finish (or remove) i18n.** `react-i18next` is in deps but the only translations are ~12 strings in `LanguageContext`. Either move to proper namespaced i18n JSON files (the 5 core screens at minimum: home, trip feed, trip detail, apply, my-trips — Tamil + Hindi), or remove the language picker so it doesn't over-promise.
 6. **Clean up legacy routes.** The router has accreted redirects (`/admin/* → /administration/*`, `/driver/profile → /profile`, `/driver/my-applications → ?tab=`, `/login → /auth`, `/driver` & `/manager` → `/home`). Settle on the canonical URL scheme and delete the cruft. The `/driver/*` / `/manager/*` prefixes are vestigial now that roles are collapsed.
 7. **Move stores into their feature folders** (e.g. `useAuthStore` → `features/auth/`, `tripStateStore` → `features/trips/`) once the import churn is worth it.
-8. **Per-app config.** This was copied from DriverMahal — review `vite.config.ts` (manifest, `api.drivermahal.in` workbox patterns), `vercel.json`, `.env.example`, and the `driver-mahal.vercel.app` fallback URL in `lib/share/tripShare.ts`; set up a separate GitHub repo + Vercel project for Trip King.
+8. **Per-app config.** This was copied from DriverMahal — review `vite.config.ts` (manifest, `api.drivermahal.in` workbox patterns), `vercel.json`, `.env.example`, and the `driver-mahal.vercel.app` fallback URL in `lib/share/tripShare.ts`. *(Done: separate GitHub repo `KillerEXXD/TripKing` + Vercel project — deployed at https://trip-king.vercel.app. Make sure the Vercel project has `VITE_API_BASE_URL` set to `https://saxcbebqxgatiktsebxw.supabase.co/functions/v1` — the prod build has no `/api` proxy.)*
 
 ---
 
