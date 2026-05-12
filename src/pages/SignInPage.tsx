@@ -40,7 +40,9 @@ const onlyDigits = (s: string) => s.replace(/\D/g, '');
 
 /**
  * `/signin` — phone-OTP sign-in (the equivalent of the prototype's `/auth`). Talks to the
- * `/auth` edge function: in this build the OTP is `123456` (dev mode, real Supabase session).
+ * `/auth` edge function. There's no real SMS provider yet (placeholder): any phone number is
+ * accepted, the "send OTP" step is best-effort (it just advances to OTP entry), and the dev
+ * code is always `123456`. When a real SMS provider lands we'll enforce delivery + validation.
  * On a plain sign-in we send the user to `/onboarding` (name → role → city → create profile);
  * if they were bounced here from a protected page, we honour that `from` instead.
  */
@@ -57,21 +59,23 @@ export function SignInPage() {
   if (isAuthenticated) return <Navigate to={fromOf(location.state)} replace />;
 
   const phoneE164 = `${cc}${onlyDigits(localPhone)}`;
-  const phoneValid = onlyDigits(localPhone).length >= 6;
+  // No real SMS provider yet — accept any non-empty number; the dev code is always 123456.
+  const phoneValid = onlyDigits(localPhone).length > 0;
 
   async function onRequest(e: FormEvent) {
     e.preventDefault();
     if (!phoneValid) return;
     setBusy(true);
+    // Best-effort: nothing is actually sent in this build, so a failed/absent /auth/request-otp
+    // shouldn't block sign-in — just move to OTP entry. (Real-SMS validation comes later.)
     try {
       await requestOtp(phoneE164);
-      setStage('otp');
-      toast.success('OTP sent');
     } catch {
-      toast.error("Couldn't send the OTP — check the number and try again");
-    } finally {
-      setBusy(false);
+      // ignore — proceed to OTP entry regardless
     }
+    setStage('otp');
+    setBusy(false);
+    toast.success(`Enter the ${OTP_LENGTH}-digit code (demo: 123456)`);
   }
   async function onVerify(e: FormEvent) {
     e.preventDefault();
@@ -132,8 +136,8 @@ export function SignInPage() {
                 {busy ? 'Sending…' : 'Send OTP'}
               </Button>
               <p className="text-xs text-secondary">
-                We&apos;ll send a {OTP_LENGTH}-digit code. This is a demo build — the code is always{' '}
-                <strong>123456</strong>.
+                Demo build — any mobile number is accepted and the {OTP_LENGTH}-digit code is always{' '}
+                <strong>123456</strong>. (Real SMS verification comes later.)
               </p>
             </form>
           ) : (

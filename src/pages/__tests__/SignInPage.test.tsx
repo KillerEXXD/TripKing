@@ -46,7 +46,7 @@ describe('SignInPage', () => {
     expect(screen.getByRole('heading', { name: 'TripKing' })).toBeInTheDocument();
     expect(screen.getByLabelText('Mobile number')).toBeInTheDocument();
     expect(screen.getByLabelText('Country code')).toBeInTheDocument();
-    expect(screen.getByText(/the code is always/i)).toBeInTheDocument();
+    expect(screen.getByText(/code is always/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /send otp/i })).toBeDisabled();
   });
 
@@ -79,6 +79,15 @@ describe('SignInPage', () => {
     fireEvent.change(otpInput, { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: /verify & continue/i }));
     expect(await screen.findByText('deep-linked trip')).toBeInTheDocument();
+  });
+
+  it('still advances to OTP entry even if request-otp fails (no real SMS provider yet)', async () => {
+    mockAuth();
+    requestOtp.mockRejectedValueOnce(new Error('no SMS provider'));
+    renderSignIn();
+    fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '9000000000' } });
+    fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    expect(await screen.findByLabelText('OTP code')).toBeInTheDocument();
   });
 
   it('"Use a different number" returns to the phone stage', async () => {
