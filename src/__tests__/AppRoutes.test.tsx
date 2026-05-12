@@ -22,6 +22,7 @@ vi.mock('@/pages/CreateAlertPage', () => ({ default: () => <div>create alert pag
 vi.mock('@/pages/AlertDetailPage', () => ({ default: () => <div>alert detail page</div> }));
 vi.mock('@/pages/NotificationsPage', () => ({ default: () => <div>notifications page</div> }));
 vi.mock('@/pages/administration/KycReviewPage', () => ({ default: () => <div>kyc review page</div> }));
+vi.mock('@/pages/administration/VehicleEligibilityPage', () => ({ default: () => <div>vehicle eligibility page</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
 const driver: User = { ...admin, id: 'd', role: 'driver', displayName: 'Driver' };
@@ -175,6 +176,12 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/administration/kyc');
     expect(await screen.findByText(/admins only/i)).toBeInTheDocument();
+  });
+
+  it('/administration/vehicles renders the vehicle-eligibility dashboard for an admin', async () => {
+    setAuth(admin);
+    renderAt('/administration/vehicles');
+    expect(await screen.findByText(/vehicle eligibility page/i)).toBeInTheDocument();
   });
 
   it('an unknown path renders the 404 page', async () => {

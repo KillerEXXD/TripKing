@@ -24,7 +24,12 @@ export function AdministrationPage() {
               KYC review queue →
             </Link>
           </li>
-          <li className="text-secondary">Vehicle eligibility · translation manager · reviews moderation — coming up.</li>
+          <li>
+            <Link to="/administration/vehicles" className="text-primary underline">
+              Vehicle-eligibility dashboard →
+            </Link>
+          </li>
+          <li className="text-secondary">Translation manager · reviews moderation — coming up.</li>
         </ul>
       </Card>
     </main>
