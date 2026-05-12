@@ -1,49 +1,107 @@
 import { Link } from 'react-router-dom';
+import { AlertTriangle, Bell, Car, ChevronRight, Languages, ShieldCheck, SlidersHorizontal, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button, Card } from '@/components/ui';
+import { useUnreadNotificationCount } from '@/hooks/useNotifications';
+import { Badge, Card } from '@/components/ui';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 
-/** Placeholder home — the role-specific driver/agent hubs land in Phase 3. */
+interface AdminTile {
+  to: string;
+  title: string;
+  desc: string;
+  Icon: LucideIcon;
+  tone: 'violet' | 'purple' | 'emerald' | 'red' | 'amber';
+}
+
+// The admin's home is the operations hub — everything under /administration, surfaced as tiles.
+const ADMIN_TILES: AdminTile[] = [
+  { to: '/administration/config', title: 'Reference data', desc: 'Car types, fuel, makes & models, cities, languages, tags, app settings', Icon: SlidersHorizontal, tone: 'violet' },
+  { to: '/administration/kyc', title: 'KYC review queue', desc: 'Verify drivers & agents — docs, video, approve / reject', Icon: ShieldCheck, tone: 'purple' },
+  { to: '/administration/vehicles', title: 'Vehicle eligibility', desc: 'Registration / insurance / fitness expiry across the fleet', Icon: Car, tone: 'emerald' },
+  { to: '/administration/reviews', title: 'Reviews moderation', desc: 'Flagged reviews — publish, hide, clear flags', Icon: AlertTriangle, tone: 'red' },
+  { to: '/administration/translations', title: 'Translation manager', desc: 'Per-language string coverage and overrides', Icon: Languages, tone: 'amber' },
+];
+
+const TONE: Record<AdminTile['tone'], string> = {
+  violet: 'bg-violet-100 text-violet-700',
+  purple: 'bg-purple-100 text-purple-700',
+  emerald: 'bg-emerald-100 text-emerald-700',
+  red: 'bg-red-100 text-red-700',
+  amber: 'bg-amber-100 text-amber-700',
+};
+
+function Bellish({ count }: { count: number }) {
+  return (
+    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative -mr-1 flex size-9 items-center justify-center rounded-full text-secondary hover:bg-muted">
+      <Bell className="size-5" aria-hidden />
+      {count > 0 ? <span className="absolute right-1 top-1 size-2 rounded-full bg-destructive" /> : null}
+    </Link>
+  );
+}
+
+function AdminTileCard({ tile }: { tile: AdminTile }) {
+  return (
+    <Link to={tile.to} className="flex flex-col gap-2 rounded-2xl border bg-white p-3.5 transition-colors hover:border-primary/40">
+      <span className={`flex size-9 items-center justify-center rounded-full ${TONE[tile.tone]}`}>
+        <tile.Icon className="size-5" aria-hidden />
+      </span>
+      <div className="text-sm font-semibold leading-tight">{tile.title}</div>
+      <div className="text-[11px] leading-snug text-secondary">{tile.desc}</div>
+    </Link>
+  );
+}
+
+/**
+ * `/` for an admin — the operations hub. Greeting + bell, then a tile grid for
+ * everything under `/administration` (reference data, KYC, vehicle eligibility,
+ * reviews moderation, translations), then a few marketplace shortcuts. (A driver
+ * or agent gets their own home; an admin can preview those via the role switcher
+ * at the top — see `HomeForRole`.)
+ */
 export function HomePage() {
   const { user } = useAuth();
+  const unread = useUnreadNotificationCount();
   return (
-    <main className="mx-auto max-w-md space-y-4 p-6">
-      <Card>
-        <h1 className="text-xl font-bold">TripKing</h1>
-        <p className="text-sm text-secondary">
-          Signed in as <strong>{user?.displayName || user?.phone}</strong> ({user?.role}).
-        </p>
-        <p className="mt-2 text-sm text-secondary">
-          More of the role-specific home hub arrives soon — for now, browse open trips or post one.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <Button asChild variant="full" className="flex-1">
-            <Link to="/trips/new">Post a trip</Link>
-          </Button>
-          <Button asChild variant="outline" className="flex-1">
-            <Link to="/trips">Browse trips</Link>
-          </Button>
+    <div>
+      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-xs text-secondary">Welcome back</div>
+          <div className="flex items-center gap-2">
+            <span className="truncate font-semibold">{user?.displayName || user?.phone || 'Admin'}</span>
+            <Badge variant="info">Admin</Badge>
+          </div>
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link to="/posted-trips" className="text-primary underline">
-            Your posted trips
-          </Link>
-          <Link to="/vacancies" className="text-primary underline">
-            Available drivers
-          </Link>
-          <Link to="/vacancies/new" className="text-primary underline">
-            Post availability
-          </Link>
-          <Link to="/alerts" className="text-primary underline">
-            Trip alerts
-          </Link>
-          <Link to="/notifications" className="text-primary underline">
-            Notifications
-          </Link>
-        </div>
-      </Card>
-      <InstallAppCard dismissable />
-    </main>
+        <Bellish count={unread} />
+      </header>
+
+      <div className="space-y-4 px-4 pb-4 pt-3">
+        <section className="space-y-2">
+          <h2 className="px-1 text-sm font-semibold">Administration</h2>
+          <div className="grid grid-cols-2 gap-2.5">
+            {ADMIN_TILES.map((t) => (
+              <AdminTileCard key={t.to} tile={t} />
+            ))}
+          </div>
+        </section>
+
+        <Card className="gap-2">
+          <h2 className="text-sm font-semibold">Marketplace</h2>
+          <p className="text-xs text-secondary">Browse the live marketplace, or use the switcher above to act as a driver or an agent.</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <Link to="/trips" className="text-primary underline">Browse trips</Link>
+            <Link to="/vacancies" className="text-primary underline">Available drivers</Link>
+            <Link to="/posted-trips" className="text-primary underline">Posted trips</Link>
+            <Link to="/notifications" className="text-primary underline">Notifications</Link>
+          </div>
+        </Card>
+
+        <Link to="/administration" className="flex items-center gap-1 px-1 text-xs text-secondary hover:text-foreground">
+          Full administration page <ChevronRight className="size-3.5" aria-hidden />
+        </Link>
+
+        <InstallAppCard dismissable />
+      </div>
+    </div>
   );
 }
 
