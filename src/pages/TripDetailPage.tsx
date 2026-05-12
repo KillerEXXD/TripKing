@@ -57,7 +57,7 @@ function Line({ label, value, muted, strong }: { label: string; value: string; m
 }
 
 /** Driver-only bottom CTA: pick a vehicle, optionally counter-quote, apply / withdraw. */
-function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing }: { trip: Trip; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean }) {
+function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycApproved }: { trip: Trip; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; kycApproved: boolean }) {
   const navigate = useNavigate();
   const vehiclesQuery = useDriverVehicles(myDriverId);
   const applyMutation = useApplyToTrip();
@@ -118,6 +118,13 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing }: { trip
         <Button variant="full" size="lg" disabled>
           Loading…
         </Button>
+      ) : !kycApproved ? (
+        <>
+          <p className="text-center text-xs text-secondary">Finish your verification (KYC) before you can apply to trips.</p>
+          <Button variant="full" size="lg" onClick={() => navigate('/profile#get-verified')}>
+            Get verified to apply →
+          </Button>
+        </>
       ) : activeVehicles.length === 0 ? (
         <>
           <p className="text-center text-xs text-secondary">Add a vehicle from your profile to apply for trips.</p>
@@ -260,7 +267,7 @@ function PostedBy({ trip }: { trip: Trip }) {
   );
 }
 
-function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean } }) {
+function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean } }) {
   const badge = STATUS_BADGE[trip.status];
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
   const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -379,7 +386,7 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
       {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
-      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} /> : showAssignedBar ? <AssignedDriverBar trip={trip} /> : null}
+      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} /> : showAssignedBar ? <AssignedDriverBar trip={trip} /> : null}
       {showShareLink && trip.passengerOtp ? <PassengerLinkModal trip={trip} otp={trip.passengerOtp} onClose={() => setShowShareLink(false)} /> : null}
     </div>
   );
@@ -437,6 +444,7 @@ export function TripDetailPage() {
             myDriverId: myDriverQuery.data?.id,
             myDriverPending: isDriver && myDriverQuery.isPending,
             myDriverMissing: !!myDriverMissing,
+            myDriverKycApproved: myDriverQuery.data?.kycStatus === 'approved',
           }}
         />
       )}
