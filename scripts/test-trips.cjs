@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Smoke test for the /trips edge function (auth → create → read → driver bootstrap → apply →
- * assign → passenger-OTP lookup (GET /trips/by-otp/:otp) → cancel).
+ * "my applications" (GET /trips/applied) → assign → passenger_otp echo (poster-only) → by-otp →
+ * start → live location → "trips I'm driving" (GET /trips?assigned_driver_id=me|<uuid>) → complete).
  *
  *   TRIPS_API_BASE=https://<ref>.supabase.co/functions/v1 node scripts/test-trips.cjs
  *
@@ -85,11 +86,28 @@ async function j(method, path, { body, token } = {}) {
     const dAuth = await j('POST', '/auth/auth/verify-otp', { body: { phone: dPhone, otp: '123456', display_name: 'Trip Smoke Driver', role: 'driver' } });
     const dToken = dAuth.json?.data?.access_token;
     const drvId = (await j('POST', '/drivers', { token: dToken, body: { full_name: 'Trip Smoke Driver' } })).json?.data?.id;
-    const apply = await j('POST', `/trips/${tid}/applicants`, { token: dToken, body: {} });
+    const apply = await j('POST', `/trips/${tid}/applicants`, { token: dToken, body: { applicant_message: 'smoke apply' } });
     const aid = apply.json?.data?.id;
+
+    // "my applications" — the driver can read back their own trip_acceptances (poster-only is GET /:id/applicants)
+    const appliedNoAuth = await j('GET', '/trips/applied');
+    check('GET /trips/applied without auth → 401', appliedNoAuth.status === 401, `status=${appliedNoAuth.status}`);
+    const applied = await j('GET', '/trips/applied', { token: dToken });
+    const mine = (applied.json?.data || []).find((a) => a.trip_id === tid);
+    check('GET /trips/applied (driver) → contains my application + its joined trip', applied.status === 200 && !!mine && mine.id === aid && !!mine.trip?.from_city?.name && !('passenger_otp_hash' in (mine.trip || {})), `status=${applied.status} ${JSON.stringify(applied.json?.data || applied.json?.error || '').slice(0, 200)}`);
+
     const assign = await j('POST', `/trips/${tid}/assign`, { token, body: { acceptance_id: aid } });
     const otp = assign.json?.data?.passenger_otp;
     check('POST /trips/:id/assign → 200 + status assigned + passenger_otp', assign.status === 200 && assign.json?.data?.status === 'assigned' && !!otp, `status=${assign.status} ${JSON.stringify(assign.json?.error || '')}`);
+
+    // passenger_otp is echoed on GET /trips/:id ONLY to the poster (or an admin) — never the hash, never to others
+    const getAsPoster = await j('GET', `/trips/${tid}`, { token });
+    check('GET /trips/:id as the poster → echoes passenger_otp (matches assign)', getAsPoster.json?.data?.passenger_otp === otp && !('passenger_otp_hash' in (getAsPoster.json?.data || {})), `otp=${getAsPoster.json?.data?.passenger_otp} expected=${otp}`);
+    const getAsDriver = await j('GET', `/trips/${tid}`, { token: dToken });
+    check('GET /trips/:id as the assigned driver → does NOT echo passenger_otp', !('passenger_otp' in (getAsDriver.json?.data || {})), `keys=${Object.keys(getAsDriver.json?.data || {}).join(',')}`);
+    const getAnon = await j('GET', `/trips/${tid}`);
+    check('GET /trips/:id unauthenticated → does NOT echo passenger_otp', !('passenger_otp' in (getAnon.json?.data || {})), `keys=${Object.keys(getAnon.json?.data || {}).join(',')}`);
+
     if (otp) {
       const byOtp = await j('GET', `/trips/by-otp/${otp}`);
       check('GET /trips/by-otp/:otp → 200 + matching trip + assigned driver + no hash', byOtp.status === 200 && byOtp.json?.data?.id === tid && !!byOtp.json?.data?.assigned_driver?.full_name && !('passenger_otp_hash' in (byOtp.json?.data || {})), `status=${byOtp.status} ${JSON.stringify(byOtp.json?.error || byOtp.json?.data || '')}`);
@@ -105,6 +123,16 @@ async function j(method, path, { body, token } = {}) {
     check('GET /trips/:id (in_progress) → assigned-driver position + distance_to_destination_km', live.status === 200 && live.json?.data?.assigned_driver?.current_lat != null && typeof live.json?.data?.distance_to_destination_km === 'number', `status=${live.status} driver=${JSON.stringify(live.json?.data?.assigned_driver)} dist=${live.json?.data?.distance_to_destination_km}`);
     const liveList = await j('GET', `/trips?status=in_progress&posted_by_user_id=${post.json?.data?.posted_by_user_id}`);
     check('GET /trips?status=in_progress&posted_by_user_id= → contains the trip with the driver position', liveList.status === 200 && (liveList.json?.data || []).some((t) => t.id === tid && t.assigned_driver?.current_lat != null), `len=${liveList.json?.data?.length}`);
+
+    // "trips I'm driving" — assigned_driver_id accepts a uuid (public) or `me` (the assigned driver, Bearer)
+    const drivingMeNoAuth = await j('GET', '/trips?assigned_driver_id=me');
+    check('GET /trips?assigned_driver_id=me without auth → 401', drivingMeNoAuth.status === 401, `status=${drivingMeNoAuth.status}`);
+    const drivingMe = await j('GET', '/trips?assigned_driver_id=me', { token: dToken });
+    check('GET /trips?assigned_driver_id=me (assigned driver) → contains the trip', drivingMe.status === 200 && (drivingMe.json?.data || []).some((t) => t.id === tid), `len=${drivingMe.json?.data?.length}`);
+    if (drvId) {
+      const drivingById = await j('GET', `/trips?assigned_driver_id=${drvId}`);
+      check('GET /trips?assigned_driver_id=<uuid> (public) → contains the trip', drivingById.status === 200 && (drivingById.json?.data || []).some((t) => t.id === tid), `len=${drivingById.json?.data?.length}`);
+    }
 
     const complete = await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { driver_notes: 'smoke' } });
     check('POST /trips/:id/complete (assigned driver) → 200, status=completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} ${JSON.stringify(complete.json?.error || '')}`);

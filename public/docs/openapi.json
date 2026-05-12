@@ -579,7 +579,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "List trips — each row carries the assigned driver (with live position). status=in_progress&posted_by_user_id=<me> is a trip manager's live-trips map; in-progress trips also get distance_to_destination_km",
+        "summary": "List trips — each row carries the assigned driver (with live position). status=in_progress&posted_by_user_id=<me> is a trip manager's live-trips map; assigned_driver_id=me (Bearer) is \"the trips I'm driving\"; in-progress trips also get distance_to_destination_km",
         "parameters": [
           {
             "name": "status",
@@ -611,6 +611,14 @@
             }
           },
           {
+            "name": "assigned_driver_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "a driver uuid (public), or the literal \"me\" — needs a Bearer; resolves to the caller's driver profile (the trips assigned to you)"
+          },
+          {
             "name": "limit",
             "in": "query",
             "schema": {
@@ -620,6 +628,9 @@
         ],
         "responses": {
           "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -663,12 +674,28 @@
         }
       }
     },
+    "/trips/applied": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "My applications (driver; Bearer) — the caller's own trip_acceptances, newest first, each with its joined trip (from/to city, car type). The poster-only GET /trips/{id}/applicants is for the other side; this is the driver's view of where they've applied. Empty array if the caller has no driver profile.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/trips/{id}": {
       "get": {
         "tags": [
           "trips"
         ],
-        "summary": "Get a trip — joined (assigned driver with live position; distance_to_destination_km when in_progress); passenger_otp_hash stripped",
+        "summary": "Get a trip — joined (assigned driver with live position; distance_to_destination_km when in_progress). passenger_otp_hash is always stripped; the plaintext passenger_otp is echoed ONLY when the caller is the trip poster (Bearer; auth.uid() = posted_by_user_id) or an admin — so the poster can re-open the passenger-portal link any time.",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"

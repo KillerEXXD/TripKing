@@ -4,11 +4,13 @@
  * the RLS policies encode). Instrumented with withTiming; verify_jwt = false (we validate).
  *
  * Routes (at the function root, i.e. /functions/v1/trips/...):
- *   GET    /trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&limit=   (public)
+ *   GET    /trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&assigned_driver_id=&limit=   (public)
+ *                                       — assigned_driver_id accepts a driver uuid OR the literal `me` (Bearer; the trips you're driving)
  *   POST   /trips                       (authed) — total_fare computed if omitted; driver_payout via trigger
+ *   GET    /trips/applied               (driver; Bearer) — the caller's own trip_acceptances, each with its joined trip ("my applications")
  *   GET    /trips/by-otp/:otp           (public — the OTP is the credential) — the passenger portal; joins assigned driver+vehicle;
  *                                       fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed
- *   GET    /trips/:id                   (public) — joined; passenger_otp_hash stripped
+ *   GET    /trips/:id                   (public) — joined; passenger_otp_hash stripped; passenger_otp echoed ONLY to the poster (auth.uid() = posted_by_user_id) or an admin
  *   GET    /trips/:id/applicants        (poster/admin) — joins driver+vehicle
  *   POST   /trips/:id/applicants        (driver) — apply; bumps trip → has_applicants
  *   DELETE /trips/:id/applicants/:aid   (owning driver/admin) — withdraw
@@ -90,10 +92,12 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-/** Strip the passenger-OTP hash (SHA-256 of a 6-digit OTP — brute-forceable) and, for an in-progress
- *  trip with a known assigned-driver position + destination coords, attach `distance_to_destination_km`. */
+/** Strip the passenger OTP (both the brute-forceable SHA-256 hash and the plaintext — the GET /trips/:id
+ *  handler re-attaches the plaintext for the poster/admin only) and, for an in-progress trip with a
+ *  known assigned-driver position + destination coords, attach `distance_to_destination_km`. */
 function enrichTrip(row: Record<string, unknown>): Record<string, unknown> {
   delete row.passenger_otp_hash;
+  delete row.passenger_otp;
   if (row.status === 'in_progress') {
     const d = row.assigned_driver as Record<string, unknown> | null | undefined;
     const dest = row.to_city as Record<string, unknown> | null | undefined;
@@ -157,6 +161,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (toCity) q = q.eq('to_city_id', toCity);
     const postedBy = url.searchParams.get('posted_by_user_id');
     if (postedBy) q = q.eq('posted_by_user_id', postedBy);
+    const assignedDriver = url.searchParams.get('assigned_driver_id');
+    if (assignedDriver) {
+      if (assignedDriver === 'me') {
+        const u = await authUser(db, req);
+        if (!u) return fail('UNAUTHORIZED', 'Sign in to see the trips you are driving', 401);
+        const did = await driverIdFor(u.id);
+        if (!did) return ok([]); // no driver profile ⇒ nothing assigned to you
+        q = q.eq('assigned_driver_id', did);
+      } else {
+        q = q.eq('assigned_driver_id', assignedDriver);
+      }
+    }
     const limit = Number(url.searchParams.get('limit') ?? '50');
     q = q.order('pickup_at', { ascending: true }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
     const { data, error } = await q;
@@ -235,12 +251,41 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return ok(row);
   }
 
+  // ── GET /trips/applied (the caller's own applications — driver-scoped) ────
+  if (tripId === 'applied' && !sub && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to see your applications', 401);
+    const did = await driverIdFor(u.id);
+    if (!did) return ok([]); // no driver profile ⇒ no applications
+    const { data, error } = await db
+      .from('trip_acceptances')
+      .select('*, trip:trips!trip_id(*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label))')
+      .eq('driver_id', did)
+      .order('applied_at', { ascending: false });
+    if (error) return fail('DB_ERROR', error.message, 500);
+    const rows = (data ?? []).map((r) => {
+      const rec = r as Record<string, unknown>;
+      const t = rec.trip as Record<string, unknown> | null;
+      if (t) { delete t.passenger_otp_hash; delete t.passenger_otp; }
+      return rec;
+    });
+    return ok(rows);
+  }
+
   // ── GET /trips/:id ───────────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', tripId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
-    return ok(enrichTrip(data as Record<string, unknown>));
+    const row = data as Record<string, unknown>;
+    const otp = typeof row.passenger_otp === 'string' && row.passenger_otp ? row.passenger_otp : null;
+    enrichTrip(row); // strips passenger_otp_hash + passenger_otp + adds distance_to_destination_km when in_progress
+    // Echo the plaintext OTP back to the trip poster (or an admin) so they can re-open the passenger-portal link any time.
+    if (otp) {
+      const u = await authUser(db, req);
+      if (u && (row.posted_by_user_id === u.id || isAdmin(u))) row.passenger_otp = otp;
+    }
+    return ok(row);
   }
 
   // ── /trips/:id/applicants ────────────────────────────────────────────────
@@ -312,7 +357,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await db.from('trip_acceptances').update({ status: 'selected', decision_at: now }).eq('id', aid);
     const { error } = await db
       .from('trips')
-      .update({ status: 'assigned', assigned_driver_id: acc.driver_id, assigned_vehicle_id: (acc.vehicle_id as string | null) ?? null, assigned_acceptance_id: aid, assigned_at: now, passenger_otp_hash: otpHash })
+      .update({ status: 'assigned', assigned_driver_id: acc.driver_id, assigned_vehicle_id: (acc.vehicle_id as string | null) ?? null, assigned_acceptance_id: aid, assigned_at: now, passenger_otp_hash: otpHash, passenger_otp: otp })
       .eq('id', tripId);
     if (error) return pgFail(error);
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
