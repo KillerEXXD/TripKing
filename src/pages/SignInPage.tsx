@@ -3,6 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input } from '@/components/ui';
+import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { OTP_LENGTH } from '@/lib/constants';
 
 /** Crown mark (matches the PWA icon / `public/logo-mark.svg`). */
@@ -166,6 +167,9 @@ export function SignInPage() {
             </form>
           )}
         </section>
+        <div className="w-full max-w-sm">
+          <InstallAppCard />
+        </div>
         <p className="text-xs text-secondary">Next: a quick setup — your name, whether you drive or post trips, and your city.</p>
       </div>
     </main>

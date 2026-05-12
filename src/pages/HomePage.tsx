@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui';
+import { InstallAppCard } from '@/components/layout/InstallAppCard';
 
 /** Placeholder home — the role-specific driver/agent hubs land in Phase 3. */
 export function HomePage() {
@@ -16,6 +17,7 @@ export function HomePage() {
           <code>docs/PLATFORM_AND_ADMIN_REQUIREMENTS.md</code>.
         </p>
       </Card>
+      <InstallAppCard dismissable />
     </main>
   );
 }
