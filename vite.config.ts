@@ -50,9 +50,10 @@ export default defineConfig({
         globPatterns: ['**/*.{ico,png,jpg,jpeg,webp,woff,woff2,svg}'],
         runtimeCaching: [
           {
-            // Live-data endpoints — Network First (never serve stale): trip feeds,
-            // vacancy feed, applicant lists, /trips/{id}/applicants.
-            urlPattern: /^https:\/\/api\.tripking\.in\/(trips|vacancies|trip-acceptances)/i,
+            // Live-data endpoints — Network First (never serve stale): trip feeds, vacancy
+            // feed, applicant lists. (Matches the Supabase Edge Functions host; if an
+            // api.tripking.in gateway is added later, add its pattern here too.)
+            urlPattern: /^https:\/\/[\w-]+\.supabase\.co\/functions\/v1\/(trips|vacancies|trip-acceptances)/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-live-cache',
@@ -61,8 +62,8 @@ export default defineConfig({
             },
           },
           {
-            // Everything else under the API (incl. /admin/*, /drivers, /reviews) — Stale While Revalidate.
-            urlPattern: /^https:\/\/api\.tripking\.in\/.*/i,
+            // Everything else under the API (incl. /admin/*, /auth/*, /drivers, /reviews) — Stale While Revalidate.
+            urlPattern: /^https:\/\/[\w-]+\.supabase\.co\/functions\/v1\/.*/i,
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'api-stable-cache',

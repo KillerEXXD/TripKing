@@ -395,7 +395,7 @@
         }
       }
     },
-    "/auth/auth/request-otp": {
+    "/auth/request-otp": {
       "post": {
         "tags": [
           "auth"
@@ -426,7 +426,7 @@
         }
       }
     },
-    "/auth/auth/verify-otp": {
+    "/auth/verify-otp": {
       "post": {
         "tags": [
           "auth"
@@ -475,7 +475,7 @@
         }
       }
     },
-    "/auth/auth/refresh": {
+    "/auth/refresh": {
       "post": {
         "tags": [
           "auth"
@@ -509,7 +509,7 @@
         }
       }
     },
-    "/auth/auth/logout": {
+    "/auth/logout": {
       "post": {
         "tags": [
           "auth"
@@ -522,7 +522,7 @@
         }
       }
     },
-    "/auth/auth/me": {
+    "/auth/me": {
       "get": {
         "tags": [
           "auth"
@@ -538,7 +538,7 @@
         }
       }
     },
-    "/trips/trips": {
+    "/trips": {
       "get": {
         "tags": [
           "trips"
@@ -623,7 +623,7 @@
         }
       }
     },
-    "/trips/trips/{id}": {
+    "/trips/{id}": {
       "get": {
         "tags": [
           "trips"
@@ -644,7 +644,7 @@
         }
       }
     },
-    "/trips/trips/{id}/applicants": {
+    "/trips/{id}/applicants": {
       "get": {
         "tags": [
           "trips"
@@ -687,7 +687,7 @@
         }
       }
     },
-    "/trips/trips/{id}/applicants/{aid}": {
+    "/trips/{id}/applicants/{aid}": {
       "delete": {
         "tags": [
           "trips"
@@ -713,7 +713,7 @@
         }
       }
     },
-    "/trips/trips/{id}/applicants/{aid}/reject": {
+    "/trips/{id}/applicants/{aid}/reject": {
       "post": {
         "tags": [
           "trips"
@@ -739,7 +739,7 @@
         }
       }
     },
-    "/trips/trips/{id}/assign": {
+    "/trips/{id}/assign": {
       "post": {
         "tags": [
           "trips"
@@ -781,7 +781,7 @@
         }
       }
     },
-    "/trips/trips/{id}/start": {
+    "/trips/{id}/start": {
       "post": {
         "tags": [
           "trips"
@@ -829,7 +829,7 @@
         }
       }
     },
-    "/trips/trips/{id}/complete": {
+    "/trips/{id}/complete": {
       "post": {
         "tags": [
           "trips"
@@ -850,7 +850,7 @@
         }
       }
     },
-    "/trips/trips/{id}/cancel": {
+    "/trips/{id}/cancel": {
       "post": {
         "tags": [
           "trips"
