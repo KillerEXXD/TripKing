@@ -4,6 +4,16 @@
 
 ---
 
+## In flight — `feat/driver-kyc` (worktree `c:/Apps/TripKing-kyc`; pushed to origin, not yet merged)
+
+**Driver onboarding & KYC verification** — the "Get verified" checklist (Home banner + Profile checklist), KYC document upload, vehicle add/photos, the video-call step + admin Video Call Console, and the `kyc_status='approved'` gate on apply/post.
+
+Done & deployed: migrations 007–010 (`drivers`/`trip_managers` KYC-doc columns; `video_verifications` + `video_call_availability`; 4 private Storage buckets + RLS; `vehicles.photo_plate_url`). Edge fns updated/added & deployed: `drivers` (server-computed `verification` block on `GET /me`; `kyc-doc-upload-url`, `kyc-docs` POST/GET; reviewer audit on `PATCH :id/kyc`), `agents` (the manager mirror), `vehicles` (`photo-upload-url` + `photo_plate_url`), new `video-verifications` (slots / book → `video_pending` + Jitsi url / cancel / reschedule / admin list / admin `finalize` → `approved` + `kyc_status_change` notification). `POST /trips`, `/trips/:id/applicants`, `/vacancies` now 403 `KYC_REQUIRED` for unverified actors. Smoke: `scripts/test-kyc-flow.cjs` (25/25). Frontend: types/transforms/services/hooks (`useSubmitDriverKycDocs`, `useVideoVerification.*`, …) + `lib/api/upload.ts` (canvas compress → signed-URL PUT, no new dep) + `<FileUpload>`; `<DriverVerificationChecklist>` (on `/profile`) + `<GetVerifiedBanner>` (driver home) + `<KycGateNotice>`; pages `/verify/documents`, `/vehicles/new|:id/edit`, `/vehicles/:id/photos`, `/verify/video-call`, `/administration/video-calls`; Apply-bar gate + post-trip/post-vacancy gates + an onboarding-carousel "Get verified" slide. `tsc` + ~340 tests + build green.
+
+Still TODO on the branch: KYC document *viewer* in `KycReviewPage` (via `GET /drivers|agents/:id/kyc-docs`); OpenAPI `yaml`/`json` + k6 entries for the ~10 new endpoints; Playwright E2E (driver journey → admin approve); fold `CLAUDE.md` §9 + this doc's main section once merged. Merge note: only `supabase/functions/{trips,vacancies}/index.ts` overlap the parallel `feat/places-frontend` work (different code regions — clean merge; re-deploy those two functions after merging).
+
+---
+
 ## State (everything below is committed & pushed — `origin/main`)
 
 **Phase 1 ✅** — scaffold (Vite `@/`+PWA+vendor chunks, tsconfig strict, ESLint, Vitest, Husky pre-push); `apiClient` singleton (401-refresh, `ApiError`, retry, Sentry/PostHog hooks); `AuthContext` + `<ProtectedRoute>`/`<AdminRoute>`; `QueryClient` (`STALE` tiers) + router + providers + Sentry/PostHog bootstrap; migration 001 (reference-data tables, seeded per §7); `/website` + `/for-agents` marketing pages; `/signin` rebuilt to match the prototype's `/auth`.
