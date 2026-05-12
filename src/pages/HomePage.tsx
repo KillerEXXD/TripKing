@@ -24,6 +24,14 @@ export function HomePage() {
             <Link to="/trips">Browse trips</Link>
           </Button>
         </div>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <Link to="/posted-trips" className="text-primary underline">
+            Your posted trips
+          </Link>
+          <Link to="/notifications" className="text-primary underline">
+            Notifications
+          </Link>
+        </div>
       </Card>
       <InstallAppCard dismissable />
     </main>

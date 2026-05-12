@@ -11,7 +11,9 @@ import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/pages/OnboardingPage', () => ({ default: () => <div>onboarding screen</div> }));
 vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }));
 vi.mock('@/pages/PostTripPage', () => ({ default: () => <div>post trip</div> }));
+vi.mock('@/pages/PostedTripsPage', () => ({ default: () => <div>posted trips</div> }));
 vi.mock('@/pages/TripDetailPage', () => ({ default: () => <div>trip detail</div> }));
+vi.mock('@/pages/NotificationsPage', () => ({ default: () => <div>notifications page</div> }));
 
 const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
 const driver: User = { ...admin, id: 'd', role: 'driver', displayName: 'Driver' };
@@ -87,6 +89,18 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/trips/abc123');
     expect(await screen.findByText(/trip detail/i)).toBeInTheDocument();
+  });
+
+  it('/posted-trips renders the posted-trips page for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/posted-trips');
+    expect(await screen.findByText(/posted trips/i)).toBeInTheDocument();
+  });
+
+  it('/notifications renders the notifications page for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/notifications');
+    expect(await screen.findByText(/notifications page/i)).toBeInTheDocument();
   });
 
   it('/administration renders the admin hub for an admin', async () => {
