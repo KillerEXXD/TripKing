@@ -78,9 +78,14 @@ export function VacanciesPage() {
 
   return (
     <main className="mx-auto max-w-md space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-bold">Available drivers</h1>
-        <p className="text-sm text-secondary">{vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available` : 'Drivers who have posted their availability'}</p>
+      <header className="flex items-center justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-bold">Available drivers</h1>
+          <p className="text-sm text-secondary">{vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available` : 'Drivers who have posted their availability'}</p>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/vacancies/new">Post availability</Link>
+        </Button>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">

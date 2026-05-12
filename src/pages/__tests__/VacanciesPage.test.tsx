@@ -76,7 +76,7 @@ describe('VacanciesPage', () => {
     expect(screen.getAllByText('Chennai').length).toBeGreaterThan(0); // also a filter option
     expect(screen.getByText('Bangalore')).toBeInTheDocument(); // destination chip only
     expect(screen.getByText('Long trips welcome.')).toBeInTheDocument();
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/drivers/d1');
+    expect(screen.getByRole('link', { name: /ravi kumar/i })).toHaveAttribute('href', '/drivers/d1');
   });
 
   it('always requests active vacancies and re-requests when a city filter changes', () => {
