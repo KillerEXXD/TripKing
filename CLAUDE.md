@@ -214,7 +214,8 @@ Work in PR-sized commits; pause for review after each.
 | URL | `https://saxcbebqxgatiktsebxw.supabase.co` |
 | Dashboard | https://supabase.com/dashboard/project/saxcbebqxgatiktsebxw |
 | Anon / publishable key | `sb_publishable_PRH2LiqnVjxAN7FYBVVQjA_TOWdFS0U` (legacy anon JWT also available via the dashboard) |
-| Service-role / secret key | `sb_secret_<redacted>` — bypasses RLS; for admin/seed scripts + edge-function runtime. (Dashboard → Project Settings → API Keys → "Secret keys"; or `GET /v1/projects/<ref>/api-keys?reveal=true` via the Management API.) NEVER ship to the browser. |
+| Service-role / secret key | `sb_secret_<redacted>` (dashboard name: `tripking_secret_api_key`) — bypasses RLS; for admin/seed scripts + edge-function runtime; **never ship to the browser**. Legacy `service_role` JWT `eyJhbGci…UC-mgo07FIVvTwxZEkjFBOimlTTtG746FzjnnbdO1t4` also works. (Edge functions get `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` auto-injected, so no secret-setting needed there.) |
+| `ADMIN_API_KEY` (stopgap admin auth for `/admin/*`) | `tk_admin_7cecc2a7400cc67d6553f778432b95449a6f27f56e476547` — in `.env.development`; set as a Supabase function secret for the `admin` edge function. (Replace with a `role=admin` JWT check once `public.users` has admin rows.) |
 | Postgres password | `DCCn6OIdwk0ENwzE` |
 | Direct Postgres URL (IPv6-only) | `postgresql://postgres:DCCn6OIdwk0ENwzE@db.saxcbebqxgatiktsebxw.supabase.co:5432/postgres` |
 

@@ -380,6 +380,10 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# The /admin/* function does its own auth (X-Admin-Key), so the gateway JWT gate is off.
+[functions.admin]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
