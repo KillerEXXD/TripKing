@@ -388,6 +388,10 @@ verify_jwt = false
 [functions.auth]
 verify_jwt = false
 
+# /trips/* — public reads; the function validates the caller's Bearer JWT for writes.
+[functions.trips]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
