@@ -20,7 +20,9 @@
 
 ## Running two sessions in parallel — lane ownership
 
-The remaining work is split into two **conflict-free lanes** so two Claude sessions can run concurrently. Each session opens its own handoff doc and **only ever edits files in its lane**:
+> **⚠ Updated — the parallel phase has wound down.** The `C:\Apps\TripKing-backend` git worktree has been removed; everyone works from **`C:\Apps\TripKing`** on `main`. The lane split below is the *record* of how the backend (`supabase/**` etc.) and frontend (`src/**`) work was divided. If you spin up parallel backend+frontend sessions again, re-create a worktree first — `git worktree add -b backend-lane ../TripKing-backend origin/main` — so the pre-push gate doesn't trip over the other session's uncommitted WIP. Until then, ignore the "work from the worktree" / per-lane push-protocol instructions and just `git pull --rebase origin main` → work → `git push origin main`.
+
+The remaining work was split into two **conflict-free lanes** so two Claude sessions could run concurrently. Each session opened its own handoff doc and **only ever edited files in its lane**:
 
 | Lane | Entry doc | Owns (the only paths it touches) | Scope |
 |---|---|---|---|

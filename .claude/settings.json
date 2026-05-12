@@ -1,0 +1,9 @@
+{
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "additionalDirectories": [
+      "c:/Apps/hudr-workspace/hudr-pwa",
+      "c:/Apps/DriverMahal"
+    ]
+  }
+}

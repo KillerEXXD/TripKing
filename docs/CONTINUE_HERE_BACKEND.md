@@ -8,9 +8,11 @@
 
 **Never touch `src/**`** — that's the frontend lane. The only cross-lane contract is the `POST /drivers` / `POST /agents` "create my profile" route below; its shape is fixed here and in `docs/CONTINUE_HERE_FRONTEND.md` — don't change it without updating both docs and pinging the other session.
 
-### Work from the `C:\Apps\TripKing-backend` worktree
+### Work from the `C:\Apps\TripKing-backend` worktree — ⚠ REMOVED
 
-There's a dedicated git worktree for this lane: **`C:\Apps\TripKing-backend`**, on branch **`backend-lane`** (created with `git worktree add -b backend-lane C:\Apps\TripKing-backend origin/main`; `npm ci` already run there). Work from it — its working tree is independent of `C:\Apps\TripKing` (where the *frontend* session works), so the Husky pre-push gate (`tsc --noEmit` + `npm run test:run` + `npm run build`) runs over **your** files only, never the other lane's uncommitted WIP. Push protocol from the worktree:
+> **The parallel phase is over.** The `C:\Apps\TripKing-backend` worktree (branch `backend-lane`) has been removed and merged back — work from **`C:\Apps\TripKing`** on `main` (`git pull --rebase origin main` → work → `git push origin main`). This doc is kept as the record of the backend lane's work. **Only** re-create the worktree (`git worktree add -b backend-lane ../TripKing-backend origin/main`; then `npm ci` there) if you genuinely run a backend session concurrently with a frontend session — that's the only reason it existed (so the Husky pre-push gate doesn't trip over the other session's uncommitted WIP). The original setup, for reference:
+
+There was a dedicated git worktree for this lane: **`C:\Apps\TripKing-backend`**, on branch **`backend-lane`** (created with `git worktree add -b backend-lane C:\Apps\TripKing-backend origin/main`; `npm ci` run there). Its working tree was independent of `C:\Apps\TripKing` (where the *frontend* session worked), so the Husky pre-push gate (`tsc --noEmit` + `npm run test:run` + `npm run build`) ran over **its** files only, never the other lane's uncommitted WIP. Push protocol from the worktree was:
 
 ```bash
 # commit on backend-lane, then:

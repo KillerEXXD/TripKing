@@ -15,9 +15,9 @@ dist-ssr
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-# Claude Code — local MCP config holds credentials (the shared settings.json may be committed)
+# Claude Code — only the local secrets file is ignored (.mcp.json + .claude/settings.json are committed;
+# secret values referenced by ${...} in .mcp.json live in .claude/settings.local.json's "env" block)
 .claude/settings.local.json
-.mcp.json
 .idea
 .DS_Store
 *.suo
