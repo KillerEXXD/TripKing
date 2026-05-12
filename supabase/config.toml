@@ -400,6 +400,15 @@ verify_jwt = false
 [functions.vehicles]
 verify_jwt = false
 
+# /drivers/* — public reads; the function validates the caller's Bearer JWT for owner/admin writes
+# (and the "create my driver/agent profile" route).
+[functions.drivers]
+verify_jwt = false
+
+# /agents/* — public reads; the function validates the caller's Bearer JWT for owner/admin writes.
+[functions.agents]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
