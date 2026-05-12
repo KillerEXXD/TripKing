@@ -69,6 +69,14 @@ function check(name, cond, detail) {
     check('POST /auth/logout → 200', out.status === 200, `status=${out.status}`);
   }
 
+  // ── verify-otp rate limit: 20 attempts per phone per 10 min, then 429 ──────
+  const rlPhone = `+919900${Math.floor(100000 + Math.random() * 900000)}`;
+  const rlStatuses = [];
+  for (let i = 0; i < 22 && !rlStatuses.includes(429); i++) {
+    rlStatuses.push((await post('/verify-otp', { phone: rlPhone, otp: 'wrong' })).status);
+  }
+  check('verify-otp: first ~20 attempts → 401, then → 429 (rate limited)', rlStatuses.slice(0, 20).every((s) => s === 401) && rlStatuses[20] === 429, `statuses=${rlStatuses.join(',')}`);
+
   if (failures) { console.error(`[test-auth] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-auth] all checks passed');
 })().catch((e) => { console.error('[test-auth] error:', e); process.exit(1); });

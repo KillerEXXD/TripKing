@@ -23,6 +23,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { rateLimitOk } from '../_shared/rateLimit.ts';
 
 const DEV_OTP = '12345'; // PLACEHOLDER default until a real SMS provider is wired (see TODO above)
 type Db = ReturnType<typeof serviceClient>;
@@ -103,8 +104,10 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
     const otp = typeof body.otp === 'string' ? body.otp.trim() : '';
     if (!phone || !otp) return fail('VALIDATION', 'phone and otp required', 422);
+    // brute-force guard — at most 20 verify attempts per phone per 10 minutes (fail-open on a limiter glitch)
+    if (!(await rateLimitOk(db, `verify-otp:${digits(phone)}`, 20, 600))) return fail('RATE_LIMITED', 'Too many attempts — try again in a few minutes', 429);
     // DEV/PLACEHOLDER: accept the dev OTP `12345` (the default) or any 4–6 digit code. TODO(real SMS):
-    // verify against the hash stored by request-otp in `auth_otps` (and expire / rate-limit it).
+    // verify against the hash stored by request-otp in `auth_otps` (and expire it).
     if (otp !== DEV_OTP && !/^\d{4,6}$/.test(otp)) return fail('INVALID_OTP', 'Incorrect or expired OTP', 401);
 
     const password = await derivedPassword(phone);
