@@ -1,10 +1,50 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { useAgents, useDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
+import { useAgentKycDocs, useAgents, useDriverKycDocs, useDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import type { KycStatus } from '@/types';
+import type { KycDocs, KycStatus } from '@/types';
+
+/** A doc thumbnail (opens the 5-min signed URL in a new tab) or a "not uploaded" placeholder. */
+function DocTile({ label, url }: { label: string; url?: string }) {
+  return (
+    <div className="space-y-1">
+      <div className="text-[11px] font-semibold text-secondary">{label}</div>
+      {url ? (
+        <a href={url} target="_blank" rel="noreferrer" className="block aspect-[4/3] overflow-hidden rounded-lg border hover:ring-2 hover:ring-primary/40">
+          <img src={url} alt={label} className="size-full object-cover" />
+        </a>
+      ) : (
+        <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed text-xs text-secondary">not uploaded</div>
+      )}
+    </div>
+  );
+}
+
+function KycDocsViewer({ kind, subjectId }: { kind: 'driver' | 'agent'; subjectId: string }) {
+  const driverDocs = useDriverKycDocs(subjectId, kind === 'driver');
+  const agentDocs = useAgentKycDocs(subjectId, kind === 'agent');
+  const q = kind === 'driver' ? driverDocs : agentDocs;
+  if (q.isPending) return <LoadingSkeleton rows={2} />;
+  if (q.isError) return <ErrorState title="Couldn't load documents" onRetry={() => void q.refetch()} />;
+  const docs = (q.data ?? {}) as KycDocs;
+  return (
+    <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
+      <div className="text-xs text-secondary">
+        Aadhaar: {docs.aadhaarNumberMasked ?? '—'}
+        {kind === 'driver' ? ` · Licence: ${docs.driverLicenseNumber ?? '—'}${docs.driverLicenseExpiry ? ` (exp ${docs.driverLicenseExpiry})` : ''}` : ''}
+        {docs.kycDocsSubmittedAt ? ` · submitted ${new Date(docs.kycDocsSubmittedAt).toLocaleDateString('en-IN')}` : ''}
+      </div>
+      <div className={`grid gap-2 ${kind === 'driver' ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        <DocTile label="Aadhaar — front" url={docs.aadhaarFrontUrl} />
+        <DocTile label="Aadhaar — back" url={docs.aadhaarBackUrl} />
+        {kind === 'driver' ? <DocTile label="Driving licence" url={docs.driverLicenseUrl} /> : null}
+        <DocTile label="Selfie" url={docs.selfieUrl} />
+      </div>
+    </div>
+  );
+}
 
 const KYC_LABEL: Record<KycStatus, string> = {
   pending: 'Pending',
@@ -53,7 +93,8 @@ function matchesFilter(status: KycStatus, f: Filter): boolean {
   return f === 'needs_review' ? NEEDS_REVIEW.includes(status) : status === f;
 }
 
-function EntryCard({ entry, onTransition, pending }: { entry: KycEntry; onTransition: (status: KycStatus) => void; pending: boolean }) {
+function EntryCard({ entry, kind, onTransition, pending }: { entry: KycEntry; kind: 'driver' | 'agent'; onTransition: (status: KycStatus) => void; pending: boolean }) {
+  const [showDocs, setShowDocs] = useState(false);
   return (
     <Card className="gap-2">
       <div className="flex items-start justify-between gap-3">
@@ -64,12 +105,14 @@ function EntryCard({ entry, onTransition, pending }: { entry: KycEntry; onTransi
         <Badge variant={KYC_VARIANT[entry.kycStatus]}>{KYC_LABEL[entry.kycStatus]}</Badge>
       </div>
       <div className="flex flex-wrap gap-1.5">
+        <Button size="sm" variant="ghost" onClick={() => setShowDocs((v) => !v)}>{showDocs ? 'Hide documents' : 'View documents'}</Button>
         {ACTIONS.map((a) => (
           <Button key={a.status} size="sm" variant={a.status === 'approved' ? 'full' : a.status === 'rejected' ? 'destructive' : 'outline'} disabled={pending || entry.kycStatus === a.status} onClick={() => onTransition(a.status)}>
             {a.label}
           </Button>
         ))}
       </div>
+      {showDocs ? <KycDocsViewer kind={kind} subjectId={entry.id} /> : null}
     </Card>
   );
 }
@@ -86,6 +129,7 @@ function DriversQueue({ filter }: { filter: Filter }) {
       {rows.map((d) => (
         <EntryCard
           key={d.id}
+          kind="driver"
           entry={{ id: d.id, name: d.fullName, subtitle: d.currentCity?.name ?? d.homeCity?.name, kycStatus: d.kycStatus }}
           pending={updateKyc.isPending}
           onTransition={(kycStatus) => updateKyc.mutate({ id: d.id, kycStatus })}
@@ -107,6 +151,7 @@ function AgentsQueue({ filter }: { filter: Filter }) {
       {rows.map((a) => (
         <EntryCard
           key={a.id}
+          kind="agent"
           entry={{ id: a.id, name: a.fullName, subtitle: a.businessName ?? a.businessCity?.name, kycStatus: a.kycStatus }}
           pending={updateKyc.isPending}
           onTransition={(kycStatus) => updateKyc.mutate({ id: a.id, kycStatus })}
