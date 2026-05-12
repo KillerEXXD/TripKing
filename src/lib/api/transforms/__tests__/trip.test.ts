@@ -72,6 +72,20 @@ describe('transformTrip', () => {
     expect(t.assignedDriver).toBeUndefined();
     expect(t.distanceToDestinationKm).toBeUndefined();
     expect(t.passengerOtp).toBeUndefined();
+    expect(t.fromPlace).toBeUndefined();
+    expect(t.toPlace).toBeUndefined();
+    expect(t.distanceKm).toBeUndefined();
+  });
+  it('maps the joined from_place / to_place and a radius-list distance_km', () => {
+    const t = transformTrip({
+      ...fullTrip,
+      from_place: { id: 'p1', provider: 'nominatim', provider_place_id: 'N1', name: 'Katpadi, Vellore', formatted_address: 'Katpadi, Vellore, India', state: 'Tamil Nadu', country: 'IN', lat: 12.9698, lng: 79.1336, is_active: true, created_at: '2026-05-20T00:00:00Z' },
+      to_place: { id: 'p2', provider: 'nominatim', provider_place_id: 'N2', name: 'Tambaram', formatted_address: 'Tambaram, Chennai, India', state: 'Tamil Nadu', country: 'IN', lat: 12.9249, lng: 80.1, is_active: true, created_at: '2026-05-20T00:00:00Z' },
+      distance_km: 3.5,
+    });
+    expect(t.fromPlace?.name).toBe('Katpadi, Vellore');
+    expect(t.toPlace?.name).toBe('Tambaram');
+    expect(t.distanceKm).toBe(3.5);
   });
 });
 
@@ -125,6 +139,8 @@ describe('toApiPostTrip', () => {
     expect(toApiPostTrip(input)).toMatchObject({
       from_city_id: 'c1',
       to_city_id: 'c2',
+      from_place_id: null,
+      to_place_id: null,
       pickup_at: '2026-06-01T08:00:00Z',
       car_type_id: 'ct1',
       rate_per_km: 14,
@@ -134,5 +150,6 @@ describe('toApiPostTrip', () => {
       show_fare_to_passenger: true,
       driver_instructions: null,
     });
+    expect(toApiPostTrip({ ...input, fromPlaceId: 'p1', toPlaceId: 'p2' })).toMatchObject({ from_place_id: 'p1', to_place_id: 'p2' });
   });
 });

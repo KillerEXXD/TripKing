@@ -42,6 +42,11 @@ export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {
   const q: Record<string, unknown> = {};
   if (params?.currentCityId) q.current_city_id = params.currentCityId;
   if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.near) {
+    q.near_lat = params.near.lat;
+    q.near_lng = params.near.lng;
+    q.radius_km = params.near.radiusKm;
+  }
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   if (params?.sort) q.sort = params.sort;

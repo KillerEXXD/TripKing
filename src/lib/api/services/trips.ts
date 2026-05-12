@@ -19,6 +19,11 @@ export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
   if (params?.fromCityId) q.from_city_id = params.fromCityId;
   if (params?.toCityId) q.to_city_id = params.toCityId;
   if (params?.postedByUserId) q.posted_by_user_id = params.postedByUserId;
+  if (params?.near) {
+    q.near_lat = params.near.lat;
+    q.near_lng = params.near.lng;
+    q.radius_km = params.near.radiusKm;
+  }
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   if (params?.sort) q.sort = params.sort;

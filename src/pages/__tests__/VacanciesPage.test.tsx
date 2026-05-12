@@ -21,6 +21,7 @@ function makeVacancy(over: Partial<Vacancy> = {}): Vacancy {
     availableFrom: '2099-06-01T00:00:00.000Z',
     availableUntil: '2099-06-05T00:00:00.000Z',
     destinationCities: [city('c2', 'Chennai'), city('c3', 'Bangalore')],
+    destinationPlaces: [],
     minRatePerKm: 18,
     notes: 'Long trips welcome.',
     status: 'active',

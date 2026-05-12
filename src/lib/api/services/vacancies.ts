@@ -13,8 +13,14 @@ export function getVacancies(params?: VacanciesQueryParams): Promise<Vacancy[]> 
   const q: Record<string, unknown> = {};
   if (params?.currentCityId) q.current_city_id = params.currentCityId;
   if (params?.destinationCityId) q.destination_city_id = params.destinationCityId;
+  if (params?.destinationPlaceId) q.destination_place_id = params.destinationPlaceId;
   if (params?.status) q.status = params.status;
   if (params?.driverId) q.driver_id = params.driverId;
+  if (params?.near) {
+    q.near_lat = params.near.lat;
+    q.near_lng = params.near.lng;
+    q.radius_km = params.near.radiusKm;
+  }
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   if (params?.sort) q.sort = params.sort;
