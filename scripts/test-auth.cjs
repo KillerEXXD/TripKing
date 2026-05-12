@@ -64,6 +64,12 @@ function check(name, cond, detail) {
   const bad = await post('/verify-otp', { phone: PHONE, otp: 'abc' });
   check('POST /auth/verify-otp bad otp → 401', bad.status === 401, `status=${bad.status}`);
 
+  // ── re-signing-in must NOT clobber an existing user's role ────────────────
+  const adminPhone = `+919900${Math.floor(100000 + Math.random() * 900000)}`;
+  const a1 = await post('/verify-otp', { phone: adminPhone, otp: '12345', display_name: 'Role Keeper', role: 'admin' });
+  const a2 = await post('/verify-otp', { phone: adminPhone, otp: '12345' }); // no role on the body — a returning sign-in
+  check('verify-otp: re-signing-in preserves the existing role (admin stays admin)', a1.json?.data?.user?.role === 'admin' && a2.status === 200 && a2.json?.data?.user?.role === 'admin', `first=${a1.json?.data?.user?.role} second=${a2.json?.data?.user?.role}`);
+
   if (accessToken) {
     const out = await post('/logout', {}, accessToken);
     check('POST /auth/logout → 200', out.status === 200, `status=${out.status}`);

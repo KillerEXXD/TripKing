@@ -135,11 +135,18 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     const { data: signIn, error: signInErr } = await db.auth.signInWithPassword({ email, password });
     if (signInErr || !signIn?.session) return fail('SIGNIN_FAILED', signInErr?.message ?? 'Could not start session', 400);
 
-    // ensure a public.users row (the handle_new_user trigger creates it; upsert for safety / metadata)
-    await db.from('users').upsert(
-      { id: userId, phone, display_name: displayName || undefined, role },
-      { onConflict: 'id', ignoreDuplicates: false },
-    );
+    // ensure a public.users row exists. For a NEW user, seed phone/display_name/role (the
+    // handle_new_user trigger usually does this from user_metadata; this is a safety net). For an
+    // EXISTING user, DON'T clobber their role/display_name on sign-in — role changes go through
+    // POST /drivers|/agents (or an admin grant), not by re-authenticating.
+    if (existing) {
+      await db.from('users').upsert({ id: userId, phone }, { onConflict: 'id', ignoreDuplicates: true });
+    } else {
+      await db.from('users').upsert(
+        { id: userId, phone, display_name: displayName || undefined, role },
+        { onConflict: 'id', ignoreDuplicates: false },
+      );
+    }
     const u = await publicUser(db, userId);
 
     return ok({ user: u, access_token: signIn.session.access_token, refresh_token: signIn.session.refresh_token });
