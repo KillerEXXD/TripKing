@@ -87,4 +87,15 @@ describe('AgentHomePage', () => {
     expect(screen.getByText('Bangalore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/of your trips has applicants/i)).toBeInTheDocument();
   });
+
+  it('shows the Get verified banner while the agent is not yet verified', () => {
+    setMyAgent({ data: { ...agent, kycStatus: 'docs_submitted', verification: { kycStatus: 'docs_submitted', steps: { details: 'done', documents: 'done', video_call: 'todo' }, stepsDone: 2, stepsTotal: 3 } } });
+    renderHome();
+    expect(screen.getByText(/get verified to start earning/i)).toBeInTheDocument();
+  });
+
+  it('hides the Get verified banner once the agent is verified', () => {
+    renderHome(); // default fixture: kycStatus 'approved', no verification block
+    expect(screen.queryByText(/get verified to start earning/i)).toBeNull();
+  });
 });

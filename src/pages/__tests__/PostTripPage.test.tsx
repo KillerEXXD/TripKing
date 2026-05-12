@@ -5,6 +5,10 @@ import { PostTripPage } from '@/pages/PostTripPage';
 
 vi.mock('@/hooks/useTrips', () => ({ usePostTrip: vi.fn() }));
 import { usePostTrip } from '@/hooks/useTrips';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useMyAgent: vi.fn() }));
+import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
+import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carTypeHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -46,6 +50,13 @@ function setPostTrip(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPe
   vi.mocked(usePostTrip).mockReturnValue({ mutateAsync, isPending: false, isError: false, ...over } as never);
   return mutateAsync;
 }
+function setPoster(role: 'driver' | 'trip_manager' = 'trip_manager', kycStatus: string | undefined = 'approved') {
+  vi.mocked(useAuth).mockReturnValue({ user: { id: 'u1', role, displayName: 'X', phone: '+91', preferredLanguage: 'en', isActive: true }, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() } as never);
+  const profQ = { isPending: false, isError: false, data: kycStatus ? { id: 'p1', kycStatus } : undefined, refetch: vi.fn() } as never;
+  const emptyQ = { isPending: false, isError: false, data: undefined, refetch: vi.fn() } as never;
+  vi.mocked(useMyDriver).mockReturnValue(role === 'driver' ? profQ : emptyQ);
+  vi.mocked(useMyAgent).mockReturnValue(role === 'trip_manager' ? profQ : emptyQ);
+}
 
 function renderPost() {
   return render(
@@ -83,9 +94,13 @@ describe('PostTripPage', () => {
     vi.mocked(cityHooks.useList).mockReset();
     vi.mocked(carTypeHooks.useList).mockReset();
     vi.mocked(useAppSettings).mockReset().mockReturnValue({ data: undefined } as never);
+    vi.mocked(useAuth).mockReset();
+    vi.mocked(useMyDriver).mockReset();
+    vi.mocked(useMyAgent).mockReset();
     vi.mocked(toast.error).mockClear();
     setLists();
     setPostTrip();
+    setPoster('trip_manager', 'approved');
   });
 
   it('renders a skeleton while the city / car-type lists load', () => {
@@ -154,5 +169,12 @@ describe('PostTripPage', () => {
     expect(await screen.findByText('share modal')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /close share/i }));
     expect(await screen.findByText('trip detail')).toBeInTheDocument();
+  });
+
+  it('shows the verification gate instead of the wizard when the poster is not approved', () => {
+    setPoster('driver', 'video_pending');
+    renderPost();
+    expect(screen.getByRole('link', { name: /go to verification/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /next: price/i })).toBeNull();
   });
 });

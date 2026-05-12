@@ -1,8 +1,25 @@
 import type { CityRow } from './adminConfig';
 import type { NearRadius, Place } from './place';
 import type { VehicleSummary } from './trip';
+import type { VideoOutcome, VideoVerificationStatus } from './videoVerification';
 
 export type KycStatus = 'pending' | 'docs_submitted' | 'video_pending' | 'approved' | 'rejected' | 'resubmit_required';
+
+/** Status of one onboarding/verification step (the server-computed checklist). */
+export type VerificationStepStatus = 'todo' | 'done' | 'action_needed' | 'scheduled';
+export type DriverVerificationStepKey = 'details' | 'documents' | 'vehicle' | 'vehicle_photos' | 'video_call';
+export type AgentVerificationStepKey = 'details' | 'documents' | 'video_call';
+
+/** Server-computed verification summary attached to `GET /drivers|agents/me` (and admin views). */
+export interface VerificationSummary {
+  kycStatus: KycStatus;
+  /** keys are DriverVerificationStepKey (5) for drivers, AgentVerificationStepKey (3) for agents. */
+  steps: Partial<Record<DriverVerificationStepKey, VerificationStepStatus>>;
+  stepsDone: number;
+  stepsTotal: number;
+  videoVerification?: { id: string; status: VideoVerificationStatus; scheduledAt: string; meetingUrl: string; outcome?: VideoOutcome } | null;
+  kycRejectionReason?: string | null;
+}
 
 /** A driver's public marketplace profile (+ owner-only fields when self). */
 export interface Driver {
@@ -31,6 +48,11 @@ export interface Driver {
   managerTopTags: string[];
   totalTripsCompleted: number;
   vehicles: VehicleSummary[];
+  // owner/admin-only (present on GET /drivers/me + admin views)
+  verification?: VerificationSummary;
+  aadhaarMasked?: string;
+  drivingLicenseNumber?: string;
+  drivingLicenseExpiry?: string;
 }
 
 /** A trip manager (agent) — public profile. */
@@ -46,6 +68,9 @@ export interface Agent {
   kycStatus: KycStatus;
   topTags: string[];
   totalTripsPosted: number;
+  // owner/admin-only
+  verification?: VerificationSummary;
+  aadhaarMasked?: string;
 }
 
 export interface DriversQueryParams {
@@ -90,4 +115,48 @@ export interface UpdateLocationInput {
   cityId?: string;
   lat?: number;
   lng?: number;
+}
+
+// ── KYC document upload ──────────────────────────────────────────────────────
+export type DriverKycDocType = 'aadhaar_front' | 'aadhaar_back' | 'driver_license' | 'selfie';
+export type AgentKycDocType = 'aadhaar_front' | 'aadhaar_back' | 'selfie';
+
+/** Response of the *-doc-upload-url / *-photo-upload-url endpoints — a short-lived signed PUT URL. */
+export interface UploadUrlResponse {
+  bucket: string;
+  path: string;
+  signedUrl: string;
+  token: string;
+  /** the DB column the resulting `path` should be stored into (vehicle photos: `column`; kyc docs: `path_col`). */
+  column?: string;
+}
+
+export interface SubmitDriverKycDocsInput {
+  aadhaarFrontPath: string;
+  aadhaarBackPath: string;
+  aadhaarLast4: string;
+  driverLicensePath: string;
+  driverLicenseNumber: string;
+  driverLicenseExpiry?: string;
+  selfiePath: string;
+  consent: boolean;
+}
+export interface SubmitAgentKycDocsInput {
+  aadhaarFrontPath: string;
+  aadhaarBackPath: string;
+  aadhaarLast4: string;
+  selfiePath: string;
+  consent: boolean;
+}
+
+/** `GET /drivers|agents/:id/kyc-docs` — masked numbers + 5-min signed download URLs. */
+export interface KycDocs {
+  aadhaarNumberMasked?: string;
+  driverLicenseNumber?: string; // driver only
+  driverLicenseExpiry?: string; // driver only
+  kycDocsSubmittedAt?: string;
+  aadhaarFrontUrl?: string;
+  aadhaarBackUrl?: string;
+  driverLicenseUrl?: string; // driver only
+  selfieUrl?: string;
 }

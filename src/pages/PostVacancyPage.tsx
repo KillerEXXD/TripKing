@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy } from '@/hooks/useVacancies';
+import { useMyDriver } from '@/hooks/useDrivers';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { Badge, Button, Card, Input } from '@/components/ui';
+import { KycGateNotice } from '@/components/driver';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatShortDate } from '@/lib/utils';
 import type { Place, PostVacancyInput } from '@/types';
@@ -52,6 +54,7 @@ function formatHours(h: number): string {
 export function PostVacancyPage() {
   const navigate = useNavigate();
   const postVacancy = usePostVacancy();
+  const myDriverQuery = useMyDriver();
   const citiesQuery = cityHooks.useList();
 
   const [currentCityId, setCurrentCityId] = useState('');
@@ -112,6 +115,17 @@ export function PostVacancyPage() {
         <FlowHeader onBack={() => navigate('/vacancies')} />
         <div className="p-4">
           <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
+        </div>
+      </div>
+    );
+  }
+
+  if (myDriverQuery.data && myDriverQuery.data.kycStatus !== 'approved') {
+    return (
+      <div className="mx-auto max-w-md">
+        <FlowHeader onBack={() => navigate('/vacancies')} />
+        <div className="p-4">
+          <KycGateNotice heading="Get verified to post your availability" body="Once your account is verified — documents, your vehicle, and a quick video call — you can show as available so agents can find you." />
         </div>
       </div>
     );

@@ -4,6 +4,7 @@ export * from './adminConfig';
 export * from './place';
 export * from './trip';
 export * from './driver';
+export * from './videoVerification';
 export * from './vehicle';
 export * from './vacancy';
 export * from './alert';

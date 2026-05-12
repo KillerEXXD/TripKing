@@ -8,8 +8,10 @@
  *                               (eligibility = CSV of eligible|expiring_soon|expired; needs_attention=true ⇒ eligibility_status≠eligible — the admin eligibility dashboard)
  *   GET    /vehicles/:id
  *   POST   /vehicles            (driver) — driver_id = the caller's driver
- *   PATCH  /vehicles/:id         (owning driver/admin) — include {is_active} to enable/disable
+ *   PATCH  /vehicles/:id         (owning driver/admin) — include {is_active} to enable/disable; accepts photo_*_url / rc_book_url / insurance_url / permit_url etc.
  *   DELETE /vehicles/:id         (owning driver/admin) — 409 IN_USE if referenced
+ *   POST   /vehicles/:id/photo-upload-url (owning driver/admin) — { slot } → short-lived signed UPLOAD url into the private 'vehicle-photos' bucket at <vehicleId>/<slot>
+ *                                slot ∈ front|back|left|right|plate|interior|rc|insurance|permit ; response includes the column to store the public path into
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -18,8 +20,15 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 
 type Db = ReturnType<typeof serviceClient>;
+type Row = Record<string, unknown>;
 const VEHICLE_SELECT =
   '*, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label), fuel_type:fuel_types(label)';
+const PHOTO_SLOTS = ['front', 'back', 'left', 'right', 'plate', 'interior', 'rc', 'insurance', 'permit'] as const;
+type PhotoSlot = (typeof PHOTO_SLOTS)[number];
+const SLOT_TO_COL: Record<PhotoSlot, string> = {
+  front: 'photo_front_url', back: 'photo_back_url', left: 'photo_left_url', right: 'photo_right_url',
+  plate: 'photo_plate_url', interior: 'photo_interior_url', rc: 'rc_book_url', insurance: 'insurance_url', permit: 'permit_url',
+};
 
 function bearer(req: Request): string | null {
   const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
@@ -34,10 +43,10 @@ async function authUser(db: Db, req: Request): Promise<{ id: string; role: strin
   return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
 }
 const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
-async function readBody(req: Request): Promise<Record<string, unknown>> {
+async function readBody(req: Request): Promise<Row> {
   try {
     const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
+    return b && typeof b === 'object' ? (b as Row) : {};
   } catch {
     return {};
   }
@@ -48,8 +57,9 @@ function pgFail(error: { code?: string; message: string }): Response {
   if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
   return fail('DB_ERROR', error.message, 400);
 }
+const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
-async function eligibilityFor(db: Db, vehicles: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+async function eligibilityFor(db: Db, vehicles: Row[]): Promise<Row[]> {
   if (vehicles.length === 0) return vehicles;
   const { data: s } = await db.from('app_settings').select('min_vehicle_year').eq('id', 1).maybeSingle();
   const minYear = Number(s?.min_vehicle_year) || 2015;
@@ -66,7 +76,9 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
   const db = serviceClient();
   const url = new URL(req.url);
   const m = url.pathname.match(/\/vehicles(?:\/(.+))?$/);
-  const id = (m && m[1] ? m[1] : '').split('/').filter(Boolean)[0];
+  const segs = (m && m[1] ? m[1] : '').split('/').filter(Boolean);
+  const id = segs[0];
+  const sub = segs[1]; // 'photo-upload-url'
 
   async function vehicleOwnerDriverId(vehId: string): Promise<{ driverId: string } | null> {
     const { data } = await db.from('vehicles').select('driver_id').eq('id', vehId).maybeSingle();
@@ -80,7 +92,7 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     const { data, error } = await db.from('vehicles').select(VEHICLE_SELECT).eq('id', vehId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Vehicle not found', 404);
-    const [withElig] = await eligibilityFor(db, [data as Record<string, unknown>]);
+    const [withElig] = await eligibilityFor(db, [data as Row]);
     return ok(withElig);
   }
 
@@ -93,7 +105,7 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     q = q.limit(500);
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    let rows = await eligibilityFor(db, (data ?? []) as Record<string, unknown>[]);
+    let rows = await eligibilityFor(db, (data ?? []) as Row[]);
     const elig = (url.searchParams.get('eligibility') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     if (elig.length) rows = rows.filter((v) => elig.includes(String(v.eligibility_status)));
     else if (url.searchParams.get('needs_attention') === 'true') rows = rows.filter((v) => v.eligibility_status !== 'eligible');
@@ -108,6 +120,7 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     if (!did) return fail('FORBIDDEN', 'You need a driver profile to add a vehicle', 403);
     const b = await readBody(req);
     if (!b.car_type_id || b.year === undefined || b.year === null) return fail('VALIDATION', 'car_type_id and year are required', 422);
+    delete b.eligibility_status; // derived, never stored
     const { data: created, error } = await db.from('vehicles').insert({ ...b, driver_id: did }).select('id').single();
     if (error) return pgFail(error);
     return returnVehicle(created.id as string);
@@ -116,7 +129,26 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
   if (!id) return fail('NOT_FOUND', 'No such route', 404);
 
   // GET /vehicles/:id
-  if (req.method === 'GET') return returnVehicle(id);
+  if (!sub && req.method === 'GET') return returnVehicle(id);
+
+  // POST /vehicles/:id/photo-upload-url (owning driver/admin) — signed UPLOAD url
+  if (sub === 'photo-upload-url' && req.method === 'POST') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    const owner = await vehicleOwnerDriverId(id);
+    if (!owner) return fail('NOT_FOUND', 'Vehicle not found', 404);
+    const did = await driverIdFor(u.id);
+    if (owner.driverId !== did && !isAdmin(u)) return fail('FORBIDDEN', 'Not your vehicle', 403);
+    const b = await readBody(req);
+    const slot = str(b.slot) as PhotoSlot;
+    if (!(PHOTO_SLOTS as readonly string[]).includes(slot)) return fail('VALIDATION', `slot must be one of ${PHOTO_SLOTS.join(', ')}`, 422);
+    const path = `${id}/${slot}`;
+    const { data, error } = await db.storage.from('vehicle-photos').createSignedUploadUrl(path, { upsert: true });
+    if (error || !data) return fail('STORAGE_ERROR', error?.message ?? 'could not create upload url', 500);
+    return ok({ bucket: 'vehicle-photos', path, signed_url: data.signedUrl, token: data.token, column: SLOT_TO_COL[slot] });
+  }
+
+  if (sub) return fail('NOT_FOUND', 'No such route', 404);
 
   // PATCH /vehicles/:id  (owning driver/admin)
   if (req.method === 'PATCH' || req.method === 'PUT') {
@@ -129,6 +161,8 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     const b = await readBody(req);
     delete b.driver_id; // can't reassign ownership
     delete b.id;
+    delete b.eligibility_status; // derived, never stored
+    if (Object.keys(b).length === 0) return fail('VALIDATION', 'Nothing to update', 422);
     const { error } = await db.from('vehicles').update(b).eq('id', id);
     if (error) return pgFail(error);
     return returnVehicle(id);

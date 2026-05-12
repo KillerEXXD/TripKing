@@ -72,6 +72,7 @@ function makeVehicle(over: Partial<Vehicle> = {}): Vehicle {
     photoBackUrl: '',
     photoLeftUrl: '',
     photoRightUrl: '',
+    photoPlateUrl: '',
     rcBookUrl: '',
     insuranceUrl: '',
     isPrimary: true,
@@ -84,8 +85,8 @@ type Q<T> = { isPending?: boolean; isError?: boolean; error?: unknown; data?: T;
 function setTrip(s: Q<Trip>) {
   vi.mocked(useTrip).mockReturnValue({ isPending: false, isError: false, error: null, data: undefined, refetch: vi.fn(), ...s } as never);
 }
-function setMyDriver(s: Q<{ id: string }> = {}) {
-  vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, error: null, data: { id: 'd1' }, refetch: vi.fn(), ...s } as never);
+function setMyDriver(s: Q<{ id: string; kycStatus?: string }> = {}) {
+  vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, error: null, data: { id: 'd1', kycStatus: 'approved' }, refetch: vi.fn(), ...s } as never);
 }
 function setVehicles(s: Q<Vehicle[]> = {}) {
   vi.mocked(useDriverVehicles).mockReturnValue({ isPending: false, isError: false, error: null, data: [makeVehicle()], refetch: vi.fn(), ...s } as never);
@@ -213,6 +214,15 @@ describe('TripDetailPage', () => {
     renderDetail();
     expect(screen.queryByRole('button', { name: /apply for this trip/i })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /add a vehicle/i }));
+    expect(screen.getByText('profile page')).toBeInTheDocument();
+  });
+
+  it('blocks an unverified driver from applying and points them to verification', () => {
+    setTrip({ data: makeTrip() });
+    setMyDriver({ data: { id: 'd1', kycStatus: 'docs_submitted' } });
+    renderDetail();
+    expect(screen.queryByRole('button', { name: /apply for this trip/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /get verified to apply/i }));
     expect(screen.getByText('profile page')).toBeInTheDocument();
   });
 

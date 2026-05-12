@@ -6,6 +6,8 @@ import { formatClockTime } from '@/lib/utils';
 
 vi.mock('@/hooks/useVacancies', () => ({ usePostVacancy: vi.fn() }));
 import { usePostVacancy } from '@/hooks/useVacancies';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
+import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -31,6 +33,9 @@ function setPost(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPendin
   vi.mocked(usePostVacancy).mockReturnValue({ mutateAsync, isPending: false, isError: false, ...over } as never);
   return mutateAsync;
 }
+function setMyDriver(kycStatus: string | undefined = 'approved') {
+  vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, data: kycStatus ? { id: 'd1', kycStatus } : undefined, refetch: vi.fn() } as never);
+}
 
 function renderPost() {
   return render(
@@ -47,8 +52,10 @@ describe('PostVacancyPage', () => {
   beforeEach(() => {
     vi.mocked(usePostVacancy).mockReset();
     vi.mocked(cityHooks.useList).mockReset();
+    vi.mocked(useMyDriver).mockReset();
     setCities();
     setPost();
+    setMyDriver('approved');
   });
 
   it('renders a skeleton while the city list loads', () => {
@@ -151,5 +158,12 @@ describe('PostVacancyPage', () => {
     renderPost();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(screen.getByText('vacancy feed')).toBeInTheDocument();
+  });
+
+  it('shows the verification gate instead of the form when the driver is not approved', () => {
+    setMyDriver('docs_submitted');
+    renderPost();
+    expect(screen.getByRole('link', { name: /go to verification/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^post availability$/i })).toBeNull();
   });
 });

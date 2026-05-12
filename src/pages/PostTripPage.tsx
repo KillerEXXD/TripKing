@@ -4,8 +4,11 @@ import { useForm } from 'react-hook-form';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
+import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
+import { useAuth } from '@/contexts/AuthContext';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
+import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -81,6 +84,11 @@ function Field({ label, error, hint, children }: { label: string; error?: string
  */
 export function PostTripPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isDriver = user?.role === 'driver';
+  const myDriverQuery = useMyDriver(isDriver);
+  const myAgentQuery = useMyAgent(!isDriver);
+  const myKycStatus = (isDriver ? myDriverQuery.data?.kycStatus : myAgentQuery.data?.kycStatus) ?? undefined;
   const postTrip = usePostTrip();
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
@@ -171,6 +179,17 @@ export function PostTripPage() {
       <div className="mx-auto max-w-md p-4">
         <h1 className="mb-3 text-xl font-bold">Post a trip</h1>
         <ErrorState title="Couldn't load the form" message="We need the city + car-type lists to post a trip." onRetry={() => { void citiesQuery.refetch(); void carTypesQuery.refetch(); }} />
+      </div>
+    );
+  }
+
+  if (myKycStatus && myKycStatus !== 'approved') {
+    return (
+      <div className="mx-auto max-w-md p-4">
+        <button type="button" onClick={() => navigate('/')} className="-ml-1 mb-3 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+          <ArrowLeft className="size-4" aria-hidden /> Back
+        </button>
+        <KycGateNotice heading="Get verified to post a trip" body="Once your account is verified you can post commercial trips and assign drivers. Your profile has a checklist that walks you through it." />
       </div>
     );
   }

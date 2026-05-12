@@ -3,9 +3,13 @@ import {
   DriverTransformError,
   toApiCreateAgentProfile,
   toApiCreateDriverProfile,
+  toApiSubmitAgentKycDocs,
+  toApiSubmitDriverKycDocs,
   toApiUpdateDriver,
   transformAgent,
   transformDriver,
+  transformKycDocs,
+  transformUploadUrl,
 } from '@/lib/api/transforms/driver';
 
 const city = (id: string, name: string) => ({ id, name, state: 'Tamil Nadu', lat: 12.9, lng: 79.1, sort_order: 10, is_active: true });
@@ -84,6 +88,64 @@ describe('toApiCreateDriverProfile', () => {
       full_name: 'Ravi',
       home_city_id: 'c1',
       email: 'r@x.com',
+    });
+  });
+});
+
+describe('transformDriver — verification block + KYC fields', () => {
+  it('parses the server-computed verification block on GET /drivers/me', () => {
+    const d = transformDriver({
+      id: 'd1', user_id: 'u1', kyc_status: 'docs_submitted', aadhaar_number_masked: '••••1234', driver_license_number: 'TN09-2020-1', driver_license_expiry: '2031-01-01',
+      verification: {
+        kyc_status: 'docs_submitted',
+        steps: { details: 'done', documents: 'done', vehicle: 'todo', vehicle_photos: 'todo', video_call: 'todo' },
+        steps_done: 2, steps_total: 5,
+        video_verification: { id: 'vv1', status: 'scheduled', scheduled_at: '2026-05-13T05:00:00Z', meeting_url: 'https://meet.jit.si/tripking-vv1', outcome: null },
+        kyc_rejection_reason: null,
+      },
+    });
+    expect(d.verification?.kycStatus).toBe('docs_submitted');
+    expect(d.verification?.steps.details).toBe('done');
+    expect(d.verification?.steps.vehicle).toBe('todo');
+    expect(d.verification?.stepsDone).toBe(2);
+    expect(d.verification?.stepsTotal).toBe(5);
+    expect(d.verification?.videoVerification?.id).toBe('vv1');
+    expect(d.verification?.videoVerification?.status).toBe('scheduled');
+    expect(d.aadhaarMasked).toBe('••••1234');
+    expect(d.drivingLicenseNumber).toBe('TN09-2020-1');
+  });
+  it('leaves verification undefined when the API did not send it (public GET /drivers/:id)', () => {
+    expect(transformDriver({ id: 'd2', user_id: 'u2' }).verification).toBeUndefined();
+  });
+  it('coerces an unknown step status to "todo"', () => {
+    const d = transformDriver({ id: 'd3', user_id: 'u3', verification: { kyc_status: 'pending', steps: { documents: 'weird' }, steps_done: 0, steps_total: 5 } });
+    expect(d.verification?.steps.documents).toBe('todo');
+  });
+});
+
+describe('transformKycDocs / transformUploadUrl', () => {
+  it('maps the kyc-docs payload', () => {
+    const k = transformKycDocs({ aadhaar_number_masked: '••••9', driver_license_number: 'DL1', driver_license_expiry: '2030-01-01', kyc_docs_submitted_at: '2026-05-12T00:00:00Z', aadhaar_front_url: 'https://x/af', aadhaar_back_url: 'https://x/ab', driver_license_url: 'https://x/dl', selfie_url: 'https://x/s' });
+    expect(k).toEqual({ aadhaarNumberMasked: '••••9', driverLicenseNumber: 'DL1', driverLicenseExpiry: '2030-01-01', kycDocsSubmittedAt: '2026-05-12T00:00:00Z', aadhaarFrontUrl: 'https://x/af', aadhaarBackUrl: 'https://x/ab', driverLicenseUrl: 'https://x/dl', selfieUrl: 'https://x/s' });
+  });
+  it('maps an upload-url response, taking either `column` or `path_col`', () => {
+    expect(transformUploadUrl({ bucket: 'driver-kyc', path: 'd1/aadhaar_front', signed_url: 'https://x/u', token: 't', path_col: 'aadhaar_front_path' })).toEqual({ bucket: 'driver-kyc', path: 'd1/aadhaar_front', signedUrl: 'https://x/u', token: 't', column: 'aadhaar_front_path' });
+    expect(transformUploadUrl({ bucket: 'vehicle-photos', path: 'v1/plate', signed_url: 'https://x/u', token: 't', column: 'photo_plate_url' }).column).toBe('photo_plate_url');
+  });
+});
+
+describe('toApiSubmitDriverKycDocs / toApiSubmitAgentKycDocs', () => {
+  it('snake-cases the driver submit body and drops empty expiry', () => {
+    expect(toApiSubmitDriverKycDocs({ aadhaarFrontPath: 'd1/af', aadhaarBackPath: 'd1/ab', aadhaarLast4: '1234', driverLicensePath: 'd1/dl', driverLicenseNumber: 'TN1', selfiePath: 'd1/s', consent: true })).toEqual({
+      consent: true, aadhaar_front_path: 'd1/af', aadhaar_back_path: 'd1/ab', aadhaar_last4: '1234', driver_license_path: 'd1/dl', driver_license_number: 'TN1', selfie_path: 'd1/s',
+    });
+  });
+  it('includes driver_license_expiry when supplied', () => {
+    expect(toApiSubmitDriverKycDocs({ aadhaarFrontPath: 'a', aadhaarBackPath: 'b', aadhaarLast4: '1', driverLicensePath: 'c', driverLicenseNumber: 'd', selfiePath: 'e', consent: true, driverLicenseExpiry: '2030-01-01' }).driver_license_expiry).toBe('2030-01-01');
+  });
+  it('builds the agent (no DL) submit body', () => {
+    expect(toApiSubmitAgentKycDocs({ aadhaarFrontPath: 'm1/af', aadhaarBackPath: 'm1/ab', aadhaarLast4: '5678', selfiePath: 'm1/s', consent: true })).toEqual({
+      consent: true, aadhaar_front_path: 'm1/af', aadhaar_back_path: 'm1/ab', aadhaar_last4: '5678', selfie_path: 'm1/s',
     });
   });
 });

@@ -17,6 +17,10 @@ const TripDetailPage = lazyWithRetry(() => import('@/pages/TripDetailPage'));
 const ApplicantReviewPage = lazyWithRetry(() => import('@/pages/ApplicantReviewPage'));
 const DriverProfilePage = lazyWithRetry(() => import('@/pages/DriverProfilePage'));
 const ProfilePage = lazyWithRetry(() => import('@/pages/ProfilePage'));
+const VerifyDocumentsPage = lazyWithRetry(() => import('@/pages/VerifyDocumentsPage'));
+const VehicleFormPage = lazyWithRetry(() => import('@/pages/VehicleFormPage'));
+const VehiclePhotosPage = lazyWithRetry(() => import('@/pages/VehiclePhotosPage'));
+const BookVideoCallPage = lazyWithRetry(() => import('@/pages/BookVideoCallPage'));
 const VacanciesPage = lazyWithRetry(() => import('@/pages/VacanciesPage'));
 const PostVacancyPage = lazyWithRetry(() => import('@/pages/PostVacancyPage'));
 const AlertsPage = lazyWithRetry(() => import('@/pages/AlertsPage'));
@@ -27,6 +31,7 @@ const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazyWithRetry(() => import('@/pages/administration/AdministrationPage'));
 const AdminConfigPage = lazyWithRetry(() => import('@/pages/administration/AdminConfigPage'));
 const KycReviewPage = lazyWithRetry(() => import('@/pages/administration/KycReviewPage'));
+const VideoCallConsolePage = lazyWithRetry(() => import('@/pages/administration/VideoCallConsolePage'));
 const VehicleEligibilityPage = lazyWithRetry(() => import('@/pages/administration/VehicleEligibilityPage'));
 const ReviewModerationPage = lazyWithRetry(() => import('@/pages/administration/ReviewModerationPage'));
 const TranslationManagerPage = lazyWithRetry(() => import('@/pages/administration/TranslationManagerPage'));
@@ -70,6 +75,11 @@ export function AppRoutes() {
             <Route path="/posted-trips" element={<PostedTripsPage />} />
             <Route path="/drivers/:id" element={<DriverProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/verify/documents" element={<VerifyDocumentsPage />} />
+            <Route path="/verify/video-call" element={<BookVideoCallPage />} />
+            <Route path="/vehicles/new" element={<VehicleFormPage />} />
+            <Route path="/vehicles/:id/edit" element={<VehicleFormPage />} />
+            <Route path="/vehicles/:id/photos" element={<VehiclePhotosPage />} />
             <Route path="/vacancies" element={<VacanciesPage />} />
             <Route path="/vacancies/new" element={<PostVacancyPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
@@ -79,6 +89,7 @@ export function AppRoutes() {
             <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
             <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
             <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
+            <Route path="/administration/video-calls" element={<AdminRoute><VideoCallConsolePage /></AdminRoute>} />
             <Route path="/administration/vehicles" element={<AdminRoute><VehicleEligibilityPage /></AdminRoute>} />
             <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
