@@ -13,6 +13,7 @@ vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }))
 vi.mock('@/pages/PostTripPage', () => ({ default: () => <div>post trip</div> }));
 vi.mock('@/pages/PostedTripsPage', () => ({ default: () => <div>posted trips</div> }));
 vi.mock('@/pages/TripDetailPage', () => ({ default: () => <div>trip detail</div> }));
+vi.mock('@/pages/ApplicantReviewPage', () => ({ default: () => <div>applicant review</div> }));
 vi.mock('@/pages/DriverProfilePage', () => ({ default: () => <div>driver profile</div> }));
 vi.mock('@/pages/VacanciesPage', () => ({ default: () => <div>vacancies page</div> }));
 vi.mock('@/pages/AlertsPage', () => ({ default: () => <div>alerts page</div> }));
@@ -94,6 +95,12 @@ describe('AppRoutes', () => {
     setAuth(driver);
     renderAt('/trips/abc123');
     expect(await screen.findByText(/trip detail/i)).toBeInTheDocument();
+  });
+
+  it('/trips/:id/applicants renders the applicant-review page for a signed-in user', async () => {
+    setAuth(driver);
+    renderAt('/trips/abc123/applicants');
+    expect(await screen.findByText(/applicant review/i)).toBeInTheDocument();
   });
 
   it('/posted-trips renders the posted-trips page for a signed-in user', async () => {

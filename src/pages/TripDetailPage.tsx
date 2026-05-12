@@ -72,6 +72,14 @@ function TripDetail({ trip, isDriver }: { trip: Trip; isDriver: boolean }) {
         </Card>
       ) : null}
 
+      {trip.applicantCount > 0 ? (
+        <Card>
+          <Link to={`/trips/${trip.id}/applicants`} className="text-sm font-medium text-primary">
+            Review {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} →
+          </Link>
+        </Card>
+      ) : null}
+
       <Card className="gap-3">
         <Row icon={<MapPin />} label="Route" value={`${trip.fromCity.name} → ${trip.toCity.name} · ${formatKm(trip.expectedDistanceKm)}`} />
         <Row icon={<Calendar />} label="Pickup" value={dateTime(trip.pickupAt)} />
