@@ -25,6 +25,11 @@ export function AdministrationPage() {
             </Link>
           </li>
           <li>
+            <Link to="/administration/video-calls" className="text-primary underline">
+              Video call console →
+            </Link>
+          </li>
+          <li>
             <Link to="/administration/vehicles" className="text-primary underline">
               Vehicle-eligibility dashboard →
             </Link>

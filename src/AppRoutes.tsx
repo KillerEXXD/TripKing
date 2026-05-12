@@ -29,6 +29,7 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazy(() => import('@/pages/administration/AdministrationPage'));
 const AdminConfigPage = lazy(() => import('@/pages/administration/AdminConfigPage'));
 const KycReviewPage = lazy(() => import('@/pages/administration/KycReviewPage'));
+const VideoCallConsolePage = lazy(() => import('@/pages/administration/VideoCallConsolePage'));
 const VehicleEligibilityPage = lazy(() => import('@/pages/administration/VehicleEligibilityPage'));
 const ReviewModerationPage = lazy(() => import('@/pages/administration/ReviewModerationPage'));
 const TranslationManagerPage = lazy(() => import('@/pages/administration/TranslationManagerPage'));
@@ -82,6 +83,7 @@ export function AppRoutes() {
           <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
           <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
           <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
+          <Route path="/administration/video-calls" element={<AdminRoute><VideoCallConsolePage /></AdminRoute>} />
           <Route path="/administration/vehicles" element={<AdminRoute><VehicleEligibilityPage /></AdminRoute>} />
           <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
           <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
