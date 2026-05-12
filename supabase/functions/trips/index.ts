@@ -3,19 +3,21 @@
  * JWT via GoTrue, then writes with the service-role client enforcing the same ownership rules
  * the RLS policies encode). Instrumented with withTiming; verify_jwt = false (we validate).
  *
- * Routes (paths under /trips/, i.e. /functions/v1/trips/trips...):
- *   GET    /trips/trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&limit=
- *   POST   /trips/trips                       (authed) — total_fare computed if omitted; driver_payout via trigger
- *   GET    /trips/trips/:id
- *   GET    /trips/trips/:id/applicants        (poster/admin) — joins driver+vehicle
- *   POST   /trips/trips/:id/applicants        (driver) — apply; bumps trip → has_applicants
- *   DELETE /trips/trips/:id/applicants/:aid   (owning driver/admin) — withdraw
- *   POST   /trips/trips/:id/applicants/:aid/reject  (poster/admin)
- *   POST   /trips/trips/:id/assign            (poster/admin) { acceptance_id } — selects one, rejects the rest,
- *                                             status → assigned, generates the passenger OTP (returned for dev)
- *   POST   /trips/trips/:id/start             (assigned driver/admin) { passenger_otp, start_odo_* } — verifies OTP → in_progress
- *   POST   /trips/trips/:id/complete          (assigned driver/admin) { end_odo_*, driver_notes }
- *   POST   /trips/trips/:id/cancel            (poster/admin) { cancel_reason_id }
+ * Routes (at the function root, i.e. /functions/v1/trips/...):
+ *   GET    /trips                       ?status=&from_city_id=&to_city_id=&posted_by_user_id=&limit=   (public)
+ *   POST   /trips                       (authed) — total_fare computed if omitted; driver_payout via trigger
+ *   GET    /trips/by-otp/:otp           (public — the OTP is the credential) — the passenger portal; joins assigned driver+vehicle;
+ *                                       fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed
+ *   GET    /trips/:id                   (public) — joined; passenger_otp_hash stripped
+ *   GET    /trips/:id/applicants        (poster/admin) — joins driver+vehicle
+ *   POST   /trips/:id/applicants        (driver) — apply; bumps trip → has_applicants
+ *   DELETE /trips/:id/applicants/:aid   (owning driver/admin) — withdraw
+ *   POST   /trips/:id/applicants/:aid/reject  (poster/admin)
+ *   POST   /trips/:id/assign            (poster/admin) { acceptance_id } — selects one, rejects the rest,
+ *                                       status → assigned, generates the passenger OTP (returned for dev)
+ *   POST   /trips/:id/start             (assigned driver/admin) { passenger_otp, start_odo_* } — verifies OTP → in_progress
+ *   POST   /trips/:id/complete          (assigned driver/admin) { end_odo_*, driver_notes }
+ *   POST   /trips/:id/cancel            (poster/admin) { cancel_reason_id }
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -26,6 +28,11 @@ import { serviceClient } from '../_shared/supabase.ts';
 type Db = ReturnType<typeof serviceClient>;
 
 const TRIP_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label)';
+// for the passenger portal (GET /trips/by-otp/:otp) — adds the assigned driver + vehicle so the passenger can see who's coming.
+const BY_OTP_SELECT =
+  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' +
+  'assigned_driver:drivers!assigned_driver_id(id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed), ' +
+  'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
   '*, driver:drivers(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
@@ -168,11 +175,31 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
 
   if (!tripId) return fail('NOT_FOUND', 'No such route', 404);
 
-  // ── GET /trips/trips/:id ─────────────────────────────────────────────────
+  // ── GET /trips/by-otp/:otp (the passenger portal — public; the OTP IS the credential) ──
+  if (tripId === 'by-otp' && sub && req.method === 'GET') {
+    const otpHash = await sha256hex(decodeURIComponent(sub));
+    const { data, error } = await db
+      .from('trips')
+      .select(BY_OTP_SELECT)
+      .eq('passenger_otp_hash', otpHash)
+      .order('assigned_at', { ascending: false, nullsFirst: false })
+      .limit(1);
+    if (error) return fail('DB_ERROR', error.message, 500);
+    const row = (data ?? [])[0] as Record<string, unknown> | undefined;
+    if (!row) return fail('NOT_FOUND', 'No trip matches that OTP', 404);
+    delete row.passenger_otp_hash; // never echo the hash
+    if (!row.show_fare_to_passenger) {
+      for (const k of ['total_fare', 'rate_per_km', 'driver_payout', 'commission_pct', 'gst_amount', 'driver_bata']) row[k] = null;
+    }
+    return ok(row);
+  }
+
+  // ── GET /trips/:id ───────────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', tripId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
+    delete (data as Record<string, unknown>).passenger_otp_hash; // it's a SHA-256 of a 6-digit OTP — don't leak it
     return ok(data);
   }
 

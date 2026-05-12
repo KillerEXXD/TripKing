@@ -7,6 +7,7 @@
  * (supabase/functions/agents/index.ts).
  *
  *   GET   /drivers              ?current_city_id=&kyc_status=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue)
+ *   GET   /drivers/me           (Bearer) — the caller's own driver profile (joined; 404 if none)
  *   POST  /drivers              (Bearer) — create my profile; user_id = caller; body.role='trip_manager'
  *                               makes an agent profile instead; idempotent (returns the existing one if any)
  *   GET   /drivers/:id          (public) — joins home/current city + vehicle summaries
@@ -158,6 +159,16 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
   }
 
   if (!id) return fail('NOT_FOUND', 'No such route', 404);
+
+  // ── GET /drivers/me (the caller's own driver profile) ────────────────────
+  if (id === 'me' && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to view your profile', 401);
+    const { data, error } = await db.from('drivers').select(DRIVER_SELECT).eq('user_id', u.id).maybeSingle();
+    if (error) return fail('DB_ERROR', error.message, 500);
+    if (!data) return fail('NOT_FOUND', 'No driver profile yet — create one with POST /drivers', 404);
+    return ok(data);
+  }
 
   // load the driver for ownership / 404
   const { data: drv } = await db.from('drivers').select('id, user_id').eq('id', id).maybeSingle();

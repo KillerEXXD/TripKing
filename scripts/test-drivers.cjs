@@ -127,6 +127,18 @@ async function tokenFor(role) {
     check('PATCH /agents/:id/kyc (admin) → 200 + kyc_status updated', agentKyc.status === 200 && agentKyc.json?.data?.kyc_status === 'approved', `status=${agentKyc.status} ${JSON.stringify(agentKyc.json?.error || '')}`);
   }
 
+  // ── "my profile" lookups ───────────────────────────────────────────────
+  const meNoAuth = await j('GET', '/drivers/me');
+  check('GET /drivers/me without auth → 401', meNoAuth.status === 401, `status=${meNoAuth.status}`);
+  const meNoProfile = await j('GET', '/drivers/me', { token: adminToken });
+  check('GET /drivers/me for a user with no driver profile → 404', meNoProfile.status === 404, `status=${meNoProfile.status}`);
+  const me = await j('GET', '/drivers/me', { token });
+  check('GET /drivers/me → 200 + the caller’s driver profile', me.status === 200 && me.json?.data?.id === driverId && !!me.json?.data?.user_id, `status=${me.status} ${JSON.stringify(me.json?.error || me.json?.data || '')}`);
+  const agentMeNoProfile = await j('GET', '/agents/me', { token: adminToken });
+  check('GET /agents/me for a user with no agent profile → 404', agentMeNoProfile.status === 404, `status=${agentMeNoProfile.status}`);
+  const agentMe = await j('GET', '/agents/me', { token: token2 });
+  check('GET /agents/me → 200 + the caller’s agent profile', agentMe.status === 200 && agentMe.json?.data?.id === agentId, `status=${agentMe.status} ${JSON.stringify(agentMe.json?.error || '')}`);
+
   if (failures) { console.error(`[test-drivers] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-drivers] all checks passed');
 })().catch((e) => { console.error('[test-drivers] error:', e); process.exit(1); });

@@ -4,10 +4,12 @@
  * owner/admin writes (Bearer-validated); withTiming; verify_jwt = false (mirrors the RLS
  * "trip_managers read / owner-or-admin write" policy in migration 002).
  *
- *   GET   /agents              ?business_city_id=&kyc_status=&limit=     (public)
+ *   GET   /agents              ?business_city_id=&kyc_status=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue)
+ *   GET   /agents/me           (Bearer) — the caller's own agent profile (joined; 404 if none)
  *   POST  /agents              (Bearer) — create my agent profile; user_id = caller; users.role → trip_manager; idempotent
  *   GET   /agents/:id          (public) — joins business city
  *   PATCH /agents/:id          (owner/admin; Bearer) — full_name, email, business_name, business_city_id, profile_photo_url
+ *   PATCH /agents/:id/kyc      (admin; Bearer) — { kyc_status, note? } — moves the KYC workflow + fires a kyc_status_change notification
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -120,6 +122,16 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
   }
 
   if (!id) return fail('NOT_FOUND', 'No such route', 404);
+
+  // ── GET /agents/me (the caller's own agent profile) ──────────────────────
+  if (id === 'me' && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to view your profile', 401);
+    const { data, error } = await db.from('trip_managers').select(AGENT_SELECT).eq('user_id', u.id).maybeSingle();
+    if (error) return fail('DB_ERROR', error.message, 500);
+    if (!data) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
+    return ok(data);
+  }
 
   const { data: tm } = await db.from('trip_managers').select('id, user_id').eq('id', id).maybeSingle();
 

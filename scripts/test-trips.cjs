@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Smoke test for the /trips edge function (auth → create → read → cancel).
+ * Smoke test for the /trips edge function (auth → create → read → driver bootstrap → apply →
+ * assign → passenger-OTP lookup (GET /trips/by-otp/:otp) → cancel).
  *
  *   TRIPS_API_BASE=https://<ref>.supabase.co/functions/v1 node scripts/test-trips.cjs
  *
- * Skips cleanly (exit 0) if TRIPS_API_BASE is unset. Creates a real Supabase auth user
- * (dev project) via /auth/verify-otp's dev-OTP mode, then posts + cancels a test trip.
+ * Skips cleanly (exit 0) if TRIPS_API_BASE is unset. Creates real Supabase auth users
+ * (dev project) via /auth/verify-otp's dev-OTP mode.
  */
 const BASE = (process.env.TRIPS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) {
@@ -76,6 +77,26 @@ async function j(method, path, { body, token } = {}) {
   if (tid) {
     const get = await j('GET', `/trips/${tid}`);
     check('GET /trips/:id → 200', get.status === 200 && get.json?.data?.id === tid, `status=${get.status}`);
+    check('GET /trips/:id does not echo passenger_otp_hash', !('passenger_otp_hash' in (get.json?.data || {})), `keys=${Object.keys(get.json?.data || {}).join(',')}`);
+
+    // driver bootstrap → apply → assign → passenger OTP → by-otp (passenger portal) lookup
+    const dPhone = `+919900${Math.floor(100000 + Math.random() * 900000)}`;
+    await j('POST', '/auth/auth/request-otp', { body: { phone: dPhone } });
+    const dAuth = await j('POST', '/auth/auth/verify-otp', { body: { phone: dPhone, otp: '123456', display_name: 'Trip Smoke Driver', role: 'driver' } });
+    const dToken = dAuth.json?.data?.access_token;
+    await j('POST', '/drivers', { token: dToken, body: { full_name: 'Trip Smoke Driver' } });
+    const apply = await j('POST', `/trips/${tid}/applicants`, { token: dToken, body: {} });
+    const aid = apply.json?.data?.id;
+    const assign = await j('POST', `/trips/${tid}/assign`, { token, body: { acceptance_id: aid } });
+    const otp = assign.json?.data?.passenger_otp;
+    check('POST /trips/:id/assign → 200 + status assigned + passenger_otp', assign.status === 200 && assign.json?.data?.status === 'assigned' && !!otp, `status=${assign.status} ${JSON.stringify(assign.json?.error || '')}`);
+    if (otp) {
+      const byOtp = await j('GET', `/trips/by-otp/${otp}`);
+      check('GET /trips/by-otp/:otp → 200 + matching trip + assigned driver + no hash', byOtp.status === 200 && byOtp.json?.data?.id === tid && !!byOtp.json?.data?.assigned_driver?.full_name && !('passenger_otp_hash' in (byOtp.json?.data || {})), `status=${byOtp.status} ${JSON.stringify(byOtp.json?.error || byOtp.json?.data || '')}`);
+    }
+    const byBadOtp = await j('GET', '/trips/by-otp/000000');
+    check('GET /trips/by-otp/<no match> → 404', byBadOtp.status === 404, `status=${byBadOtp.status}`);
+
     const reasons = await j('GET', '/admin/cancel-reasons');
     const rid = (reasons.json?.data || []).find((r) => r.applies_to === 'agent' || r.applies_to === 'both')?.id;
     const cancel = await j('POST', `/trips/${tid}/cancel`, { token, body: { cancel_reason_id: rid || null } });

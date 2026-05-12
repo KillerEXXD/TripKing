@@ -2281,6 +2281,70 @@
           }
         }
       }
+    },
+    "/drivers/me": {
+      "get": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Get the caller's own driver profile (Bearer; joined like /drivers/{id}). 404 if the caller has no driver profile yet.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/agents/me": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get the caller's own agent profile (Bearer; joined like /agents/{id}). 404 if the caller has no agent profile yet.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/trips/by-otp/{otp}": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Get the trip for a passenger OTP (public — the passenger portal) — joined assigned driver+vehicle; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed",
+        "parameters": [
+          {
+            "name": "otp",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
     }
   }
 }
