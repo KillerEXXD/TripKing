@@ -3,7 +3,7 @@
   "info": {
     "title": "TripKing API",
     "version": "0.1.0",
-    "description": "Outstation cab marketplace REST API. Wire format is snake_case; every response uses the envelope { success, data, meta?, error } (meta on lists, error non-null on failure). This document currently covers the /admin/* master-data endpoints (Phase 2); the marketplace endpoints follow in Phase 3."
+    "description": "Outstation cab marketplace REST API. Wire format is snake_case; every response uses the envelope `{ success, data, meta?, error }` (meta on lists, error non-null on failure). This document currently covers the `/admin/*` master-data endpoints (Phase 2); the marketplace endpoints (`/auth`, `/trips`, `/drivers`, `/vacancies`, …) follow in Phase 3.\n"
   },
   "servers": [
     {
@@ -54,6 +54,10 @@
     {
       "name": "analytics",
       "description": "Server-computed analytics — the platform dashboard (admin), per-agent analytics, and the API-metrics rollup (admin)."
+    },
+    {
+      "name": "video-verifications",
+      "description": "Driver/manager video-call verification — slot booking, the call record, and the admin finalize."
     }
   ],
   "components": {
@@ -116,7 +120,7 @@
         "name": "id",
         "in": "path",
         "required": true,
-        "description": "Row key — uuid for most lists, the value int for seat-options, the BCP-47 code for languages.",
+        "description": "Row key — uuid for most lists, the `value` int for seat-options, the BCP-47 `code` for languages.",
         "schema": {
           "type": "string"
         }
@@ -127,7 +131,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "Supabase access token from POST /auth/verify-otp. Authenticated endpoints validate it; every mutating /admin/* call additionally requires users.role === 'admin'."
+        "description": "Supabase access token from `POST /auth/verify-otp`. Authenticated endpoints validate it; every mutating `/admin/*` call additionally requires `users.role === 'admin'`.\n"
       }
     },
     "responses": {
@@ -240,7 +244,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Update a row (partial; include is_active to enable/disable)",
+        "summary": "Update a row (partial; include `is_active` to enable/disable)",
         "security": [
           {
             "BearerAuth": []
@@ -283,7 +287,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Delete a row — 409 IN_USE if it is referenced (disable it instead)",
+        "summary": "Delete a row — 409 `IN_USE` if it is referenced (disable it instead)",
         "security": [
           {
             "BearerAuth": []
@@ -315,7 +319,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Reorder a list — sets sort_order = (index + 1) * 10",
+        "summary": "Reorder a list — sets `sort_order = (index + 1) * 10`",
         "security": [
           {
             "BearerAuth": []
@@ -624,7 +628,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer). Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a trip (Bearer; the poster must be KYC-verified — 403 KYC_REQUIRED otherwise) — total_fare computed if omitted; driver_payout via trigger. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -650,10 +654,39 @@
           "401": {
             "$ref": "#/components/responses/Envelope"
           },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
           "422": {
             "$ref": "#/components/responses/Envelope"
           },
           "429": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/trips/by-otp/{otp}": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Get the trip for a passenger OTP (public — the passenger portal) — joins the assigned driver (with live position) + vehicle; distance_to_destination_km when in_progress; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed",
+        "parameters": [
+          {
+            "name": "otp",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -685,7 +718,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "List applicants (poster/admin)",
+        "summary": "List applicants (poster/admin; Bearer)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -704,12 +737,32 @@
         "tags": [
           "trips"
         ],
-        "summary": "Apply to a trip (driver) — per-user rate-limited (429 RATE_LIMITED on excess)",
+        "summary": "Apply to a trip (driver; Bearer; must be KYC-verified — 403 KYC_REQUIRED otherwise) — per-user rate-limited (429 RATE_LIMITED on excess)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vehicle_id": {
+                    "type": "string"
+                  },
+                  "applicant_quoted_rate_per_km": {
+                    "type": "number"
+                  },
+                  "applicant_message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "$ref": "#/components/responses/Envelope"
@@ -734,7 +787,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Withdraw an application",
+        "summary": "Withdraw an application (owning driver/admin; Bearer)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -760,7 +813,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Reject an applicant (poster/admin)",
+        "summary": "Reject an applicant (poster/admin; Bearer)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -786,7 +839,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Assign a driver (poster/admin)",
+        "summary": "Assign a driver (poster/admin; Bearer) — selects one acceptance, rejects the rest, generates the passenger OTP",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -828,7 +881,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Start the trip (assigned driver) — verifies OTP",
+        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -876,12 +929,32 @@
         "tags": [
           "trips"
         ],
-        "summary": "Complete the trip (assigned driver)",
+        "summary": "Complete the trip (assigned driver/admin; Bearer)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "end_odo_url": {
+                    "type": "string"
+                  },
+                  "end_odo_reading": {
+                    "type": "integer"
+                  },
+                  "driver_notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "$ref": "#/components/responses/Envelope"
@@ -897,7 +970,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Cancel the trip (poster/admin)",
+        "summary": "Cancel the trip (poster/admin; Bearer)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1061,7 +1134,7 @@
         "tags": [
           "vehicles"
         ],
-        "summary": "Add a vehicle (driver; Bearer)",
+        "summary": "Add a vehicle (driver; Bearer) — driver_id = the caller",
         "requestBody": {
           "required": true,
           "content": {
@@ -1116,7 +1189,7 @@
         "tags": [
           "vehicles"
         ],
-        "summary": "Update a vehicle (owning driver/admin)",
+        "summary": "Update a vehicle (owning driver/admin; Bearer) — include is_active to enable/disable",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1151,7 +1224,7 @@
         "tags": [
           "vehicles"
         ],
-        "summary": "Delete a vehicle (owning driver/admin)",
+        "summary": "Delete a vehicle (owning driver/admin; Bearer) — 409 IN_USE if referenced",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1171,6 +1244,65 @@
             "$ref": "#/components/responses/Envelope"
           },
           "409": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/vehicles/{id}/photo-upload-url": {
+      "post": {
+        "tags": [
+          "vehicles"
+        ],
+        "summary": "Mint a short-lived signed PUT URL for one vehicle photo/paper (owning driver/admin; Bearer). Upload the bytes straight to Storage, then PATCH the returned column onto the vehicle.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "slot"
+                ],
+                "properties": {
+                  "slot": {
+                    "type": "string",
+                    "enum": [
+                      "front",
+                      "back",
+                      "left",
+                      "right",
+                      "plate",
+                      "interior",
+                      "rc",
+                      "insurance",
+                      "permit"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -1267,12 +1399,31 @@
         }
       }
     },
+    "/drivers/me": {
+      "get": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Get the caller's own driver profile (Bearer; joined like /drivers/{id}). 404 if the caller has no driver profile yet. Carries a server-computed `verification` block (kyc_status, per-step status, steps_done/steps_total, the scheduled video_verification, kyc_rejection_reason) for the owner.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/drivers/{id}": {
       "get": {
         "tags": [
           "drivers"
         ],
-        "summary": "Get a driver profile",
+        "summary": "Get a driver profile — the `verification` block + private KYC fields (masked Aadhaar, licence number/expiry) are returned only to the owner/admin; the public view is the coarse kyc_status",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1394,6 +1545,219 @@
         }
       }
     },
+    "/drivers/{id}/kyc": {
+      "patch": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Move a driver through the KYC workflow (admin; Bearer) — records kyc_reviewed_by/at + kyc_rejection_reason (the `note`), and fires a kyc_status_change notification",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kyc_status"
+                ],
+                "properties": {
+                  "kyc_status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "docs_submitted",
+                      "video_pending",
+                      "approved",
+                      "rejected",
+                      "resubmit_required"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/{id}/kyc-doc-upload-url": {
+      "post": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Mint a short-lived signed PUT URL for one KYC document (owner; Bearer). Upload the bytes straight to Storage, then call POST /drivers/{id}/kyc-docs with the returned path.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "doc_type"
+                ],
+                "properties": {
+                  "doc_type": {
+                    "type": "string",
+                    "enum": [
+                      "aadhaar_front",
+                      "aadhaar_back",
+                      "driver_license",
+                      "selfie"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/{id}/kyc-docs": {
+      "post": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Submit a driver's KYC documents (owner; Bearer) — stores the Storage paths + the masked Aadhaar last-4 + licence number/expiry, sets kyc_docs_submitted_at, and moves kyc_status pending|resubmit_required → docs_submitted. Returns the driver profile.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "aadhaar_front_path",
+                  "aadhaar_back_path",
+                  "aadhaar_last4",
+                  "driver_license_path",
+                  "driver_license_number",
+                  "selfie_path",
+                  "consent"
+                ],
+                "properties": {
+                  "aadhaar_front_path": {
+                    "type": "string"
+                  },
+                  "aadhaar_back_path": {
+                    "type": "string"
+                  },
+                  "aadhaar_last4": {
+                    "type": "string",
+                    "description": "exactly 4 digits"
+                  },
+                  "driver_license_path": {
+                    "type": "string"
+                  },
+                  "driver_license_number": {
+                    "type": "string"
+                  },
+                  "driver_license_expiry": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "selfie_path": {
+                    "type": "string"
+                  },
+                  "consent": {
+                    "type": "boolean",
+                    "description": "must be true (UIDAI document-storage consent)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "The driver's KYC documents — masked Aadhaar number, licence number/expiry, kyc_docs_submitted_at, and 5-minute signed download URLs for each file (owner or admin; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/agents": {
       "get": {
         "tags": [
@@ -1477,6 +1841,25 @@
         }
       }
     },
+    "/agents/me": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get the caller's own agent profile (Bearer; joined like /agents/{id}). 404 if the caller has no agent profile yet. Carries a server-computed `verification` block (3 steps — details, documents, video_call — plus steps_done/steps_total, the scheduled video_verification, kyc_rejection_reason) for the owner.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/agents/{id}": {
       "get": {
         "tags": [
@@ -1553,6 +1936,206 @@
         }
       }
     },
+    "/agents/{id}/kyc": {
+      "patch": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Move an agent through the KYC workflow (admin; Bearer) — records kyc_reviewed_by/at + kyc_rejection_reason (the `note`), and fires a kyc_status_change notification",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "kyc_status"
+                ],
+                "properties": {
+                  "kyc_status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "docs_submitted",
+                      "video_pending",
+                      "approved",
+                      "rejected",
+                      "resubmit_required"
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/agents/{id}/kyc-doc-upload-url": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Mint a short-lived signed PUT URL for one agent KYC document (owner; Bearer) — no driving licence for trip managers. Upload the bytes straight to Storage, then call POST /agents/{id}/kyc-docs.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "doc_type"
+                ],
+                "properties": {
+                  "doc_type": {
+                    "type": "string",
+                    "enum": [
+                      "aadhaar_front",
+                      "aadhaar_back",
+                      "selfie"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/agents/{id}/kyc-docs": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Submit an agent's KYC documents (owner; Bearer) — Aadhaar (front & back) + a selfie + the masked last-4 (no driving licence); sets kyc_docs_submitted_at and moves kyc_status pending|resubmit_required → docs_submitted. Returns the agent profile.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "aadhaar_front_path",
+                  "aadhaar_back_path",
+                  "aadhaar_last4",
+                  "selfie_path",
+                  "consent"
+                ],
+                "properties": {
+                  "aadhaar_front_path": {
+                    "type": "string"
+                  },
+                  "aadhaar_back_path": {
+                    "type": "string"
+                  },
+                  "aadhaar_last4": {
+                    "type": "string",
+                    "description": "exactly 4 digits"
+                  },
+                  "selfie_path": {
+                    "type": "string"
+                  },
+                  "consent": {
+                    "type": "boolean",
+                    "description": "must be true"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "The agent's KYC documents — masked Aadhaar number, kyc_docs_submitted_at, and 5-minute signed download URLs for Aadhaar front/back + selfie (owner or admin; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/vacancies": {
       "get": {
         "tags": [
@@ -1606,7 +2189,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "Post a vacancy (driver; Bearer) — driver_id = the caller; destination_city_ids → vacancy_destinations rows. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a vacancy (driver; Bearer; must be KYC-verified — 403 KYC_REQUIRED otherwise) — driver_id = the caller; destination_city_ids → vacancy_destinations rows. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2070,145 +2653,6 @@
         }
       }
     },
-    "/reviews/{id}": {
-      "get": {
-        "tags": [
-          "reviews"
-        ],
-        "summary": "Get a review (published, or own, or admin)",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
-    "/drivers/{id}/kyc": {
-      "patch": {
-        "tags": [
-          "drivers"
-        ],
-        "summary": "Move a driver through the KYC workflow (admin; Bearer) — fires a kyc_status_change notification",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "kyc_status"
-                ],
-                "properties": {
-                  "kyc_status": {
-                    "type": "string",
-                    "enum": [
-                      "pending",
-                      "docs_submitted",
-                      "video_pending",
-                      "approved",
-                      "rejected",
-                      "resubmit_required"
-                    ]
-                  },
-                  "note": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "403": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "422": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
-    "/agents/{id}/kyc": {
-      "patch": {
-        "tags": [
-          "agents"
-        ],
-        "summary": "Move an agent through the KYC workflow (admin; Bearer) — fires a kyc_status_change notification",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "kyc_status"
-                ],
-                "properties": {
-                  "kyc_status": {
-                    "type": "string",
-                    "enum": [
-                      "pending",
-                      "docs_submitted",
-                      "video_pending",
-                      "approved",
-                      "rejected",
-                      "resubmit_required"
-                    ]
-                  },
-                  "note": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "403": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "422": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
     "/reviews/{id}/moderate": {
       "post": {
         "tags": [
@@ -2245,6 +2689,27 @@
             "$ref": "#/components/responses/Envelope"
           },
           "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/reviews/{id}": {
+      "get": {
+        "tags": [
+          "reviews"
+        ],
+        "summary": "Get a review (published, or own, or admin)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
             "$ref": "#/components/responses/Envelope"
           },
           "404": {
@@ -2332,65 +2797,254 @@
         }
       }
     },
-    "/drivers/me": {
+    "/video-verifications": {
       "get": {
         "tags": [
-          "drivers"
+          "video-verifications"
         ],
-        "summary": "Get the caller's own driver profile (Bearer; joined like /drivers/{id}). 404 if the caller has no driver profile yet.",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
-    "/agents/me": {
-      "get": {
-        "tags": [
-          "agents"
-        ],
-        "summary": "Get the caller's own agent profile (Bearer; joined like /agents/{id}). 404 if the caller has no agent profile yet.",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
-    "/trips/by-otp/{otp}": {
-      "get": {
-        "tags": [
-          "trips"
-        ],
-        "summary": "Get the trip for a passenger OTP (public — the passenger portal) — joins the assigned driver (with live position) + vehicle; distance_to_destination_km when in_progress; fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash never echoed",
+        "summary": "List video-call verifications (admin; Bearer) — the Video Call Console. Each row joins its driver or manager summary.",
         "parameters": [
           {
-            "name": "otp",
-            "in": "path",
-            "required": true,
+            "name": "status",
+            "in": "query",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "one value or a CSV of scheduled,completed,cancelled,no_show"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "minimum scheduled_at"
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "description": "maximum scheduled_at"
           }
         ],
         "responses": {
           "200": {
             "$ref": "#/components/responses/Envelope"
           },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "video-verifications"
+        ],
+        "summary": "Book a video-call slot (driver or trip_manager whose kyc_status is docs_submitted; Bearer) — creates a video_verifications row (status scheduled, meeting_provider jitsi, meeting_url https://meet.jit.si/tripking-<id>) and moves the subject's kyc_status → video_pending. One open call per subject (409 otherwise). slot_at must come from /video-verifications/available-slots.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "slot_at"
+                ],
+                "properties": {
+                  "slot_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/video-verifications/available-slots": {
+      "get": {
+        "tags": [
+          "video-verifications"
+        ],
+        "summary": "Open 15-minute video-call slots (Bearer) — derived from admin availability windows; the next ~14 days, at least an hour out. Returns [{ slot_at, slot_minutes }].",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/video-verifications/{id}": {
+      "get": {
+        "tags": [
+          "video-verifications"
+        ],
+        "summary": "Get a video-call verification (the subject, the conductor, or an admin; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
           "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "video-verifications"
+        ],
+        "summary": "Cancel / reschedule / mark no-show (Bearer). Owner: { cancel: true } → cancelled (subject kyc_status → docs_submitted) or { reschedule_to: <ISO from available-slots> }. Admin: { no_show: true } → no_show (subject kyc_status → docs_submitted).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cancel": {
+                    "type": "boolean"
+                  },
+                  "reschedule_to": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "no_show": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/video-verifications/{id}/finalize": {
+      "patch": {
+        "tags": [
+          "video-verifications"
+        ],
+        "summary": "Finalize a video call (admin; Bearer) — sets status completed + conducted_by/at; moves the subject's kyc_status → approved | rejected | resubmit_required (records kyc_reviewed_by/at + kyc_rejection_reason from `notes`) and fires a kyc_status_change notification. outcome=approved requires face_match_confirmed && documents_confirmed && liveness_check_passed all true.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "outcome",
+                  "face_match_confirmed",
+                  "documents_confirmed",
+                  "liveness_check_passed"
+                ],
+                "properties": {
+                  "outcome": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected",
+                      "resubmit_required"
+                    ]
+                  },
+                  "face_match_confirmed": {
+                    "type": "boolean"
+                  },
+                  "documents_confirmed": {
+                    "type": "boolean"
+                  },
+                  "liveness_check_passed": {
+                    "type": "boolean"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
             "$ref": "#/components/responses/Envelope"
           }
         }
