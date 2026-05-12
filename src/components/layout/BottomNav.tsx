@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ClipboardList, Home, Plus, Search, User, Users, type LucideIcon } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -35,14 +35,15 @@ const HIDE_NAV = /^\/(trips\/(new|[^/]+)|drivers\/[^/]+|alerts\/(new|[^/]+)|vaca
  * The app's bottom navigation — fixed to the viewport bottom on the tab screens
  * (rendered by `AppLayout`). Hidden on flow / detail screens (post-trip wizard,
  * trip detail, applicant review, alerts new/detail, post-vacancy, driver
- * profile). The active tab and the tab set follow the path and the user's role.
+ * profile). The active tab and the tab set follow the path and the effective role
+ * (`useEffectiveRole` — an admin's `RoleSwitcher` choice, otherwise their real role).
  */
 export function BottomNav() {
-  const { user } = useAuth();
+  const role = useEffectiveRole();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   if (HIDE_NAV.test(pathname)) return null;
-  const items = user?.role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
+  const items = role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
   const activeId = items.find((it) => it.match(pathname))?.id;
 
   return (
