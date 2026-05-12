@@ -43,10 +43,20 @@ describe('transformDriver', () => {
   it('defaults missing optionals and throws on missing id / user_id', () => {
     const d = transformDriver({ id: 'd2', user_id: 'u2' });
     expect(d.homeCity).toBeUndefined();
+    expect(d.homePlace).toBeUndefined();
+    expect(d.currentPlace).toBeUndefined();
+    expect(d.distanceKm).toBeUndefined();
     expect(d.vehicles).toEqual([]);
     expect(d.ratingDistribution).toEqual({ '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 });
     expect(() => transformDriver({ user_id: 'u2' })).toThrow(DriverTransformError);
     expect(() => transformDriver({ id: 'd2' })).toThrow(/MISSING_USER_ID/);
+  });
+  it('maps the joined current_place / home_place and a radius-list distance_km', () => {
+    const place = (id: string, name: string, lat: number, lng: number) => ({ id, provider: 'nominatim', provider_place_id: `N${id}`, name, formatted_address: `${name}, India`, state: 'Tamil Nadu', country: 'IN', lat, lng, is_active: true, created_at: '2026-05-26T00:00:00Z' });
+    const d = transformDriver({ id: 'd3', user_id: 'u3', home_place: place('p1', 'Katpadi', 12.97, 79.13), current_place: place('p2', 'Guindy, Chennai', 13.01, 80.21), current_lat: 13.01, current_lng: 80.21, distance_km: 2.4 });
+    expect(d.homePlace?.name).toBe('Katpadi');
+    expect(d.currentPlace?.name).toBe('Guindy, Chennai');
+    expect(d.distanceKm).toBe(2.4);
   });
 });
 

@@ -47,3 +47,15 @@ export interface ResolvePlaceInput {
   lng: number;
   cityId?: string | null;
 }
+
+/**
+ * A centre + radius for the `?near_lat=&near_lng=&radius_km=` filters on the public
+ * list endpoints (`/trips`, `/vacancies`, `/drivers`). When set, results are
+ * restricted to in-radius rows, nearest first, each carrying a `distanceKm`.
+ * The server caps the radius at 100 km.
+ */
+export interface NearRadius {
+  lat: number;
+  lng: number;
+  radiusKm: number;
+}

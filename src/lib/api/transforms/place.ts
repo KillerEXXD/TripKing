@@ -59,6 +59,11 @@ export function transformPlaceSearchResult(api: Api): PlaceSearchResult {
   };
 }
 
+/** A joined `*_place:places!...(*)` field on another row → `Place`, or `undefined` when the join is null. */
+export function maybePlace(v: unknown): Place | undefined {
+  return v && typeof v === 'object' ? transformPlace(v as Api) : undefined;
+}
+
 /** A stored `places` row (from `POST /places`) → `Place`. */
 export function transformPlace(api: Api): Place {
   const id = reqStr(api.id, 'MISSING_ID', 'id', { api });

@@ -1,4 +1,5 @@
 import type { CityRow } from './adminConfig';
+import type { NearRadius, Place } from './place';
 
 export type TripStatus = 'open' | 'has_applicants' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
 export type PosterRole = 'driver' | 'trip_manager';
@@ -12,6 +13,9 @@ export interface Trip {
   postedByPhone?: string;
   fromCity: CityRow;
   toCity: CityRow;
+  /** Precise pickup / drop points, when the poster pinned them (alongside `fromCity` / `toCity`). */
+  fromPlace?: Place;
+  toPlace?: Place;
   pickupAt: string;
   expectedDistanceKm: number;
   carTypeId: string;
@@ -51,6 +55,8 @@ export interface Trip {
   createdAt: string;
   /** The passenger OTP — echoed only to the trip poster / admin (or returned by `POST /trips/:id/assign`). Used to build the passenger-portal link. */
   passengerOtp?: string;
+  /** Straight-line km from the `?near_*` centre to the pickup point — present only on a radius-filtered list. */
+  distanceKm?: number;
 }
 
 /** The assigned driver as embedded on a `Trip` (joined `drivers` row + last reported position). */
@@ -108,6 +114,9 @@ export interface TripAcceptance {
 export interface PostTripInput {
   fromCityId: string;
   toCityId: string;
+  /** Optional precise pickup / drop points (`places.id`s). */
+  fromPlaceId?: string;
+  toPlaceId?: string;
   pickupAt: string;
   expectedDistanceKm: number;
   carTypeId: string;
@@ -138,6 +147,8 @@ export interface TripsQueryParams {
   fromCityId?: string;
   toCityId?: string;
   postedByUserId?: string;
+  /** Restrict to trips whose pickup point is within the radius (nearest first). */
+  near?: NearRadius;
   page?: number;
   limit?: number;
   sort?: string;

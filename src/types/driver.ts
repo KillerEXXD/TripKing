@@ -1,4 +1,5 @@
 import type { CityRow } from './adminConfig';
+import type { NearRadius, Place } from './place';
 import type { VehicleSummary } from './trip';
 
 export type KycStatus = 'pending' | 'docs_submitted' | 'video_pending' | 'approved' | 'rejected' | 'resubmit_required';
@@ -11,9 +12,14 @@ export interface Driver {
   phone: string;
   email?: string;
   homeCity?: CityRow;
+  homePlace?: Place;
   currentCity?: CityRow;
+  /** Precise current location, when the driver has pinned / GPS-reported one. */
+  currentPlace?: Place;
   currentLat?: number;
   currentLng?: number;
+  /** Straight-line km from the `?near_*` centre — present only on a radius-filtered `/drivers` list. */
+  distanceKm?: number;
   profilePhotoUrl: string;
   kycStatus: KycStatus;
   ratingAvg: number;
@@ -45,6 +51,8 @@ export interface Agent {
 export interface DriversQueryParams {
   currentCityId?: string;
   kycStatus?: KycStatus;
+  /** Restrict to drivers whose (fresh) current position is within the radius (nearest first). */
+  near?: NearRadius;
   page?: number;
   limit?: number;
   sort?: string;
