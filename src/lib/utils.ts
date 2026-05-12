@@ -31,6 +31,20 @@ export function formatRating(avg: number): string {
   return `★ ${avg.toFixed(1)}`;
 }
 
+/**
+ * Time of day in the user's locale, hour + minute only: a Date at 18:46 → "6:46 pm".
+ */
+export function formatClockTime(d: Date): string {
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+/**
+ * Short calendar date without the year: a Date on 12 May → "12 May".
+ */
+export function formatShortDate(d: Date): string {
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isValidUUID(value: string | null | undefined): value is string {
   return !!value && UUID_RE.test(value);

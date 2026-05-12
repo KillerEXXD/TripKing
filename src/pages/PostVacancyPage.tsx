@@ -6,9 +6,14 @@ import { usePostVacancy } from '@/hooks/useVacancies';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
+import { formatClockTime, formatShortDate } from '@/lib/utils';
 import type { PostVacancyInput } from '@/types';
 
 const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
+const HOUR_MS = 3_600_000;
+const MIN_HOURS = 0.5;
+const MAX_HOURS = 24;
+const DEFAULT_HOURS = 4;
 
 function FlowHeader({ onBack }: { onBack: () => void }) {
   return (
@@ -21,17 +26,27 @@ function FlowHeader({ onBack }: { onBack: () => void }) {
   );
 }
 
-function toIso(dateStr: string): string | undefined {
-  if (!dateStr) return undefined;
-  const d = new Date(`${dateStr}T00:00:00`);
-  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+/** A `Date` → the value an `<input type="datetime-local">` expects: `YYYY-MM-DDTHH:mm` in local time. */
+function toDatetimeLocalValue(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+/** Clamp to [MIN_HOURS, MAX_HOURS], rounded to the nearest half hour. */
+function clampHours(h: number): number {
+  return Math.min(MAX_HOURS, Math.max(MIN_HOURS, Math.round(h * 2) / 2));
+}
+/** "4 hrs" / "1 hr" / "0.5 hrs" */
+function formatHours(h: number): string {
+  const txt = Number.isInteger(h) ? String(h) : h.toFixed(1);
+  return `${txt} hr${h === 1 ? '' : 's'}`;
 }
 
 /**
- * `/vacancies/new` — a driver posts their availability ("I'm in city X,
- * available [dates], willing to drive to [cities], min ₹/km"). Current city +
- * available-from + at least one destination are required. On success we go to
- * the vacancy feed. (The vehicle picker lands with the driver-profile screen.)
+ * `/vacancies/new` — a driver posts their availability ("I'm in city X, available
+ * from <time> for <N> hours, willing to drive to [cities], min ₹/km"). Current city
+ * and at least one destination are required; the start time defaults to now and the
+ * window length steps in half hours. On success we go to the vacancy feed.
+ * (The vehicle picker lands with the driver-profile screen.)
  */
 export function PostVacancyPage() {
   const navigate = useNavigate();
@@ -39,9 +54,10 @@ export function PostVacancyPage() {
   const citiesQuery = cityHooks.useList();
 
   const [currentCityId, setCurrentCityId] = useState('');
-  const [availableFrom, setAvailableFrom] = useState('');
-  const [availableUntil, setAvailableUntil] = useState('');
+  const [startLocal, setStartLocal] = useState(() => toDatetimeLocalValue(new Date()));
+  const [hours, setHours] = useState(DEFAULT_HOURS);
   const [destinationCityIds, setDestinationCityIds] = useState<string[]>([]);
+  const [destQuery, setDestQuery] = useState('');
   const [minRatePerKm, setMinRatePerKm] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
 
@@ -49,18 +65,21 @@ export function PostVacancyPage() {
     setDestinationCityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  const fromIso = toIso(availableFrom);
-  const canSubmit = currentCityId.length > 0 && !!fromIso && destinationCityIds.length > 0 && !postVacancy.isPending;
+  const startDate = new Date(startLocal);
+  const startValid = !Number.isNaN(startDate.getTime());
+  const endDate = startValid ? new Date(startDate.getTime() + hours * HOUR_MS) : null;
+  const sameDay = !!endDate && startDate.toDateString() === endDate.toDateString();
+  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && destinationCityIds.length > 0 && !postVacancy.isPending;
 
   async function onSubmit() {
-    if (!currentCityId || !fromIso || destinationCityIds.length === 0) {
+    if (!currentCityId || !startValid || hours < MIN_HOURS || destinationCityIds.length === 0) {
       toast.error('Pick your city, when you’re available, and at least one destination');
       return;
     }
     const input: PostVacancyInput = {
       currentCityId,
-      availableFrom: fromIso,
-      availableUntil: toIso(availableUntil) ?? undefined,
+      availableFrom: startDate.toISOString(),
+      availableUntil: new Date(startDate.getTime() + hours * HOUR_MS).toISOString(),
       destinationCityIds,
       minRatePerKm: minRatePerKm === '' ? undefined : Math.max(0, Number(minRatePerKm)),
       notes: notes.trim() || undefined,
@@ -96,6 +115,8 @@ export function PostVacancyPage() {
   }
 
   const cities = citiesQuery.data ?? [];
+  const q = destQuery.trim().toLowerCase();
+  const shownCities = cities.filter((c) => (q === '' || c.name.toLowerCase().includes(q)) || destinationCityIds.includes(c.id));
 
   return (
     <div className="mx-auto max-w-md">
@@ -113,18 +134,50 @@ export function PostVacancyPage() {
             ))}
           </select>
         </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">Available from</span>
-            <Input type="date" value={availableFrom} onChange={(e) => setAvailableFrom(e.target.value)} />
-          </label>
-          <label className="block space-y-1">
-            <span className="text-sm font-medium">
-              Until <span className="font-normal text-secondary">(optional)</span>
-            </span>
-            <Input type="date" value={availableUntil} onChange={(e) => setAvailableUntil(e.target.value)} />
-          </label>
+
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block space-y-1">
+              <span className="text-sm font-medium">Available from</span>
+              <Input type="datetime-local" value={startLocal} onChange={(e) => setStartLocal(e.target.value)} />
+            </label>
+            <div className="space-y-1">
+              <span className="text-sm font-medium">For how long?</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  aria-label="Fewer hours"
+                  disabled={hours <= MIN_HOURS}
+                  onClick={() => setHours((h) => clampHours(h - 0.5))}
+                  className="flex size-9 items-center justify-center rounded-lg border border-input text-lg leading-none disabled:opacity-40"
+                >
+                  −
+                </button>
+                <span className="min-w-[3.5rem] text-center text-base font-semibold tabular-nums" aria-live="polite">
+                  {formatHours(hours)}
+                </span>
+                <button
+                  type="button"
+                  aria-label="More hours"
+                  disabled={hours >= MAX_HOURS}
+                  onClick={() => setHours((h) => clampHours(h + 0.5))}
+                  className="flex size-9 items-center justify-center rounded-lg border border-input text-lg leading-none disabled:opacity-40"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+          {startValid && endDate ? (
+            <p className="text-sm text-secondary">
+              Available <span className="font-semibold">{formatShortDate(startDate)}</span>, {formatClockTime(startDate)} → {sameDay ? null : <span className="font-semibold">{formatShortDate(endDate)} </span>}
+              {formatClockTime(endDate)} <span className="text-xs">({formatHours(hours)})</span>
+            </p>
+          ) : (
+            <p className="text-sm text-red-700">Pick a valid start time.</p>
+          )}
         </div>
+
         <label className="block space-y-1">
           <span className="text-sm font-medium">
             Minimum ₹ per km <span className="font-normal text-secondary">(optional)</span>
@@ -135,22 +188,34 @@ export function PostVacancyPage() {
 
       <Card className="gap-2">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Willing to drive to</div>
-        <div className="flex flex-wrap gap-1.5">
-          {cities.map((c) => {
-            const active = destinationCityIds.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => toggleDestination(c.id)}
-                className={`rounded-full border px-3 py-1 text-xs font-semibold ${active ? 'border-primary bg-primary/15 text-primary' : 'border-input bg-background hover:border-primary/40'}`}
-              >
-                {c.name}
-              </button>
-            );
-          })}
-        </div>
+        <Input
+          type="search"
+          value={destQuery}
+          onChange={(e) => setDestQuery(e.target.value)}
+          placeholder="Search a destination…"
+          aria-label="Search destinations"
+          className="h-9"
+        />
+        {shownCities.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {shownCities.map((c) => {
+              const active = destinationCityIds.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => toggleDestination(c.id)}
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${active ? 'border-primary bg-primary/15 text-primary' : 'border-input bg-background hover:border-primary/40'}`}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-secondary">No cities match “{destQuery.trim()}”.</p>
+        )}
         {destinationCityIds.length === 0 ? <p className="text-xs text-secondary">Pick at least one destination.</p> : <div className="flex flex-wrap gap-1.5">{destinationCityIds.map((id) => <Badge key={id} variant="muted">{cities.find((c) => c.id === id)?.name ?? id}</Badge>)}</div>}
       </Card>
 
