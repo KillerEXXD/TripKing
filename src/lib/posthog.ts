@@ -8,7 +8,9 @@ export function initPostHog(): void {
   const key = import.meta.env.VITE_POSTHOG_KEY;
   if (!key || initialized) return;
   posthog.init(key, {
-    api_host: import.meta.env.VITE_POSTHOG_HOST ?? 'https://us.i.posthog.com',
+    // `||` not `??` — a blank `VITE_POSTHOG_HOST` (env var present but empty) must still fall back,
+    // otherwise PostHog treats `''` as a relative host and POSTs /e/ /flags/ to our own origin (405s).
+    api_host: import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com',
     capture_pageview: false, // sent manually on route change — see PostHogPageviewTracker
     autocapture: true,
   });
@@ -33,4 +35,14 @@ export function identifyUser(id: string, props?: Record<string, unknown>): void 
 
 export function resetUser(): void {
   if (initialized) posthog.reset();
+}
+
+/** Current PostHog session id (for cross-linking a Sentry event to its replay). `''` if unavailable. */
+export function getPostHogSessionId(): string {
+  if (!initialized) return '';
+  try {
+    return posthog.get_session_id() || '';
+  } catch {
+    return '';
+  }
 }

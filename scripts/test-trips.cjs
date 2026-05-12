@@ -12,6 +12,9 @@
  * passenger name + poster phone + their own position, and the passenger phone ONLY when
  * hide_passenger_phone is false; a non-party authed user sees none of that, no positions); Phase C-2
  * from_place_id/to_place_id + Phase D radius search + the alert_match notification fired on POST /trips.
+ *
+ * For a multi-actor / many-trips version of this lifecycle (N agents × M drivers, GPS pings, etc.)
+ * see scripts/simulate-marketplace.cjs (`npm run sim:marketplace`).
  */
 const BASE = (process.env.TRIPS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) {
@@ -32,6 +35,16 @@ async function j(method, path, { body, token } = {}) {
   let json;
   try { json = JSON.parse(text); } catch { json = { raw: text }; }
   return { status: res.status, json };
+}
+// Same haversine the `trips` edge function uses for distance_to_destination_km — recomputed here to
+// black-box-check the server's number.
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 async function signIn(role, name) {
   const phone = `+919900${Math.floor(100000 + Math.random() * 900000)}`;
@@ -71,6 +84,7 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const tid = post.json?.data?.id;
   check('POST /trips (authed) → 200 + joined cities + driver_payout (= 14·140 − 10% − 98 + 300 = 1966)', post.status === 200 && !!tid && post.json?.data?.from_city?.name && post.json?.data?.driver_payout === 1966, `status=${post.status} ${JSON.stringify(post.json?.error || post.json?.data?.driver_payout)}`);
   if (!tid) process.exit(1);
+  const toLat = Number(post.json?.data?.to_city?.lat), toLng = Number(post.json?.data?.to_city?.lng);
 
   // poster reads their own trip → full
   const getAsPoster0 = await j('GET', `/trips/${tid}`, { token });
@@ -107,12 +121,22 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('GET /trips/by-otp/:otp → 200 + matching trip + assigned driver; no otp/hash', byOtp.status === 200 && byOtp.json?.data?.id === tid && !!byOtp.json?.data?.assigned_driver?.full_name && !has(byOtp.json?.data, 'passenger_otp_hash') && !has(byOtp.json?.data, 'passenger_otp'), `status=${byOtp.status} ${JSON.stringify(byOtp.json?.error || '')}`);
   check('GET /trips/by-otp/<no match> → 404', (await j('GET', '/trips/by-otp/000000')).status === 404);
 
-  // start → driver pings location → only the poster / assigned driver see the live position
+  // start: a non-assigned caller and a wrong OTP are rejected; the assigned driver with the right OTP starts it
+  check('POST /trips/:id/start by a non-assigned caller → 403', (await j('POST', `/trips/${tid}/start`, { token, body: { passenger_otp: otp } })).status === 403);
+  check('POST /trips/:id/start (assigned driver, wrong OTP) → 401', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: '000001' } })).status === 401);
   const start = await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp } });
   check('POST /trips/:id/start (assigned driver, valid OTP) → 200, in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
+
+  // driver pings location → only the poster / assigned driver see the live position
   if (drvId) await j('PATCH', `/drivers/${drvId}/location`, { token: dToken, body: { current_lat: 13.05, current_lng: 80.2 } });
   const liveAsPoster = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
   check('GET /trips/:id (in_progress) as the poster → assigned-driver position + distance_to_destination_km', liveAsPoster.assigned_driver?.current_lat != null && typeof liveAsPoster.distance_to_destination_km === 'number', `driver=${JSON.stringify(liveAsPoster.assigned_driver)} dist=${liveAsPoster.distance_to_destination_km}`);
+  if (Number.isFinite(toLat) && Number.isFinite(toLng)) {
+    const expect1 = Math.round(haversineKm(13.05, 80.2, toLat, toLng) * 10) / 10;
+    check('distance_to_destination_km matches a JS haversine recompute (±0.2 km)', typeof liveAsPoster.distance_to_destination_km === 'number' && Math.abs(liveAsPoster.distance_to_destination_km - expect1) <= 0.2, `api=${liveAsPoster.distance_to_destination_km} js=${expect1}`);
+  }
+  const byOtpLive = (await j('GET', `/trips/by-otp/${otp}`)).json?.data || {};
+  check('GET /trips/by-otp/:otp (in_progress) → same driver position the poster sees', Math.abs(Number(byOtpLive.assigned_driver?.current_lat) - 13.05) < 1e-4 && byOtpLive.distance_to_destination_km === liveAsPoster.distance_to_destination_km, `lat=${byOtpLive.assigned_driver?.current_lat} dist=${byOtpLive.distance_to_destination_km}`);
   const liveAsRando = (await j('GET', `/trips/${tid}`, { token: randoToken })).json?.data || {};
   check('GET /trips/:id (in_progress) as a non-party → NO driver position, NO distance_to_destination_km', liveAsRando.assigned_driver?.current_lat == null && !('distance_to_destination_km' in liveAsRando), `driver=${JSON.stringify(liveAsRando.assigned_driver)} dist=${liveAsRando.distance_to_destination_km}`);
   const liveListPoster = await j('GET', `/trips?status=in_progress&posted_by_user_id=${post.json?.data?.posted_by_user_id}`, { token });
@@ -120,6 +144,13 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const liveListRando = await j('GET', '/trips?status=in_progress', { token: randoToken });
   const seen = (liveListRando.json?.data || []).find((t) => t.id === tid);
   check('GET /trips?status=in_progress as a non-party → if the trip is listed, its driver position is stripped', liveListRando.status === 200 && (!seen || seen.assigned_driver?.current_lat == null), `seen=${JSON.stringify(seen && seen.assigned_driver)}`);
+
+  // a second ping, closer to the destination → distance decreases, last-seen advances
+  if (drvId && Number.isFinite(toLat) && Number.isFinite(toLng)) {
+    await j('PATCH', `/drivers/${drvId}/location`, { token: dToken, body: { current_lat: (13.05 + toLat) / 2, current_lng: (80.2 + toLng) / 2 } });
+    const live2 = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
+    check('a closer ping → distance_to_destination_km decreased, current_location_at advanced', typeof liveAsPoster.distance_to_destination_km === 'number' && typeof live2.distance_to_destination_km === 'number' && live2.distance_to_destination_km <= liveAsPoster.distance_to_destination_km && typeof live2.assigned_driver?.current_location_at === 'string' && (!liveAsPoster.assigned_driver?.current_location_at || new Date(live2.assigned_driver.current_location_at).getTime() >= new Date(liveAsPoster.assigned_driver.current_location_at).getTime()), `before=${liveAsPoster.distance_to_destination_km} after=${live2.distance_to_destination_km}`);
+  }
 
   // "trips I'm driving"
   check('GET /trips?assigned_driver_id=me without auth → 401', (await j('GET', '/trips?assigned_driver_id=me')).status === 401);
@@ -132,6 +163,8 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
 
   const complete = await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { driver_notes: 'smoke' } });
   check('POST /trips/:id/complete (assigned driver) → 200, completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} ${JSON.stringify(complete.json?.error || '')}`);
+  const afterComplete = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
+  check('completed trip no longer carries distance_to_destination_km', afterComplete.distance_to_destination_km === undefined || afterComplete.distance_to_destination_km === null, `got ${afterComplete.distance_to_destination_km}`);
 
   // ── hide_passenger_phone: true ⇒ even the assigned driver does NOT see the passenger phone ──
   if (drvId) {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@/test/test-utils';
 import { renderWithProviders } from '@/test/test-utils';
+import { ApiError } from '@/lib/api/client';
 import { EmptyState } from '../EmptyState';
 import { ErrorState } from '../ErrorState';
 import { LoadingSkeleton } from '../LoadingSkeleton';
@@ -24,6 +25,16 @@ describe('ErrorState', () => {
   it('omits the retry button when no handler is given', () => {
     renderWithProviders(<ErrorState />);
     expect(screen.queryByRole('button')).toBeNull();
+  });
+  it('shows a friendly message + HTTP status/code when given an ApiError', () => {
+    renderWithProviders(<ErrorState title="Couldn't post the trip" error={new ApiError('from_city_id is required', 422, 'VALIDATION')} />);
+    expect(screen.getByText("Couldn't post the trip")).toBeInTheDocument();
+    expect(screen.getByText('from_city_id is required')).toBeInTheDocument();
+    expect(screen.getByText('422 · VALIDATION')).toBeInTheDocument();
+  });
+  it('falls back to a category default for a server error', () => {
+    renderWithProviders(<ErrorState error={new ApiError('Internal', 500)} />);
+    expect(screen.getByText(/something went wrong on our side/i)).toBeInTheDocument();
   });
 });
 

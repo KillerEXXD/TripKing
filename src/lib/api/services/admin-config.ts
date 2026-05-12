@@ -6,7 +6,7 @@
  * get their own thin functions. Every call goes through `apiClient`; transforms
  * validate strictly.
  */
-import { apiClient } from '@/lib/api/client';
+import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import {
   toApiCancelReason,
   toApiCity,
@@ -47,7 +47,7 @@ import type {
 type ApiRow = Record<string, unknown>;
 
 function unwrap<T>(data: T | null): T {
-  if (data === null || data === undefined) throw new Error('admin-config: empty response body');
+  if (data === null || data === undefined) throw new EmptyResponseError('admin-config');
   return data;
 }
 

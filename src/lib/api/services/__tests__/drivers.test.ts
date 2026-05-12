@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiClient } from '@/lib/api/client';
-import { createMyAgentProfile, createMyDriverProfile, getAgents, getDriver, getMyAgent, getMyDriver, updateAgentKyc, updateDriverKyc } from '@/lib/api/services/drivers';
+import { createMyAgentProfile, createMyDriverProfile, getAgents, getDriver, getMyAgent, getMyDriver, updateAgentKyc, updateDriverKyc, updateDriverLocation } from '@/lib/api/services/drivers';
 
 function ok<T>(data: T) {
   return Promise.resolve({ success: true, data, error: null } as const);
@@ -78,5 +78,23 @@ describe('drivers service', () => {
     const agent = await updateAgentKyc('a1', 'approved');
     expect(patch).toHaveBeenCalledWith('/agents/a1/kyc', { kyc_status: 'approved' });
     expect(agent.kycStatus).toBe('approved');
+  });
+
+  it('updateDriverLocation → PATCH /drivers/:id/location with snake_case lat/lng + a last-seen timestamp', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 'd1', user_id: 'u1', current_lat: 13.05, current_lng: 80.2 }) as never);
+    const driver = await updateDriverLocation('d1', { lat: 13.05, lng: 80.2 });
+    expect(patch).toHaveBeenCalledTimes(1);
+    const [path, body] = patch.mock.calls[0] as [string, Record<string, unknown>];
+    expect(path).toBe('/drivers/d1/location');
+    expect(body).toMatchObject({ current_lat: 13.05, current_lng: 80.2 });
+    expect(typeof body.current_location_at).toBe('string');
+    expect(driver.currentLat).toBe(13.05);
+    expect(driver.currentLng).toBe(80.2);
+  });
+
+  it('updateDriverLocation includes current_city_id when a cityId is supplied', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 'd1', user_id: 'u1' }) as never);
+    await updateDriverLocation('d1', { cityId: 'c1', lat: 1, lng: 2 });
+    expect(patch.mock.calls[0]?.[1]).toMatchObject({ current_city_id: 'c1', current_lat: 1, current_lng: 2 });
   });
 });
