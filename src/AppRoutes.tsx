@@ -6,6 +6,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { LoadingSkeleton } from '@/components/feedback';
 
 const SignInPage = lazy(() => import('@/pages/SignInPage'));
+const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazy(() => import('@/pages/administration/AdministrationPage'));
@@ -30,6 +31,8 @@ export function AppRoutes() {
         {/* Public marketing pages */}
         <Route path="/website" element={<WebsitePage />} />
         <Route path="/for-agents" element={<ForAgentsPage />} />
+        {/* Post-sign-in onboarding/KYC — auth required, but full-screen (no app shell). */}
+        <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route path="/" element={<HomePage />} />
           <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />

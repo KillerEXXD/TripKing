@@ -21,12 +21,14 @@ function mockAuth(isAuthenticated = false) {
   });
 }
 
-function renderSignIn() {
+function renderSignIn(initialEntry: string | { pathname: string; state: unknown } = '/signin') {
   return render(
-    <MemoryRouter initialEntries={['/signin']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/signin" element={<SignInPage />} />
         <Route path="/" element={<div>home page</div>} />
+        <Route path="/onboarding" element={<div>onboarding screen</div>} />
+        <Route path="/trips/abc" element={<div>deep-linked trip</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -48,7 +50,7 @@ describe('SignInPage', () => {
     expect(screen.getByRole('button', { name: /send otp/i })).toBeDisabled();
   });
 
-  it('phone → OTP → verify calls the auth functions with the E.164 number', async () => {
+  it('phone → OTP → verify calls the auth functions with the E.164 number, then goes to /onboarding', async () => {
     mockAuth();
     verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true });
     renderSignIn();
@@ -62,8 +64,21 @@ describe('SignInPage', () => {
     fireEvent.change(otpInput, { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: /verify & continue/i }));
     await waitFor(() => expect(verifyOtp).toHaveBeenCalledWith('+919876543210', '123456'));
-    // after verify it navigates to "/"
-    expect(await screen.findByText('home page')).toBeInTheDocument();
+    // a plain sign-in lands on onboarding
+    expect(await screen.findByText('onboarding screen')).toBeInTheDocument();
+  });
+
+  it('honours a pending "from" redirect after verify instead of /onboarding', async () => {
+    mockAuth();
+    verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true });
+    renderSignIn({ pathname: '/signin', state: { from: '/trips/abc' } });
+
+    fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '9876543210' } });
+    fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    const otpInput = await screen.findByLabelText('OTP code');
+    fireEvent.change(otpInput, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /verify & continue/i }));
+    expect(await screen.findByText('deep-linked trip')).toBeInTheDocument();
   });
 
   it('"Use a different number" returns to the phone stage', async () => {

@@ -40,7 +40,8 @@ const onlyDigits = (s: string) => s.replace(/\D/g, '');
 /**
  * `/signin` — phone-OTP sign-in (the equivalent of the prototype's `/auth`). Talks to the
  * `/auth` edge function: in this build the OTP is `123456` (dev mode, real Supabase session).
- * The full onboarding / KYC steps (name, role, documents, vehicle) follow as separate screens.
+ * On a plain sign-in we send the user to `/onboarding` (name → role → city → create profile);
+ * if they were bounced here from a protected page, we honour that `from` instead.
  */
 export function SignInPage() {
   const { isAuthenticated, requestOtp, verifyOtp } = useAuth();
@@ -77,7 +78,8 @@ export function SignInPage() {
     setBusy(true);
     try {
       await verifyOtp(phoneE164, otp);
-      navigate(fromOf(location.state), { replace: true });
+      const from = fromOf(location.state);
+      navigate(from === '/' ? '/onboarding' : from, { replace: true });
     } catch {
       toast.error("That code didn't work — try again");
     } finally {
@@ -164,7 +166,7 @@ export function SignInPage() {
             </form>
           )}
         </section>
-        <p className="text-xs text-secondary">Onboarding & KYC (name, role, documents, vehicle) follow after sign-in.</p>
+        <p className="text-xs text-secondary">Next: a quick setup — your name, whether you drive or post trips, and your city.</p>
       </div>
     </main>
   );
