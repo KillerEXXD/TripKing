@@ -23,6 +23,7 @@ import {
   KeyRound,
   BellRing,
   Ticket,
+  Send,
   HelpCircle,
 } from 'lucide-react';
 
@@ -46,6 +47,7 @@ const MAP: Record<string, LucideIcon> = {
   'key-round': KeyRound,
   'bell-ring': BellRing,
   ticket: Ticket,
+  send: Send,
 };
 
 export function iconFor(key: string): LucideIcon {
