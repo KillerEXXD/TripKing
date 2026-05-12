@@ -1,0 +1,111 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { DriverHomePage } from '@/pages/DriverHomePage';
+import { ApiError } from '@/lib/api/client';
+import type { Driver, Trip, User } from '@/types';
+
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
+import { useAuth } from '@/contexts/AuthContext';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
+import { useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn() }));
+import { useTrips } from '@/hooks/useTrips';
+vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
+import { useVacancies } from '@/hooks/useVacancies';
+vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
+vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn(() => ({ data: [] })) } }));
+vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
+
+const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true };
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
+function makeDriver(over: Partial<Driver> = {}): Driver {
+  return { id: 'd1', userId: 'u1', fullName: 'Ravi Kumar', phone: '+91', homeCity: city('c1', 'Vellore'), currentCity: city('c1', 'Vellore'), profilePhotoUrl: '', kycStatus: 'approved', ratingAvg: 4.7, ratingCount: 9, ratingDistribution: { '1': 0, '2': 0, '3': 1, '4': 2, '5': 6 }, topTags: ['Punctual'], managerTopTags: [], totalTripsCompleted: 20, vehicles: [], ...over };
+}
+function makeTrip(over: Partial<Trip> = {}): Trip {
+  return { id: 't1', postedByUserId: 'u9', postedByRole: 'trip_manager', postedByName: 'Agent', fromCity: city('c1', 'Vellore'), toCity: city('c2', 'Chennai'), pickupAt: '2099-06-01T09:00:00Z', expectedDistanceKm: 140, carTypeId: 'ct1', carTypeLabel: 'Sedan', seatsRequired: 4, acRequired: true, ratePerKm: 14, totalFare: 1960, commissionPct: 10, gstAmount: 98, driverBata: 300, extrasPaidByPassenger: true, driverPayout: 2200, passengerName: 'P', passengerPhone: '+91', passengerCount: 2, status: 'open', showFareToPassenger: true, hidePassengerPhone: false, applicantCount: 0, createdAt: '2099-05-30T00:00:00Z', ...over };
+}
+
+function setUser(user: User = driverUser) {
+  vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+}
+type QS = { isPending?: boolean; isError?: boolean; isSuccess?: boolean; error?: unknown; data?: unknown; refetch?: () => void };
+function setMyDriver(s: QS = {}) {
+  vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, isSuccess: true, error: null, data: undefined, refetch: vi.fn(), ...s } as never);
+}
+function setTrips(perCall: QS[] | QS) {
+  // DriverHome calls useTrips twice (nearby, my-posts); accept an array or a single state for both.
+  let i = 0;
+  const arr = Array.isArray(perCall) ? perCall : [perCall, perCall];
+  vi.mocked(useTrips).mockImplementation(() => ({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...(arr[i++] ?? arr[arr.length - 1]) }) as never);
+}
+function setVacancies(s: QS = {}) {
+  vi.mocked(useVacancies).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...s } as never);
+}
+
+function renderHome() {
+  return render(
+    <MemoryRouter initialEntries={['/']}>
+      <Routes>
+        <Route path="/" element={<DriverHomePage />} />
+        <Route path="/onboarding" element={<div>onboarding page</div>} />
+        <Route path="/trips" element={<div>trips feed</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+describe('DriverHomePage', () => {
+  beforeEach(() => {
+    vi.mocked(useAuth).mockReset();
+    vi.mocked(useMyDriver).mockReset();
+    vi.mocked(useTrips).mockReset();
+    vi.mocked(useVacancies).mockReset();
+    setUser();
+    setMyDriver({ data: makeDriver() });
+    setTrips({ data: [] });
+    setVacancies({ data: [] });
+  });
+
+  it('prompts to onboard when the user has no driver profile (404)', () => {
+    setMyDriver({ isError: true, isSuccess: false, error: new ApiError('No profile', 404) });
+    renderHome();
+    expect(screen.getByText(/finish setting up your driver profile/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /set up my profile/i }));
+    expect(screen.getByText('onboarding page')).toBeInTheDocument();
+  });
+
+  it('shows a skeleton while the profile loads', () => {
+    setMyDriver({ isPending: true, isSuccess: false });
+    renderHome();
+    expect(screen.getByRole('status', { name: /loading/i })).toBeInTheDocument();
+  });
+
+  it('shows an error state with retry on a non-404 failure', () => {
+    const refetch = vi.fn();
+    setMyDriver({ isError: true, isSuccess: false, error: new Error('boom'), refetch });
+    renderHome();
+    expect(screen.getByText(/couldn't load your home/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('renders the driver home — greeting, action tiles, reputation, empty feed', () => {
+    setMyDriver({ data: makeDriver() });
+    setTrips({ data: [] });
+    renderHome();
+    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();
+    expect(screen.getByText('Driver')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /find a trip/i })).toHaveAttribute('href', '/trips');
+    expect(screen.getByRole('link', { name: /i'm available/i })).toHaveAttribute('href', '/vacancies/new');
+    expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
+    expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
+  });
+
+  it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {
+    setTrips([{ data: [makeTrip({ id: 't1' })] }, { data: [makeTrip({ id: 'p1', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
+    renderHome();
+    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
+    expect(screen.getByText(/trip you posted has applicants/i)).toBeInTheDocument();
+  });
+});

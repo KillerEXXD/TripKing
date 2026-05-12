@@ -9,6 +9,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 // These pages' data hooks are exercised in their own tests — here we only check routing.
 vi.mock('@/pages/OnboardingPage', () => ({ default: () => <div>onboarding screen</div> }));
+vi.mock('@/pages/HomeForRole', () => ({ default: () => <div>home for role</div> }));
 vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }));
 vi.mock('@/pages/PostTripPage', () => ({ default: () => <div>post trip</div> }));
 vi.mock('@/pages/PostedTripsPage', () => ({ default: () => <div>posted trips</div> }));
@@ -67,10 +68,10 @@ describe('AppRoutes', () => {
     expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 
-  it('/ renders the home page for a signed-in user', async () => {
+  it('/ renders the role-aware home for a signed-in user', async () => {
     setAuth(driver);
     renderAt('/');
-    expect(await screen.findByRole('link', { name: /post a trip/i })).toBeInTheDocument();
+    expect(await screen.findByText(/home for role/i)).toBeInTheDocument();
   });
 
   it('/onboarding renders the onboarding screen for a signed-in user', async () => {

@@ -7,7 +7,7 @@ import { LoadingSkeleton } from '@/components/feedback';
 
 const SignInPage = lazy(() => import('@/pages/SignInPage'));
 const OnboardingPage = lazy(() => import('@/pages/OnboardingPage'));
-const HomePage = lazy(() => import('@/pages/HomePage'));
+const HomeForRole = lazy(() => import('@/pages/HomeForRole'));
 const TripFeedPage = lazy(() => import('@/pages/TripFeedPage'));
 const PostTripPage = lazy(() => import('@/pages/PostTripPage'));
 const PostedTripsPage = lazy(() => import('@/pages/PostedTripsPage'));
@@ -51,7 +51,7 @@ export function AppRoutes() {
         {/* Post-sign-in onboarding/KYC — auth required, but full-screen (no app shell). */}
         <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<HomeForRole />} />
           <Route path="/trips" element={<TripFeedPage />} />
           <Route path="/trips/new" element={<PostTripPage />} />
           <Route path="/trips/:id" element={<TripDetailPage />} />
