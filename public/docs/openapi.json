@@ -42,6 +42,10 @@
     {
       "name": "vacancies",
       "description": "Driver availability posts (driver is in city X, willing to drive to one of these destinations)."
+    },
+    {
+      "name": "alerts",
+      "description": "Saved searches that fire a notification on a matching trip/vacancy (owner-scoped)."
     }
   ],
   "components": {
@@ -1669,6 +1673,192 @@
             "$ref": "#/components/responses/Envelope"
           },
           "409": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/alerts": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "List my alerts (Bearer) — joins from/to city",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Create an alert (Bearer; user_id = caller) — from_city_id required",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "from_city_id"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "from_city_id": {
+                    "type": "string"
+                  },
+                  "from_radius_km": {
+                    "type": "integer"
+                  },
+                  "to_city_id": {
+                    "type": "string"
+                  },
+                  "to_radius_km": {
+                    "type": "integer"
+                  },
+                  "min_rate_per_km": {
+                    "type": "number"
+                  },
+                  "min_commission_pct": {
+                    "type": "number"
+                  },
+                  "car_type_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "pickup_window_start": {
+                    "type": "string"
+                  },
+                  "pickup_window_end": {
+                    "type": "string"
+                  },
+                  "notify_via": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "push",
+                        "sms",
+                        "email",
+                        "in_app"
+                      ]
+                    }
+                  },
+                  "is_active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/alerts/{id}": {
+      "get": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Get an alert (owner/admin; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Update an alert (owner; Bearer) — partial; include is_active/paused_at to pause/resume",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "alerts"
+        ],
+        "summary": "Delete an alert (owner; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
             "$ref": "#/components/responses/Envelope"
           }
         }

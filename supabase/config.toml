@@ -413,6 +413,10 @@ verify_jwt = false
 [functions.vacancies]
 verify_jwt = false
 
+# /alerts/* — Bearer-required; the function validates the JWT and scopes to the caller's own alerts.
+[functions.alerts]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
