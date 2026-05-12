@@ -136,4 +136,14 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('heading', { name: 'Agent A' })).toBeInTheDocument();
     expect(screen.getByText(/A Travels/)).toBeInTheDocument();
   });
+
+  it('shows the 3-step verification checklist on an unverified agent profile', () => {
+    setUser({ ...driverUser, role: 'trip_manager' });
+    setMyAgent({ data: { id: 'a1', userId: 'u1', fullName: 'Agent A', phone: '+91', businessName: 'A Travels', kycStatus: 'docs_submitted', topTags: [], totalTripsPosted: 0, verification: { kycStatus: 'docs_submitted', steps: { details: 'done', documents: 'done', video_call: 'todo' }, stepsDone: 2, stepsTotal: 3 } } });
+    renderProfile();
+    expect(screen.getByText(/get verified to start earning/i)).toBeInTheDocument();
+    expect(screen.getByText('Identity documents')).toBeInTheDocument();
+    expect(screen.getByText('Video verification')).toBeInTheDocument();
+    expect(screen.queryByText('Add your vehicle')).toBeNull();
+  });
 });

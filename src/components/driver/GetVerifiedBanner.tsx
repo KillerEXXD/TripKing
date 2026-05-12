@@ -6,18 +6,20 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VerificationSummary } from '@/types';
-import { nextActionableStep } from './verificationSteps';
+import { DRIVER_VERIFICATION_STEPS, nextActionableStep, type VerificationStepMeta } from './verificationSteps';
 
 export interface GetVerifiedBannerProps {
   verification: VerificationSummary;
+  /** the checklist steps — `DRIVER_VERIFICATION_STEPS` (default) or `AGENT_VERIFICATION_STEPS`. */
+  steps?: VerificationStepMeta[];
   primaryVehicleId?: string;
   className?: string;
 }
 
-export function GetVerifiedBanner({ verification, primaryVehicleId, className }: GetVerifiedBannerProps) {
+export function GetVerifiedBanner({ verification, steps = DRIVER_VERIFICATION_STEPS, primaryVehicleId, className }: GetVerifiedBannerProps) {
   if (verification.kycStatus === 'approved') return null;
   const { stepsDone, stepsTotal } = verification;
-  const next = nextActionableStep(verification);
+  const next = nextActionableStep(verification, steps);
   const waiting =
     !next && verification.kycStatus === 'video_pending'
       ? 'Your video call is scheduled — sit tight.'

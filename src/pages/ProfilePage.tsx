@@ -7,7 +7,7 @@ import { useMyAgent, useMyDriver, useUpdateAgent, useUpdateDriver } from '@/hook
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card, Input } from '@/components/ui';
-import { DriverVerificationChecklist } from '@/components/driver';
+import { AGENT_VERIFICATION_STEPS, VerificationChecklist } from '@/components/driver';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatRating, initials } from '@/lib/utils';
@@ -148,7 +148,7 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
 
       {driver.verification ? (
         <div id="get-verified" className="scroll-mt-4">
-          <DriverVerificationChecklist verification={driver.verification} primaryVehicleId={(vehiclesQuery.data ?? []).find((v) => v.isPrimary)?.id ?? (vehiclesQuery.data ?? [])[0]?.id} />
+          <VerificationChecklist verification={driver.verification} primaryVehicleId={(vehiclesQuery.data ?? []).find((v) => v.isPrimary)?.id ?? (vehiclesQuery.data ?? [])[0]?.id} />
         </div>
       ) : null}
 
@@ -240,6 +240,12 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
           />
         ) : null}
       </Card>
+
+      {agent.verification ? (
+        <div id="get-verified" className="scroll-mt-4">
+          <VerificationChecklist verification={agent.verification} steps={AGENT_VERIFICATION_STEPS} />
+        </div>
+      ) : null}
 
       <Button variant="outline" onClick={onSignOut} disabled={signingOut} className="w-full">
         <LogOut className="size-4" aria-hidden /> {signingOut ? 'Signing out…' : 'Sign out'}

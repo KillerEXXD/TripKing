@@ -1,12 +1,13 @@
 /**
- * The driver "Get verified" checklist — the canonical view of the 5 verification steps, shown
- * on /profile. Reads the server-computed `verification` block; each row links to its own screen.
+ * The "Get verified" checklist — the canonical view of the verification steps, shown on /profile.
+ * Reads the server-computed `verification` block; each row links to its own screen. Pass `steps` to
+ * render the driver checklist (5 steps, the default) or the agent one (`AGENT_VERIFICATION_STEPS`, 3).
  */
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, Circle, Clock3, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { VerificationStepStatus, VerificationSummary } from '@/types';
-import { DRIVER_VERIFICATION_STEPS } from './verificationSteps';
+import { DRIVER_VERIFICATION_STEPS, type VerificationStepMeta } from './verificationSteps';
 
 function StepIcon({ status }: { status: VerificationStepStatus }) {
   if (status === 'done') return <CheckCircle2 className="size-5 shrink-0 text-emerald-600" aria-hidden />;
@@ -15,14 +16,16 @@ function StepIcon({ status }: { status: VerificationStepStatus }) {
   return <Circle className="size-5 shrink-0 text-gray-300" aria-hidden />;
 }
 
-export interface DriverVerificationChecklistProps {
+export interface VerificationChecklistProps {
   verification: VerificationSummary;
-  /** the driver's primary (or first) vehicle id, used for the "Vehicle photos" step. */
+  /** the checklist steps to render — `DRIVER_VERIFICATION_STEPS` (default) or `AGENT_VERIFICATION_STEPS`. */
+  steps?: VerificationStepMeta[];
+  /** the driver's primary (or first) vehicle id, used for the "Vehicle photos" step (driver checklist only). */
   primaryVehicleId?: string;
   className?: string;
 }
 
-export function DriverVerificationChecklist({ verification, primaryVehicleId, className }: DriverVerificationChecklistProps) {
+export function VerificationChecklist({ verification, steps = DRIVER_VERIFICATION_STEPS, primaryVehicleId, className }: VerificationChecklistProps) {
   const { kycStatus, stepsDone, stepsTotal, kycRejectionReason } = verification;
 
   if (kycStatus === 'approved') {
@@ -51,7 +54,7 @@ export function DriverVerificationChecklist({ verification, primaryVehicleId, cl
       )}
 
       <ul className="divide-y">
-        {DRIVER_VERIFICATION_STEPS.map((step) => {
+        {steps.map((step) => {
           const status = verification.steps[step.key] ?? 'todo';
           const to = step.route(primaryVehicleId);
           return (
@@ -77,4 +80,4 @@ export function DriverVerificationChecklist({ verification, primaryVehicleId, cl
   );
 }
 
-export default DriverVerificationChecklist;
+export default VerificationChecklist;

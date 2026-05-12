@@ -27,9 +27,21 @@ export const DRIVER_VERIFICATION_STEPS: VerificationStepMeta[] = [
   { key: 'video_call', title: 'Video verification', why: 'A quick video call so an admin can match your face to your documents and check the car is roadworthy.', route: () => '/verify/video-call' },
 ];
 
-/** The next step the driver should act on (the first `todo` / `action_needed`), or null if they're just waiting. */
-export function nextActionableStep(v: VerificationSummary): VerificationStepMeta | null {
-  for (const step of DRIVER_VERIFICATION_STEPS) {
+/** The trip-manager (agent) verification checklist — Aadhaar + selfie + a video call, no vehicle/licence. */
+export const AGENT_VERIFICATION_STEPS: VerificationStepMeta[] = [
+  { key: 'details', title: 'Your details', why: 'Your name and business city — done when you signed up. Tap to edit.', route: () => '/profile' },
+  {
+    key: 'documents',
+    title: 'Identity documents',
+    why: 'Aadhaar (front & back) and a selfie — so we can confirm who you are. Only admins see them.',
+    route: () => '/verify/documents',
+  },
+  { key: 'video_call', title: 'Video verification', why: 'A quick video call so an admin can match your face to your documents.', route: () => '/verify/video-call' },
+];
+
+/** The next step the user should act on (the first `todo` / `action_needed`), or null if they're just waiting. */
+export function nextActionableStep(v: VerificationSummary, steps: VerificationStepMeta[] = DRIVER_VERIFICATION_STEPS): VerificationStepMeta | null {
+  for (const step of steps) {
     const s = v.steps[step.key];
     if (s === 'todo' || s === 'action_needed') return step;
   }

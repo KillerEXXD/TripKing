@@ -1,6 +1,6 @@
 /** Driver feature components barrel. */
-export { DriverVerificationChecklist } from './DriverVerificationChecklist';
+export { VerificationChecklist } from './VerificationChecklist';
 export { GetVerifiedBanner } from './GetVerifiedBanner';
 export { KycGateNotice } from './KycGateNotice';
-export { DRIVER_VERIFICATION_STEPS, nextActionableStep } from './verificationSteps';
+export { DRIVER_VERIFICATION_STEPS, AGENT_VERIFICATION_STEPS, nextActionableStep } from './verificationSteps';
 export type { VerificationStepMeta } from './verificationSteps';
