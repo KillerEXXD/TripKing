@@ -24,6 +24,11 @@ export function AdministrationPage() {
         <h2 className="font-semibold">Operations</h2>
         <ul className="mt-1 space-y-1 text-sm">
           <li>
+            <Link to="/administration/dashboard" className="text-primary underline">
+              Platform dashboard →
+            </Link>
+          </li>
+          <li>
             <Link to="/administration/kyc" className="text-primary underline">
               KYC review queue →
             </Link>

@@ -17,6 +17,7 @@ const TripDetailPage = lazyWithRetry(() => import('@/pages/TripDetailPage'));
 const ApplicantReviewPage = lazyWithRetry(() => import('@/pages/ApplicantReviewPage'));
 const DriverProfilePage = lazyWithRetry(() => import('@/pages/DriverProfilePage'));
 const ProfilePage = lazyWithRetry(() => import('@/pages/ProfilePage'));
+const AgentAnalyticsPage = lazyWithRetry(() => import('@/pages/AgentAnalyticsPage'));
 const VerifyDocumentsPage = lazyWithRetry(() => import('@/pages/VerifyDocumentsPage'));
 const VehicleFormPage = lazyWithRetry(() => import('@/pages/VehicleFormPage'));
 const VehiclePhotosPage = lazyWithRetry(() => import('@/pages/VehiclePhotosPage'));
@@ -35,6 +36,7 @@ const VideoCallConsolePage = lazyWithRetry(() => import('@/pages/administration/
 const VehicleEligibilityPage = lazyWithRetry(() => import('@/pages/administration/VehicleEligibilityPage'));
 const ReviewModerationPage = lazyWithRetry(() => import('@/pages/administration/ReviewModerationPage'));
 const TranslationManagerPage = lazyWithRetry(() => import('@/pages/administration/TranslationManagerPage'));
+const AdminDashboardPage = lazyWithRetry(() => import('@/pages/administration/AdminDashboardPage'));
 // Public marketing pages — no auth, no app layout.
 const WebsitePage = lazyWithRetry(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazyWithRetry(() => import('@/pages/ForAgentsPage'));
@@ -75,6 +77,7 @@ export function AppRoutes() {
             <Route path="/posted-trips" element={<PostedTripsPage />} />
             <Route path="/drivers/:id" element={<DriverProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/analytics" element={<AgentAnalyticsPage />} />
             <Route path="/verify/documents" element={<VerifyDocumentsPage />} />
             <Route path="/verify/video-call" element={<BookVideoCallPage />} />
             <Route path="/vehicles/new" element={<VehicleFormPage />} />
@@ -87,6 +90,7 @@ export function AppRoutes() {
             <Route path="/alerts/:id" element={<AlertDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
+            <Route path="/administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
             <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
             <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
             <Route path="/administration/video-calls" element={<AdminRoute><VideoCallConsolePage /></AdminRoute>} />

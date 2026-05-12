@@ -247,6 +247,10 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
         </div>
       ) : null}
 
+      <Link to="/analytics" className="block rounded-xl border bg-white px-4 py-3 text-sm font-medium text-primary underline">
+        View your analytics →
+      </Link>
+
       <Button variant="outline" onClick={onSignOut} disabled={signingOut} className="w-full">
         <LogOut className="size-4" aria-hidden /> {signingOut ? 'Signing out…' : 'Sign out'}
       </Button>
