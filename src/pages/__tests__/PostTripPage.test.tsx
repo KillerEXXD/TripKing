@@ -19,6 +19,19 @@ vi.mock('@/components/share/ShareTripModal', () => ({
     </div>
   ),
 }));
+// Stub the place-pin affordance: a button that "pins" a fixed place (or removes it).
+vi.mock('@/components/location/PlacePinField', () => ({
+  PlacePinField: ({ value, onChange, pinLabel }: { value: { id: string; name: string } | null; onChange: (p: { id: string; name: string } | null) => void; pinLabel?: string }) =>
+    value ? (
+      <button type="button" aria-label={`Remove ${value.name}`} onClick={() => onChange(null)}>
+        {value.name}
+      </button>
+    ) : (
+      <button type="button" onClick={() => onChange({ id: 'p1', name: 'Katpadi, Vellore' })}>
+        {pinLabel ?? 'pin'}
+      </button>
+    ),
+}));
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 const carType = (id: string, label: string) => ({ id, label, sortOrder: 1, isActive: true });
@@ -52,13 +65,14 @@ function set(container: HTMLElement, name: string, value: string) {
   fireEvent.change(el, { target: { value } });
 }
 
-/** Fill the step-1 form (route + vehicle) and advance to step 2. */
+/** Fill the step-1 form (route + vehicle, + pin an exact pickup point) and advance to step 2. */
 async function completeStep1(container: HTMLElement) {
   set(container, 'fromCityId', 'c1');
   set(container, 'toCityId', 'c2');
   set(container, 'pickupAt', '2099-06-01T09:00');
   set(container, 'expectedDistanceKm', '140');
   fireEvent.click(screen.getByRole('button', { name: 'Sedan' }));
+  fireEvent.click(screen.getByRole('button', { name: /pin the exact pickup point/i })); // sets fromPlace = p1 (stubbed)
   fireEvent.click(screen.getByRole('button', { name: /next: price/i }));
   await screen.findByRole('button', { name: /^post trip$/i });
 }
@@ -134,7 +148,7 @@ describe('PostTripPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ fromCityId: 'c1', toCityId: 'c2', carTypeId: 'ct1', expectedDistanceKm: 140, ratePerKm: 15, totalFare: 2100, passengerName: 'Passenger P' }),
+        expect.objectContaining({ fromCityId: 'c1', toCityId: 'c2', fromPlaceId: 'p1', carTypeId: 'ct1', expectedDistanceKm: 140, ratePerKm: 15, totalFare: 2100, passengerName: 'Passenger P' }),
       ),
     );
     expect(await screen.findByText('share modal')).toBeInTheDocument();
