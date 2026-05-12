@@ -1,3 +1,5 @@
+import type { ErrorCode } from './codes.ts';
+
 export const corsHeaders: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key, x-admin-key',
@@ -18,7 +20,7 @@ export function ok(data: unknown, meta?: unknown): Response {
   return envelope(meta === undefined ? { success: true, data, error: null } : { success: true, data, meta, error: null }, 200);
 }
 
-/** `{ success:false, data:null, error:{ code, message, ...extra } }` */
-export function fail(code: string, message: string, status = 400, extra?: Record<string, unknown>): Response {
+/** `{ success:false, data:null, error:{ code, message, ...extra } }` — prefer a standard `ErrorCode`; other strings allowed for endpoint-specific codes. */
+export function fail(code: ErrorCode | (string & {}), message: string, status = 400, extra?: Record<string, unknown>): Response {
   return envelope({ success: false, data: null, error: { code, message, ...(extra ?? {}) } }, status);
 }
