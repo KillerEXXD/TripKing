@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { MapPin, Snowflake, Sparkles } from 'lucide-react';
 import { useTrips } from '@/hooks/useTrips';
 import { carTypeHooks, cityHooks } from '@/hooks/useAdminConfig';
+import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR } from '@/lib/utils';
-import type { Trip, TripStatus } from '@/types';
+import type { NearRadius, Trip, TripStatus } from '@/types';
 
 /** Trips a driver can still apply to. */
 const FEED_STATUSES: TripStatus[] = ['open', 'has_applicants'];
@@ -35,6 +36,11 @@ function TripCard({ trip }: { trip: Trip }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          {trip.distanceKm != null ? (
+            <Badge variant="muted">
+              <MapPin className="size-3" aria-hidden /> {trip.distanceKm} km away
+            </Badge>
+          ) : null}
           {trip.carTypeLabel ? <Badge variant="outline">{trip.carTypeLabel}</Badge> : null}
           {trip.acRequired ? <Badge variant="outline">AC</Badge> : null}
           <Badge variant="muted">{formatINR(trip.ratePerKm)}/km</Badge>
@@ -63,19 +69,30 @@ export function TripFeedPage() {
   const [fromCityId, setFromCityId] = useState('');
   const [carTypeId, setCarTypeId] = useState('');
   const [acOnly, setAcOnly] = useState(false);
+  const [near, setNear] = useState<NearRadius | null>(null);
 
-  const tripsQuery = useTrips({ status: FEED_STATUSES, fromCityId: fromCityId || undefined });
+  const tripsQuery = useTrips({ status: FEED_STATUSES, fromCityId: fromCityId || undefined, ...(near ? { near } : {}) });
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
 
   const trips = tripsQuery.data ?? [];
   const filtered = trips.filter((t) => (carTypeId === '' || t.carTypeId === carTypeId) && (!acOnly || t.acRequired));
+  const anyFilter = carTypeId !== '' || acOnly || fromCityId !== '' || near != null;
+
+  function clearFilters() {
+    setCarTypeId('');
+    setAcOnly(false);
+    setFromCityId('');
+    setNear(null);
+  }
 
   return (
     <div className="mx-auto max-w-md">
       <header className="border-b bg-white px-4 py-3">
         <h1 className="text-base font-semibold">Open trips</h1>
-        <p className="text-xs text-secondary">{tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'} you can apply to` : 'Trips that still need a driver'}</p>
+        <p className="text-xs text-secondary">
+          {tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''} you can apply to` : 'Trips that still need a driver'}
+        </p>
       </header>
 
       <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
@@ -109,6 +126,7 @@ export function TripFeedPage() {
         >
           <Snowflake className="size-3.5" aria-hidden /> AC only
         </button>
+        <NearMeFilter value={near} onChange={setNear} />
       </div>
 
       <div className="space-y-3 p-4">
@@ -119,19 +137,17 @@ export function TripFeedPage() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<MapPin className="size-7" />}
-            title={trips.length === 0 ? 'No open trips right now' : 'No trips match your filters'}
-            message={trips.length === 0 ? 'New trips from your area will show up here.' : 'Try clearing the car-type / AC filter or picking a different pickup city.'}
+            title={anyFilter ? 'No trips match your filters' : 'No open trips right now'}
+            message={
+              anyFilter
+                ? near
+                  ? 'Try a bigger radius, or clear the location filter.'
+                  : 'Try clearing the car-type / AC filter or picking a different pickup city.'
+                : 'New trips from your area will show up here.'
+            }
             action={
-              trips.length > 0 ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCarTypeId('');
-                    setAcOnly(false);
-                    setFromCityId('');
-                  }}
-                >
+              anyFilter ? (
+                <Button variant="outline" size="sm" onClick={clearFilters}>
                   Clear filters
                 </Button>
               ) : undefined

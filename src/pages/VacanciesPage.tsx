@@ -3,10 +3,11 @@ import { Link } from 'react-router-dom';
 import { Car, MapPin, Star } from 'lucide-react';
 import { useVacancies } from '@/hooks/useVacancies';
 import { cityHooks } from '@/hooks/useAdminConfig';
+import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
-import type { Vacancy } from '@/types';
+import type { NearRadius, Vacancy } from '@/types';
 
 function availableLabel(v: Vacancy): string {
   const from = new Date(v.availableFrom);
@@ -39,7 +40,8 @@ function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
                   <span className="font-semibold text-amber-600">★ {driver.ratingAvg.toFixed(1)}</span> · {driver.ratingCount} · {driver.totalTripsCompleted} trips ·{' '}
                 </>
               ) : null}
-              <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Available in {vacancy.currentCity.name} · {availableLabel(vacancy)}
+              <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Available in {vacancy.currentPlace?.name ?? vacancy.currentCity.name} · {availableLabel(vacancy)}
+              {vacancy.distanceKm != null ? ` · ${vacancy.distanceKm} km away` : ''}
             </div>
           </div>
           {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
@@ -75,9 +77,11 @@ function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
 export function VacanciesPage() {
   const [currentCityId, setCurrentCityId] = useState('');
   const [destinationCityId, setDestinationCityId] = useState('');
-  const vacanciesQuery = useVacancies({ status: 'active', currentCityId: currentCityId || undefined, destinationCityId: destinationCityId || undefined });
+  const [near, setNear] = useState<NearRadius | null>(null);
+  const vacanciesQuery = useVacancies({ status: 'active', currentCityId: currentCityId || undefined, destinationCityId: destinationCityId || undefined, ...(near ? { near } : {}) });
   const citiesQuery = cityHooks.useList();
   const vacancies = vacanciesQuery.data ?? [];
+  const anyFilter = !!currentCityId || !!destinationCityId || near != null;
 
   const chipSelect = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
   return (
@@ -85,7 +89,9 @@ export function VacanciesPage() {
       <header className="flex items-center gap-2 border-b bg-white px-4 py-3">
         <div className="min-w-0 flex-1">
           <h1 className="text-base font-semibold">Available drivers</h1>
-          <p className="text-xs text-secondary">{vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available` : 'Drivers who have posted their availability'}</p>
+          <p className="text-xs text-secondary">
+            {vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
+          </p>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link to="/vacancies/new">Post availability</Link>
@@ -115,12 +121,14 @@ export function VacanciesPage() {
             </option>
           ))}
         </select>
-        {currentCityId || destinationCityId ? (
+        <NearMeFilter value={near} onChange={setNear} />
+        {anyFilter ? (
           <button
             type="button"
             onClick={() => {
               setCurrentCityId('');
               setDestinationCityId('');
+              setNear(null);
             }}
             className="h-8 rounded-full border border-input bg-white px-3 text-xs font-medium"
           >
@@ -137,8 +145,8 @@ export function VacanciesPage() {
         ) : vacancies.length === 0 ? (
           <EmptyState
             icon={<Star className="size-7" />}
-            title={currentCityId || destinationCityId ? 'No drivers match those filters' : 'No drivers have posted availability yet'}
-            message={currentCityId || destinationCityId ? 'Try widening the filters.' : 'When a driver posts their availability it shows up here.'}
+            title={anyFilter ? 'No drivers match those filters' : 'No drivers have posted availability yet'}
+            message={anyFilter ? (near ? 'Try a bigger radius, or clear the location filter.' : 'Try widening the filters.') : 'When a driver posts their availability it shows up here.'}
           />
         ) : (
           vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} />)
