@@ -54,6 +54,10 @@
     {
       "name": "analytics",
       "description": "Server-computed analytics — the platform dashboard (admin), per-agent analytics, and the API-metrics rollup (admin)."
+    },
+    {
+      "name": "places",
+      "description": "Maps-backed locations — a server-side geocoder proxy (search) and find-or-create for a places row."
     }
   ],
   "components": {
@@ -2327,6 +2331,119 @@
             "$ref": "#/components/responses/Envelope"
           },
           "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/places/search": {
+      "get": {
+        "tags": [
+          "places"
+        ],
+        "summary": "Geocoder search (public) — server-side proxy to the configured provider (PLACES_PROVIDER + PLACES_API_KEY; biased to India). Does not persist. Per-IP rate-limited; responses carry Cache-Control. data is an array of { provider, providerPlaceId, name, formattedAddress, state, lat, lng }. Returns [] when the provider is unconfigured or upstream is unavailable; q shorter than 2 chars → [].",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "free-text query (≥ 2 chars)"
+          },
+          {
+            "name": "near_lat",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            },
+            "description": "optional proximity bias (with near_lng)"
+          },
+          {
+            "name": "near_lng",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 6,
+              "minimum": 1,
+              "maximum": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/places": {
+      "post": {
+        "tags": [
+          "places"
+        ],
+        "summary": "Find-or-create a place (public) — match by (provider, providerPlaceId), else by a ~5dp lat/lng + provider match; otherwise insert. Returns the stored Place (snake_case row, incl. id). Per-IP rate-limited.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "provider",
+                  "name",
+                  "lat",
+                  "lng"
+                ],
+                "properties": {
+                  "provider": {
+                    "type": "string"
+                  },
+                  "providerPlaceId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "formattedAddress": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lng": {
+                    "type": "number"
+                  },
+                  "cityId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
