@@ -9,6 +9,8 @@ vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn() }));
 import { useTrip } from '@/hooks/useTrips';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
+// The review block is exercised in TripReviewSection.test.tsx — here we only check it mounts on completed trips.
+vi.mock('@/components/reviews/TripReviewSection', () => ({ TripReviewSection: () => <div>review section</div> }));
 
 const driver: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Driver D', preferredLanguage: 'en', isActive: true };
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
@@ -98,6 +100,12 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('Passenger P · 2 pax')).toBeInTheDocument();
     // driver + applyable trip → the "apply coming soon" note
     expect(screen.getByText(/applying to trips/i)).toBeInTheDocument();
+  });
+
+  it('shows the review section on a completed trip', () => {
+    setTrip({ data: makeTrip({ status: 'completed' }) });
+    renderDetail();
+    expect(screen.getByText('review section')).toBeInTheDocument();
   });
 
   it('the back button returns to the trip feed', () => {

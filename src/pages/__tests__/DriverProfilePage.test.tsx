@@ -7,6 +7,8 @@ import type { Driver } from '@/types';
 
 vi.mock('@/hooks/useDrivers', () => ({ useDriver: vi.fn() }));
 import { useDriver } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useReviews', () => ({ useDriverReviews: vi.fn() }));
+import { useDriverReviews } from '@/hooks/useReviews';
 
 const city = (id: string, name: string) => ({ id, name, state: 'Tamil Nadu', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeDriver(over: Partial<Driver> = {}): Driver {
@@ -46,7 +48,10 @@ function renderProfile() {
 }
 
 describe('DriverProfilePage', () => {
-  beforeEach(() => vi.mocked(useDriver).mockReset());
+  beforeEach(() => {
+    vi.mocked(useDriver).mockReset();
+    vi.mocked(useDriverReviews).mockReset().mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn() } as never);
+  });
 
   it('renders a skeleton while the profile loads', () => {
     setDriver({ isPending: true });

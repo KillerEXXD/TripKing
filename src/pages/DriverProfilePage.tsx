@@ -1,6 +1,8 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Car, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useDriver } from '@/hooks/useDrivers';
+import { useDriverReviews } from '@/hooks/useReviews';
+import { ReviewList } from '@/components/reviews/ReviewList';
 import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -67,6 +69,8 @@ function VehicleRow({ v }: { v: VehicleSummary }) {
 function DriverDetail({ driver }: { driver: Driver }) {
   const kyc = KYC_BADGE[driver.kycStatus] ?? KYC_BADGE.pending;
   const telHref = `tel:${driver.phone.replace(/[^\d+]/g, '')}`;
+  const reviewsQuery = useDriverReviews(driver.userId);
+  const reviews = reviewsQuery.data ?? [];
   return (
     <div className="space-y-4">
       <Card className="gap-3">
@@ -170,6 +174,19 @@ function DriverDetail({ driver }: { driver: Driver }) {
           </div>
         )}
       </Card>
+
+      <div className="space-y-2">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Reviews</div>
+        {reviewsQuery.isPending ? (
+          <LoadingSkeleton rows={2} />
+        ) : reviewsQuery.isError ? (
+          <p className="text-sm text-secondary">Couldn&apos;t load reviews.</p>
+        ) : reviews.length === 0 ? (
+          <p className="text-sm text-secondary">No written reviews yet.</p>
+        ) : (
+          <ReviewList reviews={reviews} />
+        )}
+      </div>
     </div>
   );
 }

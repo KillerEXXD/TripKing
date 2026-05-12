@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Car, Info, MapPin, User, Users, Wallet } from 'lucide-react';
 import { useTrip } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
+import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -97,6 +98,8 @@ function TripDetail({ trip, isDriver }: { trip: Trip; isDriver: boolean }) {
         {trip.luggageNotes ? <Row icon={<Info />} label="Luggage" value={trip.luggageNotes} /> : null}
         {trip.specialRequests ? <Row icon={<Info />} label="Special requests" value={trip.specialRequests} /> : null}
       </Card>
+
+      {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
       {isDriver && applyable ? (
         <Card className="border-dashed">
