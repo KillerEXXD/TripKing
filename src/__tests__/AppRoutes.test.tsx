@@ -39,13 +39,13 @@ describe('AppRoutes', () => {
   it('/signin renders the sign-in page', async () => {
     setAuth(null);
     renderAt('/signin');
-    expect(await screen.findByText(/sign in to tripking/i)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 
   it('/ redirects an anonymous user to /signin', async () => {
     setAuth(null);
     renderAt('/');
-    expect(await screen.findByText(/sign in to tripking/i)).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 
   it('/ renders the home page for a signed-in user', async () => {
