@@ -10,3 +10,4 @@ export * from './vacancy';
 export * from './alert';
 export * from './review';
 export * from './notification';
+export * from './analytics';

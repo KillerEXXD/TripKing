@@ -116,6 +116,11 @@ function AgentHome({ agent }: { agent: Agent }) {
             <ChevronRight className="size-3" aria-hidden /> View / edit your profile
           </div>
         </Link>
+
+        <Link to="/analytics" className="flex items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-medium transition-colors hover:border-primary/40">
+          <span>Your analytics</span>
+          <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
+        </Link>
       </div>
 
       <div className="px-4 pb-4">
