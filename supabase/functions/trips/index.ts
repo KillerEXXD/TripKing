@@ -181,6 +181,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const totalFare = b.total_fare !== undefined && b.total_fare !== null ? Number(b.total_fare) : Math.round(distance * rate);
     const { data: usr } = await db.from('users').select('display_name, role').eq('id', u.id).maybeSingle();
     const posterRole = usr?.role === 'driver' ? 'driver' : 'trip_manager';
+    const { data: posterProf } = await (posterRole === 'driver'
+      ? db.from('drivers').select('kyc_status').eq('user_id', u.id).maybeSingle()
+      : db.from('trip_managers').select('kyc_status').eq('user_id', u.id).maybeSingle());
+    if ((posterProf?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a trip', 403);
     const insert = {
       posted_by_user_id: u.id,
       posted_by_role: posterRole,
@@ -260,6 +264,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (!(await rateLimitOk(db, `apply-trip:${u.id}`, 120, 60))) return fail('RATE_LIMITED', 'Too many applications — try again shortly', 429);
       const did = await driverIdFor(u.id);
       if (!did) return fail('FORBIDDEN', 'You need a driver profile to apply', 403);
+      const { data: drvKyc } = await db.from('drivers').select('kyc_status').eq('id', did).maybeSingle();
+      if ((drvKyc?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before applying to trips', 403);
       const b = await readBody(req);
       const { data, error } = await db
         .from('trip_acceptances')

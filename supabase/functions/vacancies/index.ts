@@ -105,6 +105,8 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     if (!(await rateLimitOk(db, `post-vacancy:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many vacancies posted — try again shortly', 429);
     const did = await driverIdFor(u.id);
     if (!did) return fail('FORBIDDEN', 'You need a driver profile to post a vacancy', 403);
+    const { data: drvKyc } = await db.from('drivers').select('kyc_status').eq('id', did).maybeSingle();
+    if ((drvKyc?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a vacancy', 403);
     const b = await readBody(req);
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);
