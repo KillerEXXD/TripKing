@@ -22,6 +22,10 @@
     {
       "name": "trips",
       "description": "Trip lifecycle."
+    },
+    {
+      "name": "notifications",
+      "description": "In-app inbox."
     }
   ],
   "components": {
@@ -880,6 +884,92 @@
             "$ref": "#/components/responses/Envelope"
           },
           "409": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/notifications": {
+      "get": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "The caller's notifications (Bearer)",
+        "parameters": [
+          {
+            "name": "unread_only",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/notifications/{id}": {
+      "patch": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark a notification read (own only; Bearer)",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "is_read": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/notifications/read-all": {
+      "post": {
+        "tags": [
+          "notifications"
+        ],
+        "summary": "Mark all the caller's notifications read (Bearer)",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
             "$ref": "#/components/responses/Envelope"
           }
         }
