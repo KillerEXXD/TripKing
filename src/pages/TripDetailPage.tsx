@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, MapPin, MessageCircle, Phone, User, Users, Wallet } from 'lucide-react';
-import { useApplyToTrip, useTrip, useWithdrawApplication } from '@/hooks/useTrips';
+import { useApplyToTrip, useCompleteTrip, useStartTrip, useTrip, useWithdrawApplication } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,6 +158,64 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing }: { trip
   );
 }
 
+/** Assigned-driver bottom CTA: start the trip with the passenger's OTP, then complete it. */
+function AssignedDriverBar({ trip }: { trip: Trip }) {
+  const startMutation = useStartTrip();
+  const completeMutation = useCompleteTrip();
+  const [showOtp, setShowOtp] = useState(false);
+  const [otp, setOtp] = useState('');
+
+  async function onStart() {
+    const code = otp.trim();
+    if (code.length < 4) {
+      toast.error("Enter the passenger's OTP to start the trip.");
+      return;
+    }
+    try {
+      await startMutation.mutateAsync({ tripId: trip.id, input: { passengerOtp: code } });
+      toast.success('Trip started — drive safe.');
+      setShowOtp(false);
+      setOtp('');
+    } catch {
+      toast.error("That OTP didn't match — double-check it with the passenger.");
+    }
+  }
+  async function onComplete() {
+    try {
+      await completeMutation.mutateAsync({ tripId: trip.id });
+      toast.success('Trip completed — your payout is queued.');
+    } catch {
+      toast.error("Couldn't complete the trip — please try again.");
+    }
+  }
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md space-y-2 border-t bg-white px-4 py-3">
+      <div className="text-center text-xs font-semibold text-primary">You&apos;re driving this trip</div>
+      {trip.status === 'assigned' ? (
+        <>
+          {showOtp ? (
+            <input type="text" inputMode="numeric" maxLength={8} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Passenger OTP" aria-label="Passenger OTP" className="h-11 w-full rounded-md border border-input bg-white text-center font-mono text-lg tracking-[0.3em]" />
+          ) : null}
+          {showOtp ? (
+            <Button variant="full" size="lg" disabled={startMutation.isPending} onClick={() => void onStart()}>
+              {startMutation.isPending ? 'Starting…' : 'Start the trip'}
+            </Button>
+          ) : (
+            <Button variant="full" size="lg" onClick={() => setShowOtp(true)}>
+              Start the trip
+            </Button>
+          )}
+        </>
+      ) : (
+        <Button variant="full" size="lg" disabled={completeMutation.isPending} onClick={() => void onComplete()}>
+          {completeMutation.isPending ? 'Completing…' : 'Complete the trip'}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function PostedBy({ trip }: { trip: Trip }) {
   const isAgentPost = trip.postedByRole !== 'driver';
   const phone = trip.postedByPhone?.trim();
@@ -199,16 +257,17 @@ function PostedBy({ trip }: { trip: Trip }) {
   );
 }
 
-function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean } }) {
+function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean } }) {
   const badge = STATUS_BADGE[trip.status];
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
   const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
   const applyable = trip.status === 'open' || trip.status === 'has_applicants';
   const showApplyBar = viewer.isDriver && !viewer.isPoster && applyable;
+  const showAssignedBar = viewer.isAssignedDriver && (trip.status === 'assigned' || trip.status === 'in_progress');
   const myApplication: MyApplication | undefined = useMyApplicationsStore().byTrip[trip.id];
 
   return (
-    <div className={cn('flex-1 space-y-3 p-4', showApplyBar && 'pb-40')}>
+    <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
       <Card className="gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="text-2xl font-bold leading-tight">
@@ -301,7 +360,7 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
 
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
-      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} /> : null}
+      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} /> : showAssignedBar ? <AssignedDriverBar trip={trip} /> : null}
     </div>
   );
 }
@@ -309,9 +368,9 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
 /**
  * `/trips/:id` — full trip detail, laid out like the prototype: route card,
  * payout breakdown, driver instructions, "Posted by" with Call / Message CTAs,
- * applicant prompts, and (for drivers) a fixed Apply / Withdraw bar that picks
- * one of the driver's vehicles and optionally counter-quotes. Read via `useTrip`;
- * the caller's driver id (for apply) comes from `useMyDriver`.
+ * applicant prompts, a fixed Apply / Withdraw bar (drivers, on open trips) and a
+ * Start / Complete bar (the assigned driver — Start verifies the passenger's
+ * OTP). Read via `useTrip`; the caller's driver id comes from `useMyDriver`.
  */
 export function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -354,6 +413,7 @@ export function TripDetailPage() {
             isDriver,
             isPoster: !!user && tripQuery.data.postedByUserId === user.id,
             isAdmin: user?.role === 'admin',
+            isAssignedDriver: !!myDriverQuery.data?.id && tripQuery.data.assignedDriverId === myDriverQuery.data.id,
             myDriverId: myDriverQuery.data?.id,
             myDriverPending: isDriver && myDriverQuery.isPending,
             myDriverMissing: !!myDriverMissing,

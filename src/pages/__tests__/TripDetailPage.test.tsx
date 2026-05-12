@@ -5,8 +5,8 @@ import { TripDetailPage } from '@/pages/TripDetailPage';
 import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
 
-vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn() }));
-import { useTrip, useApplyToTrip, useWithdrawApplication } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn() }));
+import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip } from '@/hooks/useTrips';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
@@ -92,11 +92,17 @@ function setVehicles(s: Q<Vehicle[]> = {}) {
 }
 let applyMutateAsync: ReturnType<typeof vi.fn>;
 let withdrawMutateAsync: ReturnType<typeof vi.fn>;
+let startMutateAsync: ReturnType<typeof vi.fn>;
+let completeMutateAsync: ReturnType<typeof vi.fn>;
 function setMutations() {
   applyMutateAsync = vi.fn().mockResolvedValue({ id: 'a1', appliedAt: '2099-05-31T00:00:00.000Z' });
   withdrawMutateAsync = vi.fn().mockResolvedValue(undefined);
+  startMutateAsync = vi.fn().mockResolvedValue({});
+  completeMutateAsync = vi.fn().mockResolvedValue({});
   vi.mocked(useApplyToTrip).mockReturnValue({ mutateAsync: applyMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync: withdrawMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useStartTrip).mockReturnValue({ mutateAsync: startMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useCompleteTrip).mockReturnValue({ mutateAsync: completeMutateAsync, isPending: false, isError: false } as never);
 }
 let storeState: { byTrip: Record<string, unknown>; recordApplication: ReturnType<typeof vi.fn>; clearApplication: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn> };
 function setStore(byTrip: Record<string, unknown> = {}) {
@@ -124,6 +130,8 @@ describe('TripDetailPage', () => {
     vi.mocked(useDriverVehicles).mockReset();
     vi.mocked(useApplyToTrip).mockReset();
     vi.mocked(useWithdrawApplication).mockReset();
+    vi.mocked(useStartTrip).mockReset();
+    vi.mocked(useCompleteTrip).mockReset();
     vi.mocked(useMyApplicationsStore).mockReset();
     vi.mocked(useAuth).mockReset().mockReturnValue({ user: driver, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
     vi.mocked(toast.error).mockClear();
@@ -214,5 +222,22 @@ describe('TripDetailPage', () => {
     expect(screen.queryByRole('button', { name: /apply for this trip/i })).toBeNull();
     fireEvent.click(screen.getByRole('link', { name: /review 3 applicants/i }));
     expect(screen.getByText('applicant review')).toBeInTheDocument();
+  });
+
+  it('lets the assigned driver start the trip with the passenger OTP', async () => {
+    setTrip({ data: makeTrip({ status: 'assigned', assignedDriverId: 'd1' }) });
+    renderDetail();
+    expect(screen.getByText(/you're driving this trip/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
+    fireEvent.change(screen.getByLabelText(/passenger otp/i), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
+    await waitFor(() => expect(startMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { passengerOtp: '654321' } }));
+  });
+
+  it('lets the assigned driver complete an in-progress trip', async () => {
+    setTrip({ data: makeTrip({ status: 'in_progress', assignedDriverId: 'd1' }) });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /complete the trip/i }));
+    await waitFor(() => expect(completeMutateAsync).toHaveBeenCalledWith({ tripId: 't1' }));
   });
 });
