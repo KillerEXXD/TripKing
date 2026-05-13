@@ -323,6 +323,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (error) return pgFail(error); // 23503 (bad from_place_id/to_place_id/from_city_id/…) → 422
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_trip', { p_trip_id: created.id }); } catch { /* ignore */ }
+    // upsert into the passengers directory — first poster wins (name + referrer never overwritten);
+    // a different name on a later trip is appended to `aliases`. Best-effort; never fails the POST.
+    const passengerPhone = (insert as Record<string, unknown>).passenger_phone as string;
+    const passengerName = (insert as Record<string, unknown>).passenger_name as string;
+    if (passengerPhone && passengerName) {
+      try { await db.rpc('upsert_passenger_from_trip', {
+        p_phone: passengerPhone,
+        p_name: passengerName,
+        p_referred_by_user_id: u.id,
+        p_trip_id: created.id,
+      }); } catch { /* ignore */ }
+    }
     return ok(await fullTrip(created.id as string, u));
   }
 

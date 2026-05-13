@@ -66,6 +66,10 @@
     {
       "name": "debug",
       "description": "Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See `docs/EXCEPTION_HANDLING.md`."
+    },
+    {
+      "name": "passengers",
+      "description": "Passenger directory — one row per passenger phone seen on a trip. Read-only API; the canonical row is upserted by the `trips` POST handler (migration 019). Admin reads the full list; any authenticated user can do a phone-exact lookup to prefill the post-trip form."
     }
   ],
   "components": {
@@ -237,13 +241,13 @@
           "200": {
             "$ref": "#/components/responses/Envelope"
           },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
           "409": {
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "403": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -3916,10 +3920,10 @@
         ],
         "summary": "Deliberately throw an uncaught error (admin; Bearer) — withTiming reports it to Sentry (tags: source=edge-fn, fn=debug) and returns { code: \"INTERNAL\" } with status 500 (never a raw runtime error). Exercises the L5 edge-function error boundary.",
         "responses": {
-          "500": {
+          "403": {
             "$ref": "#/components/responses/Envelope"
           },
-          "403": {
+          "500": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -3998,6 +4002,95 @@
             "$ref": "#/components/responses/Envelope"
           },
           "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/passengers": {
+      "get": {
+        "tags": [
+          "passengers"
+        ],
+        "summary": "List the passenger directory (admin; Bearer) — newest-registered first by default; joins referred_by:users!referred_by_user_id(id, display_name, role, phone). Pagination via meta.",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "case-insensitive substring match against name OR phone"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "<col>[:asc|desc] — col ∈ first_seen_at|updated_at|trips_count|name|phone (default first_seen_at:desc)"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/passengers/lookup": {
+      "get": {
+        "tags": [
+          "passengers"
+        ],
+        "summary": "Phone-exact passenger lookup (Bearer; any signed-in user) — used by the post-trip form to prefill the passenger name. Returns the passenger + referred_by, or 404 if no row exists for that phone.",
+        "parameters": [
+          {
+            "name": "phone",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "E.164, matched exactly"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
             "$ref": "#/components/responses/Envelope"
           }
         }

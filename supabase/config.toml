@@ -433,6 +433,12 @@ verify_jwt = false
 [functions.debug]
 verify_jwt = false
 
+# /passengers/* — admin Bearer for the list; any Bearer for the lookup (drivers/agents use it to
+# prefill the passenger name on the post-trip form). Read-only; writes happen via the `trips`
+# function's upsert path (migration 019).
+[functions.passengers]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

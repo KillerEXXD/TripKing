@@ -38,6 +38,8 @@ tags:
     description: Maps-backed locations — a server-side geocoder proxy (search) and find-or-create for a `places` row.
   - name: debug
     description: Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See `docs/EXCEPTION_HANDLING.md`.
+  - name: passengers
+    description: Passenger directory — one row per passenger phone seen on a trip. Read-only API; the canonical row is upserted by the `trips` POST handler (migration 019). Admin reads the full list; any authenticated user can do a phone-exact lookup to prefill the post-trip form.
 components:
   schemas:
     ApiError:
@@ -345,3 +347,7 @@ paths:
     get: { tags: [debug], summary: 'Return a fail(code, …) envelope (admin; Bearer) — ?code=<CODE> picks the code (default CONFLICT) and a sensible HTTP status; no Sentry event.', parameters: [{ name: code, in: query, schema: { type: string, enum: [VALIDATION, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, DB_ERROR, INTERNAL] } }], responses: { '400': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' }, '409': { $ref: '#/components/responses/Envelope' }, '422': { $ref: '#/components/responses/Envelope' }, '429': { $ref: '#/components/responses/Envelope' }, '500': { $ref: '#/components/responses/Envelope' } } }
   /debug/slow:
     get: { tags: [debug], summary: 'Sleep then return 200 (admin; Bearer) — ?ms=<n> (default 1000, max 10000); data is { slept_ms }.', parameters: [{ name: ms, in: query, schema: { type: integer, default: 1000, minimum: 0, maximum: 10000 } }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
+  /passengers:
+    get: { tags: [passengers], summary: 'List the passenger directory (admin; Bearer) — newest-registered first by default; joins referred_by:users!referred_by_user_id(id, display_name, role, phone). Pagination via meta.', parameters: [{ name: q, in: query, schema: { type: string }, description: 'case-insensitive substring match against name OR phone' }, { name: sort, in: query, schema: { type: string }, description: '<col>[:asc|desc] — col ∈ first_seen_at|updated_at|trips_count|name|phone (default first_seen_at:desc)' }, { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }, { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '403': { $ref: '#/components/responses/Envelope' } } }
+  /passengers/lookup:
+    get: { tags: [passengers], summary: 'Phone-exact passenger lookup (Bearer; any signed-in user) — used by the post-trip form to prefill the passenger name. Returns the passenger + referred_by, or 404 if no row exists for that phone.', parameters: [{ name: phone, in: query, required: true, schema: { type: string }, description: 'E.164, matched exactly' }], responses: { '200': { $ref: '#/components/responses/Envelope' }, '401': { $ref: '#/components/responses/Envelope' }, '404': { $ref: '#/components/responses/Envelope' }, '422': { $ref: '#/components/responses/Envelope' } } }
