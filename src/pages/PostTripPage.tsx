@@ -5,6 +5,7 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
+import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
@@ -12,7 +13,7 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR, haversineKm } from '@/lib/utils';
+import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
 import type { Place, PostTripInput, Trip } from '@/types';
 
 interface PostTripForm {
@@ -112,7 +113,7 @@ export function PostTripPage() {
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
-  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm']);
+  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName']);
   const distance = Number(distanceWatch) || 0;
   const rate = Number(rateWatch) || 0;
   const totalFare = distance > 0 && rate > 0 ? Math.round(distance * rate) : 0;
@@ -138,6 +139,21 @@ export function PostTripPage() {
     }, 450);
     return () => clearTimeout(t);
   }, [fromCityId, toCityId, fromPlace, toPlace, citiesData, setValue]);
+
+  // Look the passenger up by phone (debounced) once it's "complete" — prefill the name from the
+  // directory when we have a hit and the name field is still empty (never clobber a typed name).
+  const [debouncedPhone, setDebouncedPhone] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedPhone((passengerPhoneWatch ?? '').trim()), 350);
+    return () => clearTimeout(t);
+  }, [passengerPhoneWatch]);
+  const phoneLookupable = isLookupablePhone(debouncedPhone);
+  const passengerLookup = useLookupPassengerByPhone(debouncedPhone);
+  const knownPassenger = phoneLookupable && !passengerLookup.isFetching ? (passengerLookup.data ?? null) : null;
+  useEffect(() => {
+    const p = passengerLookup.data;
+    if (p && !getValues('passengerName').trim()) setValue('passengerName', p.name, { shouldValidate: true });
+  }, [passengerLookup.data, getValues, setValue]);
 
   async function onNext() {
     const ok = await trigger([...STEP1_FIELDS]);
@@ -347,6 +363,31 @@ export function PostTripPage() {
               <Field label="Passenger name" error={errors.passengerName?.message}>
                 <Input {...register('passengerName', { required: 'Enter the passenger name' })} placeholder="Full name" />
               </Field>
+              {phoneLookupable ? (
+                <div className="-mt-1.5 text-xs">
+                  {passengerLookup.isFetching ? (
+                    <span className="flex items-center gap-1.5 text-secondary" role="status">
+                      <Loader2 className="size-3.5 animate-spin" aria-hidden /> Checking if this passenger exists…
+                    </span>
+                  ) : knownPassenger ? (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-800">
+                      <div className="font-medium">✓ Existing passenger — {knownPassenger.name}</div>
+                      <div className="text-emerald-700">
+                        {knownPassenger.referredBy ? `Added by ${knownPassenger.referredBy.displayName}` : 'Added earlier'}
+                        {knownPassenger.firstSeenAt ? ` · ${formatShortDate(new Date(knownPassenger.firstSeenAt))}` : ''}
+                        {knownPassenger.tripsCount > 0 ? ` · ${knownPassenger.tripsCount} trip${knownPassenger.tripsCount === 1 ? '' : 's'}` : ''}
+                      </div>
+                      {passengerNameWatch.trim() && passengerNameWatch.trim().toLowerCase() !== knownPassenger.name.toLowerCase() ? (
+                        <button type="button" className="mt-0.5 font-medium underline" onClick={() => setValue('passengerName', knownPassenger.name, { shouldValidate: true })}>
+                          Use “{knownPassenger.name}”
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : passengerLookup.isSuccess ? (
+                    <span className="text-secondary">New passenger — they&apos;ll be added to the directory when you post this trip.</span>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Passenger phone" error={errors.passengerPhone?.message}>
                   <Input inputMode="tel" {...register('passengerPhone', { required: 'Enter a phone number' })} placeholder="+91…" />

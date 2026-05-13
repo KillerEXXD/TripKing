@@ -7,6 +7,8 @@ vi.mock('@/hooks/useTrips', () => ({ usePostTrip: vi.fn() }));
 import { usePostTrip } from '@/hooks/useTrips';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useMyAgent: vi.fn() }));
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(), isLookupablePhone: (p?: string) => (p ?? '').replace(/\D/g, '').length >= 10 }));
+import { useLookupPassengerByPhone } from '@/hooks/usePassengers';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carTypeHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
@@ -59,6 +61,9 @@ function setPoster(role: 'driver' | 'trip_manager' = 'trip_manager', kycStatus: 
   vi.mocked(useMyDriver).mockReturnValue(role === 'driver' ? profQ : emptyQ);
   vi.mocked(useMyAgent).mockReturnValue(role === 'trip_manager' ? profQ : emptyQ);
 }
+function setPassengerLookup(over: { isFetching?: boolean; isSuccess?: boolean; isError?: boolean; data?: unknown } = {}) {
+  vi.mocked(useLookupPassengerByPhone).mockReturnValue({ isFetching: false, isSuccess: false, isError: false, data: undefined, refetch: vi.fn(), ...over } as never);
+}
 
 function renderPost() {
   return render(
@@ -100,10 +105,12 @@ describe('PostTripPage', () => {
     vi.mocked(useAuth).mockReset();
     vi.mocked(useMyDriver).mockReset();
     vi.mocked(useMyAgent).mockReset();
+    vi.mocked(useLookupPassengerByPhone).mockReset();
     vi.mocked(toast.error).mockClear();
     setLists();
     setPostTrip();
     setPoster('trip_manager', 'approved');
+    setPassengerLookup();
   });
 
   it('renders a skeleton while the city / car-type lists load', () => {
@@ -192,5 +199,22 @@ describe('PostTripPage', () => {
     renderPost();
     expect(screen.getByRole('link', { name: /go to verification/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /next: price/i })).toBeNull();
+  });
+
+  it('shows a processing indicator while it checks whether the passenger phone is already known', async () => {
+    setPassengerLookup({ isFetching: true });
+    const { container } = renderPost();
+    await completeStep1(container);
+    set(container, 'passengerPhone', '+919876543210');
+    await waitFor(() => expect(screen.getByText(/checking if this passenger exists/i)).toBeInTheDocument());
+  });
+
+  it('prefills the passenger name from the directory when the phone matches an existing passenger', async () => {
+    const { container } = renderPost();
+    await completeStep1(container);
+    setPassengerLookup({ isSuccess: true, data: { id: 'p1', phone: '+919876543210', name: 'Jane Sharma', aliases: [], referredByUserId: 'u9', referredBy: { id: 'u9', displayName: 'Agent A', role: 'trip_manager' }, firstSeenAt: '2026-05-01T00:00:00.000Z', tripsCount: 4 } });
+    set(container, 'passengerPhone', '+919876543210'); // note: name left blank
+    await waitFor(() => expect(screen.getByText(/existing passenger — jane sharma/i)).toBeInTheDocument());
+    expect(container.querySelector<HTMLInputElement>('[name="passengerName"]')!.value).toBe('Jane Sharma');
   });
 });
