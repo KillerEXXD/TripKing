@@ -43,6 +43,26 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+
+const CACHE_EPOCH = 'v1';
+// Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
+// the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
+// replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the
+// cache when they're the same driver, and never share when they're different drivers.
+function tripsListCacheKey(filters: Record<string, string | number | undefined>): string {
+  const parts: string[] = [];
+  for (const k of Object.keys(filters).sort()) {
+    const v = filters[k];
+    if (v !== undefined && v !== '') parts.push(`${k}-${v}`);
+  }
+  return `trips:list:${parts.join(':') || 'all'}:${CACHE_EPOCH}`;
+}
+function invalidateTripsList(): void {
+  cacheDeletePattern('trips:list:*');
+}
 
 type Db = ReturnType<typeof serviceClient>;
 
@@ -205,61 +225,100 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   }
 
   // ── GET /trips (list) — Bearer required ──────────────────────────────────
-  // Always browse-safe per row, except: rows the caller posted (→ owner view, with passenger PII +
-  // the assigned driver's live position — this is the trip-manager "live map":
-  // GET /trips?status=in_progress&posted_by_user_id=<me>) and rows assigned to the caller's driver
-  // profile (→ assigned-driver view, e.g. GET /trips?assigned_driver_id=me). Everyone else: no PII,
-  // no driver positions.
+  // PII strategy: cache the RAW (unredacted) rows keyed by the resolved filters; run
+  // `redactTrip` per-viewer AFTER the cache fetch (microseconds — much cheaper than the SQL).
+  // `assigned_driver_id=me` is resolved to the caller's driver_id and included in the key,
+  // so two different drivers asking for "trips assigned to me" don't share a cache entry.
   if (!tripId && req.method === 'GET') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to browse trips', 401);
-    let q = db.from('trips').select(TRIP_SELECT);
-    const status = url.searchParams.get('status');
-    if (status) {
-      const arr = status.split(',').map((s) => s.trim()).filter(Boolean);
-      if (arr.length === 1) q = q.eq('status', arr[0]);
-      else if (arr.length > 1) q = q.in('status', arr);
+    const status = url.searchParams.get('status') ?? '';
+    const fromCity = url.searchParams.get('from_city_id') ?? '';
+    const toCity = url.searchParams.get('to_city_id') ?? '';
+    const postedBy = url.searchParams.get('posted_by_user_id') ?? '';
+    const assignedDriverRaw = url.searchParams.get('assigned_driver_id') ?? '';
+    let assignedDriver = assignedDriverRaw;
+    if (assignedDriverRaw === 'me') {
+      const did = await driverIdFor(u.id);
+      if (!did) return ok([]); // no driver profile ⇒ nothing assigned to you
+      assignedDriver = did;
     }
-    const fromCity = url.searchParams.get('from_city_id');
-    if (fromCity) q = q.eq('from_city_id', fromCity);
-    const toCity = url.searchParams.get('to_city_id');
-    if (toCity) q = q.eq('to_city_id', toCity);
-    const postedBy = url.searchParams.get('posted_by_user_id');
-    if (postedBy) q = q.eq('posted_by_user_id', postedBy);
-    const assignedDriver = url.searchParams.get('assigned_driver_id');
-    if (assignedDriver) {
-      if (assignedDriver === 'me') {
-        const did = await driverIdFor(u.id);
-        if (!did) return ok([]); // no driver profile ⇒ nothing assigned to you
-        q = q.eq('assigned_driver_id', did);
-      } else {
-        q = q.eq('assigned_driver_id', assignedDriver);
-      }
-    }
-    // Phase D radius filter: trips whose pickup point (from_place → from_city fallback) is within radius_km of (near_lat, near_lng).
     const near = parseNearRadius(url);
-    let distById: Map<string, number> | null = null;
-    if (near) {
-      const { data: rad, error: radErr } = await db.rpc('trips_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
-      if (radErr) return fail('DB_ERROR', radErr.message, 500);
-      const list = (rad ?? []) as { id: string; distance_m: number }[];
-      if (list.length === 0) return ok([]);
-      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
-      q = q.in('id', [...distById.keys()]);
+    const limit = Math.min(Number.isFinite(Number(url.searchParams.get('limit'))) ? Number(url.searchParams.get('limit')) : 50, 100);
+
+    // Cache eligibility — skip when status would touch live-tracked trips: 'in_progress' includes
+    // the driver's live position in the row, which a 30s cache would stale. Open / has_applicants
+    // / assigned / completed / cancelled are safe; mixed lists (no status) we also skip out of
+    // caution. Per-trip detail caching is a Phase-4 follow-up.
+    const statusArr = status ? status.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    const cacheable = statusArr.length > 0 && !statusArr.includes('in_progress');
+    interface CachedShape {
+      rows: Record<string, unknown>[];
+      distEntries: [string, number][] | null;
     }
-    const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 100));
-    if (!near) q = q.order('pickup_at', { ascending: true });
-    const { data, error } = await q;
-    if (error) return fail('DB_ERROR', error.message, 500);
-    const rawRows = (data ?? []) as Record<string, unknown>[];
+    const fetcher = async (): Promise<CachedShape> => {
+      let q = db.from('trips').select(TRIP_SELECT);
+      if (status) {
+        if (statusArr.length === 1) q = q.eq('status', statusArr[0]);
+        else if (statusArr.length > 1) q = q.in('status', statusArr);
+      }
+      if (fromCity) q = q.eq('from_city_id', fromCity);
+      if (toCity) q = q.eq('to_city_id', toCity);
+      if (postedBy) q = q.eq('posted_by_user_id', postedBy);
+      if (assignedDriver) q = q.eq('assigned_driver_id', assignedDriver);
+      let distEntries: [string, number][] | null = null;
+      if (near) {
+        const { data: rad, error: radErr } = await db.rpc('trips_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
+        if (radErr) throw new Error(radErr.message);
+        const list = (rad ?? []) as { id: string; distance_m: number }[];
+        if (list.length === 0) return { rows: [], distEntries: [] };
+        distEntries = list.map((r) => [r.id, toKm(Number(r.distance_m))]);
+        q = q.in('id', list.map((r) => r.id));
+      }
+      q = q.limit(limit);
+      if (!near) q = q.order('pickup_at', { ascending: true });
+      const { data, error } = await q;
+      if (error) throw new Error(error.message);
+      return { rows: (data ?? []) as Record<string, unknown>[], distEntries };
+    };
+
+    let payload: CachedShape;
+    let hit: 'memory' | 'shared' | 'miss';
+    if (cacheable) {
+      const result = await withCache<CachedShape>(
+        {
+          key: tripsListCacheKey({
+            status,
+            from_city_id: fromCity,
+            to_city_id: toCity,
+            posted_by_user_id: postedBy,
+            assigned_driver_id: assignedDriver,
+            near_lat: near ? near.lat.toFixed(3) : '',
+            near_lng: near ? near.lng.toFixed(3) : '',
+            radius_m: near ? near.radiusM : '',
+            limit,
+          }),
+          ttl: CacheTTL.SHORT,
+          tier: 'memory',
+        },
+        fetcher,
+      );
+      payload = result.data;
+      hit = result.hit;
+    } else {
+      payload = await fetcher();
+      hit = 'miss';
+    }
+    const rawRows = payload.rows;
+    const distById = payload.distEntries ? new Map(payload.distEntries) : null;
     const myDriverId = (u.role !== 'admin' && rawRows.some((r) => r.assigned_driver_id && r.posted_by_user_id !== u.id)) ? await driverIdFor(u.id) : null;
     let rows = rawRows.map((r) => redactTrip(r, relationshipFor(r, u, myDriverId)));
     if (distById) {
-      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+      rows = rows.map((r) => ({ ...r, distance_km: distById.get(r.id as string) ?? null }))
                  .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
     }
-    return ok(rows);
+    // /trips list is varies-by-viewer: NEVER public — CDN must not cache (see CACHE_BASELINE §4).
+    return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'private' });
   }
 
   // ── POST /trips/trips ────────────────────────────────────────────────────
@@ -335,6 +394,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         p_trip_id: created.id,
       }); } catch { /* ignore */ }
     }
+    invalidateTripsList();
     return ok(await fullTrip(created.id as string, u));
   }
 
@@ -426,6 +486,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (error) return error.code === '23505' ? fail('CONFLICT', 'You already applied to this trip', 409) : pgFail(error);
       await db.from('trips').update({ status: 'has_applicants' }).eq('id', tripId).eq('status', 'open');
       const { data: full } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('id', data.id as string).single();
+      invalidateTripsList();
       return ok(full);
     }
     if (acceptanceId && !subsub && req.method === 'DELETE') {
@@ -437,6 +498,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (acc.driver_id !== did && !isAdmin(u)) return fail('FORBIDDEN', '', 403);
       const { error } = await db.from('trip_acceptances').update({ status: 'withdrawn', decision_at: new Date().toISOString() }).eq('id', acceptanceId);
       if (error) return pgFail(error);
+      invalidateTripsList();
       return ok({ withdrawn: acceptanceId });
     }
     if (acceptanceId && subsub === 'reject' && req.method === 'POST') {
@@ -447,6 +509,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const b = await readBody(req);
       const { data, error } = await db.from('trip_acceptances').update({ status: 'rejected', decision_at: new Date().toISOString(), decision_note: (b.decision_note as string | null) ?? null }).eq('id', acceptanceId).eq('trip_id', tripId).select(ACCEPTANCE_SELECT).single();
       if (error) return pgFail(error);
+      invalidateTripsList();
       return ok(data);
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
@@ -476,6 +539,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (error) return pgFail(error);
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
     const t = await fullTrip(tripId, u!);
+    invalidateTripsList();
     // OTP is delivered out-of-band by the agent; included here for dev convenience (the Trip transform ignores it).
     return ok({ ...(t as Record<string, unknown>), passenger_otp: otp });
   }
@@ -497,6 +561,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       { trip_id: tripId, started_at: now, start_odo_url: (b.start_odo_url as string | null) ?? null, start_odo_reading: (b.start_odo_reading as number | null) ?? null, start_odo_at: b.start_odo_url ? now : null },
       { onConflict: 'trip_id' },
     );
+    invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -519,6 +584,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const { data: d } = await db.from('drivers').select('total_trips_completed').eq('id', trip.assigned_driver_id).maybeSingle();
       if (d) await db.from('drivers').update({ total_trips_completed: (Number(d.total_trips_completed) || 0) + 1 }).eq('id', trip.assigned_driver_id);
     }
+    invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -533,6 +599,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const now = new Date().toISOString();
     await db.from('trips').update({ status: 'cancelled', cancelled_at: now, cancel_reason_id: (b.cancel_reason_id as string | null) ?? null }).eq('id', tripId);
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).in('status', ['applied', 'selected']);
+    invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
 

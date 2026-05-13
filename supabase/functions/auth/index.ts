@@ -28,6 +28,10 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+
+const CACHE_EPOCH = 'v1';
 
 const DEV_OTP = '12345'; // PLACEHOLDER default until a real SMS provider is wired (see TODO above)
 type Db = ReturnType<typeof serviceClient>;
@@ -85,9 +89,16 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     if (!token) return fail('UNAUTHORIZED', 'Bearer token required', 401);
     const { data, error } = await db.auth.getUser(token);
     if (error || !data?.user) return fail('UNAUTHORIZED', 'Invalid or expired token', 401);
-    const u = await publicUser(db, data.user.id);
-    if (!u) return fail('NOT_FOUND', 'No profile for this user', 404);
-    return ok(u);
+    // PER_USER_PRIVATE — memory tier, 60s. The /me row is touched on every page-load via useAuth.
+    // Direct mutations to the public.users row live in /admin/users; cross-function invalidation
+    // is a Phase-4 follow-up. 60s of staleness on display_name / preferred_language is acceptable.
+    const userId = data.user.id;
+    const { data: row, hit } = await withCache<unknown>(
+      { key: `auth:me:user-${userId}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => await publicUser(db, userId),
+    );
+    if (!row) return fail('NOT_FOUND', 'No profile for this user', 404);
+    return setCacheControl(tagCacheHit(ok(row), hit), { ttl: 60, scope: 'private' });
   }
 
   if (req.method !== 'POST') return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);

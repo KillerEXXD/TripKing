@@ -21,6 +21,31 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+
+const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
+
+// LIVE tier — short TTLs, memory-only (per-isolate). The cluster has few isolates and a 30s
+// staleness window is acceptable; the DB round-trip for a shared-cache lookup would erase the
+// benefit. Bump the epoch when the response shape of GET /vacancies changes.
+const CACHE_EPOCH = 'v1';
+function vacanciesListKey(url: URL): string {
+  const params: string[] = [];
+  for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+    // Round geo to 3 decimals (~110m precision) to raise the hit rate.
+    if ((k === 'near_lat' || k === 'near_lng') && v) {
+      const n = Number(v);
+      params.push(`${k}-${Number.isFinite(n) ? n.toFixed(3) : v}`);
+    } else {
+      params.push(`${k}-${v}`);
+    }
+  }
+  const tail = params.length ? `:${params.join(':')}` : '';
+  return `vacancies:list${tail}:${CACHE_EPOCH}`;
+}
 
 type Db = ReturnType<typeof serviceClient>;
 const VACANCY_SELECT =
@@ -82,60 +107,78 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
     return (data?.id as string | undefined) ?? null;
   }
-  async function fullVacancy(vacancyId: string): Promise<Response> {
-    const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
-    if (error) return fail('DB_ERROR', error.message, 500);
+  async function fullVacancy(vacancyId: string, cached: boolean): Promise<Response> {
+    if (!cached) {
+      const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
+      if (error) return fail('DB_ERROR', error.message, 500);
+      if (!data) return fail('NOT_FOUND', 'Vacancy not found', 404);
+      return ok(data);
+    }
+    const { data, hit } = await withCache<Record<string, unknown> | null>(
+      { key: `vacancies:item:${vacancyId}:${CACHE_EPOCH}`, ttl: CacheTTL.SHORT, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    );
     if (!data) return fail('NOT_FOUND', 'Vacancy not found', 404);
-    return ok(data);
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
   }
 
-  // ── GET /vacancies (list) ────────────────────────────────────────────────
+  // ── GET /vacancies (list) — LIVE tier, 30s memory cache, public-safe ─────
   if (!id && req.method === 'GET') {
-    let q = db.from('vacancies').select(VACANCY_SELECT);
-    const city = url.searchParams.get('current_city_id');
-    if (city) q = q.eq('current_city_id', city);
-    const status = url.searchParams.get('status');
-    if (status) q = q.eq('status', status);
-    const driverId = url.searchParams.get('driver_id');
-    if (driverId) q = q.eq('driver_id', driverId);
-    // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
-    const { data: inactive } = await db.from('drivers').select('id').eq('is_active', false);
-    const inactiveIds = (inactive ?? []).map((r) => r.id as string);
-    if (inactiveIds.length) q = q.not('driver_id', 'in', `(${inactiveIds.join(',')})`);
-    const destCity = url.searchParams.get('destination_city_id');
-    const destPlace = url.searchParams.get('destination_place_id');
-    if (destCity || destPlace) {
-      let dq = db.from('vacancy_destinations').select('vacancy_id');
-      if (destCity) dq = dq.eq('city_id', destCity);
-      if (destPlace) dq = dq.eq('place_id', destPlace);
-      const { data: rows } = await dq;
-      const ids = [...new Set((rows ?? []).map((r) => r.vacancy_id as string))];
-      if (ids.length === 0) return ok([]);
-      q = q.in('id', ids);
-    }
-    // Phase D radius filter: vacancies whose current point is within radius_km of (near_lat, near_lng).
-    const near = parseNearRadius(url);
-    let distById: Map<string, number> | null = null;
-    if (near) {
-      const { data: rad, error: radErr } = await db.rpc('vacancies_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
-      if (radErr) return fail('DB_ERROR', radErr.message, 500);
-      const list = (rad ?? []) as { id: string; distance_m: number }[];
-      if (list.length === 0) return ok([]);
-      distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
-      q = q.in('id', [...distById.keys()]);
-    }
-    const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = near
-      ? q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200))
-      : q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
-    const { data, error } = await q;
-    if (error) return fail('DB_ERROR', error.message, 500);
-    let rows = (data ?? []) as Record<string, unknown>[];
-    if (distById) {
-      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
-                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
-    }
-    return ok(rows);
+    const { data: rows, hit } = await withCache<Record<string, unknown>[]>(
+      { key: vacanciesListKey(url), ttl: CacheTTL.SHORT, tier: 'memory' },
+      async () => {
+        let q = db.from('vacancies').select(VACANCY_SELECT);
+        const city = url.searchParams.get('current_city_id');
+        if (city) q = q.eq('current_city_id', city);
+        const status = url.searchParams.get('status');
+        if (status) q = q.eq('status', status);
+        const driverId = url.searchParams.get('driver_id');
+        if (driverId) q = q.eq('driver_id', driverId);
+        // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
+        const { data: inactive } = await db.from('drivers').select('id').eq('is_active', false);
+        const inactiveIds = (inactive ?? []).map((r) => r.id as string);
+        if (inactiveIds.length) q = q.not('driver_id', 'in', `(${inactiveIds.join(',')})`);
+        const destCity = url.searchParams.get('destination_city_id');
+        const destPlace = url.searchParams.get('destination_place_id');
+        if (destCity || destPlace) {
+          let dq = db.from('vacancy_destinations').select('vacancy_id');
+          if (destCity) dq = dq.eq('city_id', destCity);
+          if (destPlace) dq = dq.eq('place_id', destPlace);
+          const { data: drows } = await dq;
+          const ids = [...new Set((drows ?? []).map((r) => r.vacancy_id as string))];
+          if (ids.length === 0) return [];
+          q = q.in('id', ids);
+        }
+        // Phase D radius filter
+        const near = parseNearRadius(url);
+        let distById: Map<string, number> | null = null;
+        if (near) {
+          const { data: rad, error: radErr } = await db.rpc('vacancies_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
+          if (radErr) throw new Error(radErr.message);
+          const list = (rad ?? []) as { id: string; distance_m: number }[];
+          if (list.length === 0) return [];
+          distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
+          q = q.in('id', [...distById.keys()]);
+        }
+        const limit = Number(url.searchParams.get('limit') ?? '50');
+        q = near
+          ? q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200))
+          : q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        let out = (data ?? []) as Record<string, unknown>[];
+        if (distById) {
+          out = out.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+                   .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+        }
+        return out;
+      },
+    );
+    return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
   }
 
   // ── POST /vacancies (driver — post my availability) ──────────────────────
@@ -189,7 +232,9 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     }
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_vacancy', { p_vacancy_id: vacancyId }); } catch { /* ignore */ }
-    return fullVacancy(vacancyId);
+    cacheDeletePattern('vacancies:*');
+    purgeCloudflareAsync(VACANCY_PURGE_URLS);
+    return fullVacancy(vacancyId, false);
   }
 
   if (!id) return fail('NOT_FOUND', 'No such route', 404);
@@ -200,7 +245,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
   // ── GET /vacancies/:id ───────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
     if (!vac) return fail('NOT_FOUND', 'Vacancy not found', 404);
-    return fullVacancy(id);
+    return fullVacancy(id, true);
   }
 
   // ── POST /vacancies/:id/cancel (owning driver/admin) ─────────────────────
@@ -215,7 +260,9 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     if (vac.status === 'cancelled') return fail('CONFLICT', 'Vacancy is already cancelled', 409);
     const { error } = await db.from('vacancies').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id);
     if (error) return pgFail(error);
-    return fullVacancy(id);
+    cacheDeletePattern('vacancies:*');
+    purgeCloudflareAsync(VACANCY_PURGE_URLS);
+    return fullVacancy(id, false);
   }
 
   if (!vac) return fail('NOT_FOUND', 'Vacancy not found', 404);

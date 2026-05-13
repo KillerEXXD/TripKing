@@ -110,6 +110,13 @@ class ApiClient {
   private readonly baseUrl = API_CONFIG.BASE_URL;
   private readonly timeout = API_CONFIG.TIMEOUT;
   private readonly maxRetries = API_CONFIG.RETRY_ATTEMPTS;
+  /**
+   * Phase-5 single-flight for GETs — extends the same mutex pattern the auth refresh uses
+   * (line ~164) to *every* identical concurrent GET. React Query already dedupes its own
+   * queries, but this layer covers non-RQ callers (manual `apiClient.get(...)` calls in the
+   * passenger page, background pings, etc.). Cleared as soon as the underlying request settles.
+   */
+  private readonly inflightGets = new Map<string, Promise<unknown>>();
 
   /** Mutex — only one refresh in flight; concurrent 401s share the same promise. */
   private refreshPromise: Promise<boolean> | null = null;
@@ -283,7 +290,21 @@ class ApiClient {
 
   // ── verb helpers ──────────────────────────────────────────────────────────
   get<T>(endpoint: string, params?: Record<string, unknown>): Promise<ApiResponse<T>> {
-    return this.request<T>(`${endpoint}${buildQuery(params)}`, { method: 'GET' });
+    const url = `${endpoint}${buildQuery(params)}`;
+    // Dedup key includes the access-token prefix so two different signed-in users hitting
+    // the same endpoint concurrently DON'T share an in-flight promise (different tokens →
+    // different Authorization headers → different upstream responses for the /me family
+    // and any authed route). Anonymous callers share an empty `tok` so they DO dedupe.
+    const tok = this.getAccessToken();
+    const tokKey = tok ? tok.slice(-12) : '';
+    const key = `GET ${url} ${tokKey}`;
+    const existing = this.inflightGets.get(key) as Promise<ApiResponse<T>> | undefined;
+    if (existing) return existing;
+    const promise = this.request<T>(url, { method: 'GET' }).finally(() => {
+      this.inflightGets.delete(key);
+    });
+    this.inflightGets.set(key, promise as Promise<unknown>);
+    return promise;
   }
   post<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) });

@@ -3,7 +3,10 @@ import { toast } from 'sonner';
 import { addDataBreadcrumb, captureDataError, isReported, messageForError } from '@/lib/sentry';
 
 /**
- * Per-resource `staleTime` overrides (see CLAUDE.md §"Caching"):
+ * Per-resource `staleTime` overrides (see CLAUDE.md §"Caching" and
+ * docs/CACHE_BASELINE.md §7 — `master` was bumped from 5min → 15min in Phase 5 once the
+ * server cache started honouring an `admin:*` invalidation pattern on every admin write,
+ * so the client can stay stale longer without serving outdated lookups):
  *  - `immutable` — completed trips, finished reviews
  *  - `live`      — open/`has_applicants` trip lists, vacancy feed, applicant lists
  *  - `master`    — admin lookup data (car types, cities, tags, settings, …)
@@ -12,7 +15,7 @@ import { addDataBreadcrumb, captureDataError, isReported, messageForError } from
 export const STALE = {
   immutable: Infinity,
   live: 30_000,
-  master: 5 * 60_000,
+  master: 15 * 60_000,
   profile: 60_000,
 } as const;
 

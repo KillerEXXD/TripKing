@@ -122,6 +122,54 @@ describe('apiClient', () => {
     expect(retryHeaders['Authorization']).toBe('Bearer fresh-access');
   });
 
+  it('GET dedup — concurrent identical GETs share one network request', async () => {
+    let resolveFetch: (v: Response) => void = () => undefined;
+    const fetchMock = vi.fn().mockImplementation(
+      () => new Promise<Response>((resolve) => { resolveFetch = resolve; }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const a = apiClient.get<{ id: string }>('/trips', { status: 'open' });
+    const b = apiClient.get<{ id: string }>('/trips', { status: 'open' });
+    const c = apiClient.get<{ id: string }>('/trips', { status: 'open' });
+
+    // Single in-flight fetch despite 3 callers.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFetch(jsonResponse({ success: true, data: { id: 't1' }, error: null }));
+    const [ra, rb, rc] = await Promise.all([a, b, c]);
+    expect(ra.data).toEqual({ id: 't1' });
+    expect(rb.data).toEqual({ id: 't1' });
+    expect(rc.data).toEqual({ id: 't1' });
+
+    // After settle, a new GET runs the fetcher again (no permanent share).
+    fetchMock.mockResolvedValueOnce(jsonResponse({ success: true, data: { id: 't2' }, error: null }));
+    const d = await apiClient.get<{ id: string }>('/trips', { status: 'open' });
+    expect(d.data).toEqual({ id: 't2' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('GET dedup — different tokens do NOT share an in-flight promise', async () => {
+    // First caller — no token.
+    let resolveAnon: (v: Response) => void = () => undefined;
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveAnon = resolve; }))
+      .mockImplementationOnce(() => Promise.resolve(jsonResponse({ success: true, data: { who: 'authed' }, error: null })));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const anonPromise = apiClient.get<{ who: string }>('/me');
+    // Now sign in mid-flight and fire the same URL — should NOT reuse the anon promise.
+    apiClient.setTokens('a'.repeat(80), 'r');
+    const authedPromise = apiClient.get<{ who: string }>('/me');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2); // two separate requests despite the same URL
+
+    resolveAnon(jsonResponse({ success: true, data: { who: 'anon' }, error: null }));
+    const [anon, authed] = await Promise.all([anonPromise, authedPromise]);
+    expect(anon.data).toEqual({ who: 'anon' });
+    expect(authed.data).toEqual({ who: 'authed' });
+  });
+
   it('on 401 with a failed refresh, clears tokens and calls onAuthFailure', async () => {
     apiClient.setTokens('expired-access', 'stale-refresh');
     const onAuthFailure = vi.fn();

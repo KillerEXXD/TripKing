@@ -1,0 +1,22 @@
+name = "tripking-api-proxy"
+main = "src/worker.js"
+compatibility_date = "2026-05-13"
+account_id = "da8d5ce278b112a55924a38bd4bd31b8"
+
+# Non-secret vars — fine to commit. SUPABASE_ANON_KEY is set via `wrangler secret put`.
+[vars]
+SUPABASE_ORIGIN = "https://saxcbebqxgatiktsebxw.supabase.co"
+
+[env.production]
+# The Worker traps the request before the CNAME hop. After deployment, flip
+# the `api` DNS row to PROXIED (orange cloud) so the route can attach.
+routes = [
+  { pattern = "api.tripkingapp.com/*", zone_name = "tripkingapp.com" }
+]
+
+[env.production.vars]
+SUPABASE_ORIGIN = "https://saxcbebqxgatiktsebxw.supabase.co"
+
+# Observability — surface logs via `wrangler tail --env production`.
+[observability]
+enabled = true

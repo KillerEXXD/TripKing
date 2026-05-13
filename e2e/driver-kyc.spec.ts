@@ -11,7 +11,7 @@ import { driverRow, signInAsDriver, stubApi, VERIFICATION_APPROVED, VERIFICATION
 test.describe('driver Get-verified flow', () => {
   test('an unverified driver is guided through the checklist; an approved one is done', async ({ page }) => {
     let verification = VERIFICATION_DOCS_SUBMITTED;
-    await stubApi(page, () => driverRow(verification));
+    await stubApi(page, { paths: { '/drivers/me': () => driverRow(verification) } });
 
     // sign in → driver home
     await signInAsDriver(page);

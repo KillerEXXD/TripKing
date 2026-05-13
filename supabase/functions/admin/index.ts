@@ -35,6 +35,38 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { CacheTTL } from '../_shared/cache.ts';
+import { sharedCacheInvalidateType } from '../_shared/sharedCache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+
+/**
+ * Purge URLs that Cloudflare's Worker may have cached for an admin resource.
+ * Free plan can't purge by prefix, so we list the canonical URLs (no-param + the
+ * common admin variant). Other querystring combos stale-expire via the 15-min TTL.
+ */
+function adminPurgeUrls(listKey: string): string[] {
+  return purgeUrlsFor([
+    `/functions/v1/admin/${listKey}`,
+    `/functions/v1/admin/${listKey}?include_inactive=true`,
+  ]);
+}
+
+// Reference data (MASTER tier) — bump the epoch when the response shape of any /admin/<list>
+// or /admin/app-settings response changes; that drops every cached entry cluster-wide without
+// a manual purge. (TTL is 15 min; safe even without a bump.)
+const CACHE_EPOCH = 'v1';
+
+/** Stable cache key from (listKey, sorted query params). Mirrors how the cache layers in. */
+function adminCacheKey(listKey: string, url: URL): string {
+  const params: string[] = [];
+  for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
+    params.push(`${k}-${v}`);
+  }
+  const tail = params.length ? `:${params.join(':')}` : '';
+  return `admin:${listKey}${tail}:${CACHE_EPOCH}`;
+}
 
 interface ListCfg {
   table: string;
@@ -102,9 +134,15 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
   // ── /admin/app-settings (singleton) ──────────────────────────────────────
   if (segments[0] === 'app-settings' && segments.length === 1) {
     if (req.method === 'GET') {
-      const { data, error } = await db.from('app_settings').select('*').eq('id', 1).single();
-      if (error) return fail('DB_ERROR', error.message, 500);
-      return ok(data);
+      const { data, hit } = await withCache<unknown>(
+        { key: `admin:app-settings:${CACHE_EPOCH}`, ttl: CacheTTL.LONG, tier: 'shared', cacheType: 'admin', entityKind: 'admin', entityId: 'app-settings' },
+        async () => {
+          const { data, error } = await db.from('app_settings').select('*').eq('id', 1).single();
+          if (error) throw new Error(error.message);
+          return data;
+        },
+      );
+      return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.LONG, scope: 'public' });
     }
     if (req.method === 'PUT' || req.method === 'PATCH') {
       const a = await requireAdmin(db, req);
@@ -114,6 +152,9 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       const { data, error } = await db.from('app_settings').update(body).eq('id', 1).select('*').single();
       if (error) return pgFail(error);
       await audit(db, a.id, 'update', 'app_settings', '1', before, data);
+      // Cache-invalidation: app-settings is part of the admin/master tier; flush all of it.
+      await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(purgeUrlsFor(['/functions/v1/admin/app-settings']));
       return ok(data);
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/app-settings`, 405);
@@ -267,20 +308,23 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
   const cfg = LISTS[listKey];
   if (!cfg) return fail('NOT_FOUND', `Unknown admin resource "${listKey}"`, 404);
 
-  // GET /admin/<list>
+  // GET /admin/<list> — MASTER tier; cached for 15 min, invalidated on every write below.
   if (segments.length === 1 && req.method === 'GET') {
-    let q = db.from(cfg.table).select('*').order(cfg.orderBy);
-    if (url.searchParams.get('include_inactive') !== 'true') {
-      // every lookup table has is_active EXCEPT none — all do
-      q = q.eq('is_active', true);
-    }
-    for (const f of cfg.filters) {
-      const v = url.searchParams.get(f);
-      if (v) q = q.eq(f, v);
-    }
-    const { data, error } = await q;
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    const { data, hit } = await withCache<unknown[]>(
+      { key: adminCacheKey(listKey, url), ttl: CacheTTL.LONG, tier: 'shared', cacheType: 'admin', entityKind: 'admin', entityId: listKey },
+      async () => {
+        let q = db.from(cfg.table).select('*').order(cfg.orderBy);
+        if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
+        for (const f of cfg.filters) {
+          const v = url.searchParams.get(f);
+          if (v) q = q.eq(f, v);
+        }
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return data ?? [];
+      },
+    );
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.LONG, scope: 'public' });
   }
 
   // POST /admin/<list>
@@ -292,6 +336,8 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     if (error) return pgFail(error);
     const id = String((data as Record<string, unknown> | null)?.[cfg.pk] ?? '');
     await audit(db, a.id, 'create', cfg.table, id, null, data);
+    await sharedCacheInvalidateType('admin');
+    purgeCloudflareAsync(adminPurgeUrls(listKey));
     return ok(data);
   }
 
@@ -308,6 +354,8 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       if (error) return pgFail(error);
     }
     await audit(db, a.id, 'reorder', cfg.table, null, null, { ids });
+    await sharedCacheInvalidateType('admin');
+    purgeCloudflareAsync(adminPurgeUrls(listKey));
     return ok({ reordered: ids.length });
   }
 
@@ -323,6 +371,8 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       const { data, error } = await db.from(cfg.table).update(body).eq(cfg.pk, id).select('*').single();
       if (error) return pgFail(error);
       await audit(db, a.id, 'update', cfg.table, id, before, data);
+      await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(adminPurgeUrls(listKey));
       return ok(data);
     }
     if (req.method === 'DELETE') {
@@ -333,6 +383,8 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       const { error } = await db.from(cfg.table).delete().eq(cfg.pk, id);
       if (error) return pgFail(error);
       await audit(db, a.id, 'delete', cfg.table, id, before, null);
+      await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(adminPurgeUrls(listKey));
       return ok({ deleted: id });
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);

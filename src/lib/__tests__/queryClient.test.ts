@@ -14,9 +14,9 @@ import { ApiError } from '@/lib/api/client';
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 describe('queryClient — defaults', () => {
-  it('uses the spec defaults — staleTime 5m, gcTime 30m, no refetch-on-focus, retry 1', () => {
+  it('uses the spec defaults — staleTime master (15m), gcTime 30m, no refetch-on-focus, retry 1', () => {
     const q = queryClient.getDefaultOptions().queries;
-    expect(q?.staleTime).toBe(5 * 60_000);
+    expect(q?.staleTime).toBe(15 * 60_000);
     expect(q?.gcTime).toBe(30 * 60_000);
     expect(q?.refetchOnWindowFocus).toBe(false);
     expect(q?.retry).toBe(1);
@@ -25,7 +25,8 @@ describe('queryClient — defaults', () => {
   it('exposes per-resource staleTime tiers', () => {
     expect(STALE.immutable).toBe(Infinity);
     expect(STALE.live).toBe(30_000);
-    expect(STALE.master).toBe(5 * 60_000);
+    // Bumped 5min → 15min in Phase 5 once server-side withCache invalidates admin:* on every write.
+    expect(STALE.master).toBe(15 * 60_000);
     expect(STALE.profile).toBe(60_000);
   });
 });

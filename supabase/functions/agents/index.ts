@@ -21,6 +21,14 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { cacheDelete } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+
+const CACHE_EPOCH = 'v1';
+function invalidateAgentMe(userId: string): void {
+  cacheDelete(`agents:me:user-${userId}:${CACHE_EPOCH}`);
+}
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -182,10 +190,19 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
   if (id === 'me' && req.method === 'GET') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to view your profile', 401);
-    const { data, error } = await db.from('trip_managers').select('id').eq('user_id', u.id).maybeSingle();
-    if (error) return fail('DB_ERROR', error.message, 500);
-    if (!data) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
-    return respondAgent(data.id as string, true);
+    const { data: payload, hit } = await withCache<{ ok: true; body: unknown } | { ok: false }>(
+      { key: `agents:me:user-${u.id}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.from('trip_managers').select('id').eq('user_id', u.id).maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!data) return { ok: false };
+        const row = await fetchAgent(data.id as string);
+        if (!row) return { ok: false };
+        return { ok: true, body: { ...row, verification: await buildVerification(db, row) } };
+      },
+    );
+    if (!payload.ok) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
+    return setCacheControl(tagCacheHit(ok(payload.body), hit), { ttl: 60, scope: 'private' });
   }
 
   const { data: tm } = await db.from('trip_managers').select('id, user_id, is_active').eq('id', id).maybeSingle();
@@ -271,6 +288,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
       kyc_rejection_reason: null,
     }).eq('id', id);
     if (error) return pgFail(error);
+    invalidateAgentMe(ownerId);
     return respondAgent(id, true);
   }
 
@@ -297,6 +315,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
         : `Your KYC status is now "${next}".`,
       payload_json: { kyc_status: next, kind: 'agent', ...(reason ? { note: reason } : {}) },
     });
+    invalidateAgentMe(ownerId);
     return respondAgent(id, true);
   }
 
@@ -333,6 +352,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
         : `Your agent account has been deactivated by an administrator.${reason ? ' ' + reason : ''} Contact support if you think this is a mistake.`,
       payload_json: { is_active: b.is_active, kind: 'agent', ...(reason ? { reason } : {}) },
     });
+    invalidateAgentMe(ownerId);
     return respondAgent(id, true);
   }
 
@@ -346,6 +366,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     if (Object.keys(patch).length === 0) return fail('VALIDATION', 'Nothing to update', 422);
     const { error } = await db.from('trip_managers').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    invalidateAgentMe(ownerId);
     return respondAgent(id, true);
   }
 
