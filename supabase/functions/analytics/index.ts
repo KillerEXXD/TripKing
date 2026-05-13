@@ -16,6 +16,10 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { CacheTTL } from '../_shared/cache.ts';
+
+const CACHE_EPOCH = 'v1';
 
 type Db = ReturnType<typeof serviceClient>;
 
@@ -46,29 +50,48 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
   if (!u) return fail('UNAUTHORIZED', 'Sign in to view analytics', 401);
 
   // ── GET /analytics/admin (platform dashboard) ────────────────────────────
+  // Heaviest aggregation in the function — shared cache + 5 min TTL is a big win.
   if (resource === 'admin') {
     if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
-    const { data, error } = await db.rpc('get_admin_dashboard');
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data);
+    const { data, hit } = await withCache<unknown>(
+      { key: `analytics:admin:${CACHE_EPOCH}`, ttl: CacheTTL.MEDIUM, tier: 'shared', cacheType: 'analytics', entityKind: 'admin', entityId: 'dashboard' },
+      async () => {
+        const { data, error } = await db.rpc('get_admin_dashboard');
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    );
+    return tagCacheHit(ok(data), hit);
   }
 
-  // ── GET /analytics/agent (own; or ?user_id= for admins) ──────────────────
+  // ── GET /analytics/agent (own; or ?user_id= for admins) — 60s memory tier ──
   if (resource === 'agent') {
     const target = url.searchParams.get('user_id') ?? u.id;
     if (target !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'You can only view your own analytics', 403);
-    const { data, error } = await db.rpc('get_agent_analytics', { p_user_id: target });
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data);
+    const { data, hit } = await withCache<unknown>(
+      { key: `analytics:agent:user-${target}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.rpc('get_agent_analytics', { p_user_id: target });
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    );
+    return tagCacheHit(ok(data), hit);
   }
 
   // ── GET /analytics/driver (own; or ?user_id= for admins) — earnings & history ──
   if (resource === 'driver') {
     const target = url.searchParams.get('user_id') ?? u.id;
     if (target !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'You can only view your own analytics', 403);
-    const { data, error } = await db.rpc('get_driver_analytics', { p_user_id: target });
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data);
+    const { data, hit } = await withCache<unknown>(
+      { key: `analytics:driver:user-${target}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.rpc('get_driver_analytics', { p_user_id: target });
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    );
+    return tagCacheHit(ok(data), hit);
   }
 
   // ── GET /analytics/api-metrics?hours=24 (per-endpoint latency/error rollup) ──
@@ -76,9 +99,15 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
     if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
     const raw = parseInt(url.searchParams.get('hours') ?? '24', 10);
     const hours = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 720) : 24;
-    const { data, error } = await db.rpc('get_api_metrics_summary', { p_hours: hours });
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data);
+    const { data, hit } = await withCache<unknown>(
+      { key: `analytics:api-metrics:hours-${hours}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.rpc('get_api_metrics_summary', { p_hours: hours });
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    );
+    return tagCacheHit(ok(data), hit);
   }
 
   return fail('NOT_FOUND', 'Use /analytics/admin, /analytics/agent, /analytics/driver or /analytics/api-metrics', 404);
