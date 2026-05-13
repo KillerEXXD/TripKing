@@ -81,6 +81,7 @@ export function driverRow(verification: Verification) {
   return {
     id: 'd-e2e',
     user_id: DRIVER_USER.id,
+    display_handle: 'AE2EDRV',
     full_name: 'E2E Driver',
     phone: DRIVER_USER.phone,
     email: null,
@@ -106,6 +107,7 @@ export function agentRow(verification: Verification = AGENT_VERIFICATION_APPROVE
   return {
     id: 'a-e2e',
     user_id: AGENT_USER.id,
+    display_handle: 'AE2EAGT',
     full_name: 'E2E Agent',
     phone: AGENT_USER.phone,
     email: null,
@@ -124,6 +126,8 @@ export function openTripRow(over: Record<string, unknown> = {}) {
   return {
     id: 't-e2e',
     posted_by_user_id: AGENT_USER.id,
+    posted_by_handle: 'AE2EAGT',
+    posted_by_role: 'trip_manager',
     from_city: CITY,
     to_city: CITY_DEST,
     pickup_at: '2026-06-01T08:00:00Z',

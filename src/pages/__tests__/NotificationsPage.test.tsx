@@ -6,6 +6,7 @@ import { NotificationsPage } from '@/pages/NotificationsPage';
 import type { Notification } from '@/types';
 
 vi.mock('@/hooks/useNotifications', () => ({ useNotifications: vi.fn(), useMarkNotificationRead: vi.fn(), useMarkAllNotificationsRead: vi.fn() }));
+vi.mock('@/hooks/useVacancyInvitations', () => ({ useDecideVacancyInvitation: () => ({ mutate: vi.fn(), isPending: false }) }));
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
 
 function makeNotif(over: Partial<Notification> = {}): Notification {

@@ -13,11 +13,12 @@ import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
-import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
+import { AgentIdentity } from '@/components/agent/AgentIdentity';
+import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { toast } from 'sonner';
-import { cn, formatINR, formatKm, initials } from '@/lib/utils';
+import { cn, formatINR, formatKm } from '@/lib/utils';
 import type { Trip, TripStatus, Vehicle } from '@/types';
 
 const STATUS_BADGE = {
@@ -299,33 +300,33 @@ function PostedBy({ trip }: { trip: Trip }) {
   const phone = trip.postedByPhone?.trim();
   const tel = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : undefined;
   const sms = phone ? `sms:${phone.replace(/[^\d+]/g, '')}` : undefined;
+  const callLabel = trip.postedByName ?? `${isAgentPost ? 'agent' : 'driver'} ${trip.postedByHandle}`;
   return (
     <Card className="gap-3">
       <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Posted by</div>
-      <div className="flex items-center gap-3">
-        <Avatar className="size-12">
-          <AvatarFallback>{initials(trip.postedByName || '?')}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 truncate font-bold">
-            {trip.postedByName || 'Unknown'}
+      <AgentIdentity
+        handle={trip.postedByHandle}
+        name={trip.postedByName}
+        size="lg"
+        sub={
+          <div className="flex items-center gap-1.5">
             <Badge variant={isAgentPost ? 'info' : 'muted'} className="shrink-0 text-[10px]">
               {isAgentPost ? 'Agent' : 'Driver'}
             </Badge>
+            <span className="truncate">{isAgentPost ? 'Posts trips for drivers' : 'Another driver passing on a trip'}</span>
           </div>
-          <div className="truncate text-xs text-secondary">{isAgentPost ? 'Posts trips for drivers' : 'Another driver passing on a trip'}</div>
-          {phone ? <div className="mt-0.5 font-mono text-xs text-secondary">{phone}</div> : null}
-        </div>
-      </div>
+        }
+      />
+      {phone ? <div className="font-mono text-xs text-secondary">{phone}</div> : null}
       {phone ? (
         <div className="flex gap-2">
           <Button asChild size="sm" className="flex-1">
-            <a href={tel} aria-label={`Call ${trip.postedByName}`}>
+            <a href={tel} aria-label={`Call ${callLabel}`}>
               <Phone className="size-4" aria-hidden /> Call
             </a>
           </Button>
           <Button asChild size="sm" variant="outline" className="flex-1">
-            <a href={sms} aria-label={`Message ${trip.postedByName}`}>
+            <a href={sms} aria-label={`Message ${callLabel}`}>
               <MessageCircle className="size-4" aria-hidden /> Message
             </a>
           </Button>

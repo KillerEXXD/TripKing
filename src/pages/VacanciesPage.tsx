@@ -1,16 +1,22 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Car, MapPin, Star } from 'lucide-react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { Car, MapPin, Star, X } from 'lucide-react';
+import { toast } from 'sonner';
 import { useVacancies } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
+import { useTrips } from '@/hooks/useTrips';
+import { useCreateVacancyInvitation } from '@/hooks/useVacancyInvitations';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
-import { Badge, Card } from '@/components/ui';
+import { DriverIdentity } from '@/components/driver/DriverIdentity';
+import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
-import type { NearRadius, Vacancy } from '@/types';
+import type { NearRadius, Trip, Vacancy } from '@/types';
 
 function availableLabel(v: Vacancy): string {
   const from = new Date(v.availableFrom);
@@ -28,45 +34,134 @@ function vehicleLabel(v: Vacancy): string | null {
   return [name || null, v.vehicle.carTypeLabel ?? null, `${v.vehicle.seats} seats`, v.vehicle.ac ? 'AC' : 'Non-AC'].filter(Boolean).join(' · ');
 }
 
-function VacancyCard({ vacancy }: { vacancy: Vacancy }) {
+function VacancyCard({ vacancy, canInvite }: { vacancy: Vacancy; canInvite: boolean }) {
   const driver = vacancy.driver;
   const veh = vehicleLabel(vacancy);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const ratingSub =
+    driver && driver.ratingCount > 0
+      ? `★ ${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount} · ${driver.totalTripsCompleted} trips`
+      : null;
   return (
-    <Link to={`/drivers/${vacancy.driverId}`} className="block">
-      <Card className="gap-3 transition-colors hover:border-primary/40">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="font-bold">{driver?.fullName || 'A driver'}</div>
-            <div className="text-xs text-secondary">
-              {driver && driver.ratingCount > 0 ? (
-                <>
-                  <span className="font-semibold text-amber-600">★ {driver.ratingAvg.toFixed(1)}</span> · {driver.ratingCount} · {driver.totalTripsCompleted} trips ·{' '}
-                </>
-              ) : null}
-              <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Available in {vacancy.currentPlace?.name ?? vacancy.currentCity.name} · {availableLabel(vacancy)}
-              {vacancy.distanceKm != null ? ` · ${vacancy.distanceKm} km away` : ''}
-            </div>
-          </div>
-          {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+    <Card className="gap-3 transition-colors hover:border-primary/40">
+      <div className="flex items-start justify-between gap-3">
+        <Link to={`/drivers/${vacancy.driverId}`} className="min-w-0 flex-1">
+          <DriverIdentity driver={driver} sub={ratingSub} />
+        </Link>
+        {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+      </div>
+      <div className="text-xs text-secondary">
+        <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Available in {vacancy.currentPlace?.name ?? vacancy.currentCity.name} · {availableLabel(vacancy)}
+        {vacancy.distanceKm != null ? ` · ${vacancy.distanceKm} km away` : ''}
+      </div>
+      {vacancy.destinationCities.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-secondary">Will drive to:</span>
+          {vacancy.destinationCities.map((c) => (
+            <Badge key={c.id} variant="outline">
+              {c.name}
+            </Badge>
+          ))}
         </div>
-        {vacancy.destinationCities.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="text-secondary">Will drive to:</span>
-            {vacancy.destinationCities.map((c) => (
-              <Badge key={c.id} variant="outline">
-                {c.name}
-              </Badge>
-            ))}
+      ) : null}
+      {veh ? (
+        <div className="flex items-center gap-2 text-xs text-secondary">
+          <Car className="size-3.5" aria-hidden /> {veh}
+        </div>
+      ) : null}
+      {vacancy.notes ? <p className="text-sm text-secondary">{vacancy.notes}</p> : null}
+      {canInvite ? (
+        <div className="flex justify-end">
+          <Button type="button" size="sm" variant="outline" onClick={() => setInviteOpen(true)}>
+            Invite to trip
+          </Button>
+          {inviteOpen ? <InviteToTripDialog vacancy={vacancy} open={inviteOpen} onClose={() => setInviteOpen(false)} /> : null}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+/**
+ * Pick one of the agent's open trips and fire `POST /vacancy-invitations`. Pre-reveal — the dialog
+ * never shows the driver's name, only their handle (the same one the card surfaces).
+ */
+function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open: boolean; onClose: () => void }) {
+  const { user } = useAuth();
+  const myUserId = user?.id ?? '';
+  // Only trips the caller owns + still accepting applicants are eligible.
+  const trips = useTrips({ status: ['open', 'has_applicants'], postedByUserId: myUserId });
+  const createInvite = useCreateVacancyInvitation();
+  const eligible = (trips.data ?? []).filter((t) => t.status === 'open' || t.status === 'has_applicants');
+  const handle = vacancy.driver?.displayHandle ?? '';
+  return (
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-white p-5 shadow-xl outline-none data-[state=open]:animate-in data-[state=open]:zoom-in-95">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Dialog.Title className="text-base font-semibold">Invite {handle ? `driver ${handle}` : 'this driver'} to a trip</Dialog.Title>
+              <Dialog.Description className="mt-1 text-xs text-secondary">Pick one of your open trips. The driver gets a notification and can accept or decline.</Dialog.Description>
+            </div>
+            <button onClick={onClose} className="rounded p-1 text-secondary hover:bg-muted" aria-label="Close">
+              <X className="size-4" />
+            </button>
           </div>
-        ) : null}
-        {veh ? (
-          <div className="flex items-center gap-2 text-xs text-secondary">
-            <Car className="size-3.5" aria-hidden /> {veh}
+          <div className="mt-3 space-y-2">
+            {trips.isPending ? (
+              <LoadingSkeleton rows={3} />
+            ) : eligible.length === 0 ? (
+              <EmptyState title="No open trips" message="Post a trip first, then invite a driver to it." />
+            ) : (
+              eligible.map((t) => (
+                <TripPickRow
+                  key={t.id}
+                  trip={t}
+                  disabled={createInvite.isPending}
+                  onPick={() => {
+                    createInvite.mutate(
+                      { vacancyId: vacancy.id, tripId: t.id, message: undefined },
+                      {
+                        onSuccess: () => {
+                          toast.success('Invitation sent');
+                          onClose();
+                        },
+                        onError: (e: unknown) => {
+                          const msg = e instanceof Error ? e.message : 'Could not send the invitation';
+                          toast.error(msg);
+                        },
+                      },
+                    );
+                  }}
+                />
+              ))
+            )}
           </div>
-        ) : null}
-        {vacancy.notes ? <p className="text-sm text-secondary">{vacancy.notes}</p> : null}
-      </Card>
-    </Link>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+function TripPickRow({ trip, disabled, onPick }: { trip: Trip; disabled: boolean; onPick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onPick}
+      className="flex w-full items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
+    >
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold">
+          {trip.fromCity.name} → {trip.toCity.name}
+        </div>
+        <div className="text-xs text-secondary">
+          {formatShortDate(new Date(trip.pickupAt))} · {formatClockTime(new Date(trip.pickupAt))} · {formatINR(trip.driverPayout)}
+        </div>
+      </div>
+      <Badge variant="outline">Invite</Badge>
+    </button>
   );
 }
 
@@ -92,6 +187,8 @@ export function VacanciesPage() {
   const isDriverView = effectiveRole === 'driver';
   const myDriver = useMyDriver(isDriverView);
   const myDriverId = myDriver.data?.id;
+  // Agents (and admins viewing-as-agent) can invite a driver to one of their open trips.
+  const canInvite = effectiveRole === 'trip_manager' || effectiveRole === 'admin';
 
   const chipSelect = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
   return (
@@ -156,7 +253,7 @@ export function VacanciesPage() {
             message={anyFilter ? (near ? 'Try a bigger radius, or clear the location filter.' : 'Try widening the filters.') : 'When a driver posts their availability it shows up here.'}
           />
         ) : (
-          vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} />)
+          vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} canInvite={canInvite} />)
         )}
       </div>
     </div>

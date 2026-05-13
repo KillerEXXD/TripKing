@@ -68,16 +68,23 @@ function VehicleRow({ v }: { v: VehicleSummary }) {
 
 function DriverDetail({ driver }: { driver: Driver }) {
   const kyc = KYC_BADGE[driver.kycStatus] ?? KYC_BADGE.pending;
-  const telHref = `tel:${driver.phone.replace(/[^\d+]/g, '')}`;
+  // `phone` is required on the revealed `Driver` shape but the server may send a pre-reveal row
+  // (empty / missing identity); guard before rendering tel: links.
+  const phone = driver.phone || '';
+  const telHref = phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : undefined;
   const reviewsQuery = useDriverReviews(driver.userId);
   const reviews = reviewsQuery.data ?? [];
+  const primary = driver.fullName || `Driver ${driver.displayHandle}`;
   return (
     <div className="space-y-4">
       <Card className="gap-3">
         <div className="flex items-start gap-3">
-          <Avatar name={driver.fullName} url={driver.profilePhotoUrl || undefined} />
+          <Avatar name={primary} url={driver.profilePhotoUrl || undefined} />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-xl font-bold">{driver.fullName || 'Driver'}</h1>
+            <h1 className="truncate text-xl font-bold">{primary}</h1>
+            {driver.displayHandle ? (
+              <div className="font-mono text-[11px] uppercase tracking-wide text-secondary">{driver.displayHandle}</div>
+            ) : null}
             <div className="mt-1 flex items-center gap-1.5">
               <ShieldCheck className="size-3.5 text-secondary" aria-hidden />
               <Badge variant={kyc.variant}>{kyc.label}</Badge>
@@ -93,9 +100,9 @@ function DriverDetail({ driver }: { driver: Driver }) {
             </div>
           </div>
         </div>
-        {driver.phone ? (
+        {telHref ? (
           <Button asChild variant="outline" size="sm" className="w-fit">
-            <a href={telHref} aria-label={`Call ${driver.fullName}`}>
+            <a href={telHref} aria-label={`Call ${primary}`}>
               <Phone className="size-4" aria-hidden /> Call
             </a>
           </Button>
