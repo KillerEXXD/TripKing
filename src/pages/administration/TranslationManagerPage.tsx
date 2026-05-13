@@ -73,8 +73,8 @@ export function TranslationManagerPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Administration
+      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
       <h1 className="text-2xl font-bold">Translation manager</h1>
       <p className="text-sm text-secondary">Active locales here drive which languages the consumer app offers; the admin app stays English-only. UI strings are resolved per locale via <code>t('key')</code>.</p>

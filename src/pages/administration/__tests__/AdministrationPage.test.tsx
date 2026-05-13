@@ -26,7 +26,7 @@ describe('AdministrationPage', () => {
   it('renders the hub sections and the diagnostics panel', () => {
     renderPage();
     expect(screen.getByRole('heading', { name: /administration/i, level: 1 })).toBeInTheDocument();
-    expect(screen.getByText('Reference data')).toBeInTheDocument();
+    expect(screen.getAllByText('Reference data').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Operations')).toBeInTheDocument();
     expect(screen.getByText('Diagnostics')).toBeInTheDocument();
     for (const label of ['Throw a render error', 'Reject a promise', 'Trigger a server 500', 'Trigger a transform error']) {

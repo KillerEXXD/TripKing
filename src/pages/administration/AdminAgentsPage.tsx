@@ -31,30 +31,32 @@ function AgentCard({ a }: { a: Agent }) {
   const kyc = KYC_BADGE[a.kycStatus] ?? KYC_BADGE.pending;
   const city = a.businessCity?.name;
   return (
-    <Card className="gap-2">
+    <Card className="gap-2 transition-colors hover:border-primary/40">
       <div className="flex items-start gap-3">
-        {a.profilePhotoUrl ? (
-          <img src={a.profilePhotoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary" aria-hidden>
-            {a.fullName ? initials(a.fullName) : '?'}
+        <Link to={`/agents/${a.id}`} className="flex flex-1 items-start gap-3 min-w-0">
+          {a.profilePhotoUrl ? (
+            <img src={a.profilePhotoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary" aria-hidden>
+              {a.fullName ? initials(a.fullName) : '?'}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-bold">{a.fullName || 'Unnamed agent'}</span>
+              <Badge variant={kyc.variant}>{kyc.label}</Badge>
+            </div>
+            <div className="mt-0.5 text-xs text-secondary">
+              {a.totalTripsPosted} trip{a.totalTripsPosted === 1 ? '' : 's'} posted
+              {city ? ` · ${city}` : ''}
+              {a.businessName ? ` · ${a.businessName}` : ''}
+            </div>
+            <div className="mt-0.5 text-xs text-secondary">
+              {a.phone || '—'}
+              {a.email ? ` · ${a.email}` : ''}
+            </div>
           </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-bold">{a.fullName || 'Unnamed agent'}</span>
-            <Badge variant={kyc.variant}>{kyc.label}</Badge>
-          </div>
-          <div className="mt-0.5 text-xs text-secondary">
-            {a.totalTripsPosted} trip{a.totalTripsPosted === 1 ? '' : 's'} posted
-            {city ? ` · ${city}` : ''}
-            {a.businessName ? ` · ${a.businessName}` : ''}
-          </div>
-          <div className="mt-0.5 text-xs text-secondary">
-            {a.phone || '—'}
-            {a.email ? ` · ${a.email}` : ''}
-          </div>
-        </div>
+        </Link>
         <Link to={`/administration/kyc?agentId=${a.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
           KYC →
         </Link>
@@ -88,8 +90,8 @@ export function AdminAgentsPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Administration
+      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
       <h1 className="text-2xl font-bold">Agents</h1>
       <p className="text-sm text-secondary">

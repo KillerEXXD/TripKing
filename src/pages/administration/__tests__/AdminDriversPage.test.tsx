@@ -52,7 +52,8 @@ describe('AdminDriversPage', () => {
     expect(screen.getByText(/9 reviews/)).toBeInTheDocument();
     expect(screen.getByText('Suresh P')).toBeInTheDocument();
     expect(screen.getByText('Pending', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
-    const profileLinks = screen.getAllByRole('link', { name: /profile/i });
+    // The whole card body is a link to /drivers/:id; KYC shortcut sits next to it.
+    const profileLinks = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.startsWith('/drivers/'));
     expect(profileLinks.length).toBeGreaterThanOrEqual(2);
     expect(profileLinks[0]).toHaveAttribute('href', '/drivers/d1');
   });

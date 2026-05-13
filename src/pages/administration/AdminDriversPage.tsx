@@ -32,44 +32,46 @@ function DriverCard({ d }: { d: Driver }) {
   const city = d.currentCity?.name ?? d.homeCity?.name;
   const vehicleCount = (d.vehicles ?? []).length;
   return (
-    <Card className="gap-2">
+    <Card className="gap-2 transition-colors hover:border-primary/40">
       <div className="flex items-start gap-3">
-        {d.profilePhotoUrl ? (
-          <img src={d.profilePhotoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
-        ) : (
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary" aria-hidden>
-            {d.fullName ? initials(d.fullName) : '?'}
+        <Link to={`/drivers/${d.id}`} className="flex flex-1 items-start gap-3 min-w-0">
+          {d.profilePhotoUrl ? (
+            <img src={d.profilePhotoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
+          ) : (
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-bold text-primary" aria-hidden>
+              {d.fullName ? initials(d.fullName) : '?'}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="truncate font-bold">{d.fullName || 'Unnamed driver'}</span>
+              <Badge variant={kyc.variant}>{kyc.label}</Badge>
+            </div>
+            <div className="mt-0.5 text-xs text-secondary">
+              {d.ratingCount > 0 ? (
+                <>
+                  <span className="font-semibold text-amber-600">{formatRating(d.ratingAvg)}</span> · {d.ratingCount} review{d.ratingCount === 1 ? '' : 's'} ·{' '}
+                </>
+              ) : (
+                <>No ratings yet · </>
+              )}
+              {d.totalTripsCompleted} trip{d.totalTripsCompleted === 1 ? '' : 's'}
+              {city ? ` · ${city}` : ''}
+            </div>
+            <div className="mt-0.5 text-xs text-secondary">
+              {d.phone || '—'}
+              {d.email ? ` · ${d.email}` : ''}
+              {vehicleCount > 0 ? (
+                <>
+                  {' '}
+                  · <Car className="inline size-3" aria-hidden /> {vehicleCount} vehicle{vehicleCount === 1 ? '' : 's'}
+                </>
+              ) : null}
+            </div>
           </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-bold">{d.fullName || 'Unnamed driver'}</span>
-            <Badge variant={kyc.variant}>{kyc.label}</Badge>
-          </div>
-          <div className="mt-0.5 text-xs text-secondary">
-            {d.ratingCount > 0 ? (
-              <>
-                <span className="font-semibold text-amber-600">{formatRating(d.ratingAvg)}</span> · {d.ratingCount} review{d.ratingCount === 1 ? '' : 's'} ·{' '}
-              </>
-            ) : (
-              <>No ratings yet · </>
-            )}
-            {d.totalTripsCompleted} trip{d.totalTripsCompleted === 1 ? '' : 's'}
-            {city ? ` · ${city}` : ''}
-          </div>
-          <div className="mt-0.5 text-xs text-secondary">
-            {d.phone || '—'}
-            {d.email ? ` · ${d.email}` : ''}
-            {vehicleCount > 0 ? (
-              <>
-                {' '}
-                · <Car className="inline size-3" aria-hidden /> {vehicleCount} vehicle{vehicleCount === 1 ? '' : 's'}
-              </>
-            ) : null}
-          </div>
-        </div>
-        <Link to={`/drivers/${d.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
-          Profile →
+        </Link>
+        <Link to={`/administration/kyc?driverId=${d.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
+          KYC →
         </Link>
       </div>
     </Card>
@@ -96,8 +98,8 @@ export function AdminDriversPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Administration
+      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
       <h1 className="text-2xl font-bold">Drivers</h1>
       <p className="text-sm text-secondary">
