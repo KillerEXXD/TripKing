@@ -31,7 +31,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
   const badge = APPLICATION_BADGE[app.status] ?? APPLICATION_BADGE.applied;
   return (
     <Card className="gap-0 p-0">
-      <div className="space-y-1.5 p-4 pb-3">
+      <Link to={`/trips/${t.id}`} className="block space-y-1.5 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">
@@ -51,7 +51,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
           {' · trip is '}
           {STATUS_META[t.status].label.toLowerCase()}
         </div>
-      </div>
+      </Link>
       <div className="flex items-center justify-end border-t px-4 py-2.5 text-xs font-semibold">
         <Link to={`/trips/${t.id}`} className="flex items-center text-primary">
           View trip

@@ -33,7 +33,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
   const dest = reviewable ? `/trips/${trip.id}/applicants` : `/trips/${trip.id}`;
   return (
     <Card className={cn('gap-0 p-0', reviewable && 'border-amber-200 bg-amber-50/40')}>
-      <div className="space-y-2 p-4 pb-3">
+      <Link to={dest} className="block space-y-2 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">
@@ -55,7 +55,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
             </Badge>
           ) : null}
         </div>
-      </div>
+      </Link>
       <div className="flex items-center justify-between border-t px-4 py-2.5 text-xs font-semibold">
         {shareable ? (
           <button type="button" onClick={onShare} aria-label={`Share ${trip.fromCity.name} to ${trip.toCity.name}`} className="-ml-2 flex items-center gap-1 rounded-md px-2 py-1 text-emerald-700 hover:bg-emerald-50">
