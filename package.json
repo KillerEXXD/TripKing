@@ -60,6 +60,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@chromatic-com/storybook": "^4.1.1",
     "@playwright/test": "^1.57.0",
     "@storybook/addon-a11y": "^9.1.13",
@@ -94,6 +95,7 @@
     "vite": "^5.1.0",
     "vite-plugin-pwa": "^1.1.0",
     "vitest": "^3.2.4",
+    "vitest-axe": "^0.1.0",
     "workbox-expiration": "^7.4.1",
     "workbox-precaching": "^7.4.1",
     "workbox-routing": "^7.4.1",

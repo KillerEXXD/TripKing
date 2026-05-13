@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { axe } from 'vitest-axe';
 import { PostTripPage } from '@/pages/PostTripPage';
 
 vi.mock('@/hooks/useTrips', () => ({ usePostTrip: vi.fn() }));
@@ -224,5 +225,10 @@ describe('PostTripPage', () => {
     set(container, 'passengerPhone', '+919876543210'); // note: name left blank
     await waitFor(() => expect(screen.getByText(/existing passenger — jane sharma/i)).toBeInTheDocument());
     expect(container.querySelector<HTMLInputElement>('[name="passengerName"]')!.value).toBe('Jane Sharma');
+  });
+
+  it('a11y: step 1 wizard has no axe violations', async () => {
+    const { container } = renderPost();
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

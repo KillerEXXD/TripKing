@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { axe } from 'vitest-axe';
 import { SignInPage } from '@/pages/SignInPage';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
@@ -105,5 +106,20 @@ describe('SignInPage', () => {
     renderSignIn();
     expect(screen.getByText('home page')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /send otp/i })).toBeNull();
+  });
+
+  it('a11y: phone stage has no axe violations', async () => {
+    mockAuth();
+    const { container } = renderSignIn();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('a11y: OTP stage has no axe violations', async () => {
+    mockAuth();
+    const { container } = renderSignIn();
+    fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '9876543210' } });
+    fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    await screen.findByLabelText('OTP code');
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

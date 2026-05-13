@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { axe } from 'vitest-axe';
 import { NotificationsPage } from '@/pages/NotificationsPage';
 import type { Notification } from '@/types';
 
@@ -82,5 +83,17 @@ describe('NotificationsPage', () => {
     renderNotifs();
     fireEvent.click(screen.getByRole('button', { name: /^mark read$/i }));
     expect(markReadMut.mutate).toHaveBeenCalledWith('n7');
+  });
+
+  it('a11y: list of notifications has no axe violations', async () => {
+    setNotifs({ data: [makeNotif({ id: 'n1', isRead: false }), makeNotif({ id: 'n2', title: 'Trip completed', type: 'trip_completed', isRead: true })] });
+    const { container } = renderNotifs();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('a11y: empty state has no axe violations', async () => {
+    setNotifs({ data: [] });
+    const { container } = renderNotifs();
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
