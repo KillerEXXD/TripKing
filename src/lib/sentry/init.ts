@@ -40,8 +40,12 @@ const NOISE_MESSAGE_PATTERNS = [
   /is not a valid javascript mime type/i,
 ];
 
-/** True when the event came in via swErrorBridge (we set `tags.source = 'service-worker'`). */
-function isOurSwBridgeEvent(event: Sentry.ErrorEvent): boolean {
+/**
+ * True when the event came in via swErrorBridge (we set `tags.source = 'service-worker'`).
+ * Exported for unit testing — the `beforeSend` short-circuit must keep letting these events
+ * through, otherwise SW-context bugs get silently dropped (regression we already had once).
+ */
+export function isOurSwBridgeEvent(event: Sentry.ErrorEvent): boolean {
   const tags = event.tags as Record<string, unknown> | undefined;
   return tags?.source === 'service-worker';
 }
