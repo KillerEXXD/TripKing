@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Hand, MapPin, Plus, Search, Sparkles, Star } from 'lucide-react';
+import { Bell, ChevronRight, Hand, MapPin, Plus, Search, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -162,8 +162,14 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        <Link to="/my-earnings" className="flex items-center justify-between gap-2 rounded-xl border bg-white px-3 py-2.5 text-sm font-medium transition-colors hover:border-primary/40">
-          <span>Your earnings &amp; history</span>
+        <Link to="/my-earnings" className="flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-50 to-emerald-100/40 px-4 py-3 transition-colors hover:border-primary/40">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+            <TrendingUp className="size-5" aria-hidden />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">Your earnings</span>
+            <span className="block text-xs text-secondary">Trips, payouts and monthly trend</span>
+          </span>
           <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
         </Link>
       </div>
