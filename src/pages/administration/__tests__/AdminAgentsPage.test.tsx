@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { AdminAgentsPage } from '@/pages/administration/AdminAgentsPage';
 import type { Agent } from '@/types';
 
-vi.mock('@/hooks/useDrivers', () => ({ useAgents: vi.fn() }));
-import { useAgents } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useDrivers', () => ({ useInfiniteAgents: vi.fn() }));
+import { useInfiniteAgents } from '@/hooks/useDrivers';
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeAgent(over: Partial<Agent> = {}): Agent {
@@ -25,9 +25,20 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
   } as Agent;
 }
 
-type Q = { isPending?: boolean; isError?: boolean; data?: Agent[]; refetch?: () => void };
-function setAgents(q: Q = {}) {
-  vi.mocked(useAgents).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn(), ...q } as never);
+interface PageMeta { page: number; limit: number; total: number; hasMore: boolean }
+type State = { isPending?: boolean; isError?: boolean; rows?: Agent[]; total?: number; hasNextPage?: boolean; refetch?: () => void };
+function setAgents(s: State = {}) {
+  const rows = s.rows ?? [];
+  const total = s.total ?? rows.length;
+  vi.mocked(useInfiniteAgents).mockReturnValue({
+    isPending: s.isPending ?? false,
+    isError: s.isError ?? false,
+    data: s.isPending || s.isError ? undefined : { pages: [{ data: rows, meta: { page: 1, limit: 50, total, hasMore: s.hasNextPage ?? false } as PageMeta }], pageParams: [1] },
+    hasNextPage: s.hasNextPage ?? false,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: s.refetch ?? vi.fn(),
+  } as never);
 }
 function renderPage() {
   return render(<MemoryRouter><AdminAgentsPage /></MemoryRouter>);
@@ -35,13 +46,13 @@ function renderPage() {
 
 describe('AdminAgentsPage', () => {
   beforeEach(() => {
-    vi.mocked(useAgents).mockReset();
-    setAgents({ data: [] });
+    vi.mocked(useInfiniteAgents).mockReset();
+    setAgents({ rows: [] });
   });
 
   it('lists agents with KYC badge, business, trips and a KYC link', () => {
     setAgents({
-      data: [
+      rows: [
         makeAgent(),
         makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', kycStatus: 'pending', businessName: 'SP Tours', totalTripsPosted: 0 }),
       ],
@@ -58,9 +69,15 @@ describe('AdminAgentsPage', () => {
     expect(rowKycLinks[1]).toHaveAttribute('href', '/administration/kyc?agentId=a2');
   });
 
+  it('shows the server total in the header', () => {
+    setAgents({ rows: [makeAgent()], total: 567 });
+    renderPage();
+    expect(screen.getByText(/567 total/)).toBeInTheDocument();
+  });
+
   it('filters the loaded list by the search box (name / phone / email / business)', () => {
     setAgents({
-      data: [
+      rows: [
         makeAgent(),
         makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', phone: '+918000000000', email: 'suresh@example.com', businessName: 'SP Tours' }),
       ],
@@ -81,16 +98,16 @@ describe('AdminAgentsPage', () => {
     expect(screen.queryByText('Suresh P')).toBeNull();
   });
 
-  it('a KYC chip narrows the server query', () => {
-    setAgents({ data: [makeAgent()] });
+  it('defaults to All and a KYC chip narrows the server query', () => {
+    setAgents({ rows: [makeAgent()] });
     renderPage();
-    const lastCallArg = () => {
-      const calls = vi.mocked(useAgents).mock.calls;
-      return calls[calls.length - 1]?.[0];
+    const lastCallArgs = () => {
+      const calls = vi.mocked(useInfiniteAgents).mock.calls;
+      return calls[calls.length - 1];
     };
-    expect(lastCallArg()).toEqual({ limit: 200 });
+    expect(lastCallArgs()).toEqual([undefined, 50]);
     fireEvent.click(screen.getByRole('button', { name: 'Docs in' }));
-    expect(lastCallArg()).toEqual({ kycStatus: 'docs_submitted', limit: 200 });
+    expect(lastCallArgs()).toEqual([{ kycStatus: 'docs_submitted' }, 50]);
   });
 
   it('shows loading, error and empty states', () => {
@@ -105,7 +122,7 @@ describe('AdminAgentsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /try again/i }));
     expect(refetch).toHaveBeenCalled();
 
-    setAgents({ data: [] });
+    setAgents({ rows: [] });
     rerender(<MemoryRouter><AdminAgentsPage /></MemoryRouter>);
     expect(screen.getByText('No agents')).toBeInTheDocument();
   });

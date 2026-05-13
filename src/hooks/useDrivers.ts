@@ -8,6 +8,7 @@ import {
   getAgents,
   getDriver,
   getDriverKycDocs,
+  getAgentsPage,
   getDrivers,
   getDriversPage,
   getMyAgent,
@@ -59,6 +60,16 @@ export function useAgent(id: string | undefined) {
 }
 export function useAgents(params?: AgentsQueryParams) {
   return useQuery({ queryKey: ['agents', params ?? {}], queryFn: () => getAgents(params), staleTime: STALE.profile });
+}
+/** Paginated `GET /agents` for infinite-scroll admin directory — see `useInfiniteDrivers`. */
+export function useInfiniteAgents(params?: Omit<AgentsQueryParams, 'page'>, limit = 50) {
+  return useInfiniteQuery({
+    queryKey: ['agents', 'infinite', { ...(params ?? {}), limit }],
+    queryFn: ({ pageParam }) => getAgentsPage({ ...(params ?? {}), page: pageParam as number, limit }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.meta.hasMore ? last.meta.page + 1 : undefined),
+    staleTime: STALE.profile,
+  });
 }
 /** The signed-in user's own driver profile (404 if they aren't a driver / haven't onboarded). */
 export function useMyDriver(enabled = true) {

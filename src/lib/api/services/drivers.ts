@@ -113,14 +113,38 @@ export function updateDriverKyc(id: string, kycStatus: KycStatus, note?: string)
 export interface AgentsQueryParams {
   businessCityId?: string;
   kycStatus?: KycStatus;
+  page?: number;
   limit?: number;
 }
 export function getAgents(params?: AgentsQueryParams): Promise<Agent[]> {
   const q: Record<string, unknown> = {};
   if (params?.businessCityId) q.business_city_id = params.businessCityId;
   if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   return apiClient.get<Api[]>('/agents', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformAgent));
+}
+
+/** Paginated `GET /agents` — page rows + `{ total, page, limit, hasMore }` meta. */
+export function getAgentsPage(params?: AgentsQueryParams): Promise<{ data: Agent[]; meta: { page: number; limit: number; total: number; hasMore: boolean } }> {
+  const q: Record<string, unknown> = {};
+  if (params?.businessCityId) q.business_city_id = params.businessCityId;
+  if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.page) q.page = params.page;
+  if (params?.limit) q.limit = params.limit;
+  return apiClient.get<Api[]>('/agents', Object.keys(q).length ? q : undefined).then((r) => {
+    const rawMeta = (r as { meta?: { total?: number; page?: number; limit?: number; has_more?: boolean } }).meta;
+    const data = (r.data ?? []).map(transformAgent);
+    return {
+      data,
+      meta: {
+        page: Number(rawMeta?.page ?? params?.page ?? 1),
+        limit: Number(rawMeta?.limit ?? params?.limit ?? 50),
+        total: Number(rawMeta?.total ?? data.length),
+        hasMore: Boolean(rawMeta?.has_more ?? false),
+      },
+    };
+  });
 }
 export function getAgent(id: string): Promise<Agent> {
   return apiClient.get<Api>(`/agents/${id}`).then((r) => transformAgent(unwrap(r.data)));

@@ -140,9 +140,16 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     if (u && u.role !== 'admin' && u.role !== 'trip_manager') await db.from('users').update({ role: 'trip_manager' }).eq('id', userId);
   }
 
-  // ── GET /agents (list — public; private KYC stripped, full rows for admins) ─
+  // ── GET /agents (list — paginated; private KYC stripped for non-admins) ───
+  // Query: ?page= (1-based, default 1) ?limit= (default 50, max 200). Returns
+  // `meta: { total, page, limit, has_more }` via PostgREST count:'exact'.
   if (!id && req.method === 'GET') {
-    let q = db.from('trip_managers').select(AGENT_SELECT);
+    const limit = Math.min(Math.max(1, Number(url.searchParams.get('limit') ?? '50') || 50), 200);
+    const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let q = db.from('trip_managers').select(AGENT_SELECT, { count: 'exact' });
     const city = url.searchParams.get('business_city_id');
     if (city) q = q.eq('business_city_id', city);
     const kyc = csv(url.searchParams.get('kyc_status'));
@@ -152,13 +159,14 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     const activeParam = url.searchParams.get('active');
     if (activeParam === 'false') q = q.eq('is_active', false);
     else if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
-    const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
-    const { data, error } = await q;
+    q = q.order('created_at', { ascending: false }).range(from, to);
+    const { data, error, count } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
     const u = await authUser(db, req);
     const rows = (data ?? []) as Row[];
-    return ok(isAdmin(u) ? rows : rows.map(stripPrivateKyc));
+    const out = isAdmin(u) ? rows : rows.map(stripPrivateKyc);
+    const total = typeof count === 'number' ? count : rows.length;
+    return ok(out, { total, page, limit, has_more: from + rows.length < total });
   }
 
   // ── POST /agents (create my agent profile) ───────────────────────────────

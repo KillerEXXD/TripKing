@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Briefcase } from 'lucide-react';
-import { useAgents } from '@/hooks/useDrivers';
-import { Badge, Card, Input } from '@/components/ui';
+import { useInfiniteAgents } from '@/hooks/useDrivers';
+import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { initials } from '@/lib/utils';
 import type { Agent, KycStatus } from '@/types';
@@ -65,35 +65,53 @@ function AgentCard({ a }: { a: Agent }) {
   );
 }
 
+const PAGE_SIZE = 50;
+
 /**
- * `/administration/agents` — read-only admin agents directory. Filter chips drive
- * `useAgents({ kycStatus })` server-side; the search box narrows by name/phone/business
- * client-side. Each row links to the KYC queue filtered to that agent.
+ * `/administration/agents` — read-only admin agents directory. Defaults to "All".
+ * Server-paginated via `useInfiniteAgents` (50/page); IntersectionObserver auto-fetches
+ * the next page. Header shows the server total.
  */
 export function AdminAgentsPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  const agentsQuery = useAgents({ ...(filter === 'all' ? {} : { kycStatus: filter }), limit: 200 });
+  const agentsQuery = useInfiniteAgents(filter === 'all' ? undefined : { kycStatus: filter }, PAGE_SIZE);
+
+  const rows = useMemo(() => (agentsQuery.data?.pages.flatMap((p) => p.data) ?? []), [agentsQuery.data]);
+  const total = agentsQuery.data?.pages[0]?.meta.total;
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const list = agentsQuery.data ?? [];
-    if (!term) return list;
-    return list.filter(
+    if (!term) return rows;
+    return rows.filter(
       (a) =>
         a.fullName.toLowerCase().includes(term) ||
         (a.phone ?? '').toLowerCase().includes(term) ||
         (a.email ?? '').toLowerCase().includes(term) ||
         (a.businessName ?? '').toLowerCase().includes(term),
     );
-  }, [agentsQuery.data, q]);
+  }, [rows, q]);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !agentsQuery.hasNextPage) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !agentsQuery.isFetchingNextPage) void agentsQuery.fetchNextPage();
+    }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [agentsQuery]);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
-      <h1 className="text-2xl font-bold">Agents</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-2xl font-bold">Agents</h1>
+        {typeof total === 'number' ? <span className="text-sm text-secondary">{total.toLocaleString('en-IN')} total</span> : null}
+      </div>
       <p className="text-sm text-secondary">
         Read-only directory. Move an agent through verification in the{' '}
         <Link to="/administration/kyc" className="text-primary underline">
@@ -129,6 +147,16 @@ export function AdminAgentsPage() {
           {filtered.map((a) => (
             <AgentCard key={a.id} a={a} />
           ))}
+          <div ref={sentinelRef} aria-hidden className="h-1" />
+          {agentsQuery.isFetchingNextPage ? <LoadingSkeleton rows={2} /> : null}
+          {!agentsQuery.hasNextPage && rows.length > PAGE_SIZE ? (
+            <p className="py-2 text-center text-xs text-secondary">— end of list ({rows.length.toLocaleString('en-IN')} loaded) —</p>
+          ) : null}
+          {agentsQuery.hasNextPage && !agentsQuery.isFetchingNextPage ? (
+            <div className="flex justify-center pt-1">
+              <Button size="sm" variant="outline" onClick={() => void agentsQuery.fetchNextPage()}>Load more</Button>
+            </div>
+          ) : null}
         </div>
       )}
     </main>
