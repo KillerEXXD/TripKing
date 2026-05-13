@@ -145,6 +145,20 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   const byStatus = await j('GET', '/vacancies?status=cancelled');
   check('GET /vacancies?status=cancelled → contains my vacancy', byStatus.status === 200 && (byStatus.json?.data || []).some((v) => v.id === vacancyId), `len=${byStatus.json?.data?.length}`);
 
+  // ── driver deactivation: a deactivated driver can't post a vacancy + their vacancies leave the public list ──
+  const deact = await j('PATCH', `/drivers/${driverId}/active`, { token: adminToken, body: { is_active: false, reason: 'smoke deactivation' } });
+  check('PATCH /drivers/:id/active {is_active:false} (admin) → 200 + is_active false', deact.status === 200 && deact.json?.data?.is_active === false, `status=${deact.status} ${JSON.stringify(deact.json?.error || deact.json?.data?.is_active)}`);
+  const postWhileDeact = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  check('POST /vacancies while the driver is deactivated → 403 ACCOUNT_SUSPENDED', postWhileDeact.status === 403 && postWhileDeact.json?.error?.code === 'ACCOUNT_SUSPENDED', `status=${postWhileDeact.status} ${JSON.stringify(postWhileDeact.json?.error || '')}`);
+  const listWhileDeact = await j('GET', `/vacancies?driver_id=${driverId}`);
+  check('GET /vacancies?driver_id=<deactivated driver> → empty (vacancies hidden)', listWhileDeact.status === 200 && (listWhileDeact.json?.data || []).length === 0, `len=${listWhileDeact.json?.data?.length}`);
+  const reactNotAdmin = await j('PATCH', `/drivers/${driverId}/active`, { token: driverToken, body: { is_active: true } });
+  check('PATCH /drivers/:id/active by a non-admin → 403', reactNotAdmin.status === 403, `status=${reactNotAdmin.status}`);
+  const react = await j('PATCH', `/drivers/${driverId}/active`, { token: adminToken, body: { is_active: true } });
+  check('PATCH /drivers/:id/active {is_active:true} (admin) → 200 + is_active true', react.status === 200 && react.json?.data?.is_active === true, `status=${react.status} ${JSON.stringify(react.json?.error || '')}`);
+  const listAfter = await j('GET', `/vacancies?driver_id=${driverId}`);
+  check('GET /vacancies?driver_id= after reactivation → vacancies visible again', listAfter.status === 200 && (listAfter.json?.data || []).some((v) => v.id === vacancyId), `len=${listAfter.json?.data?.length}`);
+
   if (failures) { console.error(`[test-vacancies] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-vacancies] all checks passed');
 })().catch((e) => { console.error('[test-vacancies] error:', e); process.exit(1); });

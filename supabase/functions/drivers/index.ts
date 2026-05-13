@@ -6,12 +6,13 @@
  * write" policy in migration 002). The /agents function is the trip-manager twin
  * (supabase/functions/agents/index.ts).
  *
- *   GET   /drivers              ?current_city_id=&kyc_status=&near_lat=&near_lng=&radius_km=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue; near_* restricts to drivers within radius_km of (near_lat, near_lng) by their generated geog, ignoring stale positions, nearest first + a distance_km per row; private KYC fields stripped unless admin)
- *   GET   /drivers/me           (Bearer) — the caller's own driver profile (joined; +verification block; 404 if none)
+ *   GET   /drivers              ?current_city_id=&kyc_status=&active=&include_inactive=&near_lat=&near_lng=&radius_km=&limit=     (public; kyc_status accepts a CSV — the admin KYC queue; defaults to is_active=true — ?active=false lists only deactivated, ?include_inactive=true lists all; near_* restricts to drivers within radius_km of (near_lat, near_lng) by their generated geog, ignoring stale positions, nearest first + a distance_km per row; private KYC fields stripped unless admin)
+ *   GET   /drivers/me           (Bearer) — the caller's own driver profile (joined; +verification block; returned even when deactivated, with is_active:false; 404 if none)
  *   POST  /drivers              (Bearer) — create my profile; user_id = caller; body.role='trip_manager'
  *                               makes an agent profile instead; idempotent (returns the existing one if any)
- *   GET   /drivers/:id          (public) — joins home/current city + vehicle summaries (private KYC fields stripped unless owner/admin)
+ *   GET   /drivers/:id          (public) — joins home/current city + vehicle summaries (private KYC fields stripped unless owner/admin); 404 for a deactivated profile unless the caller is its owner or an admin
  *   PATCH /drivers/:id          (owner/admin; Bearer) — full_name, email, home_city_id, current_city_id, profile_photo_url
+ *   PATCH /drivers/:id/active   (admin; Bearer) — { is_active, reason? } — the deactivation kill switch (audit-logged + an account_status_change notification); a deactivated driver can't post/apply to trips, post vacancies, or leave reviews, and is excluded from public lists & alert matching (in-flight trips are left alone)
  *   PATCH /drivers/:id/location (owner; Bearer) — current_city_id, current_lat, current_lng, current_location_at
  *   POST  /drivers/:id/kyc-doc-upload-url (owner; Bearer) — { doc_type } → short-lived signed UPLOAD url into the private 'driver-kyc' bucket
  *   POST  /drivers/:id/kyc-docs     (owner; Bearer) — { aadhaar_front_path, aadhaar_back_path, aadhaar_last4, driver_license_path, driver_license_number, driver_license_expiry, selfie_path, consent } → kyc_status pending|resubmit_required → docs_submitted
@@ -174,6 +175,10 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const kyc = csv(url.searchParams.get('kyc_status'));
     if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
     else if (kyc.length > 1) q = q.in('kyc_status', kyc);
+    // is_active filter — default to active-only; ?active=false → only deactivated; ?include_inactive=true → all
+    const activeParam = url.searchParams.get('active');
+    if (activeParam === 'false') q = q.eq('is_active', false);
+    else if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
     // Phase D radius filter: drivers whose (fresh) current position is within radius_km of (near_lat, near_lng).
     const near = parseNearRadius(url);
     let distById: Map<string, number> | null = null;
@@ -254,13 +259,15 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
   }
 
   // load the driver for ownership / 404
-  const { data: drv } = await db.from('drivers').select('id, user_id').eq('id', id).maybeSingle();
+  const { data: drv } = await db.from('drivers').select('id, user_id, is_active').eq('id', id).maybeSingle();
 
   // ── GET /drivers/:id ─────────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
     if (!drv) return fail('NOT_FOUND', 'Driver not found', 404);
     const u = await authUser(db, req);
     const privileged = !!u && (u.id === (drv.user_id as string) || isAdmin(u));
+    // a deactivated profile is invisible to everyone but its owner and admins
+    if (drv.is_active === false && !privileged) return fail('NOT_FOUND', 'Driver not found', 404);
     return respondDriver(id, privileged);
   }
 
@@ -384,6 +391,42 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
         : next === 'resubmit_required' ? `Please re-submit your KYC documents.${reason ? ' ' + reason : ''}`
         : `Your KYC status is now "${next}".`,
       payload_json: { kyc_status: next, kind: 'driver', ...(reason ? { note: reason } : {}) },
+    });
+    return respondDriver(id, true);
+  }
+
+  // ── PATCH /drivers/:id/active (admin — deactivate / reactivate a driver) ──
+  // The `is_active` kill switch: a deactivated driver can't post or apply to trips, post vacancies,
+  // or leave reviews; their profile 404s for non-owners; their vacancies stop matching alerts. In-flight
+  // (assigned / in-progress) trips are intentionally left alone. Orthogonal to kyc_status.
+  if (sub === 'active' && (req.method === 'PATCH' || req.method === 'PUT' || req.method === 'POST')) {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const b = await readBody(req);
+    if (typeof b.is_active !== 'boolean') return fail('VALIDATION', 'is_active (true|false) is required', 422);
+    const reason = b.is_active ? null : strOrNull(b.reason);
+    const { data: before } = await db.from('drivers').select('is_active, deactivated_at, deactivation_reason, deactivated_by').eq('id', id).maybeSingle();
+    const now = new Date().toISOString();
+    const { error } = await db.from('drivers').update({
+      is_active: b.is_active,
+      deactivated_at: b.is_active ? null : now,
+      deactivation_reason: reason,
+      deactivated_by: b.is_active ? null : u.id,
+    }).eq('id', id);
+    if (error) return pgFail(error);
+    await db.from('admin_audit_log').insert({
+      actor_user_id: u.id, action: b.is_active ? 'reactivate' : 'deactivate', entity: 'drivers', entity_id: id,
+      before_json: before ?? null, after_json: { is_active: b.is_active, ...(reason ? { reason } : {}) },
+    });
+    await db.from('notifications').insert({
+      user_id: ownerId,
+      type: 'account_status_change',
+      title: b.is_active ? 'Account reactivated' : 'Account deactivated',
+      body: b.is_active
+        ? 'Your driver account has been reactivated — you can post and apply to trips again.'
+        : `Your driver account has been deactivated by an administrator.${reason ? ' ' + reason : ''} Contact support if you think this is a mistake.`,
+      payload_json: { is_active: b.is_active, kind: 'driver', ...(reason ? { reason } : {}) },
     });
     return respondDriver(id, true);
   }

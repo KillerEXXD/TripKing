@@ -7,7 +7,8 @@
  *
  * Covers: public list (200 + array), 404, unauth post (401), bad direction/score (422),
  * not-completed trip (422), happy path (both directions; ratee derived; rater role from caller),
- * unique (trip,direction) (409), filters (trip_id / ratee_user_id / direction), report (401/404/200).
+ * unique (trip,direction) (409), filters (trip_id / ratee_user_id / direction), report (401/404/200),
+ * a deactivated driver can't post a review (403 ACCOUNT_SUSPENDED), admin moderation.
  */
 const BASE = (process.env.REVIEWS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) {
@@ -45,12 +46,19 @@ async function postTrip(agentToken, cityA, cityB, carTypeId) {
   const agent = await signIn('trip_manager');
   const driver = await signIn('driver');
   const stranger = await signIn('driver');
-  check('auth tokens + user ids obtained', !!agent.token && !!agent.userId && !!driver.token && !!driver.userId && !!stranger.token);
-  if (!agent.token || !driver.token || !stranger.token) process.exit(1);
+  const admin = await signIn('admin');
+  check('auth tokens + user ids obtained', !!agent.token && !!agent.userId && !!driver.token && !!driver.userId && !!stranger.token && !!admin.token);
+  if (!agent.token || !driver.token || !stranger.token || !admin.token) process.exit(1);
 
   const drv = await j('POST', '/drivers', { token: driver.token, body: { full_name: 'Review Smoke Driver' } });
   const driverId = drv.json?.data?.id;
   check('driver profile created', drv.status === 200 && !!driverId && drv.json?.data?.user_id === driver.userId, `status=${drv.status}`);
+  const ag = await j('POST', '/agents', { token: agent.token, body: { full_name: 'Review Smoke Agent', business_name: 'Smoke Travels' } });
+  const agentProfileId = ag.json?.data?.id;
+  check('agent profile created', ag.status === 200 && !!agentProfileId, `status=${ag.status}`);
+  // posting trips / applying both require an approved KYC — bump the driver and agent
+  if (driverId) await j('PATCH', `/drivers/${driverId}/kyc`, { token: admin.token, body: { kyc_status: 'approved', note: 'smoke' } });
+  if (agentProfileId) await j('PATCH', `/agents/${agentProfileId}/kyc`, { token: admin.token, body: { kyc_status: 'approved', note: 'smoke' } });
 
   const cities = (await j('GET', '/admin/cities')).json?.data || [];
   const carTypes = (await j('GET', '/admin/car-types')).json?.data || [];
@@ -104,6 +112,14 @@ async function postTrip(agentToken, cityA, cityB, carTypeId) {
   const dup = await j('POST', '/reviews', { token: agent.token, body: { trip_id: tripId, direction: 'manager_to_driver', score: 3 } });
   check('POST /reviews duplicate (trip_id, direction) → 409', dup.status === 409, `status=${dup.status}`);
 
+  // a deactivated driver can't leave reviews
+  const deactDrv = await j('PATCH', `/drivers/${driverId}/active`, { token: admin.token, body: { is_active: false, reason: 'smoke' } });
+  check('PATCH /drivers/:id/active {is_active:false} (admin) → 200', deactDrv.status === 200 && deactDrv.json?.data?.is_active === false, `status=${deactDrv.status} ${JSON.stringify(deactDrv.json?.error || '')}`);
+  const reviewWhileDeact = await j('POST', '/reviews', { token: driver.token, body: { trip_id: tripId, direction: 'driver_to_manager', score: 4 } });
+  check('POST /reviews while the driver is deactivated → 403 ACCOUNT_SUSPENDED', reviewWhileDeact.status === 403 && reviewWhileDeact.json?.error?.code === 'ACCOUNT_SUSPENDED', `status=${reviewWhileDeact.status} ${JSON.stringify(reviewWhileDeact.json?.error || '')}`);
+  const reactDrv = await j('PATCH', `/drivers/${driverId}/active`, { token: admin.token, body: { is_active: true } });
+  check('PATCH /drivers/:id/active {is_active:true} (admin) → 200', reactDrv.status === 200 && reactDrv.json?.data?.is_active === true, `status=${reactDrv.status}`);
+
   // driver → agent
   const r2 = await j('POST', '/reviews', { token: driver.token, body: { trip_id: tripId, direction: 'driver_to_manager', score: 4, comment: 'Clear instructions' } });
   check('POST /reviews (driver_to_manager) → 200 + ratee = the trip poster', r2.status === 200 && r2.json?.data?.rater_user_id === driver.userId && r2.json?.data?.ratee_user_id === agent.userId, `status=${r2.status} ${JSON.stringify(r2.json?.error || r2.json?.data || '')}`);
@@ -126,8 +142,6 @@ async function postTrip(agentToken, cityA, cityB, carTypeId) {
   check('POST /reviews/:id/report (any authed user) → 200 + is_flagged', reported.status === 200 && reported.json?.data?.is_flagged === true, `status=${reported.status} ${JSON.stringify(reported.json?.error || '')}`);
 
   // ── admin moderation ───────────────────────────────────────────────────
-  const admin = await signIn('admin');
-  check('admin auth token obtained', !!admin.token);
   const modNoAuth = await j('POST', `/reviews/${reviewId}/moderate`, { body: { clear_flag: true } });
   check('POST /reviews/:id/moderate without auth → 401', modNoAuth.status === 401, `status=${modNoAuth.status}`);
   const modNotAdmin = await j('POST', `/reviews/${reviewId}/moderate`, { token: stranger.token, body: { clear_flag: true } });

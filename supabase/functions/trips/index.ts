@@ -16,7 +16,7 @@
  *   GET    /trips                       (Bearer) ?status=&from_city_id=&to_city_id=&posted_by_user_id=&assigned_driver_id=&near_lat=&near_lng=&radius_km=&limit=
  *                                       — assigned_driver_id accepts a driver uuid OR the literal `me` (the trips you're driving);
  *                                         near_lat+near_lng+radius_km restrict to trips whose pickup point (from_place → from_city fallback) is within the radius (nearest first; each row gets distance_km)
- *   POST   /trips                       (Bearer) — from_place_id / to_place_id accepted alongside from_city_id / to_city_id; hide_passenger_phone (bool) + passenger_count (int≥1) are REQUIRED; total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification
+ *   POST   /trips                       (Bearer; the poster must be is_active + KYC-approved) — from_place_id / to_place_id accepted alongside from_city_id / to_city_id; hide_passenger_phone (bool) + passenger_count (int≥1) are REQUIRED; total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification
  *   GET    /trips/applied               (driver; Bearer) — the caller's own trip_acceptances, each with its joined trip ("my applications") — the joined trip is browse-safe (the caller is an applicant, not assigned)
  *   GET    /trips/by-otp/:otp           (public — the OTP is the credential) — the passenger portal; joins assigned driver+vehicle;
  *                                       fare fields nulled when show_fare_to_passenger is false; passenger_otp_hash / passenger_otp never echoed
@@ -287,8 +287,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const { data: usr } = await db.from('users').select('display_name, role').eq('id', u.id).maybeSingle();
     const posterRole = usr?.role === 'driver' ? 'driver' : 'trip_manager';
     const { data: posterProf } = await (posterRole === 'driver'
-      ? db.from('drivers').select('kyc_status').eq('user_id', u.id).maybeSingle()
-      : db.from('trip_managers').select('kyc_status').eq('user_id', u.id).maybeSingle());
+      ? db.from('drivers').select('kyc_status, is_active').eq('user_id', u.id).maybeSingle()
+      : db.from('trip_managers').select('kyc_status, is_active').eq('user_id', u.id).maybeSingle());
+    if (posterProf?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your account has been deactivated — contact support.', 403);
     if ((posterProf?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a trip', 403);
     const insert = {
       posted_by_user_id: u.id,
@@ -403,8 +404,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (!(await rateLimitOk(db, `apply-trip:${u.id}`, 120, 60))) return fail('RATE_LIMITED', 'Too many applications — try again shortly', 429);
       const did = await driverIdFor(u.id);
       if (!did) return fail('FORBIDDEN', 'You need a driver profile to apply', 403);
-      const { data: drvKyc } = await db.from('drivers').select('kyc_status').eq('id', did).maybeSingle();
-      if ((drvKyc?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before applying to trips', 403);
+      const { data: drv } = await db.from('drivers').select('kyc_status, is_active').eq('id', did).maybeSingle();
+      if (drv?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your driver account has been deactivated — contact support.', 403);
+      if ((drv?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before applying to trips', 403);
       const b = await readBody(req);
       const { data, error } = await db
         .from('trip_acceptances')
@@ -450,6 +452,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const aid = String(b.acceptance_id ?? '');
     const { data: acc } = await db.from('trip_acceptances').select('id, driver_id, vehicle_id').eq('id', aid).eq('trip_id', tripId).maybeSingle();
     if (!acc) return fail('VALIDATION', 'acceptance_id not found for this trip', 422);
+    const { data: chosenDrv } = await db.from('drivers').select('is_active').eq('id', acc.driver_id).maybeSingle();
+    if (chosenDrv?.is_active === false) return fail('VALIDATION', 'That driver has been deactivated — pick another applicant', 422);
     const now = new Date().toISOString();
     const otp = genOtp();
     const otpHash = await sha256hex(otp);

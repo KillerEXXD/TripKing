@@ -5,8 +5,8 @@
  * /functions/v1/auth/<x> or proxied as /auth/<x> or /<x>):
  *   POST /auth/request-otp  { phone }                     → { sent: true, dev_otp? }
  *   POST /auth/verify-otp   { phone, otp, display_name?, role? }
- *                                                          → { user, access_token, refresh_token }
- *   POST /auth/refresh      { refresh_token }              → { user?, access_token, refresh_token }
+ *                                                          → { user, access_token, refresh_token }  (403 ACCOUNT_SUSPENDED if users.is_active = false)
+ *   POST /auth/refresh      { refresh_token }              → { user?, access_token, refresh_token }  (403 ACCOUNT_SUSPENDED if users.is_active = false)
  *   POST /auth/logout       (Bearer access_token)          → { ok: true }
  *   GET  /me  (or /auth/me) (Bearer access_token)          → the public.users row
  *
@@ -148,6 +148,10 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
       );
     }
     const u = await publicUser(db, userId);
+    // account-level kill switch — a suspended user can't get a session (orthogonal to KYC; flipped by an admin)
+    if (u && (u as Record<string, unknown>).is_active === false) {
+      return fail('ACCOUNT_SUSPENDED', 'This account has been suspended. Please contact support.', 403);
+    }
 
     return ok({ user: u, access_token: signIn.session.access_token, refresh_token: signIn.session.refresh_token });
   }
@@ -159,6 +163,10 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     const { data, error } = await db.auth.refreshSession({ refresh_token: refreshToken });
     if (error || !data?.session) return fail('INVALID_REFRESH', error?.message ?? 'Could not refresh session', 401);
     const u = data.session.user ? await publicUser(db, data.session.user.id) : null;
+    // a suspended account loses access on its next refresh
+    if (u && (u as Record<string, unknown>).is_active === false) {
+      return fail('ACCOUNT_SUSPENDED', 'This account has been suspended. Please contact support.', 403);
+    }
     return ok({ user: u, access_token: data.session.access_token, refresh_token: data.session.refresh_token });
   }
 

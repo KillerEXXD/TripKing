@@ -13,6 +13,9 @@
  * hide_passenger_phone is false; a non-party authed user sees none of that, no positions); Phase C-2
  * from_place_id/to_place_id + Phase D radius search + the alert_match notification fired on POST /trips.
  *
+ * Also covers KYC gating (a non-approved poster/driver → 403 KYC_REQUIRED) and the deactivation
+ * kill switch (a deactivated driver can't apply → 403 ACCOUNT_SUSPENDED, and can't be assigned → 422).
+ *
  * For a multi-actor / many-trips version of this lifecycle (N agents × M drivers, GPS pings, etc.)
  * see scripts/simulate-marketplace.cjs (`npm run sim:marketplace`).
  */
@@ -59,8 +62,9 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   console.log(`[test-trips] base = ${BASE}`);
   const token = await signIn('trip_manager', 'Trip Smoke');         // the poster
   const randoToken = await signIn('trip_manager', 'Rando');          // a never-a-party authed user
-  check('auth tokens obtained', !!token && !!randoToken);
-  if (!token) process.exit(1);
+  const adminToken = await signIn('admin', 'Trip Smoke Admin');      // to bump KYC + (de)activate
+  check('auth tokens obtained', !!token && !!randoToken && !!adminToken);
+  if (!token || !adminToken) process.exit(1);
 
   const cityIds = ((await j('GET', '/admin/cities')).json?.data || []).map((c) => c.id);
   const carTypeId = ((await j('GET', '/admin/car-types')).json?.data || [])[0]?.id;
@@ -79,6 +83,11 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('POST /trips without hide_passenger_phone → 422', (await j('POST', '/trips', { token, body: baseTrip })).status === 422);
   check('POST /trips without passenger_count → 422', (await j('POST', '/trips', { token, body: { ...baseTrip, hide_passenger_phone: false, passenger_count: undefined } })).status === 422);
 
+  // posting a trip requires an approved-KYC poster — give the trip_manager an agent profile + approve it.
+  const posterAgentId = (await j('POST', '/agents', { token, body: { full_name: 'Trip Smoke Agent', business_name: 'Trip Smoke Travels' } })).json?.data?.id;
+  if (posterAgentId) await j('PATCH', `/agents/${posterAgentId}/kyc`, { token: adminToken, body: { kyc_status: 'approved', note: 'smoke' } });
+  check('poster agent profile created + KYC approved', !!posterAgentId);
+
   // ── the trip + lifecycle (hide_passenger_phone: false ⇒ the assigned driver may see the phone) ──
   const post = await j('POST', '/trips', { token, body: { ...baseTrip, hide_passenger_phone: false } });
   const tid = post.json?.data?.id;
@@ -96,8 +105,11 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   // driver bootstrap → apply → my-applications → assign
   const dToken = await signIn('driver', 'Trip Smoke Driver');
   const drvId = (await j('POST', '/drivers', { token: dToken, body: { full_name: 'Trip Smoke Driver' } })).json?.data?.id;
+  check('POST /trips/:id/applicants before KYC approval → 403 KYC_REQUIRED', (await j('POST', `/trips/${tid}/applicants`, { token: dToken, body: {} })).status === 403);
+  if (drvId) await j('PATCH', `/drivers/${drvId}/kyc`, { token: adminToken, body: { kyc_status: 'approved', note: 'smoke' } });
   const apply = await j('POST', `/trips/${tid}/applicants`, { token: dToken, body: { applicant_message: 'smoke apply' } });
   const aid = apply.json?.data?.id;
+  check('POST /trips/:id/applicants (KYC-approved driver) → 200 + acceptance id', apply.status === 200 && !!aid, `status=${apply.status} ${JSON.stringify(apply.json?.error || '')}`);
   check('GET /trips/applied without auth → 401', (await j('GET', '/trips/applied')).status === 401);
   const applied = await j('GET', '/trips/applied', { token: dToken });
   const mineApp = (applied.json?.data || []).find((a) => a.trip_id === tid);
@@ -210,6 +222,24 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const notifs = await j('GET', '/notifications', { token: alertToken });
   const matched = (notifs.json?.data || []).find((n) => n && n.type === 'alert_match' && n.payload_json && n.payload_json.trip_id === t2?.id);
   check('POST /trips inside a saved alert\'s radius → alert_match notification fired for the alert owner', notifs.status === 200 && !!matched, `notifs=${JSON.stringify((notifs.json?.data || []).map((n) => ({ t: n?.type, p: n?.payload_json })))}`);
+
+  // ── deactivation: a deactivated driver can't apply, and can't be assigned ──────────────────────
+  const newTrip = async (extra) => (await j('POST', '/trips', { token, body: { ...baseTrip, hide_passenger_phone: false, passenger_count: 1, pickup_at: futureIso(3), ...(extra || {}) } })).json?.data?.id;
+  const dToken2 = await signIn('driver', 'Deact Test Driver');
+  const drv2Id = (await j('POST', '/drivers', { token: dToken2, body: { full_name: 'Deact Test Driver' } })).json?.data?.id;
+  if (drv2Id) await j('PATCH', `/drivers/${drv2Id}/kyc`, { token: adminToken, body: { kyc_status: 'approved', note: 'smoke' } });
+  const tA = await newTrip();
+  const applyDeact = await j('POST', `/trips/${tA}/applicants`, { token: dToken2, body: {} });
+  const aA = applyDeact.json?.data?.id;
+  check('a KYC-approved driver applies to a fresh trip → 200', applyDeact.status === 200 && !!aA, `status=${applyDeact.status} ${JSON.stringify(applyDeact.json?.error || '')}`);
+  const deact2 = await j('PATCH', `/drivers/${drv2Id}/active`, { token: adminToken, body: { is_active: false, reason: 'smoke' } });
+  check('PATCH /drivers/:id/active {is_active:false} (admin) → 200 + is_active false', deact2.status === 200 && deact2.json?.data?.is_active === false, `status=${deact2.status} ${JSON.stringify(deact2.json?.error || '')}`);
+  const tB = await newTrip();
+  const applyWhileDeact = await j('POST', `/trips/${tB}/applicants`, { token: dToken2, body: {} });
+  check('POST /trips/:id/applicants while the driver is deactivated → 403 ACCOUNT_SUSPENDED', applyWhileDeact.status === 403 && applyWhileDeact.json?.error?.code === 'ACCOUNT_SUSPENDED', `status=${applyWhileDeact.status} ${JSON.stringify(applyWhileDeact.json?.error || '')}`);
+  const assignDeact = await j('POST', `/trips/${tA}/assign`, { token, body: { acceptance_id: aA } });
+  check('POST /trips/:id/assign with a deactivated driver\'s acceptance → 422', assignDeact.status === 422, `status=${assignDeact.status} ${JSON.stringify(assignDeact.json?.error || '')}`);
+  await j('PATCH', `/drivers/${drv2Id}/active`, { token: adminToken, body: { is_active: true } });
 
   if (failures) { console.error(`[test-trips] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-trips] all checks passed');

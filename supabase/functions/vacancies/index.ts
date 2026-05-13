@@ -4,8 +4,8 @@
  * writes; withTiming; verify_jwt = false (mirrors the migration-003 RLS "vacancies read /
  * owner-or-admin write" policy). Destinations live in the `vacancy_destinations` junction.
  *
- *   GET   /vacancies              ?current_city_id=&destination_city_id=&destination_place_id=&status=&driver_id=&near_lat=&near_lng=&radius_km=&limit=   (public)
- *   POST  /vacancies              (driver; Bearer) — body: current_city_id (required) + current_place_id?; destinations?: [{ cityId?, placeId? }]  (or the legacy parallel destination_city_ids?: string[] / destination_place_ids?: string[])
+ *   GET   /vacancies              ?current_city_id=&destination_city_id=&destination_place_id=&status=&driver_id=&near_lat=&near_lng=&radius_km=&limit=   (public; vacancies of deactivated drivers are excluded)
+ *   POST  /vacancies              (driver; Bearer; the driver must be is_active + KYC-approved) — body: current_city_id (required) + current_place_id?; destinations?: [{ cityId?, placeId? }]  (or the legacy parallel destination_city_ids?: string[] / destination_place_ids?: string[])
  *   GET   /vacancies/:id          (public) — joins driver+vehicle summary, current_city/current_place, destination cities + places
  *   POST  /vacancies/:id/cancel   (owning driver/admin; Bearer)
  *
@@ -98,6 +98,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     if (status) q = q.eq('status', status);
     const driverId = url.searchParams.get('driver_id');
     if (driverId) q = q.eq('driver_id', driverId);
+    // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
+    const { data: inactive } = await db.from('drivers').select('id').eq('is_active', false);
+    const inactiveIds = (inactive ?? []).map((r) => r.id as string);
+    if (inactiveIds.length) q = q.not('driver_id', 'in', `(${inactiveIds.join(',')})`);
     const destCity = url.searchParams.get('destination_city_id');
     const destPlace = url.searchParams.get('destination_place_id');
     if (destCity || destPlace) {
@@ -141,8 +145,9 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     if (!(await rateLimitOk(db, `post-vacancy:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many vacancies posted — try again shortly', 429);
     const did = await driverIdFor(u.id);
     if (!did) return fail('FORBIDDEN', 'You need a driver profile to post a vacancy', 403);
-    const { data: drvKyc } = await db.from('drivers').select('kyc_status').eq('id', did).maybeSingle();
-    if ((drvKyc?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a vacancy', 403);
+    const { data: drv } = await db.from('drivers').select('kyc_status, is_active').eq('id', did).maybeSingle();
+    if (drv?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your driver account has been deactivated — contact support.', 403);
+    if ((drv?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a vacancy', 403);
     const b = await readBody(req);
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);

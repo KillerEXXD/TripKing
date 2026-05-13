@@ -65,7 +65,7 @@
     },
     {
       "name": "debug",
-      "description": "Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See docs/EXCEPTION_HANDLING.md."
+      "description": "Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See `docs/EXCEPTION_HANDLING.md`."
     }
   ],
   "components": {
@@ -237,13 +237,13 @@
           "200": {
             "$ref": "#/components/responses/Envelope"
           },
-          "403": {
-            "$ref": "#/components/responses/Envelope"
-          },
           "409": {
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -691,7 +691,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Verify an OTP → { user, access_token, refresh_token } (dev: accepts \"12345\" or any 4–6 digit code; role:admin is dev-only)",
+        "summary": "Verify an OTP → { user, access_token, refresh_token } (dev: accepts \"12345\" or any 4–6 digit code; role:admin is dev-only). 403 ACCOUNT_SUSPENDED if users.is_active = false (the account-level kill switch — an admin flipped it; orthogonal to KYC).",
         "requestBody": {
           "required": true,
           "content": {
@@ -731,6 +731,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
           }
         }
       }
@@ -740,7 +743,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Exchange a refresh token for a new pair",
+        "summary": "Exchange a refresh token for a new pair. 403 ACCOUNT_SUSPENDED if users.is_active = false (a suspended account loses access on its next refresh).",
         "requestBody": {
           "required": true,
           "content": {
@@ -764,6 +767,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -886,7 +892,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer; the poster must be KYC-verified — 403 KYC_REQUIRED otherwise) — hide_passenger_phone (true|false) and passenger_count (≥1) are REQUIRED. from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422). total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a trip (Bearer; the poster must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver/agent profile is deactivated, 403 KYC_REQUIRED if not yet approved) — hide_passenger_phone (true|false) and passenger_count (≥1) are REQUIRED. from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422). total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1032,7 +1038,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Apply to a trip (driver; Bearer; must be KYC-verified — 403 KYC_REQUIRED otherwise) — per-user rate-limited (429 RATE_LIMITED on excess)",
+        "summary": "Apply to a trip (driver; Bearer; must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver is deactivated, 403 KYC_REQUIRED if not yet approved) — per-user rate-limited (429 RATE_LIMITED on excess)",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1134,7 +1140,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Assign a driver (poster/admin; Bearer) — selects one acceptance, rejects the rest, generates the passenger OTP",
+        "summary": "Assign a driver (poster/admin; Bearer) — selects one acceptance, rejects the rest, generates the passenger OTP. 422 if the chosen acceptance's driver has been deactivated (pick another applicant).",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1608,7 +1614,7 @@
         "tags": [
           "drivers"
         ],
-        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries; kyc_status accepts a CSV (the admin KYC queue). When near_lat+near_lng+radius_km are all given, the list is restricted to drivers whose (non-stale, ≤30 min old) current position is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
+        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries; kyc_status accepts a CSV (the admin KYC queue). Deactivated drivers are excluded by default (pass active=false for only-deactivated, or include_inactive=true for all). When near_lat+near_lng+radius_km are all given, the list is restricted to drivers whose (non-stale, ≤30 min old) current position is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "current_city_id",
@@ -1624,6 +1630,25 @@
               "type": "string"
             },
             "description": "one value or a CSV — e.g. docs_submitted,video_pending"
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false"
+              ]
+            },
+            "description": "active=false ⇒ list only deactivated drivers (default lists only active ones)"
+          },
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true ⇒ include deactivated drivers"
           },
           {
             "name": "near_lat",
@@ -1741,7 +1766,7 @@
         "tags": [
           "drivers"
         ],
-        "summary": "Get a driver profile — the `verification` block + private KYC fields (masked Aadhaar, licence number/expiry) are returned only to the owner/admin; the public view is the coarse kyc_status",
+        "summary": "Get a driver profile — the `verification` block + private KYC fields (masked Aadhaar, licence number/expiry) are returned only to the owner/admin; the public view is the coarse kyc_status. A deactivated profile 404s for everyone except its owner and admins.",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1787,6 +1812,58 @@
                   },
                   "profile_photo_url": {
                     "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/{id}/active": {
+      "patch": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Deactivate / reactivate a driver (admin; Bearer) — { is_active: bool, reason?: string }. Sets deactivated_at / deactivation_reason / deactivated_by, appends an admin_audit_log row, and fires an account_status_change notification to the driver. A deactivated driver can't post or apply to trips, post vacancies, or leave reviews; they're excluded from public driver lists & alert matching; their profile 404s for non-owners. In-flight (assigned / in-progress) trips are intentionally left alone. Orthogonal to kyc_status.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "is_active"
+                ],
+                "properties": {
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "shown to the driver when deactivating"
                   }
                 }
               }
@@ -2081,7 +2158,7 @@
         "tags": [
           "agents"
         ],
-        "summary": "List agent (trip-manager) profiles (public)",
+        "summary": "List agent (trip-manager) profiles (public) — deactivated agents are excluded by default (pass active=false for only-deactivated, or include_inactive=true for all)",
         "parameters": [
           {
             "name": "business_city_id",
@@ -2096,6 +2173,25 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "false"
+              ]
+            },
+            "description": "active=false ⇒ list only deactivated agents (default lists only active ones)"
+          },
+          {
+            "name": "include_inactive",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "true ⇒ include deactivated agents"
           },
           {
             "name": "limit",
@@ -2183,7 +2279,7 @@
         "tags": [
           "agents"
         ],
-        "summary": "Get an agent profile (joins business city)",
+        "summary": "Get an agent profile (joins business city). A deactivated profile 404s for everyone except its owner and admins.",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -2229,6 +2325,58 @@
                   },
                   "profile_photo_url": {
                     "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/agents/{id}/active": {
+      "patch": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Deactivate / reactivate an agent (admin; Bearer) — { is_active: bool, reason?: string }. Sets deactivated_at / deactivation_reason / deactivated_by, appends an admin_audit_log row, and fires an account_status_change notification to the agent. A deactivated agent can't post trips or leave reviews; they're excluded from public agent lists; their profile 404s for non-owners. In-flight trips are intentionally left alone. Orthogonal to kyc_status.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "is_active"
+                ],
+                "properties": {
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "shown to the agent when deactivating"
                   }
                 }
               }
@@ -2459,7 +2607,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "List vacancies (public) — joins driver+vehicle summary, current_city/current_place, and destination cities + places (vacancy_destinations: [{ city, place }]). When near_lat+near_lng+radius_km are all given, restricted to vacancies whose current point (current_place → current_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
+        "summary": "List vacancies (public; vacancies of deactivated drivers are excluded) — joins driver+vehicle summary, current_city/current_place, and destination cities + places (vacancy_destinations: [{ city, place }]). When near_lat+near_lng+radius_km are all given, restricted to vacancies whose current point (current_place → current_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "current_city_id",
@@ -2537,7 +2685,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "Post a vacancy (driver; Bearer; must be KYC-verified — 403 KYC_REQUIRED otherwise) — driver_id = the caller; current_place_id accepted alongside current_city_id; destinations: [{ cityId?, placeId? }] (each entry may be a curated city, a precise place, or both — at least one id required; or the legacy parallel destination_place_ids / destination_city_ids) → vacancy_destinations rows (a bad place id → 422); matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a vacancy (driver; Bearer; must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver is deactivated, 403 KYC_REQUIRED if not yet approved) — driver_id = the caller; current_place_id accepted alongside current_city_id; destinations: [{ cityId?, placeId? }] (each entry may be a curated city, a precise place, or both — at least one id required; or the legacy parallel destination_place_ids / destination_city_ids) → vacancy_destinations rows (a bad place id → 422); matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2939,7 +3087,7 @@
         "tags": [
           "reviews"
         ],
-        "summary": "Post a review (Bearer; rater_user_id = caller) — the trip must be completed; unique (trip_id, direction); ratee_user_id derived from the trip if omitted; fires a review_received notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a review (Bearer; rater_user_id = caller; a deactivated driver/agent can't — 403 ACCOUNT_SUSPENDED) — the trip must be completed; unique (trip_id, direction); ratee_user_id derived from the trip if omitted; fires a review_received notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -2990,6 +3138,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
             "$ref": "#/components/responses/Envelope"
           },
           "404": {
@@ -3578,10 +3729,10 @@
         ],
         "summary": "Deliberately throw an uncaught error (admin; Bearer) — withTiming reports it to Sentry (tags: source=edge-fn, fn=debug) and returns { code: \"INTERNAL\" } with status 500 (never a raw runtime error). Exercises the L5 edge-function error boundary.",
         "responses": {
-          "403": {
+          "500": {
             "$ref": "#/components/responses/Envelope"
           },
-          "500": {
+          "403": {
             "$ref": "#/components/responses/Envelope"
           }
         }

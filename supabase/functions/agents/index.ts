@@ -5,11 +5,12 @@
  * "trip_managers read / owner-or-admin write" policy in migration 002). Managers get a lighter
  * KYC than drivers: Aadhaar (front+back) + selfie + a video call — no driving licence, no vehicle.
  *
- *   GET   /agents                  ?business_city_id=&kyc_status=&limit=   (public; kyc_status CSV — admin queue)
- *   GET   /agents/me               (Bearer) — caller's own agent profile (joined; +verification block; 404 if none)
+ *   GET   /agents                  ?business_city_id=&kyc_status=&active=&include_inactive=&limit=   (public; kyc_status CSV — admin queue; defaults to is_active=true — ?active=false lists only deactivated, ?include_inactive=true lists all)
+ *   GET   /agents/me               (Bearer) — caller's own agent profile (joined; +verification block; returned even when deactivated, with is_active:false; 404 if none)
  *   POST  /agents                  (Bearer) — create my agent profile; user_id = caller; users.role → trip_manager; idempotent
- *   GET   /agents/:id              (public) — joins business city (private KYC fields stripped unless owner/admin)
+ *   GET   /agents/:id              (public) — joins business city (private KYC fields stripped unless owner/admin); 404 for a deactivated profile unless the caller is its owner or an admin
  *   PATCH /agents/:id              (owner/admin; Bearer) — full_name, email, business_name, business_city_id, profile_photo_url
+ *   PATCH /agents/:id/active       (admin; Bearer) — { is_active, reason? } — the deactivation kill switch (audit-logged + an account_status_change notification); a deactivated agent can't post trips or leave reviews, and is excluded from public lists
  *   POST  /agents/:id/kyc-doc-upload-url (owner; Bearer) — { doc_type: aadhaar_front|aadhaar_back|selfie } → signed UPLOAD url into 'manager-kyc'
  *   POST  /agents/:id/kyc-docs     (owner; Bearer) — { aadhaar_front_path, aadhaar_back_path, aadhaar_last4, selfie_path, consent } → kyc_status pending|resubmit_required → docs_submitted
  *   GET   /agents/:id/kyc-docs     (owner/admin; Bearer) — 5-min signed download urls for Aadhaar f/b + selfie + masked-4
@@ -139,6 +140,10 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     const kyc = csv(url.searchParams.get('kyc_status'));
     if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
     else if (kyc.length > 1) q = q.in('kyc_status', kyc);
+    // is_active filter — default to active-only; ?active=false → only deactivated; ?include_inactive=true → all
+    const activeParam = url.searchParams.get('active');
+    if (activeParam === 'false') q = q.eq('is_active', false);
+    else if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
     const limit = Number(url.searchParams.get('limit') ?? '50');
     q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
     const { data, error } = await q;
@@ -183,13 +188,15 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     return respondAgent(data.id as string, true);
   }
 
-  const { data: tm } = await db.from('trip_managers').select('id, user_id').eq('id', id).maybeSingle();
+  const { data: tm } = await db.from('trip_managers').select('id, user_id, is_active').eq('id', id).maybeSingle();
 
   // ── GET /agents/:id ──────────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
     if (!tm) return fail('NOT_FOUND', 'Agent not found', 404);
     const u = await authUser(db, req);
     const privileged = !!u && (u.id === (tm.user_id as string) || isAdmin(u));
+    // a deactivated profile is invisible to everyone but its owner and admins
+    if (tm.is_active === false && !privileged) return fail('NOT_FOUND', 'Agent not found', 404);
     return respondAgent(id, privileged);
   }
 
@@ -289,6 +296,42 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
         : next === 'resubmit_required' ? `Please re-submit your KYC documents.${reason ? ' ' + reason : ''}`
         : `Your KYC status is now "${next}".`,
       payload_json: { kyc_status: next, kind: 'agent', ...(reason ? { note: reason } : {}) },
+    });
+    return respondAgent(id, true);
+  }
+
+  // ── PATCH /agents/:id/active (admin — deactivate / reactivate an agent) ──
+  // The `is_active` kill switch: a deactivated agent can't post trips or leave reviews; their profile
+  // 404s for non-owners; they drop out of public lists. In-flight trips are intentionally left alone.
+  // Orthogonal to kyc_status.
+  if (sub === 'active' && (req.method === 'PATCH' || req.method === 'PUT' || req.method === 'POST')) {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const b = await readBody(req);
+    if (typeof b.is_active !== 'boolean') return fail('VALIDATION', 'is_active (true|false) is required', 422);
+    const reason = b.is_active ? null : strOrNull(b.reason);
+    const { data: before } = await db.from('trip_managers').select('is_active, deactivated_at, deactivation_reason, deactivated_by').eq('id', id).maybeSingle();
+    const now = new Date().toISOString();
+    const { error } = await db.from('trip_managers').update({
+      is_active: b.is_active,
+      deactivated_at: b.is_active ? null : now,
+      deactivation_reason: reason,
+      deactivated_by: b.is_active ? null : u.id,
+    }).eq('id', id);
+    if (error) return pgFail(error);
+    await db.from('admin_audit_log').insert({
+      actor_user_id: u.id, action: b.is_active ? 'reactivate' : 'deactivate', entity: 'trip_managers', entity_id: id,
+      before_json: before ?? null, after_json: { is_active: b.is_active, ...(reason ? { reason } : {}) },
+    });
+    await db.from('notifications').insert({
+      user_id: ownerId,
+      type: 'account_status_change',
+      title: b.is_active ? 'Account reactivated' : 'Account deactivated',
+      body: b.is_active
+        ? 'Your agent account has been reactivated — you can post trips again.'
+        : `Your agent account has been deactivated by an administrator.${reason ? ' ' + reason : ''} Contact support if you think this is a mistake.`,
+      payload_json: { is_active: b.is_active, kind: 'agent', ...(reason ? { reason } : {}) },
     });
     return respondAgent(id, true);
   }

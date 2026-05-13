@@ -97,6 +97,12 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
   if (!id && req.method === 'POST') {
     if (!u) return fail('UNAUTHORIZED', 'Sign in to leave a review', 401);
     if (!(await rateLimitOk(db, `post-review:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many reviews — try again shortly', 429);
+    // a deactivated driver / agent can't leave reviews — the is_active flag must be honoured everywhere
+    if (u.role === 'driver' || u.role === 'trip_manager') {
+      const profTable = u.role === 'driver' ? 'drivers' : 'trip_managers';
+      const { data: prof } = await db.from(profTable).select('is_active').eq('user_id', u.id).maybeSingle();
+      if (prof?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your account has been deactivated — contact support.', 403);
+    }
     const b = await readBody(req);
     const tripId = strOrNull(b.trip_id);
     const direction = strOrNull(b.direction);
