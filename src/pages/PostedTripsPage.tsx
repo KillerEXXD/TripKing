@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatKm } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
-const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
+export const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   open: { label: 'Open', variant: 'success' },
   has_applicants: { label: 'Needs review', variant: 'warning' },
   assigned: { label: 'Assigned', variant: 'info' },
@@ -19,13 +19,13 @@ const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'war
 };
 const FILTERS: ('all' | TripStatus)[] = ['all', 'open', 'has_applicants', 'assigned', 'in_progress', 'completed', 'cancelled'];
 
-function pickupLabel(iso: string): string {
+export function pickupLabel(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
 
-function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => void }) {
+export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => void }) {
   const meta = STATUS_META[trip.status];
   const hasApplicants = trip.applicantCount > 0;
   const reviewable = hasApplicants && trip.status === 'has_applicants';

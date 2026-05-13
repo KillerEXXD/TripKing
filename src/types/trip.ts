@@ -95,6 +95,16 @@ export interface VehicleSummary {
   ac: boolean;
 }
 
+/** An entry in "my applications" (`GET /trips/applied`) — a trip_acceptance of the caller's, with its joined trip. */
+export interface MyApplication {
+  acceptanceId: string;
+  status: AcceptanceStatus;
+  appliedAt: string;
+  applicantQuotedRatePerKm?: number;
+  applicantMessage?: string;
+  trip: Trip;
+}
+
 export interface TripAcceptance {
   id: string;
   tripId: string;
@@ -147,6 +157,8 @@ export interface TripsQueryParams {
   fromCityId?: string;
   toCityId?: string;
   postedByUserId?: string;
+  /** A driver uuid, or the literal `'me'` — the trips assigned to (being driven by) that driver. */
+  assignedDriverId?: string;
   /** Restrict to trips whose pickup point is within the radius (nearest first). */
   near?: NearRadius;
   page?: number;

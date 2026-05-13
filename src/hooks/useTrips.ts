@@ -5,6 +5,7 @@ import {
   assignDriver,
   cancelTrip,
   completeTrip,
+  getMyApplications,
   getTrip,
   getTripApplicants,
   getTripByOtp,
@@ -57,6 +58,10 @@ export function useTripByOtp(otp: string | undefined) {
 }
 export function useTripApplicants(tripId: string | undefined) {
   return useQuery({ queryKey: ['trip', tripId, 'applicants'], queryFn: () => getTripApplicants(tripId as string), enabled: !!tripId, staleTime: STALE.live });
+}
+/** The caller's own trip applications (`GET /trips/applied`) — "my applications"; `[]` if they have no driver profile. */
+export function useMyApplications() {
+  return useQuery({ queryKey: ['trips', 'applied'], queryFn: getMyApplications, staleTime: STALE.live });
 }
 
 function useInvalidateTrips() {

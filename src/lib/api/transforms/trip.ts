@@ -10,6 +10,7 @@ import type {
   AssignedDriver,
   CityRow,
   DriverSummary,
+  MyApplication,
   PosterRole,
   PostTripInput,
   Trip,
@@ -178,6 +179,21 @@ export function transformTripAcceptance(api: Api): TripAcceptance {
     appliedAt: reqStr(api.applied_at, 'MISSING_FIELD', ctx),
     decisionAt: str(api.decision_at),
     decisionNote: str(api.decision_note),
+  };
+}
+
+/** `GET /trips/applied` entry — the caller's own trip_acceptance with its joined (browse-safe) trip. */
+export function transformMyApplication(api: Api): MyApplication {
+  const ctx = { acceptance_id: str(api.id) ?? '?' };
+  const trip = api.trip as Api | undefined;
+  if (!trip || typeof trip !== 'object') throw new TripTransformError('application has no joined trip', 'MISSING_FIELD', ctx);
+  return {
+    acceptanceId: reqStr(api.id, 'MISSING_ID', { api }),
+    status: (str(api.status) ?? 'applied') as AcceptanceStatus,
+    appliedAt: reqStr(api.applied_at, 'MISSING_FIELD', ctx),
+    applicantQuotedRatePerKm: typeof api.applicant_quoted_rate_per_km === 'number' ? (api.applicant_quoted_rate_per_km as number) : undefined,
+    applicantMessage: str(api.applicant_message),
+    trip: transformTrip(trip),
   };
 }
 

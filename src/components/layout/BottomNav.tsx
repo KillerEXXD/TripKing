@@ -18,7 +18,7 @@ const DRIVER_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
   { id: 'browse', label: 'Browse', Icon: Search, to: '/trips', match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
   { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, match: (p) => p === '/trips/new' },
-  { id: 'mine', label: 'My trips', Icon: ClipboardList, to: '/posted-trips', match: (p) => p === '/posted-trips' },
+  { id: 'mine', label: 'My trips', Icon: ClipboardList, to: '/my-trips', match: (p) => p === '/my-trips' || p === '/posted-trips' },
   { id: 'profile', label: 'Profile', Icon: User, to: '/profile', match: (p) => p === '/profile' || p.startsWith('/drivers/') },
 ];
 const AGENT_NAV: NavItem[] = [

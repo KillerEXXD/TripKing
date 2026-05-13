@@ -4,8 +4,8 @@
  * (The matching `/trips/*` edge functions land in a later commit.)
  */
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
-import { toApiPostTrip, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
-import type { ApplyToTripInput, PostTripInput, Trip, TripAcceptance, TripsQueryParams } from '@/types';
+import { toApiPostTrip, transformMyApplication, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
+import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripsQueryParams } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -19,6 +19,7 @@ export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
   if (params?.fromCityId) q.from_city_id = params.fromCityId;
   if (params?.toCityId) q.to_city_id = params.toCityId;
   if (params?.postedByUserId) q.posted_by_user_id = params.postedByUserId;
+  if (params?.assignedDriverId) q.assigned_driver_id = params.assignedDriverId;
   if (params?.near) {
     q.near_lat = params.near.lat;
     q.near_lng = params.near.lng;
@@ -28,6 +29,11 @@ export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
   if (params?.limit) q.limit = params.limit;
   if (params?.sort) q.sort = params.sort;
   return apiClient.get<Api[]>('/trips', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformTrip));
+}
+
+/** The caller's own trip applications (`GET /trips/applied`) — each a trip_acceptance with its joined (browse-safe) trip. Empty if the caller has no driver profile. */
+export function getMyApplications(): Promise<MyApplication[]> {
+  return apiClient.get<Api[]>('/trips/applied').then((r) => (r.data ?? []).map(transformMyApplication));
 }
 
 export function getTrip(id: string): Promise<Trip> {
