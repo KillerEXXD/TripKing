@@ -25,14 +25,17 @@ function metricsClient(): ReturnType<typeof serviceClient> | null {
   }
   return _metrics ?? null;
 }
-function persist(name: string, method: string, status: number, ms: number): void {
+function persist(name: string, method: string, status: number, ms: number, cacheStatus: string | null): void {
   const c = metricsClient();
   if (!c) return;
   // fire-and-forget — swallow both resolution paths
-  c.from('api_metrics').insert({ endpoint: name, method, status, duration_ms: ms }).then(
-    () => {},
-    () => {},
-  );
+  c.from('api_metrics').insert({
+    endpoint: name,
+    method,
+    status,
+    duration_ms: ms,
+    cache_status: cacheStatus,    // 'memory' | 'shared' | 'miss' | null (uncached endpoint)
+  }).then(() => {}, () => {});
 }
 
 export function withTiming(name: string, handler: (req: Request) => Promise<Response>): (req: Request) => Promise<Response> {
@@ -42,9 +45,14 @@ export function withTiming(name: string, handler: (req: Request) => Promise<Resp
     try {
       const res = await handler(req);
       const ms = Math.round(performance.now() - started);
+      // X-Cache is stamped by `_shared/withCache.ts` (tagCacheHit) on cached responses;
+      // uncached endpoints leave it null. Validate before persisting (a value other than
+      // memory|shared|miss is a bug).
+      const xc = res.headers.get('X-Cache');
+      const cacheStatus = xc === 'memory' || xc === 'shared' || xc === 'miss' ? xc : null;
       if (req.method !== 'OPTIONS') {
-        console.log(`[${name}] ${req.method} ${path} -> ${res.status} ${ms}ms`);
-        persist(name, req.method, res.status, ms);
+        console.log(`[${name}] ${req.method} ${path} -> ${res.status} ${ms}ms${cacheStatus ? ' (cache=' + cacheStatus + ')' : ''}`);
+        persist(name, req.method, res.status, ms, cacheStatus);
       }
       try {
         res.headers.set('Server-Timing', `total;dur=${ms};desc="${name}"`);
@@ -56,7 +64,7 @@ export function withTiming(name: string, handler: (req: Request) => Promise<Resp
       const ms = Math.round(performance.now() - started);
       console.error(`[${name}] ${req.method} ${path} -> threw after ${ms}ms`, err);
       if (req.method !== 'OPTIONS') {
-        persist(name, req.method, 500, ms);
+        persist(name, req.method, 500, ms, null);
         captureServerException(err, { fn: name, method: req.method, path, status: 500 });
       }
       const res = fail(ERROR_CODES.INTERNAL, 'Something went wrong on our side. We have been notified — please try again.', 500);

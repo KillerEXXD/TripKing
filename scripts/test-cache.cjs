@@ -98,6 +98,15 @@ function sql(query) {
   // Tidy up.
   sql(`delete from public.api_cache where cache_key in ('${KEY}','${SIBLING}')`);
 
+  console.log('• Migration 021 — api_metrics.cache_status + updated RPC');
+  const col = sql(
+    "select column_name from information_schema.columns where table_schema='public' and table_name='api_metrics' and column_name='cache_status'",
+  );
+  check('api_metrics.cache_status column present', col.length === 1);
+  const rpcShape = sql('select (public.get_api_metrics_summary(24)->\'cache\') as cache');
+  const c = rpcShape[0]?.cache ?? {};
+  check('get_api_metrics_summary returns the new cache block', 'memory' in c && 'shared' in c && 'miss' in c && 'unknown' in c, JSON.stringify(c));
+
   console.log('• CHECK constraint — bad cache_type is rejected');
   let threw = false;
   try {
