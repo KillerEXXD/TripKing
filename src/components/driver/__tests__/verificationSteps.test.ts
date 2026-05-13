@@ -17,7 +17,7 @@ describe('verificationSteps', () => {
 
   it('the agent checklist is the 3-step variant — details, documents, video_call (no vehicle/licence)', () => {
     expect(AGENT_VERIFICATION_STEPS.map((s) => s.key)).toEqual(['details', 'documents', 'video_call']);
-    expect(AGENT_VERIFICATION_STEPS.map((s) => s.route(undefined))).toEqual(['/profile', '/verify/documents', '/verify/video-call']);
+    expect(AGENT_VERIFICATION_STEPS.map((s) => s.route(undefined))).toEqual(['/profile#edit', '/verify/documents', '/verify/video-call']);
   });
 
   it('nextActionableStep defaults to the driver checklist', () => {

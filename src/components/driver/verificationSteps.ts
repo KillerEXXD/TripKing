@@ -10,7 +10,7 @@ export interface VerificationStepMeta {
 }
 
 export const DRIVER_VERIFICATION_STEPS: VerificationStepMeta[] = [
-  { key: 'details', title: 'Your details', why: 'Your name and home city — done when you signed up. Tap to edit.', route: () => '/profile' },
+  { key: 'details', title: 'Your details', why: 'Your name and home city — done when you signed up. Tap to edit.', route: () => '/profile#edit'},
   {
     key: 'documents',
     title: 'Identity documents',
@@ -29,7 +29,7 @@ export const DRIVER_VERIFICATION_STEPS: VerificationStepMeta[] = [
 
 /** The trip-manager (agent) verification checklist — Aadhaar + selfie + a video call, no vehicle/licence. */
 export const AGENT_VERIFICATION_STEPS: VerificationStepMeta[] = [
-  { key: 'details', title: 'Your details', why: 'Your name and business city — done when you signed up. Tap to edit.', route: () => '/profile' },
+  { key: 'details', title: 'Your details', why: 'Your name and business city — done when you signed up. Tap to edit.', route: () => '/profile#edit'},
   {
     key: 'documents',
     title: 'Identity documents',

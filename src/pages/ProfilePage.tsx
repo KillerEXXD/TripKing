@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Car, LogOut, Pencil, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -92,7 +92,9 @@ function EditForm({
 }
 
 function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSignOut: () => void; signingOut: boolean }) {
-  const [editing, setEditing] = useState(false);
+  const { hash } = useLocation();
+  const [editing, setEditing] = useState(hash === '#edit');
+  useEffect(() => { if (hash === '#edit') setEditing(true); }, [hash]);
   const update = useUpdateDriver();
   const vehiclesQuery = useDriverVehicles(driver.id);
   const kyc = KYC_BADGE[driver.kycStatus] ?? KYC_BADGE.pending;
@@ -200,7 +202,9 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
 }
 
 function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOut: () => void; signingOut: boolean }) {
-  const [editing, setEditing] = useState(false);
+  const { hash } = useLocation();
+  const [editing, setEditing] = useState(hash === '#edit');
+  useEffect(() => { if (hash === '#edit') setEditing(true); }, [hash]);
   const update = useUpdateAgent();
   const kyc = KYC_BADGE[agent.kycStatus] ?? KYC_BADGE.pending;
 
