@@ -235,22 +235,24 @@ export function PassengerPage() {
         <div className="text-base font-semibold">{otp ? 'Your trip' : 'Passenger portal'}</div>
       </header>
 
-      {!otp ? (
-        <OtpGate onSubmit={(value) => navigate(`/passenger/${encodeURIComponent(value)}`)} />
-      ) : tripQuery.isError ? (
-        <div className="space-y-3 p-4">
-          <ErrorState title="OTP not recognised" message="Double-check the code with your trip manager, or ask them to share the link again." />
-          <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/passenger', { replace: true })}>
-            Try another OTP
-          </Button>
-        </div>
-      ) : tripQuery.isPending ? (
-        <div className="p-4">
-          <LoadingSkeleton rows={6} />
-        </div>
-      ) : (
-        <TripView trip={tripQuery.data} otp={otp} />
-      )}
+      <main className="flex-1">
+        {!otp ? (
+          <OtpGate onSubmit={(value) => navigate(`/passenger/${encodeURIComponent(value)}`)} />
+        ) : tripQuery.isError ? (
+          <div className="space-y-3 p-4">
+            <ErrorState title="OTP not recognised" message="Double-check the code with your trip manager, or ask them to share the link again." />
+            <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/passenger', { replace: true })}>
+              Try another OTP
+            </Button>
+          </div>
+        ) : tripQuery.isPending ? (
+          <div className="p-4">
+            <LoadingSkeleton rows={6} />
+          </div>
+        ) : (
+          <TripView trip={tripQuery.data} otp={otp} />
+        )}
+      </main>
     </div>
   );
 }
