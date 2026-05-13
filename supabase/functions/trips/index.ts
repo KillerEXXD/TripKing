@@ -46,8 +46,9 @@ import { parseNearRadius, toKm } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { stripPhones, assertNoPhones, PhoneInTextError, revealCache, logPiiReveal } from '../_shared/pii.ts';
 
-const CACHE_EPOCH = 'v1';
+const CACHE_EPOCH = 'v2';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the
@@ -68,15 +69,15 @@ type Db = ReturnType<typeof serviceClient>;
 
 // includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map; from/to place joined alongside the curated cities.
 const TRIP_SELECT =
-  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
-  'assigned_driver:drivers!assigned_driver_id(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at)';
+  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
+  'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle))';
 // for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
 const BY_OTP_SELECT =
-  '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
-  'assigned_driver:drivers!assigned_driver_id(id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at), ' +
+  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
+  'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle)), ' +
   'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
-  '*, driver:drivers(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, current_city:cities!current_city_id(*)), ' +
+  '*, driver:drivers(id, user_id, full_name, phone, email, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, user:users!user_id(display_handle), current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 
 function bearer(req: Request): string | null {
@@ -135,8 +136,10 @@ function distanceToDest(raw: Record<string, unknown>): number | null {
 // ── PII redaction ────────────────────────────────────────────────────────────
 // PII / sensitive trip columns — stripped from every response by default; re-attached per viewer
 // relationship in redactTrip(). IF YOU ADD A PII COLUMN TO public.trips, ADD IT TO BOTH HERE.
-const TRIP_PII_COLS = ['passenger_name', 'passenger_phone', 'posted_by_phone', 'passenger_otp'] as const;
+const TRIP_PII_COLS = ['passenger_name', 'passenger_phone', 'posted_by_name', 'posted_by_phone', 'passenger_otp'] as const;
 const DRIVER_POSITION_COLS = ['current_lat', 'current_lng', 'current_location_at'] as const;
+const DRIVER_PII_COLS = ['full_name', 'phone', 'email', 'profile_photo_url'] as const;
+const TRIP_TEXT_FIELDS = ['driver_instructions', 'luggage_notes', 'special_requests'] as const;
 type ViewerRel = 'owner' | 'admin' | 'assigned' | 'browse';
 
 /** Who is `u` to this trip? owner (the poster) | admin | assigned (the assigned driver) | browse (anyone else). */
@@ -147,11 +150,28 @@ function relationshipFor(raw: Record<string, unknown>, u: { id: string; role: st
   if (myDriverId && raw.assigned_driver_id === myDriverId) return 'assigned';
   return 'browse';
 }
-function withoutKeys(o: Record<string, unknown> | null | undefined, keys: readonly string[]): Record<string, unknown> | null {
-  if (!o) return (o ?? null) as null;
-  const c = { ...o };
-  for (const k of keys) delete c[k];
-  return c;
+/** Flatten `driver.user.display_handle` onto the joined driver row + scrub free-text on acceptances. */
+function shapeAcceptance(row: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!row) return row ?? null;
+  const out = { ...row };
+  const drv = out.driver as Record<string, unknown> | null | undefined;
+  if (drv) {
+    const flat = { ...drv };
+    const u = flat.user as Record<string, unknown> | null | undefined;
+    flat.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
+    delete flat.user;
+    out.driver = flat;
+  }
+  if (typeof out.applicant_message === 'string') out.applicant_message = stripPhones(out.applicant_message);
+  if (typeof out.decision_note === 'string') out.decision_note = stripPhones(out.decision_note);
+  // if a trip is joined into the acceptance (e.g. GET /trips/applied), scrub its text fields too
+  const t = out.trip as Record<string, unknown> | null | undefined;
+  if (t) {
+    const tt = { ...t } as Record<string, unknown>;
+    scrubTripText(tt);
+    out.trip = tt;
+  }
+  return out;
 }
 /**
  * Strip passenger/poster PII and the assigned driver's precise position from a raw trip row, then
@@ -165,26 +185,69 @@ function withoutKeys(o: Record<string, unknown> | null | undefined, keys: readon
  *   - browse (any other authed user — incl. an applicant who isn't assigned yet): none of the above —
  *     route / fare / car type / pickup / passenger_count / applicant_count / posted_by_name / etc. only.
  */
-function redactTrip(raw: Record<string, unknown>, rel: ViewerRel): Record<string, unknown> {
+/** Flatten the joined assigned_driver row: lift display_handle off the nested `user`, return both the
+ *  shaped driver and the handle. */
+function shapeAssignedDriver(raw: Record<string, unknown> | null | undefined): { driver: Record<string, unknown> | null; handle: string | null } {
+  if (!raw) return { driver: null, handle: null };
+  const drv: Record<string, unknown> = { ...raw };
+  const du = drv.user as Record<string, unknown> | null | undefined;
+  const handle = du && typeof du.display_handle === 'string' ? du.display_handle : null;
+  drv.display_handle = handle;
+  delete drv.user;
+  return { driver: drv, handle };
+}
+function scrubTripText(out: Record<string, unknown>): void {
+  for (const k of TRIP_TEXT_FIELDS) if (typeof out[k] === 'string') out[k] = stripPhones(out[k] as string);
+}
+/**
+ * `posterReveal`: extra carve-out for the browse case — when the viewer has applied to one of the
+ * trip's poster's trips (per `can_reveal_agent` predicate), they get to see posted_by_name/phone too.
+ * Computed by the caller before invoking this (an async predicate call).
+ */
+function redactTrip(raw: Record<string, unknown>, rel: ViewerRel, posterReveal = false): Record<string, unknown> {
   const out = { ...raw };
   delete out.passenger_otp_hash;            // never anyone
   for (const k of TRIP_PII_COLS) delete out[k];
-  out.assigned_driver = withoutKeys(raw.assigned_driver as Record<string, unknown> | null, DRIVER_POSITION_COLS);
+  // Posted-by handle (always present, lifted from joined users row)
+  const posterUser = raw.posted_by_user as Record<string, unknown> | null | undefined;
+  out.posted_by_handle = posterUser && typeof posterUser.display_handle === 'string' ? posterUser.display_handle : null;
+  delete out.posted_by_user;
+  // Assigned driver: shape + handle
+  const shaped = shapeAssignedDriver(raw.assigned_driver as Record<string, unknown> | null | undefined);
+  out.assigned_driver_handle = shaped.handle;
+  // Free-text scrub for everyone (admins included — internal text shouldn't carry contact info)
+  scrubTripText(out);
   if (rel === 'owner' || rel === 'admin') {
     out.passenger_name = raw.passenger_name;
     out.passenger_phone = raw.passenger_phone;
     out.posted_by_phone = raw.posted_by_phone;
-    out.assigned_driver = (raw.assigned_driver as Record<string, unknown> | null) ?? null;
+    out.posted_by_name = raw.posted_by_name;
+    out.assigned_driver = shaped.driver; // full identity + position
     if (typeof raw.passenger_otp === 'string' && raw.passenger_otp) out.passenger_otp = raw.passenger_otp;
     const dist = distanceToDest(raw);
     if (dist != null) out.distance_to_destination_km = dist;
   } else if (rel === 'assigned') {
     out.passenger_name = raw.passenger_name;
     out.posted_by_phone = raw.posted_by_phone;
+    out.posted_by_name = raw.posted_by_name;
     if (!raw.hide_passenger_phone) out.passenger_phone = raw.passenger_phone;
-    out.assigned_driver = (raw.assigned_driver as Record<string, unknown> | null) ?? null; // their own position
+    out.assigned_driver = shaped.driver; // their own — full identity + own position
     const dist = distanceToDest(raw);
     if (dist != null) out.distance_to_destination_km = dist;
+  } else {
+    // browse: strip assigned-driver identity + position; optionally reveal poster name/phone if applicant
+    if (shaped.driver) {
+      const stripped = { ...shaped.driver };
+      for (const k of DRIVER_PII_COLS) delete stripped[k];
+      for (const k of DRIVER_POSITION_COLS) delete stripped[k];
+      out.assigned_driver = stripped;
+    } else {
+      out.assigned_driver = null;
+    }
+    if (posterReveal) {
+      out.posted_by_phone = raw.posted_by_phone;
+      out.posted_by_name = raw.posted_by_name;
+    }
   }
   return out;
 }
@@ -221,7 +284,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (error) throw new Error(error.message);
     const raw = data as Record<string, unknown>;
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
-    return redactTrip(raw, relationshipFor(raw, u, myDriverId));
+    return redactTrip(raw, relationshipFor(raw, u, myDriverId), false);
   }
 
   // ── GET /trips (list) — Bearer required ──────────────────────────────────
@@ -312,7 +375,19 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const rawRows = payload.rows;
     const distById = payload.distEntries ? new Map(payload.distEntries) : null;
     const myDriverId = (u.role !== 'admin' && rawRows.some((r) => r.assigned_driver_id && r.posted_by_user_id !== u.id)) ? await driverIdFor(u.id) : null;
-    let rows = rawRows.map((r) => redactTrip(r, relationshipFor(r, u, myDriverId)));
+    const rc = revealCache(db);
+    let rows = await Promise.all(rawRows.map(async (r) => {
+      const rel = relationshipFor(r, u, myDriverId);
+      let posterReveal = false;
+      if (rel === 'browse') {
+        const posterUserId = r.posted_by_user_id as string | undefined;
+        if (posterUserId) {
+          posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
+          if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips', trip_id: r.id as string });
+        }
+      }
+      return redactTrip(r, rel, posterReveal);
+    }));
     if (distById) {
       rows = rows.map((r) => ({ ...r, distance_km: distById.get(r.id as string) ?? null }))
                  .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
@@ -327,6 +402,12 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!u) return fail('UNAUTHORIZED', 'Sign in to post a trip', 401);
     if (!(await rateLimitOk(db, `post-trip:${u.id}`, 60, 60))) return fail('RATE_LIMITED', 'Too many trips posted — try again shortly', 429);
     const b = await readBody(req);
+    try {
+      for (const f of TRIP_TEXT_FIELDS) assertNoPhones(typeof b[f] === 'string' ? (b[f] as string) : null, f);
+    } catch (e) {
+      if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+      throw e;
+    }
     const fromCityId = String(b.from_city_id ?? '');
     const toCityId = String(b.to_city_id ?? '');
     if (!fromCityId || !toCityId) return fail('VALIDATION', 'from_city_id and to_city_id are required', 422);
@@ -415,6 +496,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // The passenger's own view: their data + the assigned driver (with live position + phone, to track/reach the ride).
     delete row.passenger_otp_hash;
     delete row.passenger_otp; // the OTP is already in the URL — no need to echo the stored copy
+    // flatten posted_by_handle off the joined users row (the passenger sees this alongside posted_by_name)
+    const posterUser = row.posted_by_user as Record<string, unknown> | null | undefined;
+    row.posted_by_handle = posterUser && typeof posterUser.display_handle === 'string' ? posterUser.display_handle : null;
+    delete row.posted_by_user;
+    // flatten the assigned driver's handle
+    const drv = row.assigned_driver as Record<string, unknown> | null | undefined;
+    if (drv) {
+      const drvOut: Record<string, unknown> = { ...drv };
+      const du = drvOut.user as Record<string, unknown> | null | undefined;
+      drvOut.display_handle = du && typeof du.display_handle === 'string' ? du.display_handle : null;
+      delete drvOut.user;
+      row.assigned_driver = drvOut;
+    }
+    scrubTripText(row);
     const dist = distanceToDest(row);
     if (dist != null) row.distance_to_destination_km = dist;
     if (!row.show_fare_to_passenger) {
@@ -431,16 +526,25 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!did) return ok([]); // no driver profile ⇒ no applications
     const { data, error } = await db
       .from('trip_acceptances')
-      .select('*, trip:trips!trip_id(*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label))')
+      .select('*, trip:trips!trip_id(*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label))')
       .eq('driver_id', did)
       .order('applied_at', { ascending: false });
     if (error) return fail('DB_ERROR', error.message, 500);
     const rows = (data ?? []).map((r) => {
       const rec = r as Record<string, unknown>;
       const t = rec.trip as Record<string, unknown> | null;
-      // the caller is an applicant (not yet assigned) on these trips ⇒ browse-safe trip detail (no PII)
-      if (t) { delete t.passenger_otp_hash; delete t.passenger_otp; for (const k of TRIP_PII_COLS) delete t[k]; }
-      return rec;
+      // the caller is an applicant (not yet assigned) on these trips. They DID apply, so by the
+      // `can_reveal_agent` predicate they're entitled to the poster's name/phone — keep it. Strip OTP only.
+      if (t) {
+        delete t.passenger_otp_hash; delete t.passenger_otp;
+        // strip passenger PII (irrelevant to the applicant) but keep posted_by_*; flatten posted_by_handle
+        delete t.passenger_name; delete t.passenger_phone;
+        const posterUser = t.posted_by_user as Record<string, unknown> | null | undefined;
+        t.posted_by_handle = posterUser && typeof posterUser.display_handle === 'string' ? posterUser.display_handle : null;
+        delete t.posted_by_user;
+        scrubTripText(t);
+      }
+      return shapeAcceptance(rec);
     });
     return ok(rows);
   }
@@ -454,7 +558,17 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
     const raw = data as Record<string, unknown>;
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
-    return ok(redactTrip(raw, relationshipFor(raw, u, myDriverId)));
+    const rel = relationshipFor(raw, u, myDriverId);
+    let posterReveal = false;
+    if (rel === 'browse') {
+      const posterUserId = raw.posted_by_user_id as string | undefined;
+      if (posterUserId) {
+        const rc = revealCache(db);
+        posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
+        if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips/:id', trip_id: raw.id as string });
+      }
+    }
+    return ok(redactTrip(raw, rel, posterReveal));
   }
 
   // ── /trips/:id/applicants ────────────────────────────────────────────────
@@ -466,7 +580,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (!u || (trip.posted_by_user_id !== u.id && !isAdmin(u))) return fail('FORBIDDEN', 'Only the trip poster can see applicants', 403);
       const { data, error } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('trip_id', tripId).order('applied_at', { ascending: true });
       if (error) return fail('DB_ERROR', error.message, 500);
-      return ok(data ?? []);
+      // poster/admin reading applicants — reveal is the design intent (each applicant has applied,
+      // so `can_reveal_driver` is true); just shape the rows.
+      return ok((data ?? []).map((r) => shapeAcceptance(r as Record<string, unknown>)));
     }
     if (!acceptanceId && req.method === 'POST') {
       const u = await authUser(db, req);
@@ -478,6 +594,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (drv?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your driver account has been deactivated — contact support.', 403);
       if ((drv?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before applying to trips', 403);
       const b = await readBody(req);
+      try { assertNoPhones(typeof b.applicant_message === 'string' ? (b.applicant_message as string) : null, 'applicant_message'); } catch (e) {
+        if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+        throw e;
+      }
       const { data, error } = await db
         .from('trip_acceptances')
         .insert({ trip_id: tripId, driver_id: did, vehicle_id: (b.vehicle_id as string | null) ?? null, applicant_quoted_rate_per_km: (b.applicant_quoted_rate_per_km as number | null) ?? null, applicant_message: (b.applicant_message as string | null) ?? null, status: 'applied' })
@@ -487,7 +607,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       await db.from('trips').update({ status: 'has_applicants' }).eq('id', tripId).eq('status', 'open');
       const { data: full } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('id', data.id as string).single();
       invalidateTripsList();
-      return ok(full);
+      return ok(shapeAcceptance(full as Record<string, unknown>));
     }
     if (acceptanceId && !subsub && req.method === 'DELETE') {
       const u = await authUser(db, req);
@@ -507,10 +627,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
       if (!u || (trip.posted_by_user_id !== u.id && !isAdmin(u))) return fail('FORBIDDEN', '', 403);
       const b = await readBody(req);
+      try { assertNoPhones(typeof b.decision_note === 'string' ? b.decision_note : null, 'decision_note'); } catch (e) {
+        if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+        throw e;
+      }
       const { data, error } = await db.from('trip_acceptances').update({ status: 'rejected', decision_at: new Date().toISOString(), decision_note: (b.decision_note as string | null) ?? null }).eq('id', acceptanceId).eq('trip_id', tripId).select(ACCEPTANCE_SELECT).single();
       if (error) return pgFail(error);
       invalidateTripsList();
-      return ok(data);
+      return ok(shapeAcceptance(data as Record<string, unknown>));
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
   }
@@ -620,6 +744,13 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const pc = Number(b.passenger_count);
       if (!Number.isInteger(pc) || pc < 1) return fail('VALIDATION', 'passenger_count must be a positive integer', 422);
       patch.passenger_count = pc;
+    }
+    try {
+      if ('luggage_notes' in b) assertNoPhones(typeof b.luggage_notes === 'string' ? (b.luggage_notes as string) : null, 'luggage_notes');
+      if ('special_requests' in b) assertNoPhones(typeof b.special_requests === 'string' ? (b.special_requests as string) : null, 'special_requests');
+    } catch (e) {
+      if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+      throw e;
     }
     if ('luggage_notes' in b) patch.luggage_notes = (b.luggage_notes as string | null) ?? null;
     if ('special_requests' in b) patch.special_requests = (b.special_requests as string | null) ?? null;

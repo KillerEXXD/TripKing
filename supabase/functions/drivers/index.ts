@@ -29,6 +29,7 @@ import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { cacheDelete } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+import { revealCache, redactDriver, logPiiReveal } from '../_shared/pii.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
 const CACHE_EPOCH = 'v1';
@@ -56,7 +57,7 @@ function purgeVacanciesFor(driverId: string): void {
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
 const DRIVER_SELECT =
-  '*, home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
+  '*, user:users!user_id(display_handle), home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
   'vehicles(id, year, seats, ac, is_primary, is_active, registration_number, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const AGENT_SELECT = '*, business_city:cities!business_city_id(*)';
 
@@ -119,6 +120,15 @@ const stripPrivateKyc = (drv: Row): Row => {
   for (const f of PRIVATE_KYC_FIELDS) delete out[f];
   return out;
 };
+/** Flatten the joined `user:{display_handle}` onto the row as `display_handle`. Non-mutating. */
+function flattenHandle(row: Row | null | undefined): Row | null {
+  if (!row) return (row ?? null) as null;
+  const out = { ...row };
+  const u = out.user as Record<string, unknown> | null | undefined;
+  out.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
+  delete out.user;
+  return out;
+}
 
 /** server-computed onboarding/verification summary — the client just renders this. */
 async function buildVerification(db: Db, drv: Row): Promise<Row> {
@@ -175,13 +185,29 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (error) throw new Error(error.message);
     return (data as Row) ?? null;
   }
-  /** owner/admin → full record + verification block; otherwise private KYC fields stripped & no verification. */
-  async function respondDriver(driverId: string, privileged: boolean): Promise<Response> {
+  /**
+   * owner/admin → full record + verification block;
+   * non-owner authed with a "reveal" relationship → full identity but no verification + private KYC stripped;
+   * non-owner without relationship → identity (full_name/phone/email/profile_photo_url) redacted, only `display_handle` remains.
+   * Anon (`viewer === null`) → same as non-owner-no-relationship.
+   */
+  async function respondDriver(driverId: string, privileged: boolean, viewer: { id: string; role: string } | null = null): Promise<Response> {
     let data: Row | null;
     try { data = await fetchDriver(driverId); } catch (e) { return fail('DB_ERROR', String(e), 500); }
     if (!data) return fail('NOT_FOUND', 'Driver not found', 404);
-    if (privileged) return ok({ ...data, verification: await buildVerification(db, data) });
-    return ok(stripPrivateKyc(data));
+    const flat = flattenHandle(data) as Row;
+    if (privileged) return ok({ ...flat, verification: await buildVerification(db, data) });
+    const stripped = stripPrivateKyc(flat);
+    let reveal = false;
+    if (viewer) {
+      const driverUserId = (data.user_id as string) ?? '';
+      if (driverUserId) {
+        const rc = revealCache(db);
+        reveal = await rc.canRevealDriverUser(viewer.id, driverUserId);
+        if (reveal) await logPiiReveal(db, { viewer_user_id: viewer.id, target_user_id: driverUserId, surface: 'GET /drivers/:id' });
+      }
+    }
+    return ok(redactDriver(stripped as Row & { id: string; user_id: string }, reveal));
   }
   async function fullAgent(agentId: string): Promise<Response> {
     const { data, error } = await db.from('trip_managers').select(AGENT_SELECT).eq('id', agentId).maybeSingle();
@@ -245,7 +271,25 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     }
     // the admin KYC queue passes a kyc_status filter + Bearer — give admins the full rows
     const u = await authUser(db, req);
-    const out = isAdmin(u) ? rows : rows.map(stripPrivateKyc);
+    const flatRows = rows.map((r) => flattenHandle(r) as Row);
+    let out: Row[];
+    if (isAdmin(u)) {
+      out = flatRows;
+    } else {
+      const stripped = flatRows.map(stripPrivateKyc);
+      if (!u) {
+        // anon caller — never reveal
+        out = stripped.map((r) => redactDriver(r as Row & { id: string; user_id: string }, false));
+      } else {
+        const rc = revealCache(db);
+        out = await Promise.all(stripped.map(async (r) => {
+          const driverUserId = (r.user_id as string) ?? '';
+          const reveal = driverUserId ? await rc.canRevealDriverUser(u.id, driverUserId) : false;
+          if (reveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: driverUserId, surface: 'GET /drivers' });
+          return redactDriver(r as Row & { id: string; user_id: string }, reveal);
+        }));
+      }
+    }
     return ok(out, { total, page, limit, has_more: from + rows.length < total });
   }
 
@@ -308,7 +352,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
         const driverId = data.id as string;
         const row = await fetchDriver(driverId);
         if (!row) return { ok: false, reason: 'no_profile' };
-        return { ok: true, body: { ...row, verification: await buildVerification(db, row) } };
+        return { ok: true, body: { ...(flattenHandle(row) as Row), verification: await buildVerification(db, row) } };
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No driver profile yet — create one with POST /drivers', 404);
@@ -325,7 +369,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const privileged = !!u && (u.id === (drv.user_id as string) || isAdmin(u));
     // a deactivated profile is invisible to everyone but its owner and admins
     if (drv.is_active === false && !privileged) return fail('NOT_FOUND', 'Driver not found', 404);
-    return respondDriver(id, privileged);
+    return respondDriver(id, privileged, u);
   }
 
   if (!drv) return fail('NOT_FOUND', 'Driver not found', 404);

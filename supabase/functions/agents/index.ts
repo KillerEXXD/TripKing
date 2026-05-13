@@ -24,6 +24,7 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { cacheDelete } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { revealCache, redactAgent, logPiiReveal } from '../_shared/pii.ts';
 
 const CACHE_EPOCH = 'v1';
 function invalidateAgentMe(userId: string): void {
@@ -32,7 +33,7 @@ function invalidateAgentMe(userId: string): void {
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
-const AGENT_SELECT = '*, business_city:cities!business_city_id(*)';
+const AGENT_SELECT = '*, user:users!user_id(display_handle), business_city:cities!business_city_id(*)';
 const PRIVATE_KYC_FIELDS = [
   'aadhaar_number_masked', 'aadhaar_front_path', 'aadhaar_back_path', 'selfie_path',
   'kyc_consent_at', 'kyc_reviewed_by', 'kyc_rejection_reason',
@@ -86,6 +87,14 @@ const stripPrivateKyc = (a: Row): Row => {
   for (const f of PRIVATE_KYC_FIELDS) delete out[f];
   return out;
 };
+function flattenHandle(row: Row | null | undefined): Row | null {
+  if (!row) return (row ?? null) as null;
+  const out = { ...row };
+  const u = out.user as Record<string, unknown> | null | undefined;
+  out.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
+  delete out.user;
+  return out;
+}
 
 async function buildVerification(db: Db, tm: Row): Promise<Row> {
   const kycStatus = str(tm.kyc_status) || 'pending';
@@ -128,12 +137,23 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     if (error) throw new Error(error.message);
     return (data as Row) ?? null;
   }
-  async function respondAgent(agentId: string, privileged: boolean): Promise<Response> {
+  async function respondAgent(agentId: string, privileged: boolean, viewer: { id: string; role: string } | null = null): Promise<Response> {
     let data: Row | null;
     try { data = await fetchAgent(agentId); } catch (e) { return fail('DB_ERROR', String(e), 500); }
     if (!data) return fail('NOT_FOUND', 'Agent not found', 404);
-    if (privileged) return ok({ ...data, verification: await buildVerification(db, data) });
-    return ok(stripPrivateKyc(data));
+    const flat = flattenHandle(data) as Row;
+    if (privileged) return ok({ ...flat, verification: await buildVerification(db, data) });
+    const stripped = stripPrivateKyc(flat);
+    let reveal = false;
+    if (viewer) {
+      const agentUserId = (data.user_id as string) ?? '';
+      if (agentUserId) {
+        const rc = revealCache(db);
+        reveal = await rc.canRevealAgentUser(viewer.id, agentUserId);
+        if (reveal) await logPiiReveal(db, { viewer_user_id: viewer.id, target_user_id: agentUserId, surface: 'GET /agents/:id' });
+      }
+    }
+    return ok(redactAgent(stripped as Row & { id: string; user_id: string }, reveal));
   }
   async function syncRole(userId: string): Promise<void> {
     const { data: u } = await db.from('users').select('role').eq('id', userId).maybeSingle();
@@ -164,7 +184,24 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     if (error) return fail('DB_ERROR', error.message, 500);
     const u = await authUser(db, req);
     const rows = (data ?? []) as Row[];
-    const out = isAdmin(u) ? rows : rows.map(stripPrivateKyc);
+    const flatRows = rows.map((r) => flattenHandle(r) as Row);
+    let out: Row[];
+    if (isAdmin(u)) {
+      out = flatRows;
+    } else {
+      const stripped = flatRows.map(stripPrivateKyc);
+      if (!u) {
+        out = stripped.map((r) => redactAgent(r as Row & { id: string; user_id: string }, false));
+      } else {
+        const rc = revealCache(db);
+        out = await Promise.all(stripped.map(async (r) => {
+          const agentUserId = (r.user_id as string) ?? '';
+          const reveal = agentUserId ? await rc.canRevealAgentUser(u.id, agentUserId) : false;
+          if (reveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: agentUserId, surface: 'GET /agents' });
+          return redactAgent(r as Row & { id: string; user_id: string }, reveal);
+        }));
+      }
+    }
     const total = typeof count === 'number' ? count : rows.length;
     return ok(out, { total, page, limit, has_more: from + rows.length < total });
   }
@@ -206,7 +243,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
         if (!data) return { ok: false };
         const row = await fetchAgent(data.id as string);
         if (!row) return { ok: false };
-        return { ok: true, body: { ...row, verification: await buildVerification(db, row) } };
+        return { ok: true, body: { ...(flattenHandle(row) as Row), verification: await buildVerification(db, row) } };
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
@@ -222,7 +259,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     const privileged = !!u && (u.id === (tm.user_id as string) || isAdmin(u));
     // a deactivated profile is invisible to everyone but its owner and admins
     if (tm.is_active === false && !privileged) return fail('NOT_FOUND', 'Agent not found', 404);
-    return respondAgent(id, privileged);
+    return respondAgent(id, privileged, u);
   }
 
   if (!tm) return fail('NOT_FOUND', 'Agent not found', 404);

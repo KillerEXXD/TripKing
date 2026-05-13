@@ -25,13 +25,14 @@ import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+import { redactDriver, stripPhones, assertNoPhones, PhoneInTextError } from '../_shared/pii.ts';
 
 const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 
 // LIVE tier — short TTLs, memory-only (per-isolate). The cluster has few isolates and a 30s
 // staleness window is acceptable; the DB round-trip for a shared-cache lookup would erase the
 // benefit. Bump the epoch when the response shape of GET /vacancies changes.
-const CACHE_EPOCH = 'v1';
+const CACHE_EPOCH = 'v2';
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
   for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
@@ -49,9 +50,26 @@ function vacanciesListKey(url: URL): string {
 
 type Db = ReturnType<typeof serviceClient>;
 const VACANCY_SELECT =
-  '*, driver:drivers(id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, current_city:cities!current_city_id(*)), ' +
+  '*, driver:drivers(id, user_id, full_name, phone, email, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, user:users!user_id(display_handle), current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label)), ' +
   'current_city:cities!current_city_id(*), current_place:places!current_place_id(*), vacancy_destinations(city:cities(*), place:places(*))';
+
+/** Vacancies NEVER reveal driver PII (per design — applying/inviting is the gate). Flatten the driver's
+ *  display_handle off `driver.user`, then strip name/phone/email/photo. Also scrubs phones from `notes`. */
+function shapeVacancy(row: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
+  if (!row) return row ?? null;
+  const out = { ...row };
+  const drv = out.driver as Record<string, unknown> | null | undefined;
+  if (drv) {
+    const flat: Record<string, unknown> = { ...drv };
+    const u = flat.user as Record<string, unknown> | null | undefined;
+    flat.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
+    delete flat.user;
+    out.driver = redactDriver(flat as { id: string; user_id: string; [k: string]: unknown }, false);
+  }
+  if (typeof out.notes === 'string') out.notes = stripPhones(out.notes);
+  return out;
+}
 
 function bearer(req: Request): string | null {
   const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
@@ -112,14 +130,14 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
       if (error) return fail('DB_ERROR', error.message, 500);
       if (!data) return fail('NOT_FOUND', 'Vacancy not found', 404);
-      return ok(data);
+      return ok(shapeVacancy(data as Record<string, unknown>));
     }
     const { data, hit } = await withCache<Record<string, unknown> | null>(
       { key: `vacancies:item:${vacancyId}:${CACHE_EPOCH}`, ttl: CacheTTL.SHORT, tier: 'memory' },
       async () => {
         const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
         if (error) throw new Error(error.message);
-        return data;
+        return shapeVacancy(data as Record<string, unknown> | null);
       },
     );
     if (!data) return fail('NOT_FOUND', 'Vacancy not found', 404);
@@ -175,7 +193,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
           out = out.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
                    .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
         }
-        return out;
+        return out.map((r) => shapeVacancy(r) as Record<string, unknown>);
       },
     );
     return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
@@ -192,6 +210,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     if (drv?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your driver account has been deactivated — contact support.', 403);
     if ((drv?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a vacancy', 403);
     const b = await readBody(req);
+    try { assertNoPhones(typeof b.notes === 'string' ? b.notes : null, 'notes'); } catch (e) {
+      if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+      throw e;
+    }
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);
     const currentPlaceId = strOrNull(b.current_place_id);

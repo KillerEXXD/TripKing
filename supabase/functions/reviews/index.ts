@@ -18,6 +18,7 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { stripPhones, assertNoPhones, PhoneInTextError } from '../_shared/pii.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 const DIRECTIONS = ['passenger_to_driver', 'manager_to_driver', 'driver_to_manager'] as const;
@@ -66,18 +67,30 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
 
   const u = await authUser(db, req);
 
+  /** Pull `display_handle` off the joined rater user row (if present) and flatten it as `rater_handle`. */
+  function shapeReview(row: Record<string, unknown> | null): Record<string, unknown> | null {
+    if (!row) return row;
+    const out = { ...row };
+    const ru = out.rater_user as Record<string, unknown> | null | undefined;
+    out.rater_handle = ru && typeof ru.display_handle === 'string' ? ru.display_handle : null;
+    delete out.rater_user;
+    out.comment = stripPhones(typeof out.comment === 'string' ? out.comment : null) ?? out.comment ?? '';
+    return out;
+  }
+  const REVIEW_SELECT = '*, rater_user:users!rater_user_id(display_handle)';
+
   async function fullReview(reviewId: string): Promise<Response> {
-    const { data, error } = await db.from('reviews').select('*').eq('id', reviewId).maybeSingle();
+    const { data, error } = await db.from('reviews').select(REVIEW_SELECT).eq('id', reviewId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Review not found', 404);
-    return ok(data);
+    return ok(shapeReview(data as Record<string, unknown>));
   }
   // visibility for SELECTs: admins see all; an authed user sees published rows + their own (rater/ratee); anon sees published only.
   const visibilityOr = isAdmin(u) ? null : u ? `is_published.eq.true,rater_user_id.eq.${u.id},ratee_user_id.eq.${u.id}` : 'is_published.eq.true';
 
   // ── GET /reviews (list) ──────────────────────────────────────────────────
   if (!id && req.method === 'GET') {
-    let q = db.from('reviews').select('*');
+    let q = db.from('reviews').select(REVIEW_SELECT);
     const tripId = url.searchParams.get('trip_id');
     if (tripId) q = q.eq('trip_id', tripId);
     const ratee = url.searchParams.get('ratee_user_id');
@@ -90,7 +103,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    return ok((data ?? []).map((r) => shapeReview(r as Record<string, unknown>)));
   }
 
   // ── POST /reviews (the rater) ────────────────────────────────────────────
@@ -110,6 +123,11 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     if (!tripId) return fail('VALIDATION', 'trip_id is required', 422);
     if (!direction || !(DIRECTIONS as readonly string[]).includes(direction)) return fail('VALIDATION', `direction must be one of ${DIRECTIONS.join(', ')}`, 422);
     if (!Number.isInteger(score) || score < 1 || score > 5) return fail('VALIDATION', 'score must be an integer 1–5', 422);
+    const comment = typeof b.comment === 'string' ? b.comment : '';
+    try { assertNoPhones(comment, 'comment'); } catch (e) {
+      if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+      throw e;
+    }
 
     const { data: trip } = await db.from('trips').select('id, status, posted_by_user_id, assigned_driver_id').eq('id', tripId).maybeSingle();
     if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
@@ -133,7 +151,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
       ratee_user_id: rateeUserId,
       direction,
       score,
-      comment: typeof b.comment === 'string' ? b.comment : '',
+      comment,
       tag_ids: strArray(b.tag_ids),
     };
     const { data: created, error } = await db.from('reviews').insert(insert).select('id').single();
@@ -184,12 +202,12 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
 
   // ── GET /reviews/:id ─────────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
-    let q = db.from('reviews').select('*').eq('id', id);
+    let q = db.from('reviews').select(REVIEW_SELECT).eq('id', id);
     if (visibilityOr) q = q.or(visibilityOr);
     const { data, error } = await q.maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Review not found', 404);
-    return ok(data);
+    return ok(shapeReview(data as Record<string, unknown>));
   }
 
   return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
