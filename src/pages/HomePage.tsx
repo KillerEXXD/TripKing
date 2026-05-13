@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Bell, Car, ChevronRight, Languages, ShieldCheck, SlidersHorizontal, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Bell, Briefcase, Car, ChevronRight, Languages, ShieldCheck, SlidersHorizontal, UserCheck, Users, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Badge, Card } from '@/components/ui';
@@ -10,24 +10,30 @@ interface AdminTile {
   title: string;
   desc: string;
   Icon: LucideIcon;
-  tone: 'violet' | 'purple' | 'emerald' | 'red' | 'amber';
+  tone: 'violet' | 'purple' | 'red' | 'amber' | 'blue' | 'sky' | 'teal' | 'orange';
 }
 
 // The admin's home is the operations hub — everything under /administration, surfaced as tiles.
 const ADMIN_TILES: AdminTile[] = [
-  { to: '/administration/config', title: 'Reference data', desc: 'Car types, fuel, makes & models, cities, languages, tags, app settings', Icon: SlidersHorizontal, tone: 'violet' },
-  { to: '/administration/kyc', title: 'KYC review queue', desc: 'Verify drivers & agents — docs, video, approve / reject', Icon: ShieldCheck, tone: 'purple' },
-  { to: '/administration/vehicles', title: 'Vehicle eligibility', desc: 'Registration / insurance / fitness expiry across the fleet', Icon: Car, tone: 'emerald' },
-  { to: '/administration/reviews', title: 'Reviews moderation', desc: 'Flagged reviews — publish, hide, clear flags', Icon: AlertTriangle, tone: 'red' },
-  { to: '/administration/translations', title: 'Translation manager', desc: 'Per-language string coverage and overrides', Icon: Languages, tone: 'amber' },
+  { to: '/administration/config',      title: 'Reference data',    desc: 'Car types, fuel, makes & models, cities, languages, tags, app settings',      Icon: SlidersHorizontal, tone: 'violet' },
+  { to: '/administration/kyc',         title: 'KYC review queue',  desc: 'Verify drivers & agents — docs, video, approve / reject',                      Icon: ShieldCheck,       tone: 'purple' },
+  { to: '/administration/reviews',     title: 'Reviews moderation',desc: 'Flagged reviews — publish, hide, clear flags',                                  Icon: AlertTriangle,     tone: 'red'    },
+  { to: '/administration/translations',title: 'Translation manager',desc: 'Per-language string coverage and overrides',                                   Icon: Languages,         tone: 'amber'  },
+  { to: '/administration/drivers',     title: 'Drivers',           desc: 'Search by name, phone, city — filter by KYC status',                           Icon: UserCheck,         tone: 'blue'   },
+  { to: '/administration/agents',      title: 'Agents',            desc: 'Search by name, phone, business — filter by KYC status',                       Icon: Briefcase,         tone: 'sky'    },
+  { to: '/administration/passengers',  title: 'Passengers',        desc: 'Search by name, phone, alias — see referrer and trip count',                   Icon: Users,             tone: 'teal'   },
+  { to: '/administration/vehicles',    title: 'Vehicles',          desc: 'Search by registration or driver — filter by eligibility and expiry status',   Icon: Car,               tone: 'orange' },
 ];
 
 const TONE: Record<AdminTile['tone'], string> = {
   violet: 'bg-violet-100 text-violet-700',
   purple: 'bg-purple-100 text-purple-700',
-  emerald: 'bg-emerald-100 text-emerald-700',
-  red: 'bg-red-100 text-red-700',
-  amber: 'bg-amber-100 text-amber-700',
+  red:    'bg-red-100 text-red-700',
+  amber:  'bg-amber-100 text-amber-700',
+  blue:   'bg-blue-100 text-blue-700',
+  sky:    'bg-sky-100 text-sky-700',
+  teal:   'bg-teal-100 text-teal-700',
+  orange: 'bg-orange-100 text-orange-700',
 };
 
 function Bellish({ count }: { count: number }) {

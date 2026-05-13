@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Car } from 'lucide-react';
 import { useAdminVehicles } from '@/hooks/useVehicles';
 import { type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
-import { Badge, Card } from '@/components/ui';
+import { Badge, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { EligibilityStatus, Vehicle } from '@/types';
 
@@ -77,8 +77,19 @@ function VehicleCard({ v }: { v: Vehicle }) {
  */
 export function VehicleEligibilityPage() {
   const [filter, setFilter] = useState<Filter>('needs_attention');
+  const [q, setQ] = useState('');
   const vehiclesQuery = useAdminVehicles(paramsFor(filter));
-  const vehicles = vehiclesQuery.data ?? [];
+
+  const vehicles = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const list = vehiclesQuery.data ?? [];
+    if (!term) return list;
+    return list.filter(
+      (v) =>
+        (v.registrationNumber ?? '').toLowerCase().includes(term) ||
+        [v.makeLabel, v.modelName].filter(Boolean).join(' ').toLowerCase().includes(term),
+    );
+  }, [vehiclesQuery.data, q]);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
@@ -95,12 +106,14 @@ export function VehicleEligibilityPage() {
         ))}
       </div>
 
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by registration number or make / model" aria-label="Search vehicles" />
+
       {vehiclesQuery.isPending ? (
         <LoadingSkeleton rows={5} />
       ) : vehiclesQuery.isError ? (
         <ErrorState title="Couldn't load vehicles" message="Check your connection and try again." onRetry={() => void vehiclesQuery.refetch()} />
       ) : vehicles.length === 0 ? (
-        <EmptyState icon={<Car className="size-7" />} title="Nothing to show" message={filter === 'needs_attention' ? 'No vehicles need attention right now.' : 'No vehicles match this filter.'} />
+        <EmptyState icon={<Car className="size-7" />} title="Nothing to show" message={q.trim() ? 'No vehicles match that search.' : filter === 'needs_attention' ? 'No vehicles need attention right now.' : 'No vehicles match this filter.'} />
       ) : (
         <div className="space-y-3">
           {vehicles.map((v) => (
