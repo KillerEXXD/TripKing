@@ -20,7 +20,15 @@ function detectEnvironment(): string {
   return 'production';
 }
 
-/** Noise we never want in Sentry — chunk-load failures (handled by a reload), benign browser quirks, SW load errors. */
+/**
+ * Noise we never want in Sentry — chunk-load failures (handled by a reload), benign
+ * browser quirks, browser-SW infrastructure errors (registration MIME-type / network).
+ *
+ * Note: we deliberately do NOT filter on `/\bsw\.js\b/` any more. Our own SW errors
+ * arrive via the swErrorBridge tagged `source: 'service-worker'` and we DO want those
+ * in Sentry. The intercept lower in `beforeSend` lets them through before this list
+ * is checked.
+ */
 const NOISE_MESSAGE_PATTERNS = [
   /failed to fetch dynamically imported module/i,
   /loading chunk \d+ failed/i,
@@ -28,9 +36,15 @@ const NOISE_MESSAGE_PATTERNS = [
   /importing a module script failed/i,
   /\bchunkloaderror\b/i,
   /resizeobserver loop/i,
-  /\bsw\.js\b/i,
+  /failed to register .* service ?worker/i,
   /is not a valid javascript mime type/i,
 ];
+
+/** True when the event came in via swErrorBridge (we set `tags.source = 'service-worker'`). */
+function isOurSwBridgeEvent(event: Sentry.ErrorEvent): boolean {
+  const tags = event.tags as Record<string, unknown> | undefined;
+  return tags?.source === 'service-worker';
+}
 
 function isExtensionFrame(filename: string | undefined): boolean {
   return Boolean(filename && /^(chrome|moz|safari|webkit|ms-browser)-extension:\/\//i.test(filename));
@@ -71,6 +85,10 @@ export function initSentry(): void {
         'Non-Error promise rejection captured',
       ],
       beforeSend(event, hint) {
+        // Always let our own SW-bridge events through — they're explicitly captured by
+        // `src/lib/swErrorBridge.ts` from the custom service worker and shouldn't be
+        // filtered by the SW-infra noise patterns below.
+        if (isOurSwBridgeEvent(event)) return event;
         const original = hint?.originalException as { status?: number } | undefined;
         // 401 (bad/expired creds — the client refreshes) and 404 (stale links) are user errors, not bugs.
         if (original && typeof original === 'object' && (original.status === 401 || original.status === 404)) {

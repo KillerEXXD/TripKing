@@ -94,6 +94,10 @@
     "vite": "^5.1.0",
     "vite-plugin-pwa": "^1.1.0",
     "vitest": "^3.2.4",
+    "workbox-expiration": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1",
     "workbox-window": "^7.3.0"
   }
 }
