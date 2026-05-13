@@ -25,6 +25,14 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared/geo.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { cacheDelete } from '../_shared/cache.ts';
+
+// Bump on response-shape changes — wipes every cached /me without a manual purge.
+const CACHE_EPOCH = 'v1';
+function invalidateDriverMe(userId: string): void {
+  cacheDelete(`drivers:me:user-${userId}:${CACHE_EPOCH}`);
+}
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -252,10 +260,23 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
   if (id === 'me' && req.method === 'GET') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to view your profile', 401);
-    const { data, error } = await db.from('drivers').select('id').eq('user_id', u.id).maybeSingle();
-    if (error) return fail('DB_ERROR', error.message, 500);
-    if (!data) return fail('NOT_FOUND', 'No driver profile yet — create one with POST /drivers', 404);
-    return respondDriver(data.id as string, true);
+    // PER_USER_PRIVATE — memory tier, 60s TTL, keyed by user_id. Direct profile mutations
+    // below invalidate via `cacheDeletePattern('drivers:me:user-<uid>:*')`. Cross-function
+    // invalidation (vehicles, video-verifications) is a Phase-4 follow-up.
+    const { data: payload, hit } = await withCache<{ ok: true; body: unknown } | { ok: false; reason: 'no_profile' }>(
+      { key: `drivers:me:user-${u.id}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.from('drivers').select('id').eq('user_id', u.id).maybeSingle();
+        if (error) throw new Error(error.message);
+        if (!data) return { ok: false, reason: 'no_profile' };
+        const driverId = data.id as string;
+        const row = await fetchDriver(driverId);
+        if (!row) return { ok: false, reason: 'no_profile' };
+        return { ok: true, body: { ...row, verification: await buildVerification(db, row) } };
+      },
+    );
+    if (!payload.ok) return fail('NOT_FOUND', 'No driver profile yet — create one with POST /drivers', 404);
+    return tagCacheHit(ok(payload.body), hit);
   }
 
   // load the driver for ownership / 404
@@ -284,6 +305,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (!('current_location_at' in patch)) patch.current_location_at = new Date().toISOString();
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    invalidateDriverMe(ownerId);
     return respondDriver(id, true);
   }
 
@@ -366,6 +388,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     };
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    invalidateDriverMe(ownerId);
     return respondDriver(id, true);
   }
 
@@ -392,6 +415,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
         : `Your KYC status is now "${next}".`,
       payload_json: { kyc_status: next, kind: 'driver', ...(reason ? { note: reason } : {}) },
     });
+    invalidateDriverMe(ownerId);
     return respondDriver(id, true);
   }
 
@@ -428,6 +452,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
         : `Your driver account has been deactivated by an administrator.${reason ? ' ' + reason : ''} Contact support if you think this is a mistake.`,
       payload_json: { is_active: b.is_active, kind: 'driver', ...(reason ? { reason } : {}) },
     });
+    invalidateDriverMe(ownerId);
     return respondDriver(id, true);
   }
 
@@ -441,6 +466,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (Object.keys(patch).length === 0) return fail('VALIDATION', 'Nothing to update', 422);
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    invalidateDriverMe(ownerId);
     return respondDriver(id, true);
   }
 
