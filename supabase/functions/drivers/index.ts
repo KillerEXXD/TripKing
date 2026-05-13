@@ -28,11 +28,29 @@ import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { cacheDelete } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
 const CACHE_EPOCH = 'v1';
 function invalidateDriverMe(userId: string): void {
   cacheDelete(`drivers:me:user-${userId}:${CACHE_EPOCH}`);
+}
+
+/**
+ * Cross-function cache purge for the vacancies feed when a driver's `is_active` flips.
+ * /vacancies hides deactivated drivers' rows server-side, but the Cloudflare Worker cached
+ * the previous response — so the new state is invisible until the TTL (30 s) expires.
+ * Purging both the unfiltered list URL and the `?driver_id=<id>` variant covers the smoke
+ * test's exact-URL check AND the production hot paths.
+ *
+ * Free-plan caveat: Cloudflare can't purge by prefix, so we list the URLs explicitly.
+ * Other filter variants (e.g. `?current_city_id=X`) stale-expire via the 30 s TTL.
+ */
+function purgeVacanciesFor(driverId: string): void {
+  purgeCloudflareAsync(purgeUrlsFor([
+    '/functions/v1/vacancies',
+    `/functions/v1/vacancies?driver_id=${driverId}`,
+  ]));
 }
 
 type Db = ReturnType<typeof serviceClient>;
@@ -454,6 +472,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
       payload_json: { is_active: b.is_active, kind: 'driver', ...(reason ? { reason } : {}) },
     });
     invalidateDriverMe(ownerId);
+    purgeVacanciesFor(id); // /vacancies cache must reflect the new is_active state (issue #21)
     return respondDriver(id, true);
   }
 
