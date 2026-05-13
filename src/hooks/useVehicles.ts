@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { addVehicle, deleteVehicle, getAdminVehicles, getDriverVehicles, getVehicle, setVehicleActive, updateVehicle, type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
+import { addVehicle, deleteVehicle, getAdminVehicles, getAdminVehiclesPage, getDriverVehicles, getVehicle, setVehicleActive, updateVehicle, type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
 import type { VehicleInput } from '@/types';
 
 export function useDriverVehicles(driverId: string | undefined) {
@@ -12,6 +12,16 @@ export function useVehicle(id: string | undefined) {
 /** Admin eligibility dashboard — vehicles across all drivers. */
 export function useAdminVehicles(params?: AdminVehiclesQueryParams) {
   return useQuery({ queryKey: ['vehicles', 'admin', params ?? {}], queryFn: () => getAdminVehicles(params), staleTime: STALE.profile });
+}
+/** Paginated `GET /vehicles` for the admin eligibility dashboard with infinite scroll. */
+export function useInfiniteAdminVehicles(params?: Omit<AdminVehiclesQueryParams, 'page'>, limit = 50) {
+  return useInfiniteQuery({
+    queryKey: ['vehicles', 'admin', 'infinite', { ...(params ?? {}), limit }],
+    queryFn: ({ pageParam }) => getAdminVehiclesPage({ ...(params ?? {}), page: pageParam as number, limit }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.meta.hasMore ? last.meta.page + 1 : undefined),
+    staleTime: STALE.profile,
+  });
 }
 
 function useInvalidateVehicles() {

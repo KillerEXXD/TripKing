@@ -1,22 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Car } from 'lucide-react';
-import { useAdminVehicles } from '@/hooks/useVehicles';
+import { useInfiniteAdminVehicles } from '@/hooks/useVehicles';
 import { type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
-import { Badge, Card, Input } from '@/components/ui';
+import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { EligibilityStatus, Vehicle } from '@/types';
 
 const ELIG_LABEL: Record<EligibilityStatus, string> = { eligible: 'Eligible', expiring_soon: 'Expiring soon', expired: 'Expired' };
 const ELIG_VARIANT: Record<EligibilityStatus, 'success' | 'warning' | 'destructive'> = { eligible: 'success', expiring_soon: 'warning', expired: 'destructive' };
 
-type Filter = 'needs_attention' | 'expiring_soon' | 'expired' | 'eligible' | 'all';
+type Filter = 'all' | 'needs_attention' | 'expiring_soon' | 'expired' | 'eligible';
 const FILTERS: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'All' },
   { value: 'needs_attention', label: 'Needs attention' },
   { value: 'expiring_soon', label: 'Expiring soon' },
   { value: 'expired', label: 'Expired' },
   { value: 'eligible', label: 'Eligible' },
-  { value: 'all', label: 'All' },
 ];
 function paramsFor(f: Filter): AdminVehiclesQueryParams {
   if (f === 'all') return { includeInactive: true };
@@ -68,35 +68,51 @@ function VehicleCard({ v }: { v: Vehicle }) {
   );
 }
 
+const PAGE_SIZE = 50;
+
 /**
- * `/administration/vehicles` — vehicle-eligibility dashboard (admin-only). Lists
- * vehicles across all drivers with their server-derived `eligibilityStatus`
- * (year vs `app_settings.min_vehicle_year`); the filter chips drive
- * `useAdminVehicles` server-side (defaults to "needs attention"). Each card
- * links to the owning driver's profile.
+ * `/administration/vehicles` — vehicle-eligibility dashboard (admin-only).
+ * Defaults to "All". Server-paginated via `useInfiniteAdminVehicles` (50/page);
+ * the eligibility filter is server-derived. Header shows the server total.
  */
 export function VehicleEligibilityPage() {
-  const [filter, setFilter] = useState<Filter>('needs_attention');
+  const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  const vehiclesQuery = useAdminVehicles(paramsFor(filter));
+  const vehiclesQuery = useInfiniteAdminVehicles(paramsFor(filter), PAGE_SIZE);
+
+  const rows = useMemo(() => (vehiclesQuery.data?.pages.flatMap((p) => p.data) ?? []), [vehiclesQuery.data]);
+  const total = vehiclesQuery.data?.pages[0]?.meta.total;
 
   const vehicles = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const list = vehiclesQuery.data ?? [];
-    if (!term) return list;
-    return list.filter(
+    if (!term) return rows;
+    return rows.filter(
       (v) =>
         (v.registrationNumber ?? '').toLowerCase().includes(term) ||
         [v.makeLabel, v.modelName].filter(Boolean).join(' ').toLowerCase().includes(term),
     );
-  }, [vehiclesQuery.data, q]);
+  }, [rows, q]);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !vehiclesQuery.hasNextPage) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !vehiclesQuery.isFetchingNextPage) void vehiclesQuery.fetchNextPage();
+    }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [vehiclesQuery]);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
-      <h1 className="text-2xl font-bold">Vehicle eligibility</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-2xl font-bold">Vehicle eligibility</h1>
+        {typeof total === 'number' ? <span className="text-sm text-secondary">{total.toLocaleString('en-IN')} total</span> : null}
+      </div>
 
       <div className="flex flex-wrap gap-1.5">
         {FILTERS.map((f) => (
@@ -119,6 +135,16 @@ export function VehicleEligibilityPage() {
           {vehicles.map((v) => (
             <VehicleCard key={v.id} v={v} />
           ))}
+          <div ref={sentinelRef} aria-hidden className="h-1" />
+          {vehiclesQuery.isFetchingNextPage ? <LoadingSkeleton rows={2} /> : null}
+          {!vehiclesQuery.hasNextPage && rows.length > PAGE_SIZE ? (
+            <p className="py-2 text-center text-xs text-secondary">— end of list ({rows.length.toLocaleString('en-IN')} loaded) —</p>
+          ) : null}
+          {vehiclesQuery.hasNextPage && !vehiclesQuery.isFetchingNextPage ? (
+            <div className="flex justify-center pt-1">
+              <Button size="sm" variant="outline" onClick={() => void vehiclesQuery.fetchNextPage()}>Load more</Button>
+            </div>
+          ) : null}
         </div>
       )}
     </main>

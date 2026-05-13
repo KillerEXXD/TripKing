@@ -3,12 +3,23 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { VehicleEligibilityPage } from '@/pages/administration/VehicleEligibilityPage';
 
-vi.mock('@/hooks/useVehicles', () => ({ useAdminVehicles: vi.fn() }));
-import { useAdminVehicles } from '@/hooks/useVehicles';
+vi.mock('@/hooks/useVehicles', () => ({ useInfiniteAdminVehicles: vi.fn() }));
+import { useInfiniteAdminVehicles } from '@/hooks/useVehicles';
 
-type VState = { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void };
-function setVehicles(s: VState = {}) {
-  vi.mocked(useAdminVehicles).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn(), ...s } as never);
+interface PageMeta { page: number; limit: number; total: number; hasMore: boolean }
+type State = { isPending?: boolean; isError?: boolean; rows?: unknown[]; total?: number; hasNextPage?: boolean; refetch?: () => void };
+function setVehicles(s: State = {}) {
+  const rows = s.rows ?? [];
+  const total = s.total ?? rows.length;
+  vi.mocked(useInfiniteAdminVehicles).mockReturnValue({
+    isPending: s.isPending ?? false,
+    isError: s.isError ?? false,
+    data: s.isPending || s.isError ? undefined : { pages: [{ data: rows, meta: { page: 1, limit: 50, total, hasMore: s.hasNextPage ?? false } as PageMeta }], pageParams: [1] },
+    hasNextPage: s.hasNextPage ?? false,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: s.refetch ?? vi.fn(),
+  } as never);
 }
 const vehicle = (over: Record<string, unknown> = {}) => ({
   id: 'v1',
@@ -43,8 +54,8 @@ function renderPage() {
 
 describe('VehicleEligibilityPage', () => {
   beforeEach(() => {
-    vi.mocked(useAdminVehicles).mockReset();
-    setVehicles({ data: [] });
+    vi.mocked(useInfiniteAdminVehicles).mockReset();
+    setVehicles({ rows: [] });
   });
 
   it('shows a skeleton while vehicles load', () => {
@@ -62,40 +73,45 @@ describe('VehicleEligibilityPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('defaults to the "needs attention" filter (server-side)', () => {
-    setVehicles({ data: [] });
+  it('defaults to the "all" filter (server-side)', () => {
+    setVehicles({ rows: [] });
     renderPage();
-    expect(useAdminVehicles).toHaveBeenCalledWith({ needsAttention: true, includeInactive: true });
+    expect(useInfiniteAdminVehicles).toHaveBeenCalledWith({ includeInactive: true }, 50);
   });
 
   it('changing the filter re-queries with the new params', () => {
-    setVehicles({ data: [] });
+    setVehicles({ rows: [] });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^expired$/i }));
-    expect(useAdminVehicles).toHaveBeenLastCalledWith({ eligibility: ['expired'], includeInactive: true });
-    fireEvent.click(screen.getByRole('button', { name: /^all$/i }));
-    expect(useAdminVehicles).toHaveBeenLastCalledWith({ includeInactive: true });
+    expect(useInfiniteAdminVehicles).toHaveBeenLastCalledWith({ eligibility: ['expired'], includeInactive: true }, 50);
+    fireEvent.click(screen.getByRole('button', { name: /needs attention/i }));
+    expect(useInfiniteAdminVehicles).toHaveBeenLastCalledWith({ needsAttention: true, includeInactive: true }, 50);
+  });
+
+  it('shows the server total in the header', () => {
+    setVehicles({ rows: [vehicle()], total: 999 });
+    renderPage();
+    expect(screen.getByText(/999 total/)).toBeInTheDocument();
   });
 
   it('renders a card per vehicle with its eligibility badge and a link to the driver', () => {
-    setVehicles({ data: [vehicle({ insuranceExpiry: '2024-12-31T00:00:00Z' })] });
+    setVehicles({ rows: [vehicle({ insuranceExpiry: '2024-12-31T00:00:00Z' })] });
     renderPage();
     expect(screen.getByText(/Toyota Innova 2014/)).toBeInTheDocument();
     expect(screen.getByText('TN01AB1234')).toBeInTheDocument();
-    // "Expired" appears as the eligibility badge (and as the filter chip) — at least the badge
     expect(screen.getAllByText('Expired').length).toBeGreaterThanOrEqual(2);
     expect(screen.getByRole('link', { name: /view driver profile/i })).toHaveAttribute('href', '/drivers/d1');
   });
 
   it('shows an empty state when nothing matches', () => {
-    setVehicles({ data: [] });
+    setVehicles({ rows: [] });
     renderPage();
     expect(screen.getByText(/nothing to show/i)).toBeInTheDocument();
   });
 
   it('the search box narrows the loaded list by registration or make / model', () => {
     setVehicles({
-      data: [
+      rows: [
         vehicle(),
         vehicle({ id: 'v2', driverId: 'd2', makeLabel: 'Maruti', modelName: 'Dzire', year: 2020, registrationNumber: 'TN09XY9999', eligibilityStatus: 'eligible' }),
       ],

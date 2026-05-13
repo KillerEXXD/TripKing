@@ -96,20 +96,30 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     return ok(withElig);
   }
 
-  // GET /vehicles (list)
+  // GET /vehicles (list, paginated)
+  // Query: ?page= (1-based, default 1) ?limit= (default 50, max 200). The eligibility
+  // filter is server-side-derived (year vs app_settings.min_vehicle_year), so we load
+  // candidates, derive + filter, then slice the page. `meta.total` is the filtered set
+  // size; `has_more` is computed from page + slice.
   if (!id && req.method === 'GET') {
+    const limit = Math.min(Math.max(1, Number(url.searchParams.get('limit') ?? '50') || 50), 200);
+    const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);
+    const from = (page - 1) * limit;
+
     let q = db.from('vehicles').select(VEHICLE_SELECT).order('is_primary', { ascending: false }).order('created_at', { ascending: false });
     const driverId = url.searchParams.get('driver_id');
     if (driverId) q = q.eq('driver_id', driverId);
     if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
-    q = q.limit(500);
+    q = q.limit(1000);
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
     let rows = await eligibilityFor(db, (data ?? []) as Row[]);
     const elig = (url.searchParams.get('eligibility') ?? '').split(',').map((s) => s.trim()).filter(Boolean);
     if (elig.length) rows = rows.filter((v) => elig.includes(String(v.eligibility_status)));
     else if (url.searchParams.get('needs_attention') === 'true') rows = rows.filter((v) => v.eligibility_status !== 'eligible');
-    return ok(rows);
+    const total = rows.length;
+    const pageRows = rows.slice(from, from + limit);
+    return ok(pageRows, { total, page, limit, has_more: from + pageRows.length < total });
   }
 
   // POST /vehicles (create — caller must be a driver)
