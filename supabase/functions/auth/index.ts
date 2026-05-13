@@ -29,6 +29,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 const CACHE_EPOCH = 'v1';
 
@@ -97,7 +98,7 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
       async () => await publicUser(db, userId),
     );
     if (!row) return fail('NOT_FOUND', 'No profile for this user', 404);
-    return tagCacheHit(ok(row), hit);
+    return setCacheControl(tagCacheHit(ok(row), hit), { ttl: 60, scope: 'private' });
   }
 
   if (req.method !== 'POST') return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);

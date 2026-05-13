@@ -23,6 +23,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { cacheDelete } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 const CACHE_EPOCH = 'v1';
 function invalidateAgentMe(userId: string): void {
@@ -201,7 +202,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
-    return tagCacheHit(ok(payload.body), hit);
+    return setCacheControl(tagCacheHit(ok(payload.body), hit), { ttl: 60, scope: 'private' });
   }
 
   const { data: tm } = await db.from('trip_managers').select('id, user_id, is_active').eq('id', id).maybeSingle();

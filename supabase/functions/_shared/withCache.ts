@@ -108,3 +108,25 @@ export function tagCacheHit(res: Response, hit: CacheHit): Response {
   }
   return res;
 }
+
+import { type CacheScope, setCacheControl, maybeNotModified } from './httpCache.ts';
+
+/**
+ * Tag X-Cache + Cache-Control + (conditionally) ETag on a 200 Response in one call.
+ * On an If-None-Match match, returns 304 with the same Cache-Control + X-Cache.
+ *
+ * Pass `body` only if you want ETag-based revalidation (it must be the exact JSON the
+ * Response carries). Omit for endpoints where 304 churn isn't worth the SHA-1 hash.
+ */
+export async function tagResponse(
+  req: Request,
+  res: Response,
+  opts: { hit: CacheHit; ttl: number; scope: CacheScope; body?: string },
+): Promise<Response> {
+  tagCacheHit(res, opts.hit);
+  setCacheControl(res, { ttl: opts.ttl, scope: opts.scope });
+  if (opts.body !== undefined) {
+    return await maybeNotModified(req, res, opts.body);
+  }
+  return res;
+}

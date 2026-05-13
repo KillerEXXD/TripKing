@@ -45,6 +45,7 @@ import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 const CACHE_EPOCH = 'v1';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
@@ -316,7 +317,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       rows = rows.map((r) => ({ ...r, distance_km: distById.get(r.id as string) ?? null }))
                  .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
     }
-    return tagCacheHit(ok(rows), hit);
+    // /trips list is varies-by-viewer: NEVER public — CDN must not cache (see CACHE_BASELINE §4).
+    return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'private' });
   }
 
   // ── POST /trips/trips ────────────────────────────────────────────────────

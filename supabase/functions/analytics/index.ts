@@ -18,6 +18,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 const CACHE_EPOCH = 'v1';
 
@@ -61,7 +62,8 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
         return data;
       },
     );
-    return tagCacheHit(ok(data), hit);
+    // admin dashboard is identical for all admins, but it IS admin-only — keep private to skip CDN.
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.MEDIUM, scope: 'private' });
   }
 
   // ── GET /analytics/agent (own; or ?user_id= for admins) — 60s memory tier ──
@@ -76,7 +78,7 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
         return data;
       },
     );
-    return tagCacheHit(ok(data), hit);
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: 60, scope: 'private' });
   }
 
   // ── GET /analytics/driver (own; or ?user_id= for admins) — earnings & history ──
@@ -91,7 +93,7 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
         return data;
       },
     );
-    return tagCacheHit(ok(data), hit);
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: 60, scope: 'private' });
   }
 
   // ── GET /analytics/api-metrics?hours=24 (per-endpoint latency/error rollup) ──
@@ -107,7 +109,7 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
         return data;
       },
     );
-    return tagCacheHit(ok(data), hit);
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: 60, scope: 'private' });
   }
 
   return fail('NOT_FOUND', 'Use /analytics/admin, /analytics/agent, /analytics/driver or /analytics/api-metrics', 404);

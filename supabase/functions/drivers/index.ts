@@ -27,6 +27,7 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { cacheDelete } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
 const CACHE_EPOCH = 'v1';
@@ -276,7 +277,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No driver profile yet — create one with POST /drivers', 404);
-    return tagCacheHit(ok(payload.body), hit);
+    return setCacheControl(tagCacheHit(ok(payload.body), hit), { ttl: 60, scope: 'private' });
   }
 
   // load the driver for ownership / 404

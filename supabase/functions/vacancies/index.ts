@@ -23,6 +23,7 @@ import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 // LIVE tier — short TTLs, memory-only (per-isolate). The cluster has few isolates and a 30s
 // staleness window is acceptable; the DB round-trip for a shared-cache lookup would erase the
@@ -119,7 +120,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       },
     );
     if (!data) return fail('NOT_FOUND', 'Vacancy not found', 404);
-    return tagCacheHit(ok(data), hit);
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
   }
 
   // ── GET /vacancies (list) — LIVE tier, 30s memory cache, public-safe ─────
@@ -174,7 +175,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         return out;
       },
     );
-    return tagCacheHit(ok(rows), hit);
+    return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
   }
 
   // ── POST /vacancies (driver — post my availability) ──────────────────────

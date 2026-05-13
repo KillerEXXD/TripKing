@@ -38,6 +38,7 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL } from '../_shared/cache.ts';
 import { sharedCacheInvalidateType } from '../_shared/sharedCache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
 
 // Reference data (MASTER tier) — bump the epoch when the response shape of any /admin/<list>
 // or /admin/app-settings response changes; that drops every cached entry cluster-wide without
@@ -128,7 +129,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
           return data;
         },
       );
-      return tagCacheHit(ok(data), hit);
+      return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.LONG, scope: 'public' });
     }
     if (req.method === 'PUT' || req.method === 'PATCH') {
       const a = await requireAdmin(db, req);
@@ -309,7 +310,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
         return data ?? [];
       },
     );
-    return tagCacheHit(ok(data), hit);
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.LONG, scope: 'public' });
   }
 
   // POST /admin/<list>
