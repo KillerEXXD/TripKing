@@ -2,11 +2,11 @@
 --
 -- Anti-disintermediation: name/phone/email/photo of drivers and agents are gated
 -- behind a platform action (apply / invite-accept). Pre-reveal, both sides see a
--- stable opaque handle (e.g. "A2X9F1") plus trust signals. This migration adds:
+-- stable opaque handle (e.g. "A3E5A6E") plus trust signals. This migration adds:
 --
 --   * public.users.display_handle  — text, unique, populated on insert by trigger.
---                                    Format: 'A' + 5 upper-case hex chars (drawn
---                                    from gen_random_bytes), e.g. "A2X9F1". Stable
+--                                    Format: 'A' + 6 upper-case hex chars (drawn
+--                                    from gen_random_bytes(3)), e.g. "A3E5A6E". Stable
 --                                    per-user across sessions so a viewer can
 --                                    mentally track "this is the same person" without
 --                                    learning identity. Backfilled for existing rows.
@@ -24,15 +24,15 @@
 -- Enforcement of redaction lives in the edge functions — this migration only
 -- provides the columns / trigger / audit table / predicate functions.
 
-set search_path = public, pg_catalog;
+set search_path = public, extensions, pg_catalog;
 
 -- ── display_handle column + trigger ─────────────────────────────────────────
 alter table public.users
   add column if not exists display_handle text unique;
 
 create or replace function public.gen_display_handle()
-returns text language sql volatile as $$
-  select 'A' || upper(encode(gen_random_bytes(3), 'hex'));
+returns text language sql volatile set search_path = public, extensions, pg_catalog as $$
+  select 'A' || upper(encode(extensions.gen_random_bytes(3), 'hex'));
 $$;
 
 create or replace function public.users_set_display_handle()

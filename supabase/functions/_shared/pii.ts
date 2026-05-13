@@ -9,8 +9,8 @@
  *   • the viewer is an admin.
  *
  * Pre-reveal, every redacted shape carries a stable opaque `display_handle`
- * (column on public.users; migration 022) so the UI still has a per-user
- * identifier without leaking identity.
+ * (column on public.users; migration 022 — format 'A' + 6 hex chars, e.g.
+ * "A3E5A6E") so the UI still has a per-user identifier without leaking identity.
  *
  * All redaction is enforced server-side here — never trust the client to hide
  * fields. A client-side hide is trivially defeated by inspecting the network
