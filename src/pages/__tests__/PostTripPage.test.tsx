@@ -23,26 +23,28 @@ vi.mock('@/components/share/ShareTripModal', () => ({
     </div>
   ),
 }));
-// Stub the place-pin affordance: a button that "pins" a fixed place (or removes it).
+// Stub the place-pin affordance: a button that "pins" a fixed place (with coords, so the distance
+// auto-calc has a point to work with) or removes it.
+const PINNED_PLACE = { id: 'p1', name: 'Katpadi, Vellore', lat: 11.0, lng: 76.96 };
 vi.mock('@/components/location/PlacePinField', () => ({
-  PlacePinField: ({ value, onChange, pinLabel }: { value: { id: string; name: string } | null; onChange: (p: { id: string; name: string } | null) => void; pinLabel?: string }) =>
+  PlacePinField: ({ value, onChange, pinLabel }: { value: { id: string; name: string } | null; onChange: (p: typeof PINNED_PLACE | null) => void; pinLabel?: string }) =>
     value ? (
       <button type="button" aria-label={`Remove ${value.name}`} onClick={() => onChange(null)}>
         {value.name}
       </button>
     ) : (
-      <button type="button" onClick={() => onChange({ id: 'p1', name: 'Katpadi, Vellore' })}>
+      <button type="button" onClick={() => onChange(PINNED_PLACE)}>
         {pinLabel ?? 'pin'}
       </button>
     ),
 }));
 
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
+const city = (id: string, name: string, lat = 12.9, lng = 79.1) => ({ id, name, state: 'TN', lat, lng, sortOrder: 1, isActive: true });
 const carType = (id: string, label: string) => ({ id, label, sortOrder: 1, isActive: true });
 
 type ListState = { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void };
 function setLists(citiesOver: ListState = {}, carTypesOver: ListState = {}) {
-  vi.mocked(cityHooks.useList).mockReturnValue({ isPending: false, isError: false, data: [city('c1', 'Vellore'), city('c2', 'Chennai')], refetch: vi.fn(), ...citiesOver } as never);
+  vi.mocked(cityHooks.useList).mockReturnValue({ isPending: false, isError: false, data: [city('c1', 'Vellore', 12.92, 79.13), city('c2', 'Chennai', 13.08, 80.27)], refetch: vi.fn(), ...citiesOver } as never);
   vi.mocked(carTypeHooks.useList).mockReturnValue({ isPending: false, isError: false, data: [carType('ct1', 'Sedan'), carType('ct2', 'SUV')], refetch: vi.fn(), ...carTypesOver } as never);
 }
 function setPostTrip(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPending: boolean; isError: boolean }> = {}) {
@@ -76,14 +78,15 @@ function set(container: HTMLElement, name: string, value: string) {
   fireEvent.change(el, { target: { value } });
 }
 
-/** Fill the step-1 form (route + vehicle, + pin an exact pickup point) and advance to step 2. */
+/** Fill the step-1 form (route + vehicle, + pin an exact pickup point) and advance to step 2.
+ *  The distance is computed automatically from the route — we wait for it before clicking Next. */
 async function completeStep1(container: HTMLElement) {
   set(container, 'fromCityId', 'c1');
   set(container, 'toCityId', 'c2');
   set(container, 'pickupAt', '2099-06-01T09:00');
-  set(container, 'expectedDistanceKm', '140');
   fireEvent.click(screen.getByRole('button', { name: 'Sedan' }));
   fireEvent.click(screen.getByRole('button', { name: /pin the exact pickup point/i })); // sets fromPlace = p1 (stubbed)
+  await waitFor(() => expect(Number(container.querySelector<HTMLInputElement>('[name="expectedDistanceKm"]')!.value)).toBeGreaterThanOrEqual(1));
   fireEvent.click(screen.getByRole('button', { name: /next: price/i }));
   await screen.findByRole('button', { name: /^post trip$/i });
 }
@@ -138,11 +141,24 @@ describe('PostTripPage', () => {
     const { container } = renderPost();
     expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
     set(container, 'fromCityId', 'c1');
-    set(container, 'toCityId', 'c1'); // same as pickup
+    set(container, 'toCityId', 'c1'); // same as pickup — and so no distance is computed
     set(container, 'pickupAt', '2099-06-01T09:00');
-    set(container, 'expectedDistanceKm', '140');
     fireEvent.click(screen.getByRole('button', { name: 'Sedan' }));
     expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
+  });
+
+  it('computes the expected distance from the route — read-only, with a spinner while working, and re-runs when an exact point is pinned', async () => {
+    const { container } = renderPost();
+    const distanceInput = () => container.querySelector<HTMLInputElement>('[name="expectedDistanceKm"]')!;
+    expect(distanceInput()).toHaveAttribute('readonly'); // the agent / driver can't type it
+    set(container, 'fromCityId', 'c1');
+    set(container, 'toCityId', 'c2'); // distinct coords → triggers a calculation
+    expect(screen.getByText(/calculating route/i)).toBeInTheDocument(); // the processing indicator
+    await waitFor(() => expect(Number(distanceInput().value)).toBeGreaterThanOrEqual(1));
+    expect(screen.queryByText(/calculating route/i)).toBeNull();
+    const fromCities = Number(distanceInput().value);
+    fireEvent.click(screen.getByRole('button', { name: /pin the exact pickup point/i })); // re-runs with the pinned coords
+    await waitFor(() => expect(Number(distanceInput().value)).not.toBe(fromCities));
   });
 
   it('advances to step 2 and the back arrow returns to step 1', async () => {
@@ -163,7 +179,7 @@ describe('PostTripPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(
-        expect.objectContaining({ fromCityId: 'c1', toCityId: 'c2', fromPlaceId: 'p1', carTypeId: 'ct1', expectedDistanceKm: 140, ratePerKm: 15, totalFare: 2100, passengerName: 'Passenger P' }),
+        expect.objectContaining({ fromCityId: 'c1', toCityId: 'c2', fromPlaceId: 'p1', carTypeId: 'ct1', expectedDistanceKm: expect.any(Number), ratePerKm: 15, totalFare: expect.any(Number), passengerName: 'Passenger P' }),
       ),
     );
     expect(await screen.findByText('share modal')).toBeInTheDocument();

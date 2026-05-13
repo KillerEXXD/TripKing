@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
@@ -12,7 +12,7 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR } from '@/lib/utils';
+import { cn, formatINR, haversineKm } from '@/lib/utils';
 import type { Place, PostTripInput, Trip } from '@/types';
 
 interface PostTripForm {
@@ -60,6 +60,8 @@ const DEFAULTS: PostTripForm = {
 const STEP1_FIELDS = ['fromCityId', 'toCityId', 'pickupAt', 'expectedDistanceKm', 'carTypeId', 'seatsRequired', 'acRequired'] as const;
 const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
 const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-secondary';
+/** Road routes run longer than the crow-flies line — a rough multiplier so the auto-estimate isn't an under-count. */
+const ROAD_DISTANCE_FACTOR = 1.3;
 
 function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -97,6 +99,7 @@ export function PostTripPage() {
   const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
   const [fromPlace, setFromPlace] = useState<Place | null>(null);
   const [toPlace, setToPlace] = useState<Place | null>(null);
+  const [distanceCalculating, setDistanceCalculating] = useState(false);
 
   const { register, handleSubmit, watch, setValue, getValues, trigger, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
@@ -115,6 +118,26 @@ export function PostTripPage() {
   const totalFare = distance > 0 && rate > 0 ? Math.round(distance * rate) : 0;
   const cityName = (id: string) => citiesQuery.data?.find((c) => c.id === id)?.name;
   const carTypeName = (id: string) => carTypesQuery.data?.find((c) => c.id === id)?.label;
+
+  // The expected distance is computed from the picked route (the curated city's centre, or the
+  // pinned exact spot when one is set) — the poster never types it. A short delay debounces rapid
+  // changes and lets the "calculating…" indicator paint.
+  const citiesData = citiesQuery.data;
+  useEffect(() => {
+    const coordsOf = (id: string) => citiesData?.find((c) => c.id === id);
+    const a = fromPlace ?? coordsOf(fromCityId);
+    const b = toPlace ?? coordsOf(toCityId);
+    if (!a || !b || !Number.isFinite(a.lat) || !Number.isFinite(a.lng) || !Number.isFinite(b.lat) || !Number.isFinite(b.lng) || (a.lat === b.lat && a.lng === b.lng)) {
+      setDistanceCalculating(false);
+      return;
+    }
+    setDistanceCalculating(true);
+    const t = setTimeout(() => {
+      setValue('expectedDistanceKm', Math.max(1, Math.round(haversineKm(a.lat, a.lng, b.lat, b.lng) * ROAD_DISTANCE_FACTOR)), { shouldValidate: true });
+      setDistanceCalculating(false);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [fromCityId, toCityId, fromPlace, toPlace, citiesData, setValue]);
 
   async function onNext() {
     const ok = await trigger([...STEP1_FIELDS]);
@@ -197,7 +220,7 @@ export function PostTripPage() {
   const cities = citiesQuery.data ?? [];
   const carTypes = (carTypesQuery.data ?? []).filter((c) => c.isActive);
   const submitting = isSubmitting || postTrip.isPending;
-  const step1Ready = !!fromCityId && !!toCityId && fromCityId !== toCityId && !!getValues('pickupAt') && distance >= 1 && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
+  const step1Ready = !!fromCityId && !!toCityId && fromCityId !== toCityId && !!getValues('pickupAt') && distance >= 1 && !distanceCalculating && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
   const summary = [cityName(fromCityId) && cityName(toCityId) ? `${cityName(fromCityId)} → ${cityName(toCityId)}` : null, distance > 0 ? `${distance} km` : null, carTypeName(carTypeId) ?? null, acRequired ? 'AC' : null].filter(Boolean).join(' · ');
 
   return (
@@ -247,8 +270,23 @@ export function PostTripPage() {
               <Field label="Pickup date &amp; time" error={errors.pickupAt?.message}>
                 <Input type="datetime-local" {...register('pickupAt', { required: 'Set the pickup time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Pickup must be in the future' })} />
               </Field>
-              <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message}>
-                <Input type="number" min={1} step={1} inputMode="numeric" {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter the distance in km' })} />
+              <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message} hint="Worked out from the route — you don't need to enter it">
+                <div className="relative">
+                  <Input
+                    type="number"
+                    readOnly
+                    tabIndex={-1}
+                    aria-readonly="true"
+                    inputMode="numeric"
+                    className={cn('bg-muted/60', distanceCalculating && 'text-transparent')}
+                    {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Pick the pickup & drop-off points so we can work out the distance' })}
+                  />
+                  {distanceCalculating ? (
+                    <span className="pointer-events-none absolute inset-0 flex items-center gap-1.5 px-3 text-sm text-secondary" role="status">
+                      <Loader2 className="size-4 animate-spin" aria-hidden /> Calculating route…
+                    </span>
+                  ) : null}
+                </div>
               </Field>
             </Card>
 
