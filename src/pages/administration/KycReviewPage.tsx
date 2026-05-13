@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAgentKycDocs, useAgents, useDriverKycDocs, useDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -95,17 +95,29 @@ function matchesFilter(status: KycStatus, f: Filter): boolean {
 
 function EntryCard({ entry, kind, onTransition, pending }: { entry: KycEntry; kind: 'driver' | 'agent'; onTransition: (status: KycStatus) => void; pending: boolean }) {
   const [showDocs, setShowDocs] = useState(false);
+  const profileHref = kind === 'driver' ? `/drivers/${entry.id}` : `/agents/${entry.id}`;
   return (
     <Card className="gap-2">
-      <div className="flex items-start justify-between gap-3">
+      <button
+        type="button"
+        onClick={() => setShowDocs((v) => !v)}
+        aria-expanded={showDocs ? 'true' : 'false'}
+        className="-mx-1 -mt-1 flex items-start justify-between gap-3 rounded-lg p-1 text-left transition-colors hover:bg-muted/40"
+      >
         <div className="min-w-0">
           <div className="font-bold">{entry.name || '—'}</div>
           {entry.subtitle ? <div className="text-xs text-secondary">{entry.subtitle}</div> : null}
         </div>
-        <Badge variant={KYC_VARIANT[entry.kycStatus]}>{KYC_LABEL[entry.kycStatus]}</Badge>
-      </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={KYC_VARIANT[entry.kycStatus]}>{KYC_LABEL[entry.kycStatus]}</Badge>
+          {showDocs ? <ChevronUp className="size-4 text-secondary" aria-hidden /> : <ChevronDown className="size-4 text-secondary" aria-hidden />}
+        </div>
+      </button>
       <div className="flex flex-wrap gap-1.5">
         <Button size="sm" variant="ghost" onClick={() => setShowDocs((v) => !v)}>{showDocs ? 'Hide documents' : 'View documents'}</Button>
+        <Link to={profileHref} className="inline-flex h-8 items-center rounded-full border border-input bg-background px-3 text-sm font-medium hover:bg-muted">
+          Open profile
+        </Link>
         {ACTIONS.map((a) => (
           <Button key={a.status} size="sm" variant={a.status === 'approved' ? 'full' : a.status === 'rejected' ? 'destructive' : 'outline'} disabled={pending || entry.kycStatus === a.status} onClick={() => onTransition(a.status)}>
             {a.label}
