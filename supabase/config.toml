@@ -439,6 +439,9 @@ verify_jwt = false
 [functions.passengers]
 verify_jwt = false
 
+[functions.vacancy-invitations]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
