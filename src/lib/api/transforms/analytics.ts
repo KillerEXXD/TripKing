@@ -3,7 +3,7 @@
  * functions always supply every key, `coalesce`'d, so a gap means a contract break). One-way
  * snake_case → camelCase; never compute here — the numbers come straight from Postgres.
  */
-import type { AdminDashboard, AgentAnalytics, ApiEndpointMetric, ApiMetricsSummary, MonthlyTripPoint } from '@/types';
+import type { AdminDashboard, AgentAnalytics, ApiEndpointMetric, ApiMetricsSummary, DriverAnalytics, MonthlyEarningsPoint, MonthlyTripPoint } from '@/types';
 
 export type AnalyticsTransformErrorCode = 'NOT_OBJECT' | 'MISSING_FIELD' | 'BAD_NUMBER' | 'BAD_ARRAY';
 export class AnalyticsTransformError extends Error {
@@ -51,6 +51,13 @@ function monthlySeries(v: unknown, what: string): MonthlyTripPoint[] {
     return { month: str(r, 'month'), posted: num(r, 'posted'), completed: num(r, 'completed') };
   });
 }
+function earningsSeries(v: unknown, what: string): MonthlyEarningsPoint[] {
+  if (!Array.isArray(v)) throw new AnalyticsTransformError(`${what} is not an array`, 'BAD_ARRAY', { value: v });
+  return v.map((row, i) => {
+    const r = obj(row, `${what}[${i}]`);
+    return { month: str(r, 'month'), completed: num(r, 'completed'), earnings: num(r, 'earnings') };
+  });
+}
 
 export function transformAdminDashboard(api: unknown): AdminDashboard {
   const a = obj(api, 'admin dashboard');
@@ -93,6 +100,27 @@ export function transformAgentAnalytics(api: unknown): AgentAnalytics {
     reviewsReceived: num(a, 'reviews_received'),
     avgReviewScore: num(a, 'avg_review_score'),
     monthly: monthlySeries(a.monthly, 'monthly'),
+    generatedAt: str(a, 'generated_at'),
+  };
+}
+
+export function transformDriverAnalytics(api: unknown): DriverAnalytics {
+  const a = obj(api, 'driver analytics');
+  return {
+    driverUserId: str(a, 'driver_user_id'),
+    hasDriverProfile: a.has_driver_profile === true,
+    tripsAssigned: num(a, 'trips_assigned'),
+    tripsByStatus: countMap(a.trips_by_status, 'trips_by_status'),
+    tripsCompleted: num(a, 'trips_completed'),
+    earningsTotal: num(a, 'earnings_total'),
+    earningsPending: num(a, 'earnings_pending'),
+    distanceCompletedKm: num(a, 'distance_completed_km'),
+    applicationsTotal: num(a, 'applications_total'),
+    applicationsPending: num(a, 'applications_pending'),
+    applicationsSelected: num(a, 'applications_selected'),
+    reviewsReceived: num(a, 'reviews_received'),
+    avgReviewScore: num(a, 'avg_review_score'),
+    monthly: earningsSeries(a.monthly, 'monthly'),
     generatedAt: str(a, 'generated_at'),
   };
 }

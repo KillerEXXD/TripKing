@@ -72,6 +72,18 @@ const isNum = (v) => typeof v === 'number';
   const selfViaParam = await j('GET', `/analytics/agent?user_id=${agent.userId}`, { token: agent.token });
   check('GET /analytics/agent?user_id=<self> by self → 200', selfViaParam.status === 200, `status=${selfViaParam.status}`);
 
+  // ── /analytics/driver ──────────────────────────────────────────────────
+  const drvNoAuth = await j('GET', '/analytics/driver');
+  check('GET /analytics/driver without auth → 401', drvNoAuth.status === 401, `status=${drvNoAuth.status}`);
+  const drv = await j('GET', '/analytics/driver', { token: agent.token });
+  const dr = drv.json?.data || {};
+  check('GET /analytics/driver (own) → 200 + driver_user_id = caller + numeric stats', drv.status === 200 && dr.driver_user_id === agent.userId && isNum(dr.earnings_total) && isNum(dr.trips_completed) && typeof dr.has_driver_profile === 'boolean' && dr.trips_by_status && typeof dr.trips_by_status === 'object', `status=${drv.status} ${JSON.stringify(dr)}`);
+  check('GET /analytics/driver → monthly has 6 {month, completed, earnings} entries', Array.isArray(dr.monthly) && dr.monthly.length === 6 && dr.monthly.every((p) => typeof p.month === 'string' && isNum(p.completed) && isNum(p.earnings)), `len=${dr.monthly?.length}`);
+  const drvOtherForbidden = await j('GET', `/analytics/driver?user_id=${NONE}`, { token: agent.token });
+  check('GET /analytics/driver?user_id=<other> by a non-admin → 403', drvOtherForbidden.status === 403, `status=${drvOtherForbidden.status}`);
+  const drvAsAdmin = await j('GET', `/analytics/driver?user_id=${agent.userId}`, { token: admin.token });
+  check('GET /analytics/driver?user_id=<u> by admin → 200 + matching driver_user_id', drvAsAdmin.status === 200 && drvAsAdmin.json?.data?.driver_user_id === agent.userId, `status=${drvAsAdmin.status}`);
+
   // ── /analytics/api-metrics ─────────────────────────────────────────────
   const metricsNoAuth = await j('GET', '/analytics/api-metrics');
   check('GET /analytics/api-metrics without auth → 401', metricsNoAuth.status === 401, `status=${metricsNoAuth.status}`);
