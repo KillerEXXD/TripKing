@@ -18,6 +18,7 @@ const baseTrip: Trip = {
   postedByUserId: 'u1',
   postedByRole: 'trip_manager',
   postedByName: 'Agent A',
+  postedByHandle: 'A1B2C3D',
   postedByPhone: '+919999999999',
   fromCity: city('c1', 'Vellore', 12.92, 79.13),
   toCity: city('c2', 'Chennai', 13.08, 80.27),
@@ -48,7 +49,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
   return { ...baseTrip, ...over };
 }
 function driver(over: Partial<AssignedDriver> = {}): AssignedDriver {
-  return { id: 'd1', fullName: 'Ravi', phone: '+918888888888', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 12, totalTripsCompleted: 30, ...over };
+  return { id: 'd1', fullName: 'Ravi', displayHandle: 'A1B2C3D', phone: '+918888888888', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 12, totalTripsCompleted: 30, ...over };
 }
 
 describe('<TripTracking>', () => {

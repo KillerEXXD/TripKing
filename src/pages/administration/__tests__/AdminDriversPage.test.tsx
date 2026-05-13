@@ -13,6 +13,7 @@ function makeDriver(over: Partial<Driver> = {}): Driver {
     id: 'd1',
     userId: 'u1',
     fullName: 'Ravi Kumar',
+    displayHandle: 'A1B2C3D',
     phone: '+919876500000',
     homeCity: city('c1', 'Vellore'),
     currentCity: city('c1', 'Vellore'),
@@ -55,7 +56,7 @@ describe('AdminDriversPage', () => {
   });
 
   it('lists drivers with their KYC badge, rating and a profile link', () => {
-    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', kycStatus: 'pending', ratingCount: 0, totalTripsCompleted: 0, vehicles: [] })] });
+    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A1B2C3D', kycStatus: 'pending', ratingCount: 0, totalTripsCompleted: 0, vehicles: [] })] });
     renderPage();
     expect(screen.getByRole('heading', { name: /^drivers$/i })).toBeInTheDocument();
     expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();
@@ -76,7 +77,7 @@ describe('AdminDriversPage', () => {
   });
 
   it('filters the loaded list by the search box (name / phone)', () => {
-    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', phone: '+918000000000' })] });
+    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A1B2C3D', phone: '+918000000000' })] });
     renderPage();
     fireEvent.change(screen.getByLabelText(/search drivers/i), { target: { value: 'suresh' } });
     expect(screen.queryByText('Ravi Kumar')).toBeNull();

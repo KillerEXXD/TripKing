@@ -31,6 +31,7 @@ const ADMIN_BLOB = {
 };
 const AGENT_BLOB = {
   agent_user_id: 'u-1',
+  display_handle: 'A1B2C3D',
   trips_posted: 9,
   trips_by_status: { open: 1, completed: 7, cancelled: 1 },
   fare_posted_total: 120000,

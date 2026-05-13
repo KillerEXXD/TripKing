@@ -21,33 +21,44 @@ export interface VerificationSummary {
   kycRejectionReason?: string | null;
 }
 
-/** A driver's public marketplace profile (+ owner-only fields when self). */
-export interface Driver {
+/**
+ * The pre-reveal driver shape returned on public surfaces (`/drivers` list, `/drivers/:id` to a
+ * non-revealed viewer, the `driver` field on a vacancy, the `assigned_driver` on a browse-safe
+ * trip). Identity (fullName / phone / email / profilePhotoUrl) is absent server-side until the
+ * `can_reveal_driver` predicate fires — the client renders by `displayHandle` instead.
+ *
+ * `Driver` (below) extends this with the revealed identity fields, kept required there because
+ * the server only returns the revealed shape to viewers who passed the gate.
+ */
+export interface DriverPublic {
   id: string;
   userId: string;
-  fullName: string;
-  phone: string;
-  email?: string;
+  /** Stable opaque per-user identifier (e.g. "A3E5A6E") — always present pre-reveal. */
+  displayHandle: string;
   homeCity?: CityRow;
   homePlace?: Place;
   currentCity?: CityRow;
-  /** Precise current location, when the driver has pinned / GPS-reported one. */
   currentPlace?: Place;
   currentLat?: number;
   currentLng?: number;
   /** Straight-line km from the `?near_*` centre — present only on a radius-filtered `/drivers` list. */
   distanceKm?: number;
-  profilePhotoUrl: string;
   kycStatus: KycStatus;
   ratingAvg: number;
   ratingCount: number;
   ratingDistribution: Record<'1' | '2' | '3' | '4' | '5', number>;
-  /** top positive passenger→driver tags. */
   topTags: string[];
-  /** top positive agent→driver tags. */
   managerTopTags: string[];
   totalTripsCompleted: number;
   vehicles: VehicleSummary[];
+}
+
+/** A driver's revealed marketplace profile (+ owner-only fields when self). */
+export interface Driver extends DriverPublic {
+  fullName: string;
+  phone: string;
+  email?: string;
+  profilePhotoUrl: string;
   // owner/admin-only (present on GET /drivers/me + admin views)
   verification?: VerificationSummary;
   aadhaarMasked?: string;
@@ -55,19 +66,24 @@ export interface Driver {
   drivingLicenseExpiry?: string;
 }
 
-/** A trip manager (agent) — public profile. */
-export interface Agent {
+/** Pre-reveal agent shape (the twin of `DriverPublic`). */
+export interface AgentPublic {
   id: string;
   userId: string;
-  fullName: string;
-  phone: string;
-  email?: string;
+  displayHandle: string;
   businessName?: string;
   businessCity?: CityRow;
-  profilePhotoUrl: string;
   kycStatus: KycStatus;
   topTags: string[];
   totalTripsPosted: number;
+}
+
+/** A trip manager (agent) — revealed profile. */
+export interface Agent extends AgentPublic {
+  fullName: string;
+  phone: string;
+  email?: string;
+  profilePhotoUrl: string;
   // owner/admin-only
   verification?: VerificationSummary;
   aadhaarMasked?: string;

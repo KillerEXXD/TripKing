@@ -56,6 +56,7 @@ describe('transformAlert', () => {
     const a = transformAlert({
       id: 'al1',
       user_id: 'u1',
+      display_handle: 'A1B2C3D',
       name: 'Vellore → Chennai > ₹14/km',
       from_city: city('c1', 'Vellore'),
       from_radius_km: 30,
@@ -73,13 +74,13 @@ describe('transformAlert', () => {
     expect(a.carTypeIds).toEqual(['ct1', 'ct2']);
   });
   it('defaults notifyVia and throws on missing id / user_id / from_city', () => {
-    expect(transformAlert({ id: 'x', user_id: 'u1', from_city: city('c1', 'V') }).notifyVia).toEqual(['in_app']);
-    expect(() => transformAlert({ user_id: 'u1', from_city: city('c1', 'V') })).toThrow(AlertTransformError);
+    expect(transformAlert({ id: 'x', user_id: 'u1', display_handle: 'A1B2C3D', from_city: city('c1', 'V') }).notifyVia).toEqual(['in_app']);
+    expect(() => transformAlert({ user_id: 'u1', display_handle: 'A1B2C3D', from_city: city('c1', 'V') })).toThrow(AlertTransformError);
     expect(() => transformAlert({ id: 'x', from_city: city('c1', 'V') })).toThrow(/MISSING_USER_ID/);
-    expect(() => transformAlert({ id: 'x', user_id: 'u1' })).toThrow(/MISSING_FROM_CITY/);
+    expect(() => transformAlert({ id: 'x', user_id: 'u1', display_handle: 'A1B2C3D', })).toThrow(/MISSING_FROM_CITY/);
   });
   it('maps from_place / to_place when joined', () => {
-    const a = transformAlert({ id: 'al2', user_id: 'u1', from_city: city('c1', 'Vellore'), from_place: place('p1', 'Katpadi', 12.97, 79.13), to_city: city('c2', 'Chennai'), to_place: place('p2', 'Tambaram', 12.92, 80.12) });
+    const a = transformAlert({ id: 'al2', user_id: 'u1', display_handle: 'A1B2C3D', from_city: city('c1', 'Vellore'), from_place: place('p1', 'Katpadi', 12.97, 79.13), to_city: city('c2', 'Chennai'), to_place: place('p2', 'Tambaram', 12.92, 80.12) });
     expect(a.fromPlace?.name).toBe('Katpadi');
     expect(a.toPlace?.name).toBe('Tambaram');
   });

@@ -8,13 +8,14 @@ vi.mock('@/hooks/useTrips', () => ({ useTripByOtp: vi.fn() }));
 import { useTripByOtp } from '@/hooks/useTrips';
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
-const driver: AssignedDriver = { id: 'd1', fullName: 'Ravi Kumar', phone: '+918888888888', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 12, totalTripsCompleted: 30 };
+const driver: AssignedDriver = { id: 'd1', fullName: 'Ravi Kumar', displayHandle: 'A1B2C3D', phone: '+918888888888', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 12, totalTripsCompleted: 30 };
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
     id: 't1',
     postedByUserId: 'u9',
     postedByRole: 'trip_manager',
     postedByName: 'Agent A',
+    postedByHandle: 'A1B2C3D',
     postedByPhone: '+919000000000',
     fromCity: city('c1', 'Vellore'),
     toCity: city('c2', 'Chennai'),

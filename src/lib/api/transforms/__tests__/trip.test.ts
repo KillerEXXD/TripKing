@@ -7,6 +7,7 @@ const city = (id: string, name: string) => ({ id, name, state: 'Tamil Nadu', lat
 const fullTrip = {
   id: 't1',
   posted_by_user_id: 'u1',
+  posted_by_handle: 'A1B2C3D',
   posted_by_role: 'trip_manager',
   posted_by_name: 'Agent A',
   posted_by_phone: '+919999999999',
@@ -59,11 +60,11 @@ describe('transformTrip', () => {
       ...fullTrip,
       status: 'in_progress',
       assigned_driver_id: 'd1',
-      assigned_driver: { id: 'd1', full_name: 'Ravi', phone: '+918888888888', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: 12.97, current_lng: 79.16, current_location_at: '2026-06-01T10:30:00Z' },
+      assigned_driver: { id: 'd1', display_handle: 'A1B2C3D', full_name: 'Ravi', phone: '+918888888888', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: 12.97, current_lng: 79.16, current_location_at: '2026-06-01T10:30:00Z' },
       distance_to_destination_km: 42,
       passenger_otp: '123456',
     });
-    expect(t.assignedDriver).toMatchObject({ id: 'd1', fullName: 'Ravi', phone: '+918888888888', currentLat: 12.97, currentLng: 79.16 });
+    expect(t.assignedDriver).toMatchObject({ id: 'd1', fullName: 'Ravi', displayHandle: 'A1B2C3D', phone: '+918888888888', currentLat: 12.97, currentLng: 79.16 });
     expect(t.distanceToDestinationKm).toBe(42);
     expect(t.passengerOtp).toBe('123456');
   });
@@ -92,7 +93,7 @@ describe('transformTrip', () => {
       ...fullTrip,
       status: 'assigned',
       assigned_driver_id: 'd1',
-      assigned_driver: { id: 'd1', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: null, current_lng: null, current_location_at: null },
+      assigned_driver: { id: 'd1', display_handle: 'A1B2C3D', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: null, current_lng: null, current_location_at: null },
     });
     expect(t.assignedDriver?.id).toBe('d1');
     expect(t.assignedDriver?.currentLat).toBeUndefined();
@@ -105,7 +106,7 @@ describe('transformTrip', () => {
       ...fullTrip,
       status: 'in_progress',
       assigned_driver_id: 'd1',
-      assigned_driver: { id: 'd1', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: 13.05, current_lng: 80.2, current_location_at: '2026-06-01T10:30:00Z' },
+      assigned_driver: { id: 'd1', display_handle: 'A1B2C3D', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: 13.05, current_lng: 80.2, current_location_at: '2026-06-01T10:30:00Z' },
       distance_to_destination_km: 37.2,
     });
     expect(t.assignedDriver?.currentLat).toBe(13.05);

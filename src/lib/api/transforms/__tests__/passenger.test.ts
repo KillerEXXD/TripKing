@@ -7,6 +7,7 @@ const FULL = {
   name: 'Jane',
   aliases: ['Janet', 'J.'],
   referred_by_user_id: 'u9',
+  display_handle: 'A1B2C3D',
   referred_by: { id: 'u9', display_name: 'Agent A', role: 'trip_manager', phone: '+919000000000' },
   first_trip_id: 't1',
   first_seen_at: '2026-05-01T10:00:00Z',

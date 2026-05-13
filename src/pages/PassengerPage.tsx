@@ -135,7 +135,7 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
         </Card>
       )}
 
-      <ContactCard title="Trip manager" name={trip.postedByName} sub={trip.postedByRole === 'driver' ? 'A driver who passed on this trip' : 'Trip Manager'} phone={trip.postedByPhone} callLabel={`Call ${trip.postedByName}`} />
+      <ContactCard title="Trip manager" name={trip.postedByName ?? trip.postedByHandle} sub={trip.postedByRole === 'driver' ? 'A driver who passed on this trip' : 'Trip Manager'} phone={trip.postedByPhone} callLabel={`Call ${trip.postedByName ?? trip.postedByHandle}`} />
 
       <Card className={trip.showFareToPassenger ? 'gap-2' : 'gap-2 border-gray-200 bg-gray-50'}>
         <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-secondary">

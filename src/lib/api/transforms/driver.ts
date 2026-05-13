@@ -5,12 +5,12 @@
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
 import type {
-  Agent, CreateAgentProfileInput, CreateDriverProfileInput, Driver, KycDocs, KycStatus,
-  SubmitAgentKycDocsInput, SubmitDriverKycDocsInput, UploadUrlResponse, VehicleSummary,
-  VerificationStepStatus, VerificationSummary, VideoOutcome, VideoVerificationStatus,
+  Agent, AgentPublic, CreateAgentProfileInput, CreateDriverProfileInput, Driver, DriverPublic,
+  KycDocs, KycStatus, SubmitAgentKycDocsInput, SubmitDriverKycDocsInput, UploadUrlResponse,
+  VehicleSummary, VerificationStepStatus, VerificationSummary, VideoOutcome, VideoVerificationStatus,
 } from '@/types';
 
-export type DriverTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID';
+export type DriverTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID' | 'MISSING_DISPLAY_HANDLE';
 export class DriverTransformError extends Error {
   constructor(message: string, public code: DriverTransformErrorCode, public context: Record<string, unknown> = {}) {
     super(message);
@@ -133,14 +133,19 @@ function vehicleSummary(api: Api): VehicleSummary {
   };
 }
 
-export function transformDriver(api: Api): Driver {
+/**
+ * The pre-reveal slice of a driver row. The API may return name/phone/email/photo when the viewer
+ * passed the reveal gate — those fields are upgraded to required in `transformDriver` below. This
+ * variant intentionally does NOT throw on missing name/phone (intentional absence, not a backend bug).
+ * `display_handle` is required — every redacted row must carry it (server-side invariant from
+ * migration 022 + step-2 redaction).
+ */
+export function transformDriverPublic(api: Api): DriverPublic {
   const id = reqStr(api.id, 'MISSING_ID', { api });
   return {
     id,
     userId: reqStr(api.user_id, 'MISSING_USER_ID', { id }),
-    fullName: str(api.full_name) ?? '',
-    phone: str(api.phone) ?? '',
-    email: str(api.email),
+    displayHandle: reqStr(api.display_handle, 'MISSING_DISPLAY_HANDLE', { id }),
     homeCity: maybeCity(api.home_city),
     homePlace: maybePlace(api.home_place),
     currentCity: maybeCity(api.current_city),
@@ -148,7 +153,6 @@ export function transformDriver(api: Api): Driver {
     currentLat: typeof api.current_lat === 'number' ? api.current_lat : undefined,
     currentLng: typeof api.current_lng === 'number' ? api.current_lng : undefined,
     distanceKm: typeof api.distance_km === 'number' ? api.distance_km : undefined,
-    profilePhotoUrl: str(api.profile_photo_url) ?? '',
     kycStatus: (str(api.kyc_status) ?? 'pending') as KycStatus,
     ratingAvg: num(api.rating_avg, 0),
     ratingCount: num(api.rating_count, 0),
@@ -157,6 +161,17 @@ export function transformDriver(api: Api): Driver {
     managerTopTags: strArray(api.manager_top_tags),
     totalTripsCompleted: num(api.total_trips_completed, 0),
     vehicles: Array.isArray(api.vehicles) ? (api.vehicles as Api[]).map(vehicleSummary) : [],
+  };
+}
+
+/** Revealed driver — extends the public slice with the identity fields and owner-only bits. */
+export function transformDriver(api: Api): Driver {
+  return {
+    ...transformDriverPublic(api),
+    fullName: str(api.full_name) ?? '',
+    phone: str(api.phone) ?? '',
+    email: str(api.email),
+    profilePhotoUrl: str(api.profile_photo_url) ?? '',
     verification: transformVerification(api.verification),
     aadhaarMasked: str(api.aadhaar_number_masked),
     drivingLicenseNumber: str(api.driver_license_number),
@@ -164,20 +179,27 @@ export function transformDriver(api: Api): Driver {
   };
 }
 
-export function transformAgent(api: Api): Agent {
+export function transformAgentPublic(api: Api): AgentPublic {
   const id = reqStr(api.id, 'MISSING_ID', { api });
   return {
     id,
     userId: reqStr(api.user_id, 'MISSING_USER_ID', { id }),
-    fullName: str(api.full_name) ?? '',
-    phone: str(api.phone) ?? '',
-    email: str(api.email),
+    displayHandle: reqStr(api.display_handle, 'MISSING_DISPLAY_HANDLE', { id }),
     businessName: str(api.business_name),
     businessCity: maybeCity(api.business_city),
-    profilePhotoUrl: str(api.profile_photo_url) ?? '',
     kycStatus: (str(api.kyc_status) ?? 'pending') as KycStatus,
     topTags: strArray(api.top_tags),
     totalTripsPosted: num(api.total_trips_posted, 0),
+  };
+}
+
+export function transformAgent(api: Api): Agent {
+  return {
+    ...transformAgentPublic(api),
+    fullName: str(api.full_name) ?? '',
+    phone: str(api.phone) ?? '',
+    email: str(api.email),
+    profilePhotoUrl: str(api.profile_photo_url) ?? '',
     verification: transformVerification(api.verification),
     aadhaarMasked: str(api.aadhaar_number_masked),
   };

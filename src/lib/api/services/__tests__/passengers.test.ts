@@ -5,7 +5,7 @@ import { getPassengers, lookupPassengerByPhone } from '@/lib/api/services/passen
 function ok<T>(data: T) {
   return Promise.resolve({ success: true, data, error: null } as const);
 }
-const ROW = { id: 'p1', phone: '+919876543210', name: 'Jane', aliases: [], referred_by_user_id: 'u9', trips_count: 2 };
+const ROW = { id: 'p1', phone: '+919876543210', name: 'Jane', aliases: [], referred_by_user_id: 'u9', display_handle: 'A1B2C3D', trips_count: 2 };
 
 describe('passengers service', () => {
   beforeEach(() => vi.restoreAllMocks());

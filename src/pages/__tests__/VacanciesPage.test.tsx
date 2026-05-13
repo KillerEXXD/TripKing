@@ -19,7 +19,7 @@ function makeVacancy(over: Partial<Vacancy> = {}): Vacancy {
   return {
     id: 'v1',
     driverId: 'd1',
-    driver: { id: 'd1', fullName: 'Ravi Kumar', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 9, totalTripsCompleted: 30, topTags: [] },
+    driver: { id: 'd1', userId: 'u1', displayHandle: 'A1B2C3D', fullName: 'Ravi Kumar', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 9, totalTripsCompleted: 30, topTags: [] },
     vehicleId: 'veh1',
     vehicle: { id: 'veh1', makeLabel: 'Toyota', modelName: 'Innova', year: 2021, carTypeLabel: 'Innova', seats: 7, ac: true },
     currentCity: city('c1', 'Vellore'),

@@ -26,11 +26,14 @@ function reqCity(v: unknown, ctx: Api): CityRow {
   if (!v || typeof v !== 'object') throw new VacancyTransformError('missing MISSING_CURRENT_CITY', 'MISSING_CURRENT_CITY', ctx);
   return transformCity(v as Api);
 }
+/** A vacancy's joined driver is always pre-reveal — fullName / profilePhotoUrl are absent by design. */
 function driverSummary(api: Api): DriverSummary {
   return {
     id: str(api.id) ?? '',
-    fullName: str(api.full_name) ?? '',
-    profilePhotoUrl: str(api.profile_photo_url) ?? '',
+    userId: str(api.user_id) ?? '',
+    displayHandle: str(api.display_handle) ?? '',
+    fullName: str(api.full_name),
+    profilePhotoUrl: str(api.profile_photo_url),
     ratingAvg: num(api.rating_avg) ?? 0,
     ratingCount: num(api.rating_count) ?? 0,
     totalTripsCompleted: num(api.total_trips_completed) ?? 0,

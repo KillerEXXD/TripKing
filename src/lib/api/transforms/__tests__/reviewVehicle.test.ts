@@ -53,14 +53,14 @@ describe('transformReview', () => {
 
 describe('transformNotification', () => {
   it('maps a notification', () => {
-    const n = transformNotification({ id: 'n1', user_id: 'u1', type: 'trip_assigned', title: 'Assigned', body: 'You got the trip', payload_json: { tripId: 't1' }, is_read: false });
+    const n = transformNotification({ id: 'n1', user_id: 'u1', display_handle: 'A1B2C3D', type: 'trip_assigned', title: 'Assigned', body: 'You got the trip', payload_json: { tripId: 't1' }, is_read: false });
     expect(n.type).toBe('trip_assigned');
     expect(n.payloadJson).toEqual({ tripId: 't1' });
   });
   it('throws on missing id/user_id/bad type', () => {
-    expect(() => transformNotification({ user_id: 'u1', type: 'trip_assigned' })).toThrow();
+    expect(() => transformNotification({ user_id: 'u1', display_handle: 'A1B2C3D', type: 'trip_assigned' })).toThrow();
     expect(() => transformNotification({ id: 'n', type: 'trip_assigned' })).toThrow(/user_id/);
-    expect(() => transformNotification({ id: 'n', user_id: 'u1', type: 'spam' })).toThrow(/bad type/);
+    expect(() => transformNotification({ id: 'n', user_id: 'u1', display_handle: 'A1B2C3D', type: 'spam' })).toThrow(/bad type/);
   });
 });
 

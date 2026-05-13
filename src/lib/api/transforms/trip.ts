@@ -73,7 +73,8 @@ export function transformTrip(api: Api): Trip {
     id,
     postedByUserId: reqStr(api.posted_by_user_id, 'MISSING_FIELD', ctx),
     postedByRole: ((api.posted_by_role as string) ?? 'trip_manager') as PosterRole,
-    postedByName: str(api.posted_by_name) ?? '',
+    postedByHandle: reqStr(api.posted_by_handle, 'MISSING_FIELD', { ...ctx, field: 'posted_by_handle' }),
+    postedByName: str(api.posted_by_name),
     postedByPhone: str(api.posted_by_phone),
     fromCity: joinedCity(api.from_city, 'MISSING_FROM_CITY', ctx),
     toCity: joinedCity(api.to_city, 'MISSING_TO_CITY', ctx),
@@ -103,6 +104,7 @@ export function transformTrip(api: Api): Trip {
     assignedVehicleId: str(api.assigned_vehicle_id),
     assignedAcceptanceId: str(api.assigned_acceptance_id),
     assignedAt: str(api.assigned_at),
+    assignedDriverHandle: str(api.assigned_driver_handle),
     assignedDriver: assignedDriverOf(api.assigned_driver),
     distanceToDestinationKm: numOpt(api.distance_to_destination_km),
     showFareToPassenger: bool(api.show_fare_to_passenger, true),
@@ -116,7 +118,11 @@ export function transformTrip(api: Api): Trip {
   };
 }
 
-/** The `assigned_driver:drivers!...(...)` join on a trip row → an {@link AssignedDriver}, or `undefined` when no driver is assigned. */
+/**
+ * The `assigned_driver:drivers!...(...)` join on a trip row → an {@link AssignedDriver}, or
+ * `undefined` when no driver is assigned. `display_handle` is required; `full_name` / `phone` /
+ * `profile_photo_url` may be stripped by the server for browse viewers — kept optional.
+ */
 function assignedDriverOf(v: unknown): AssignedDriver | undefined {
   if (!v || typeof v !== 'object') return undefined;
   const a = v as Api;
@@ -124,9 +130,10 @@ function assignedDriverOf(v: unknown): AssignedDriver | undefined {
   if (!id) return undefined;
   return {
     id,
-    fullName: str(a.full_name) ?? '',
+    displayHandle: str(a.display_handle) ?? '',
+    fullName: str(a.full_name),
     phone: str(a.phone),
-    profilePhotoUrl: str(a.profile_photo_url) ?? '',
+    profilePhotoUrl: str(a.profile_photo_url),
     ratingAvg: num(a.rating_avg, 0),
     ratingCount: num(a.rating_count, 0),
     totalTripsCompleted: num(a.total_trips_completed, 0),
@@ -136,11 +143,18 @@ function assignedDriverOf(v: unknown): AssignedDriver | undefined {
   };
 }
 
-function transformDriverSummary(api: Api, ctx: Api): DriverSummary {
+/**
+ * The joined `driver:drivers(...)` summary on an acceptance / vacancy row. `displayHandle` always
+ * present; `fullName` / `profilePhotoUrl` are optional — absent on pre-reveal rows (vacancies are
+ * pre-reveal by design; an applicants list to the poster is post-reveal so they'll be set).
+ */
+export function transformDriverSummary(api: Api, ctx: Api): DriverSummary {
   return {
     id: reqStr(api.id, 'MISSING_FIELD', ctx),
-    fullName: str(api.full_name) ?? '',
-    profilePhotoUrl: str(api.profile_photo_url) ?? '',
+    userId: str(api.user_id) ?? '',
+    displayHandle: str(api.display_handle) ?? '',
+    fullName: str(api.full_name),
+    profilePhotoUrl: str(api.profile_photo_url),
     ratingAvg: num(api.rating_avg, 0),
     ratingCount: num(api.rating_count, 0),
     totalTripsCompleted: num(api.total_trips_completed, 0),

@@ -58,7 +58,7 @@ describe('KycReviewPage', () => {
   });
 
   it('defaults to the "needs review" filter (hides approved/rejected drivers)', () => {
-    setDrivers({ data: [{ id: 'd1', fullName: 'Needs Review', currentCity: city('c1', 'Vellore'), kycStatus: 'docs_submitted' }, { id: 'd2', fullName: 'Already Approved', kycStatus: 'approved' }] });
+    setDrivers({ data: [{ id: 'd1', fullName: 'Needs Review', displayHandle: 'A1B2C3D', currentCity: city('c1', 'Vellore'), kycStatus: 'docs_submitted' }, { id: 'd2', fullName: 'Already Approved', kycStatus: 'approved' }] });
     renderKyc();
     expect(screen.getByText('Needs Review')).toBeInTheDocument();
     expect(screen.queryByText('Already Approved')).toBeNull();
@@ -66,7 +66,7 @@ describe('KycReviewPage', () => {
 
   it('approving a driver calls useUpdateDriverKyc; the current-status button is disabled', () => {
     const { dm } = setMutations();
-    setDrivers({ data: [{ id: 'd1', fullName: 'Ravi', kycStatus: 'docs_submitted' }] });
+    setDrivers({ data: [{ id: 'd1', fullName: 'Ravi', displayHandle: 'A1B2C3D', kycStatus: 'docs_submitted' }] });
     renderKyc();
     expect(screen.getByRole('button', { name: /docs in/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^approve$/i }));
@@ -75,7 +75,7 @@ describe('KycReviewPage', () => {
 
   it('switching to "Agents" shows the agent queue, and approving an agent calls useUpdateAgentKyc', () => {
     const { am } = setMutations();
-    setAgents({ data: [{ id: 'a1', fullName: 'Agent X', businessName: 'X Travels', kycStatus: 'pending' }] });
+    setAgents({ data: [{ id: 'a1', fullName: 'Agent X', displayHandle: 'A1B2C3D', businessName: 'X Travels', kycStatus: 'pending' }] });
     renderKyc();
     fireEvent.click(screen.getByRole('button', { name: /^agents$/i }));
     expect(screen.getByText('Agent X')).toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('KycReviewPage', () => {
   });
 
   it('the "Approved" filter shows approved entries', () => {
-    setDrivers({ data: [{ id: 'd1', fullName: 'Approved One', kycStatus: 'approved' }] });
+    setDrivers({ data: [{ id: 'd1', fullName: 'Approved One', displayHandle: 'A1B2C3D', kycStatus: 'approved' }] });
     renderKyc();
     expect(screen.queryByText('Approved One')).toBeNull(); // hidden under "needs review"
     fireEvent.click(screen.getByRole('button', { name: /^approved$/i }));

@@ -9,7 +9,10 @@ export interface Trip {
   id: string;
   postedByUserId: string;
   postedByRole: PosterRole;
-  postedByName: string;
+  /** Stable opaque poster identifier (e.g. "A3E5A6E") — always present, even on a browse-safe view. */
+  postedByHandle: string;
+  /** The poster's name. Absent on a browse view to a viewer who hasn't applied; revealed once `can_reveal_agent` fires. */
+  postedByName?: string;
   postedByPhone?: string;
   fromCity: CityRow;
   toCity: CityRow;
@@ -44,6 +47,8 @@ export interface Trip {
   assignedVehicleId?: string;
   assignedAcceptanceId?: string;
   assignedAt?: string;
+  /** Stable opaque handle for the assigned driver (e.g. "A3E5A6E") — present once a driver is assigned, even on a browse-safe view. */
+  assignedDriverHandle?: string;
   /** The assigned driver, joined server-side (with live position). Present once a driver is assigned. */
   assignedDriver?: AssignedDriver;
   /** Server-computed straight-line km from the assigned driver's last position to the drop-off city (in-progress trips only). */
@@ -60,13 +65,18 @@ export interface Trip {
   distanceKm?: number;
 }
 
-/** The assigned driver as embedded on a `Trip` (joined `drivers` row + last reported position). */
+/**
+ * The assigned driver as embedded on a `Trip` (joined `drivers` row + last reported position).
+ * `fullName` / `phone` / `profilePhotoUrl` are absent on a browse-safe view (the viewer hasn't
+ * crossed the reveal gate); `displayHandle` is always present.
+ */
 export interface AssignedDriver {
   id: string;
-  fullName: string;
-  /** Present on `GET /trips/:id` and the passenger-portal lookup (not on the public list). */
+  /** Stable opaque per-driver identifier. */
+  displayHandle: string;
+  fullName?: string;
   phone?: string;
-  profilePhotoUrl: string;
+  profilePhotoUrl?: string;
   ratingAvg: number;
   ratingCount: number;
   totalTripsCompleted: number;
@@ -75,11 +85,18 @@ export interface AssignedDriver {
   currentLocationAt?: string;
 }
 
-/** Lightweight driver summary embedded in an applicant card / assigned-trip card. */
+/**
+ * Lightweight driver summary embedded in an applicant card / assigned-trip card.
+ * Identity fields (`fullName` / `profilePhotoUrl`) are absent when the row is rendered pre-reveal
+ * (e.g. a vacancy's `driver` field is always pre-reveal by design).
+ */
 export interface DriverSummary {
   id: string;
-  fullName: string;
-  profilePhotoUrl: string;
+  userId: string;
+  /** Stable opaque per-driver identifier. */
+  displayHandle: string;
+  fullName?: string;
+  profilePhotoUrl?: string;
   ratingAvg: number;
   ratingCount: number;
   totalTripsCompleted: number;

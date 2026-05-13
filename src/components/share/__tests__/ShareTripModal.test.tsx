@@ -21,6 +21,7 @@ const trip = {
   postedByUserId: 'u1',
   postedByRole: 'trip_manager',
   postedByName: 'Agent A',
+  postedByHandle: 'A1B2C3D',
   fromCity: city('c1', 'Vellore'),
   toCity: city('c2', 'Chennai'),
   pickupAt: '2099-06-01T03:30:00.000Z',

@@ -32,6 +32,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     postedByUserId: 'u9',
     postedByRole: 'trip_manager',
     postedByName: 'Agent A',
+    postedByHandle: 'A1B2C3D',
     postedByPhone: '+919000000000',
     fromCity: city('c1', 'Vellore'),
     toCity: city('c2', 'Chennai'),

@@ -20,6 +20,7 @@ function call(over: Partial<VideoVerification> = {}): VideoVerification {
     documentsConfirmed: false,
     livenessCheckPassed: false,
     driver: { id: 'd1', fullName: 'Ravi Kumar', phone: '+919999999999', kycStatus: 'video_pending', cityName: 'Vellore' },
+    displayHandle: 'A1B2C3D',
     ...over,
   } as VideoVerification;
 }
