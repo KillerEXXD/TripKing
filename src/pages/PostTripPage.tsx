@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
@@ -55,7 +55,7 @@ const DEFAULTS: PostTripForm = {
   specialRequests: '',
   driverInstructions: '',
   showFareToPassenger: true,
-  hidePassengerPhone: false,
+  hidePassengerPhone: true,
 };
 
 const STEP1_FIELDS = ['fromCityId', 'toCityId', 'pickupAt', 'expectedDistanceKm', 'carTypeId', 'seatsRequired', 'acRequired'] as const;
@@ -101,6 +101,8 @@ export function PostTripPage() {
   const [fromPlace, setFromPlace] = useState<Place | null>(null);
   const [toPlace, setToPlace] = useState<Place | null>(null);
   const [distanceCalculating, setDistanceCalculating] = useState(false);
+  const [passengerSectionOpen, setPassengerSectionOpen] = useState(false);
+  const passengerSectionRef = useRef<HTMLDivElement>(null);
 
   const { register, handleSubmit, watch, setValue, getValues, trigger, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
@@ -113,7 +115,7 @@ export function PostTripPage() {
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
-  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName']);
+  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone']);
   const distance = Number(distanceWatch) || 0;
   const rate = Number(rateWatch) || 0;
   const totalFare = distance > 0 && rate > 0 ? Math.round(distance * rate) : 0;
@@ -188,11 +190,11 @@ export function PostTripPage() {
       driverBata: Math.max(0, Math.round(Number(values.driverBata) || 0)),
       extrasPaidByPassenger: values.extrasPaidByPassenger,
       driverInstructions: values.driverInstructions.trim() || undefined,
-      passengerName: values.passengerName.trim(),
-      passengerPhone: values.passengerPhone.trim(),
+      passengerName: passengerSectionOpen ? values.passengerName.trim() : '',
+      passengerPhone: passengerSectionOpen ? values.passengerPhone.trim() : '',
       passengerCount: Number(values.passengerCount),
-      luggageNotes: values.luggageNotes.trim() || undefined,
-      specialRequests: values.specialRequests.trim() || undefined,
+      luggageNotes: passengerSectionOpen ? (values.luggageNotes.trim() || undefined) : undefined,
+      specialRequests: passengerSectionOpen ? (values.specialRequests.trim() || undefined) : undefined,
       showFareToPassenger: values.showFareToPassenger,
       hidePassengerPhone: values.hidePassengerPhone,
     };
@@ -358,62 +360,91 @@ export function PostTripPage() {
               </label>
             </Card>
 
-            <Card className="gap-3">
-              <div className={sectionLabel}>Passenger</div>
-              <Field label="Passenger name" error={errors.passengerName?.message}>
-                <Input {...register('passengerName', { required: 'Enter the passenger name' })} placeholder="Full name" />
-              </Field>
-              {phoneLookupable ? (
-                <div className="-mt-1.5 text-xs">
-                  {passengerLookup.isFetching ? (
-                    <span className="flex items-center gap-1.5 text-secondary" role="status">
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden /> Checking if this passenger exists…
-                    </span>
-                  ) : knownPassenger ? (
-                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-800">
-                      <div className="font-medium">✓ Existing passenger — {knownPassenger.name}</div>
-                      <div className="text-emerald-700">
-                        {knownPassenger.referredBy ? `Added by ${knownPassenger.referredBy.displayName}` : 'Added earlier'}
-                        {knownPassenger.firstSeenAt ? ` · ${formatShortDate(new Date(knownPassenger.firstSeenAt))}` : ''}
-                        {knownPassenger.tripsCount > 0 ? ` · ${knownPassenger.tripsCount} trip${knownPassenger.tripsCount === 1 ? '' : 's'}` : ''}
-                      </div>
-                      {passengerNameWatch.trim() && passengerNameWatch.trim().toLowerCase() !== knownPassenger.name.toLowerCase() ? (
-                        <button type="button" className="mt-0.5 font-medium underline" onClick={() => setValue('passengerName', knownPassenger.name, { shouldValidate: true })}>
-                          Use “{knownPassenger.name}”
-                        </button>
+            {/* Passenger section — collapsed by default; details can be added later after driver is assigned */}
+            <Card className="gap-0 overflow-hidden p-0">
+              <button
+                type="button"
+                aria-expanded={passengerSectionOpen}
+                onClick={() => {
+                  setPassengerSectionOpen((v) => !v);
+                  if (!passengerSectionOpen) setTimeout(() => passengerSectionRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' }), 100);
+                }}
+                className="flex w-full items-center justify-between px-4 py-3 text-left"
+              >
+                <div>
+                  <div className={sectionLabel}>Passenger details</div>
+                  <div className="text-xs text-secondary">{passengerSectionOpen ? 'Tap to collapse' : 'Optional — you can add these after assigning a driver'}</div>
+                </div>
+                {passengerSectionOpen ? <ChevronDown className="size-4 text-secondary" aria-hidden /> : <ChevronRight className="size-4 text-secondary" aria-hidden />}
+              </button>
+
+              {passengerSectionOpen ? (
+                <div ref={passengerSectionRef} className="space-y-3 border-t px-4 pb-4 pt-3">
+                  <Field label="Passenger name" error={errors.passengerName?.message}>
+                    <Input {...register('passengerName')} placeholder="Full name" />
+                  </Field>
+                  {phoneLookupable ? (
+                    <div className="-mt-1.5 text-xs">
+                      {passengerLookup.isFetching ? (
+                        <span className="flex items-center gap-1.5 text-secondary" role="status">
+                          <Loader2 className="size-3.5 animate-spin" aria-hidden /> Checking if this passenger exists…
+                        </span>
+                      ) : knownPassenger ? (
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-emerald-800">
+                          <div className="font-medium">✓ Existing passenger — {knownPassenger.name}</div>
+                          <div className="text-emerald-700">
+                            {knownPassenger.referredBy ? `Added by ${knownPassenger.referredBy.displayName}` : 'Added earlier'}
+                            {knownPassenger.firstSeenAt ? ` · ${formatShortDate(new Date(knownPassenger.firstSeenAt))}` : ''}
+                            {knownPassenger.tripsCount > 0 ? ` · ${knownPassenger.tripsCount} trip${knownPassenger.tripsCount === 1 ? '' : 's'}` : ''}
+                          </div>
+                          {passengerNameWatch.trim() && passengerNameWatch.trim().toLowerCase() !== knownPassenger.name.toLowerCase() ? (
+                            <button type="button" className="mt-0.5 font-medium underline" onClick={() => setValue('passengerName', knownPassenger.name, { shouldValidate: true })}>
+                              Use "{knownPassenger.name}"
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : passengerLookup.isSuccess ? (
+                        <span className="text-secondary">New passenger — they&apos;ll be added to the directory when you post this trip.</span>
                       ) : null}
                     </div>
-                  ) : passengerLookup.isSuccess ? (
-                    <span className="text-secondary">New passenger — they&apos;ll be added to the directory when you post this trip.</span>
                   ) : null}
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Passenger phone" error={errors.passengerPhone?.message}>
+                      <Input inputMode="tel" {...register('passengerPhone')} placeholder="+91…" />
+                    </Field>
+                    <Field label="Headcount" error={errors.passengerCount?.message}>
+                      <Input type="number" min={1} max={20} step={1} inputMode="numeric" {...register('passengerCount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 20) || '1–20 passengers' })} />
+                    </Field>
+                  </div>
+                  <Field label="Luggage notes (optional)">
+                    <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('luggageNotes')} />
+                  </Field>
+                  <Field label="Special requests (optional)">
+                    <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('specialRequests')} />
+                  </Field>
+
+                  {/* Visibility note when user chooses to show passenger details */}
+                  {!hidePassengerPhoneWatch ? (
+                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
+                      <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                      <span>Passenger details are shared with the driver only after the trip is assigned.</span>
+                    </div>
+                  ) : null}
+
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input type="checkbox" {...register('hidePassengerPhone')} /> Keep passenger details hidden from drivers until assigned
+                  </label>
                 </div>
               ) : null}
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Passenger phone" error={errors.passengerPhone?.message}>
-                  <Input inputMode="tel" {...register('passengerPhone', { required: 'Enter a phone number' })} placeholder="+91…" />
-                </Field>
-                <Field label="Headcount" error={errors.passengerCount?.message}>
-                  <Input type="number" min={1} max={20} step={1} inputMode="numeric" {...register('passengerCount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 20) || '1–20 passengers' })} />
-                </Field>
-              </div>
-              <Field label="Luggage notes (optional)">
-                <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('luggageNotes')} />
-              </Field>
-              <Field label="Special requests (optional)">
-                <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('specialRequests')} />
-              </Field>
+            </Card>
+
+            <Card className="gap-3">
+              <div className={sectionLabel}>More details</div>
               <Field label="Instructions for the driver (optional)">
                 <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('driverInstructions')} />
               </Field>
-            </Card>
-
-            <Card className="gap-2">
-              <div className={sectionLabel}>Visibility</div>
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" {...register('showFareToPassenger')} /> Show the fare to the passenger
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input type="checkbox" {...register('hidePassengerPhone')} /> Hide the passenger&apos;s phone from drivers until assigned
               </label>
             </Card>
 

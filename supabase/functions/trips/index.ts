@@ -276,9 +276,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!Number.isFinite(distance) || !Number.isFinite(rate) || !b.pickup_at || !b.car_type_id) {
       return fail('VALIDATION', 'pickup_at, car_type_id, expected_distance_km, rate_per_km are required', 422);
     }
-    if (typeof b.hide_passenger_phone !== 'boolean') {
-      return fail('VALIDATION', 'hide_passenger_phone (true|false) is required — choose whether the assigned driver may see the passenger phone', 422);
-    }
+    const hidePassengerPhone = typeof b.hide_passenger_phone === 'boolean' ? b.hide_passenger_phone : true;
     const passengerCount = Number(b.passenger_count);
     if (!Number.isInteger(passengerCount) || passengerCount < 1) {
       return fail('VALIDATION', 'passenger_count (a positive integer) is required', 422);
@@ -312,13 +310,13 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       driver_bata: b.driver_bata ?? 300,
       extras_paid_by_passenger: b.extras_paid_by_passenger ?? true,
       driver_instructions: (b.driver_instructions as string | null) ?? null,
-      passenger_name: b.passenger_name ?? '',
-      passenger_phone: b.passenger_phone ?? '',
+      passenger_name: (typeof b.passenger_name === 'string' && b.passenger_name.trim()) ? b.passenger_name.trim() : '',
+      passenger_phone: (typeof b.passenger_phone === 'string' && b.passenger_phone.trim()) ? b.passenger_phone.trim() : '',
       passenger_count: passengerCount,
       luggage_notes: (b.luggage_notes as string | null) ?? null,
       special_requests: (b.special_requests as string | null) ?? null,
       show_fare_to_passenger: b.show_fare_to_passenger ?? true,
-      hide_passenger_phone: b.hide_passenger_phone,
+      hide_passenger_phone: hidePassengerPhone,
       status: 'open',
     };
     const { data: created, error } = await db.from('trips').insert(insert).select('id').single();
@@ -524,6 +522,33 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await db.from('trips').update({ status: 'cancelled', cancelled_at: now, cancel_reason_id: (b.cancel_reason_id as string | null) ?? null }).eq('id', tripId);
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).in('status', ['applied', 'selected']);
     return ok(await fullTrip(tripId, u!));
+  }
+
+  // ── PATCH /trips/:id — update passenger details (poster/admin; blocked once in_progress) ──
+  if (!sub && req.method === 'PATCH') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to update a trip', 401);
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    if (trip.posted_by_user_id !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'Only the trip poster can update passenger details', 403);
+    const blockingStatuses = ['in_progress', 'completed', 'cancelled'];
+    if (blockingStatuses.includes(trip.status)) return fail('CONFLICT', 'Trip has started — passenger details can no longer be changed', 422);
+    const b = await readBody(req);
+    const patch: Record<string, unknown> = {};
+    if ('passenger_name' in b) patch.passenger_name = (typeof b.passenger_name === 'string' && b.passenger_name.trim()) ? b.passenger_name.trim() : '';
+    if ('passenger_phone' in b) patch.passenger_phone = (typeof b.passenger_phone === 'string' && b.passenger_phone.trim()) ? b.passenger_phone.trim() : '';
+    if ('passenger_count' in b) {
+      const pc = Number(b.passenger_count);
+      if (!Number.isInteger(pc) || pc < 1) return fail('VALIDATION', 'passenger_count must be a positive integer', 422);
+      patch.passenger_count = pc;
+    }
+    if ('luggage_notes' in b) patch.luggage_notes = (b.luggage_notes as string | null) ?? null;
+    if ('special_requests' in b) patch.special_requests = (b.special_requests as string | null) ?? null;
+    if ('hide_passenger_phone' in b && typeof b.hide_passenger_phone === 'boolean') patch.hide_passenger_phone = b.hide_passenger_phone;
+    if (Object.keys(patch).length === 0) return ok(await fullTrip(tripId, u));
+    const { error } = await db.from('trips').update(patch).eq('id', tripId);
+    if (error) return pgFail(error);
+    return ok(await fullTrip(tripId, u));
   }
 
   return fail('NOT_FOUND', 'No such trips route', 404);

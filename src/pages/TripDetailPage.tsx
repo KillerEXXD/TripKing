@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from 'react';
+﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, ClipboardList, Clock, MapPin, MessageCircle, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
-import { useApplyToTrip, useCancelTrip, useCompleteTrip, useStartTrip, useTrip, useWithdrawApplication } from '@/hooks/useTrips';
+import { useForm } from 'react-hook-form';
+import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
+import { useApplyToTrip, useCancelTrip, useCompleteTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cancelReasonHooks } from '@/hooks/useAdminConfig';
@@ -333,7 +335,106 @@ function PostedBy({ trip }: { trip: Trip }) {
   );
 }
 
-function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean } }) {
+interface PassengerForm {
+  passengerName: string;
+  passengerPhone: string;
+  passengerCount: number;
+  luggageNotes: string;
+  specialRequests: string;
+  hidePassengerPhone: boolean;
+}
+
+/** Inline form for the poster to enter / update passenger details (editable until trip starts). */
+function PassengerEditForm({ trip, onSaved }: { trip: Trip; onSaved?: () => void }) {
+  const update = useUpdateTripPassenger();
+  const { register, handleSubmit, watch, setValue, getValues, formState: { errors } } = useForm<PassengerForm>({
+    defaultValues: {
+      passengerName: trip.passengerName,
+      passengerPhone: trip.passengerPhone,
+      passengerCount: trip.passengerCount,
+      luggageNotes: trip.luggageNotes ?? '',
+      specialRequests: trip.specialRequests ?? '',
+      hidePassengerPhone: trip.hidePassengerPhone,
+    },
+  });
+
+  const phoneWatch = watch('passengerPhone');
+  const [debouncedPhone, setDebouncedPhone] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedPhone(phoneWatch.trim()), 350);
+    return () => clearTimeout(t);
+  }, [phoneWatch]);
+  const phoneLookupable = isLookupablePhone(debouncedPhone);
+  const passengerLookup = useLookupPassengerByPhone(debouncedPhone);
+  const knownPassenger = phoneLookupable && !passengerLookup.isFetching ? (passengerLookup.data ?? null) : null;
+  useEffect(() => {
+    const p = passengerLookup.data;
+    if (p && !getValues('passengerName').trim()) setValue('passengerName', p.name, { shouldValidate: true });
+  }, [passengerLookup.data, getValues, setValue]);
+
+  async function onSubmit(values: PassengerForm) {
+    try {
+      await update.mutateAsync({
+        tripId: trip.id,
+        input: {
+          passengerName: values.passengerName.trim(),
+          passengerPhone: values.passengerPhone.trim(),
+          passengerCount: Number(values.passengerCount),
+          luggageNotes: values.luggageNotes.trim() || undefined,
+          specialRequests: values.specialRequests.trim() || undefined,
+          hidePassengerPhone: values.hidePassengerPhone,
+        },
+      });
+      toast.success('Passenger details saved.');
+      onSaved?.();
+    } catch {
+      toast.error("Couldn't save — please try again.");
+    }
+  }
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); void handleSubmit(onSubmit)(); }} className="space-y-3">
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Passenger name</span>
+        <input className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base" placeholder="Full name" {...register('passengerName', { required: 'Enter the passenger name' })} />
+        {errors.passengerName ? <span className="block text-xs text-red-700">{errors.passengerName.message}</span> : null}
+      </label>
+      {phoneLookupable && knownPassenger ? (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800">
+          ✓ Existing passenger — {knownPassenger.name}
+        </div>
+      ) : null}
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Passenger phone</span>
+          <input inputMode="tel" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base" placeholder="+91…" {...register('passengerPhone', { required: 'Enter a phone number' })} />
+          {errors.passengerPhone ? <span className="block text-xs text-red-700">{errors.passengerPhone.message}</span> : null}
+        </label>
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Headcount</span>
+          <input type="number" min={1} max={20} step={1} inputMode="numeric" className="h-11 w-full rounded-lg border border-input bg-background px-3 text-base" {...register('passengerCount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1 && v <= 20) || '1–20' })} />
+          {errors.passengerCount ? <span className="block text-xs text-red-700">{errors.passengerCount.message}</span> : null}
+        </label>
+      </div>
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Luggage notes (optional)</span>
+        <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('luggageNotes')} />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-sm font-medium">Special requests (optional)</span>
+        <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('specialRequests')} />
+      </label>
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <input type="checkbox" {...register('hidePassengerPhone')} /> Keep passenger details hidden from drivers until assigned
+      </label>
+      <button type="submit" disabled={update.isPending} className="h-11 w-full rounded-lg bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-60">
+        {update.isPending ? <span className="flex items-center justify-center gap-1.5"><Loader2 className="size-4 animate-spin" aria-hidden /> Saving…</span> : 'Save passenger details'}
+      </button>
+    </form>
+  );
+}
+
+function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
   const badge = STATUS_BADGE[trip.status];
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
   const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -341,10 +442,24 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
   const showApplyBar = viewer.isDriver && !viewer.isPoster && applyable;
   const showAssignedBar = viewer.isAssignedDriver && (trip.status === 'assigned' || trip.status === 'in_progress');
   const showTracking = viewer.isPoster || viewer.isAssignedDriver;
-  const canSharePassengerLink = viewer.isPoster && !!trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress');
+  const canSharePassengerLink = viewer.isPoster && !!trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress') && !!trip.passengerName;
   const canCancel = viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants' || trip.status === 'assigned');
+  const passengerEditable = viewer.isPoster && ['open', 'has_applicants', 'assigned'].includes(trip.status);
+  const passengerMissing = !trip.passengerName;
+  // Auto-open the passenger edit form when redirected here from the assign flow.
+  const [editingPassenger, setEditingPassenger] = useState(fillPassenger && passengerEditable);
+  const passengerCardRef = useRef<HTMLDivElement>(null);
   const myApplication: MyApplication | undefined = useMyApplicationsStore().byTrip[trip.id];
   const [showShareLink, setShowShareLink] = useState(false);
+
+  // Scroll to passenger card when auto-opened.
+  useEffect(() => {
+    if (fillPassenger && passengerEditable) {
+      setTimeout(() => passengerCardRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 300);
+    }
+  // Only run on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
@@ -410,13 +525,40 @@ function TripDetail({ trip, viewer }: { trip: Trip; viewer: { isDriver: boolean;
 
       <PostedBy trip={trip} />
 
-      <Card className="gap-3">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Passenger</div>
-        <Stat icon={<Users />} label="Name & headcount" value={`${trip.passengerName || '—'} · ${trip.passengerCount} pax`} />
-        {!trip.hidePassengerPhone && trip.passengerPhone ? <Stat icon={<Phone />} label="Phone" value={trip.passengerPhone} /> : null}
-        {trip.luggageNotes ? <Stat icon={<ClipboardList />} label="Luggage" value={trip.luggageNotes} /> : null}
-        {trip.specialRequests ? <Stat icon={<ClipboardList />} label="Special requests" value={trip.specialRequests} /> : null}
-      </Card>
+      {/* Passenger card — always visible for the poster; shown to the assigned driver once assigned */}
+      {(viewer.isPoster || (viewer.isAssignedDriver && trip.status !== 'open' && trip.status !== 'has_applicants')) ? (
+        <Card className="gap-3" ref={passengerCardRef}>
+          <div className="flex items-center justify-between">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Passenger</div>
+            {passengerEditable ? (
+              <button type="button" onClick={() => setEditingPassenger((v) => !v)} className="flex items-center gap-1 text-xs font-medium text-primary">
+                <Pencil className="size-3" aria-hidden /> {editingPassenger ? 'Cancel' : (passengerMissing ? 'Add details' : 'Edit')}
+              </button>
+            ) : null}
+          </div>
+
+          {/* Prompt banner when redirected from assign flow */}
+          {fillPassenger && !editingPassenger && passengerMissing ? (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>Almost done — enter the passenger details so the driver knows who to pick up.</span>
+            </div>
+          ) : null}
+
+          {editingPassenger ? (
+            <PassengerEditForm trip={trip} onSaved={() => setEditingPassenger(false)} />
+          ) : passengerMissing ? (
+            <p className="text-sm text-secondary">No passenger details yet.</p>
+          ) : (
+            <>
+              <Stat icon={<Users />} label="Name & headcount" value={`${trip.passengerName} · ${trip.passengerCount} pax`} />
+              {!trip.hidePassengerPhone && trip.passengerPhone ? <Stat icon={<Phone />} label="Phone" value={trip.passengerPhone} /> : null}
+              {trip.luggageNotes ? <Stat icon={<ClipboardList />} label="Luggage" value={trip.luggageNotes} /> : null}
+              {trip.specialRequests ? <Stat icon={<ClipboardList />} label="Special requests" value={trip.specialRequests} /> : null}
+            </>
+          )}
+        </Card>
+      ) : null}
 
       {trip.assignedDriverId ? (
         <Card>
@@ -474,6 +616,7 @@ export function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const fillPassenger = new URLSearchParams(location.search).get('fillPassenger') === '1';
   const { user } = useAuth();
   const isDriver = user?.role === 'driver';
   const tripQuery = useTrip(id);
@@ -507,6 +650,7 @@ export function TripDetailPage() {
       ) : (
         <TripDetail
           trip={tripQuery.data}
+          fillPassenger={fillPassenger}
           viewer={{
             isDriver,
             isPoster: !!user && tripQuery.data.postedByUserId === user.id,

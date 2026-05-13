@@ -13,9 +13,10 @@ import {
   postTrip,
   rejectApplicant,
   startTrip,
+  updateTripPassenger,
   withdrawApplication,
 } from '@/lib/api/services/trips';
-import type { ApplyToTripInput, PostTripInput, TripsQueryParams, TripStatus } from '@/types';
+import type { ApplyToTripInput, PostTripInput, TripsQueryParams, TripStatus, UpdateTripPassengerInput } from '@/types';
 
 type StartInput = { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number };
 type CompleteInput = { endOdoUrl?: string; endOdoReading?: number; driverNotes?: string };
@@ -122,6 +123,13 @@ export function useCancelTrip() {
   const invalidate = useInvalidateTrips();
   return useMutation({
     mutationFn: ({ tripId, cancelReasonId }: { tripId: string; cancelReasonId: string }) => cancelTrip(tripId, cancelReasonId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+export function useUpdateTripPassenger() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, input }: { tripId: string; input: UpdateTripPassengerInput }) => updateTripPassenger(tripId, input),
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
 }

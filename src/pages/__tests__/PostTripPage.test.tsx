@@ -83,6 +83,11 @@ function set(container: HTMLElement, name: string, value: string) {
   fireEvent.change(el, { target: { value } });
 }
 
+/** Expand the passenger details collapsible (collapsed by default in step 2). */
+function expandPassengerSection() {
+  fireEvent.click(screen.getByRole('button', { name: /passenger details/i }));
+}
+
 /** Fill the step-1 form (route + vehicle, + pin an exact pickup point) and advance to step 2.
  *  The distance is computed automatically from the route — we wait for it before clicking Next. */
 async function completeStep1(container: HTMLElement) {
@@ -181,6 +186,7 @@ describe('PostTripPage', () => {
     const { container } = renderPost();
     await completeStep1(container);
     set(container, 'ratePerKm', '15');
+    expandPassengerSection();
     set(container, 'passengerName', 'Passenger P');
     set(container, 'passengerPhone', '+919999999999');
     fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
@@ -205,6 +211,7 @@ describe('PostTripPage', () => {
     setPassengerLookup({ isFetching: true });
     const { container } = renderPost();
     await completeStep1(container);
+    expandPassengerSection();
     set(container, 'passengerPhone', '+919876543210');
     await waitFor(() => expect(screen.getByText(/checking if this passenger exists/i)).toBeInTheDocument());
   });
@@ -212,6 +219,7 @@ describe('PostTripPage', () => {
   it('prefills the passenger name from the directory when the phone matches an existing passenger', async () => {
     const { container } = renderPost();
     await completeStep1(container);
+    expandPassengerSection();
     setPassengerLookup({ isSuccess: true, data: { id: 'p1', phone: '+919876543210', name: 'Jane Sharma', aliases: [], referredByUserId: 'u9', referredBy: { id: 'u9', displayName: 'Agent A', role: 'trip_manager' }, firstSeenAt: '2026-05-01T00:00:00.000Z', tripsCount: 4 } });
     set(container, 'passengerPhone', '+919876543210'); // note: name left blank
     await waitFor(() => expect(screen.getByText(/existing passenger — jane sharma/i)).toBeInTheDocument());

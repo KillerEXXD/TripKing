@@ -5,7 +5,7 @@
  */
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiPostTrip, transformMyApplication, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
-import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripsQueryParams } from '@/types';
+import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripsQueryParams, UpdateTripPassengerInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -107,4 +107,15 @@ export function completeTrip(tripId: string, input?: { endOdoUrl?: string; endOd
 
 export function cancelTrip(tripId: string, cancelReasonId: string): Promise<Trip> {
   return apiClient.post<Api>(`/trips/${tripId}/cancel`, { cancel_reason_id: cancelReasonId }).then((r) => transformTrip(unwrap(r.data)));
+}
+
+export function updateTripPassenger(tripId: string, input: UpdateTripPassengerInput): Promise<Trip> {
+  const body: Record<string, unknown> = {};
+  if (input.passengerName !== undefined) body.passenger_name = input.passengerName;
+  if (input.passengerPhone !== undefined) body.passenger_phone = input.passengerPhone;
+  if (input.passengerCount !== undefined) body.passenger_count = input.passengerCount;
+  if (input.luggageNotes !== undefined) body.luggage_notes = input.luggageNotes;
+  if (input.specialRequests !== undefined) body.special_requests = input.specialRequests;
+  if (input.hidePassengerPhone !== undefined) body.hide_passenger_phone = input.hidePassengerPhone;
+  return apiClient.patch<Api>(`/trips/${tripId}`, body).then((r) => transformTrip(unwrap(r.data)));
 }

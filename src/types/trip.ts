@@ -33,6 +33,7 @@ export interface Trip {
   driverInstructions?: string;
   /** server-computed (fare − commission − GST + bata) — never recomputed in the client. */
   driverPayout: number;
+  /** Empty string means passenger details have not been entered yet. */
   passengerName: string;
   passengerPhone: string;
   passengerCount: number;
@@ -146,6 +147,14 @@ export interface PostTripInput {
   specialRequests?: string;
   showFareToPassenger: boolean;
   hidePassengerPhone: boolean;
+}
+export interface UpdateTripPassengerInput {
+  passengerName?: string;
+  passengerPhone?: string;
+  passengerCount?: number;
+  luggageNotes?: string;
+  specialRequests?: string;
+  hidePassengerPhone?: boolean;
 }
 export interface ApplyToTripInput {
   vehicleId: string;

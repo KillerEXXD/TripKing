@@ -109,6 +109,7 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
   const applicantsQuery = useTripApplicants(trip.id);
   const assign = useAssignDriver();
   const reject = useRejectApplicant();
+  const navigate = useNavigate();
   const assignable = trip.status === 'open' || trip.status === 'has_applicants';
   const canAct = isPoster && assignable;
   const applicants = applicantsQuery.data ?? [];
@@ -119,8 +120,14 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
       { tripId: trip.id, acceptanceId },
       {
         onSuccess: (updated) => {
-          toast.success('Driver selected — share the trip link with the passenger.');
-          if (updated.passengerOtp) setAssignedTrip(updated);
+          if (!updated.passengerName) {
+            // No passenger details yet — go to the trip and prompt the agent to fill them in.
+            toast.success('Driver selected — add the passenger details to complete the booking.');
+            navigate(`/trips/${trip.id}?fillPassenger=1`);
+          } else {
+            toast.success('Driver selected — share the trip link with the passenger.');
+            if (updated.passengerOtp) setAssignedTrip(updated);
+          }
         },
         onError: () => toast.error("Couldn't select that driver — try again."),
       },

@@ -5,8 +5,9 @@ import { TripDetailPage } from '@/pages/TripDetailPage';
 import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
 
-vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn() }));
-import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn() }));
+import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger } from '@/hooks/useTrips';
+vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(() => ({ data: null, isFetching: false, isSuccess: false })), isLookupablePhone: vi.fn(() => false) }));
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
 import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
@@ -109,6 +110,7 @@ function setMutations() {
   vi.mocked(useStartTrip).mockReturnValue({ mutateAsync: startMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useCompleteTrip).mockReturnValue({ mutateAsync: completeMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useCancelTrip).mockReturnValue({ mutateAsync: cancelMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useUpdateTripPassenger).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false, isError: false } as never);
 }
 const CANCEL_REASONS = [
   { id: 'cr1', label: 'Passenger no longer needs the ride', appliesTo: 'both', sortOrder: 1, isActive: true },
@@ -181,14 +183,22 @@ describe('TripDetailPage', () => {
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
   });
 
-  it('renders the trip details — route, payout, posted-by', () => {
+  it('renders the trip details — route, payout, posted-by (driver view)', () => {
     setTrip({ data: makeTrip() });
     renderDetail();
     expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/payout breakdown/i)).toBeInTheDocument();
     expect(screen.getByText(/driver payout/i)).toBeInTheDocument();
-    expect(screen.getByText('Passenger P · 2 pax')).toBeInTheDocument();
+    // Passenger card is not shown to a browsing driver (PII not visible before assignment)
+    expect(screen.queryByText('Passenger P · 2 pax')).toBeNull();
     expect(screen.getByRole('link', { name: /call agent a/i })).toBeInTheDocument();
+  });
+
+  it('shows the passenger card to the poster (trip manager)', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip() });
+    renderDetail();
+    expect(screen.getByText('Passenger P · 2 pax')).toBeInTheDocument();
   });
 
   it('shows the review section on a completed trip', () => {
