@@ -12,11 +12,10 @@ export interface GetVerifiedBannerProps {
   verification: VerificationSummary;
   /** the checklist steps — `DRIVER_VERIFICATION_STEPS` (default) or `AGENT_VERIFICATION_STEPS`. */
   steps?: VerificationStepMeta[];
-  primaryVehicleId?: string;
   className?: string;
 }
 
-export function GetVerifiedBanner({ verification, steps = DRIVER_VERIFICATION_STEPS, primaryVehicleId, className }: GetVerifiedBannerProps) {
+export function GetVerifiedBanner({ verification, steps = DRIVER_VERIFICATION_STEPS, className }: GetVerifiedBannerProps) {
   if (verification.kycStatus === 'approved') return null;
   const { stepsDone, stepsTotal } = verification;
   const next = nextActionableStep(verification, steps);
@@ -26,7 +25,7 @@ export function GetVerifiedBanner({ verification, steps = DRIVER_VERIFICATION_ST
       : !next
         ? 'Your documents are with our team for review.'
         : null;
-  const to = next ? next.route(primaryVehicleId) : '/profile';
+  const to = '/profile#get-verified';
   const pct = stepsTotal ? Math.round((stepsDone / stepsTotal) * 100) : 0;
 
   return (

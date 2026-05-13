@@ -136,7 +136,7 @@ function DriverHome({ driver }: { driver: Driver }) {
       </header>
 
       <div className="space-y-3 px-4 pb-4 pt-3">
-        {driver.verification && <GetVerifiedBanner verification={driver.verification} primaryVehicleId={driver.vehicles[0]?.id} />}
+        {driver.verification && <GetVerifiedBanner verification={driver.verification} />}
         {nearCity ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 py-1.5 pl-3 pr-2 text-sm text-emerald-700">
             <MapPin className="size-3.5" aria-hidden />
