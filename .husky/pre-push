@@ -1,12 +1,16 @@
 #!/bin/sh
-# Pre-push gate: type-check, tests, production build must all pass.
+# Pre-push gate: type-check, tests, coverage, test-policy compliance, prod build.
+# Policy doc: docs/TEST_POLICY.md
 echo "🔎  tsc --noEmit"
 npx tsc --noEmit || { echo "❌ Type errors — fix before pushing."; exit 1; }
 
 echo "🧪  npm run test:coverage (enforces coverage thresholds)"
 npm run test:coverage || { echo "❌ Tests or coverage thresholds failed — fix before pushing."; exit 1; }
 
+echo "📋  test-required gate (docs/TEST_POLICY.md)"
+node scripts/check-tests-required.cjs || exit 1
+
 echo "🏗️   npm run build"
 npm run build || { echo "❌ Build failed — fix before pushing."; exit 1; }
 
-echo "✅  tsc + tests + build all green"
+echo "✅  tsc + tests + coverage + policy + build all green"
