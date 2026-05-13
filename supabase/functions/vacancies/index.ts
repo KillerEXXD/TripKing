@@ -191,6 +191,16 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const { data: drv } = await db.from('drivers').select('kyc_status, is_active').eq('id', did).maybeSingle();
     if (drv?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your driver account has been deactivated — contact support.', 403);
     if ((drv?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a vacancy', 403);
+    // Max 2 ACTIVE vacancies per driver. Cancelled / completed rows don't count — the limit
+    // matches the "I'm available" card on /vacancies (src/components/vacancy/IAmAvailableCard.tsx).
+    const { count: activeCount } = await db
+      .from('vacancies')
+      .select('id', { count: 'exact', head: true })
+      .eq('driver_id', did)
+      .eq('status', 'active');
+    if ((activeCount ?? 0) >= 2) {
+      return fail('CONFLICT', 'You already have 2 active vacancies. Cancel one before posting a new one.', 409);
+    }
     const b = await readBody(req);
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);

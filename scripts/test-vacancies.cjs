@@ -89,6 +89,8 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   if (!vacancyId) process.exit(1);
 
   // ── place_id plumbing (Phase C-2) + radius search (Phase D) ────────────
+  // The "max 2 active vacancies per driver" rule means we cancel the first one before
+  // posting the next, so each sub-test runs against a fresh 0/2 slot.
   const ppid = `vac-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const placeA = await j('POST', '/places', { body: { provider: 'smoketest', providerPlaceId: `${ppid}-a`, name: 'Vac Place A', lat: 12.97, lng: 77.59 } });
   const placeB = await j('POST', '/places', { body: { provider: 'smoketest', providerPlaceId: `${ppid}-b`, name: 'Vac Place B', lat: 13.34, lng: 77.10 } });
@@ -101,6 +103,10 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('POST /vacancies joins destination places (vacancy_destinations[].place)', destPlaces.some((pl) => pl && pl.id === placeBId), `dests=${JSON.stringify(destPlaces.map((p) => p.id))}`);
   const badPlace = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, current_place_id: NONE } });
   check('POST /vacancies with a bad current_place_id → 422', badPlace.status === 422, `status=${badPlace.status}`);
+
+  // The "max 2 active vacancies per driver" rule means `posted` + `vac2` already = 2 active.
+  // Cancel `vac2` here so the rest of this script can post one more without 409ing.
+  if (vac2Id) await j('POST', `/vacancies/${vac2Id}/cancel`, { token: driverToken });
 
   // ── unified `destinations` array — mix a curated city, a precise place, and both ─
   const vac3 = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destinations: [{ cityId: dest1 }, { placeId: placeBId }, { cityId: dest2, placeId: placeAId }] } });
@@ -132,6 +138,24 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('GET /vacancies?destination_city_id= → contains my vacancy', byDest.status === 200 && (byDest.json?.data || []).some((v) => v.id === vacancyId), `len=${byDest.json?.data?.length}`);
   const byNoDest = await j('GET', `/vacancies?destination_city_id=${NONE}`);
   check('GET /vacancies?destination_city_id=<none> → 200 + empty array', byNoDest.status === 200 && Array.isArray(byNoDest.json?.data) && byNoDest.json.data.length === 0, `status=${byNoDest.status} len=${byNoDest.json?.data?.length}`);
+
+  // ── max 2 ACTIVE per driver — the limit matches `IAmAvailableCard`'s X/2 counter ─
+  // At this point in the script, `posted` and `vac3` are active (= 2). A 3rd POST must 409.
+  const overLimit = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  check(
+    'POST /vacancies past 2 active → 409 CONFLICT (limit per driver)',
+    overLimit.status === 409 && /already have 2 active/i.test(overLimit.json?.error?.message ?? ''),
+    `status=${overLimit.status} ${JSON.stringify(overLimit.json?.error || '')}`,
+  );
+  // Free a slot, the next POST succeeds again.
+  if (vac3Id) await j('POST', `/vacancies/${vac3Id}/cancel`, { token: driverToken });
+  const afterCancel = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  check(
+    'POST /vacancies after cancelling one → 200 (slot freed)',
+    afterCancel.status === 200 && !!afterCancel.json?.data?.id,
+    `status=${afterCancel.status} ${JSON.stringify(afterCancel.json?.error || '')}`,
+  );
+  if (afterCancel.json?.data?.id) await j('POST', `/vacancies/${afterCancel.json.data.id}/cancel`, { token: driverToken });
 
   // ── cancel ─────────────────────────────────────────────────────────────
   const cancelNoAuth = await j('POST', `/vacancies/${vacancyId}/cancel`, {});
