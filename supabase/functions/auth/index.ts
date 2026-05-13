@@ -15,8 +15,12 @@
  * accepts the dev OTP `12345` (the default) or any 4–6 digit code. The session itself is real —
  * verify-otp find-or-creates the auth user for the phone (with a server-derived password the client
  * never sees) and `signInWithPassword` mints a genuine Supabase session, so `auth.uid()` works in RLS.
+ * Self-signup as `role:'admin'` is honoured ONLY when `TRIPKING_DEV_MODE` is unset or `'true'` (the
+ * default); in production set `TRIPKING_DEV_MODE=false` and admins are provisioned out-of-band — the
+ * first via SQL, thereafter via `PATCH /admin/users/:id`. A suspended account (`users.is_active=false`)
+ * gets a 403 from `verify-otp` and `refresh`.
  * TODO(real SMS): wire MSG91/Twilio + an `auth_otps` table — `request-otp` then sends a real code and
- * stores its hash; `verify-otp` checks it; stop returning `dev_otp`; gate `role:'admin'` for prod.
+ * stores its hash; `verify-otp` checks it; stop returning `dev_otp`; flip `TRIPKING_DEV_MODE=false`.
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -113,7 +117,15 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     const password = await derivedPassword(phone);
     const email = syntheticEmail(phone);
     const displayName = typeof body.display_name === 'string' ? body.display_name : '';
-    const role = body.role === 'driver' || body.role === 'trip_manager' || body.role === 'admin' ? body.role : 'driver';
+    // Self-signup as 'admin' is dev-only. In production (TRIPKING_DEV_MODE !== 'true') it's rejected —
+    // admins are provisioned out-of-band: the first one via SQL, thereafter via PATCH /admin/users/:id
+    // by an existing admin. Defaults to dev mode because the dev-OTP placeholder relies on it; flip
+    // TRIPKING_DEV_MODE=false in prod together with wiring a real SMS provider (see docs/SECURITY_REVIEW.md).
+    const devMode = (Deno.env.get('TRIPKING_DEV_MODE') ?? 'true').toLowerCase() === 'true';
+    if (body.role === 'admin' && !devMode) {
+      return fail('FORBIDDEN', "Self-signup as 'admin' is not allowed — ask an existing administrator to grant the role", 403);
+    }
+    const role = body.role === 'driver' || body.role === 'trip_manager' || (body.role === 'admin' && devMode) ? body.role : 'driver';
 
     let userId: string;
     const existing = await findAuthUserForPhone(db, phone);

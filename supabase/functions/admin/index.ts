@@ -14,6 +14,11 @@
  *   PATCH  /admin/places/<id>            (admin) — { is_active?, city_id?, name?, formatted_address?, state? }
  *   POST   /admin/places/<id>/merge      (admin) — { into } → repoint every *_place_id FK from <id> to <into>, then delete <id> (dedupe)
  *   DELETE /admin/places/<id>            (admin) — 409 IN_USE if referenced (deactivate or merge instead)
+ *   GET    /admin/users[?role=&active=true|false&q=&limit=]   (admin) — list accounts (filter by role / active / phone|email|name)
+ *   GET    /admin/users/<id>             (admin) — one account
+ *   PATCH  /admin/users/<id>             (admin) — { is_active?, role?, display_name?, reason? } — the account-level kill switch + role grant
+ *                                        (is_active=false ⇒ the account can't get a new session — /auth verify-otp & refresh 403; fires an account_status_change notification.
+ *                                         Distinct from PATCH /drivers|/agents/<id>/active, which deactivates the marketplace *profile* but still lets the user sign in. You can't deactivate / demote your own account.)
  *
  * Lists: car-types · fuel-types · vehicle-makes · vehicle-models · seat-options ·
  * cities · languages · review-tags · cancel-reasons.
@@ -183,6 +188,78 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/places/<id>`, 405);
     }
     return fail('NOT_FOUND', 'No such /admin/places route', 404);
+  }
+
+  // ── /admin/users — account management (list / view / activate-deactivate / grant role) ──
+  // The account-level switch (users.is_active). Distinct from PATCH /drivers|/agents/:id/active,
+  // which only deactivates the marketplace *profile* (the user can still sign in & see a banner) —
+  // this one stops the account from getting a new session at all (/auth verify-otp & refresh → 403).
+  if (segments[0] === 'users') {
+    const USER_ROLES = ['driver', 'trip_manager', 'admin'];
+    const USER_SELECT = 'id, role, phone, email, display_name, preferred_language, is_active, created_at, updated_at';
+    if (segments.length === 1 && req.method === 'GET') {
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
+      let q = db.from('users').select(USER_SELECT);
+      const role = url.searchParams.get('role');
+      if (role) q = q.eq('role', role);
+      const active = url.searchParams.get('active');
+      if (active === 'true') q = q.eq('is_active', true);
+      else if (active === 'false') q = q.eq('is_active', false);
+      const query = (url.searchParams.get('q') ?? '').trim().replace(/[%,]/g, '');
+      if (query) q = q.or(`phone.ilike.%${query}%,email.ilike.%${query}%,display_name.ilike.%${query}%`);
+      const limit = Number(url.searchParams.get('limit') ?? '100');
+      const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 100, 500));
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data ?? []);
+    }
+    if (segments.length === 2) {
+      const id = decodeURIComponent(segments[1]);
+      if (req.method === 'GET') {
+        const a = await requireAdmin(db, req);
+        if (a instanceof Response) return a;
+        const { data, error } = await db.from('users').select(USER_SELECT).eq('id', id).maybeSingle();
+        if (error) return fail('DB_ERROR', error.message, 500);
+        if (!data) return fail('NOT_FOUND', `user "${id}" not found`, 404);
+        return ok(data);
+      }
+      if (req.method === 'PATCH' || req.method === 'PUT') {
+        const a = await requireAdmin(db, req);
+        if (a instanceof Response) return a;
+        const body = await readBody(req);
+        const patch: Record<string, unknown> = {};
+        if (typeof body.is_active === 'boolean') patch.is_active = body.is_active;
+        if (typeof body.role === 'string') {
+          if (!USER_ROLES.includes(body.role)) return fail('VALIDATION', `role must be one of ${USER_ROLES.join(', ')}`, 422);
+          patch.role = body.role;
+        }
+        if (typeof body.display_name === 'string') patch.display_name = body.display_name;
+        if (Object.keys(patch).length === 0) return fail('VALIDATION', 'nothing to update — allowed: is_active, role, display_name', 422);
+        // can't lock yourself out
+        if (patch.is_active === false && id === a.id) return fail('VALIDATION', 'you cannot deactivate your own account', 422);
+        if (patch.role !== undefined && patch.role !== 'admin' && id === a.id) return fail('VALIDATION', 'you cannot remove your own admin role', 422);
+        const { data: before } = await db.from('users').select('id, role, phone, email, display_name, is_active').eq('id', id).maybeSingle();
+        if (!before) return fail('NOT_FOUND', `user "${id}" not found`, 404);
+        const { data, error } = await db.from('users').update(patch).eq('id', id).select(USER_SELECT).single();
+        if (error) return pgFail(error);
+        const reason = (typeof body.reason === 'string' && body.reason.trim()) ? body.reason.trim() : null;
+        await audit(db, a.id, 'update', 'users', id, before, { ...data, ...(reason ? { reason } : {}) });
+        if (typeof body.is_active === 'boolean' && before.is_active !== body.is_active) {
+          await db.from('notifications').insert({
+            user_id: id,
+            type: 'account_status_change',
+            title: body.is_active ? 'Account reactivated' : 'Account suspended',
+            body: body.is_active
+              ? 'Your account has been reactivated — you can sign in again.'
+              : `Your account has been suspended by an administrator.${reason ? ' ' + reason : ''} Contact support if you think this is a mistake.`,
+            payload_json: { is_active: body.is_active, kind: 'account', ...(reason ? { reason } : {}) },
+          });
+        }
+        return ok(data);
+      }
+      return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/users/<id>`, 405);
+    }
+    return fail('NOT_FOUND', 'No such /admin/users route', 404);
   }
 
   // ── /admin/<list>... ─────────────────────────────────────────────────────

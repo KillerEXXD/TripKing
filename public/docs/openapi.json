@@ -655,6 +655,164 @@
         }
       }
     },
+    "/admin/users": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List user accounts (admin) — filter by role / active / q (phone|email|display_name ilike); limit (default 100, max 500), newest first.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "driver",
+                "trip_manager",
+                "admin"
+              ]
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "true",
+                "false"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/admin/users/{id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get a user account (admin).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update a user account (admin) — { is_active?, role?, display_name?, reason? }. is_active is the ACCOUNT-level kill switch: when false the account can't get a new session (/auth verify-otp & refresh → 403) and gets an account_status_change notification; this is distinct from PATCH /drivers|/agents/{id}/active, which only deactivates the marketplace *profile* (the user can still sign in & see a \"suspended\" banner). role grants/revokes administrator (or driver / trip_manager). You cannot deactivate or demote your own account (422). Audit-logged with the actor's id (+ the reason).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "is_active": {
+                    "type": "boolean"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "driver",
+                      "trip_manager",
+                      "admin"
+                    ]
+                  },
+                  "display_name": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "shown to the user when suspending; recorded in the audit log"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/auth/request-otp": {
       "post": {
         "tags": [
@@ -691,7 +849,7 @@
         "tags": [
           "auth"
         ],
-        "summary": "Verify an OTP → { user, access_token, refresh_token } (dev: accepts \"12345\" or any 4–6 digit code; role:admin is dev-only). 403 ACCOUNT_SUSPENDED if users.is_active = false (the account-level kill switch — an admin flipped it; orthogonal to KYC).",
+        "summary": "Verify an OTP → { user, access_token, refresh_token } (dev: accepts \"12345\" or any 4–6 digit code). Self-signup as role:admin is honoured only when TRIPKING_DEV_MODE is unset/\"true\" (the default); in production it's rejected with 403 — admins are provisioned via PATCH /admin/users/{id}. 403 ACCOUNT_SUSPENDED if users.is_active = false (the account-level kill switch — an admin flipped it; orthogonal to KYC).",
         "requestBody": {
           "required": true,
           "content": {
