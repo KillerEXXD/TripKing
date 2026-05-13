@@ -24,6 +24,9 @@ import { parseNearRadius, toKm } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+
+const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 
 // LIVE tier — short TTLs, memory-only (per-isolate). The cluster has few isolates and a 30s
 // staleness window is acceptable; the DB round-trip for a shared-cache lookup would erase the
@@ -230,6 +233,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_vacancy', { p_vacancy_id: vacancyId }); } catch { /* ignore */ }
     cacheDeletePattern('vacancies:*');
+    purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(vacancyId, false);
   }
 
@@ -257,6 +261,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const { error } = await db.from('vacancies').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id);
     if (error) return pgFail(error);
     cacheDeletePattern('vacancies:*');
+    purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(id, false);
   }
 

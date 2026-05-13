@@ -39,6 +39,19 @@ import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL } from '../_shared/cache.ts';
 import { sharedCacheInvalidateType } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+
+/**
+ * Purge URLs that Cloudflare's Worker may have cached for an admin resource.
+ * Free plan can't purge by prefix, so we list the canonical URLs (no-param + the
+ * common admin variant). Other querystring combos stale-expire via the 15-min TTL.
+ */
+function adminPurgeUrls(listKey: string): string[] {
+  return purgeUrlsFor([
+    `/functions/v1/admin/${listKey}`,
+    `/functions/v1/admin/${listKey}?include_inactive=true`,
+  ]);
+}
 
 // Reference data (MASTER tier) — bump the epoch when the response shape of any /admin/<list>
 // or /admin/app-settings response changes; that drops every cached entry cluster-wide without
@@ -141,6 +154,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       await audit(db, a.id, 'update', 'app_settings', '1', before, data);
       // Cache-invalidation: app-settings is part of the admin/master tier; flush all of it.
       await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(purgeUrlsFor(['/functions/v1/admin/app-settings']));
       return ok(data);
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/app-settings`, 405);
@@ -323,6 +337,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     const id = String((data as Record<string, unknown> | null)?.[cfg.pk] ?? '');
     await audit(db, a.id, 'create', cfg.table, id, null, data);
     await sharedCacheInvalidateType('admin');
+    purgeCloudflareAsync(adminPurgeUrls(listKey));
     return ok(data);
   }
 
@@ -340,6 +355,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     }
     await audit(db, a.id, 'reorder', cfg.table, null, null, { ids });
     await sharedCacheInvalidateType('admin');
+    purgeCloudflareAsync(adminPurgeUrls(listKey));
     return ok({ reordered: ids.length });
   }
 
@@ -356,6 +372,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       if (error) return pgFail(error);
       await audit(db, a.id, 'update', cfg.table, id, before, data);
       await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(adminPurgeUrls(listKey));
       return ok(data);
     }
     if (req.method === 'DELETE') {
@@ -367,6 +384,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
       if (error) return pgFail(error);
       await audit(db, a.id, 'delete', cfg.table, id, before, null);
       await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(adminPurgeUrls(listKey));
       return ok({ deleted: id });
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
