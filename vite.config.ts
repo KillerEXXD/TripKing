@@ -24,7 +24,20 @@ export default defineConfig({
       disable: !process.env.SENTRY_AUTH_TOKEN,
     }),
     VitePWA({
-      // New service worker activates immediately — no stale-bundle white screen.
+      // Custom service worker (src/sw.ts) via `injectManifest`. The previous `generateSW`
+      // strategy auto-bound a `createHandlerBoundToURL('index.html')` handler that threw on
+      // every cold load because index.html is NOT precached (chunk hashes must match the
+      // latest deploy). Switching to injectManifest gives us full control of the SW source.
+      //
+      // `/api/*` runtime caching is intentionally NOT here — Phase 3 of the caching strategy
+      // (Cloudflare Worker on api.tripkingapp.com) covers that tier alongside the browser
+      // HTTP cache + React Query. See docs/CACHE_BASELINE.md.
+      //
+      // The SW also wires an error bridge that postMessages SW-context errors to clients;
+      // src/lib/swErrorBridge.ts on the page side funnels them into Sentry.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt', 'icons/*.svg'],
       manifest: {
@@ -41,48 +54,9 @@ export default defineConfig({
           { src: 'icons/icon-512x512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
         ],
       },
-      workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
-        // index.html is NOT precached — navigations always hit the network for fresh chunk refs.
-        navigateFallbackDenylist: [/.*/],
+      injectManifest: {
+        // Match the previous generateSW globs — images + fonts only (HTML stays uncached).
         globPatterns: ['**/*.{ico,png,jpg,jpeg,webp,woff,woff2,svg}'],
-        runtimeCaching: [
-          {
-            // Live-data endpoints — Network First (never serve stale): trip feeds, vacancy
-            // feed, applicant lists. (Matches the Supabase Edge Functions host; if an
-            // api.tripking.in gateway is added later, add its pattern here too.)
-            urlPattern: /^https:\/\/[\w-]+\.supabase\.co\/functions\/v1\/(trips|vacancies|trip-acceptances)/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-live-cache',
-              networkTimeoutSeconds: 5,
-              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 5 },
-            },
-          },
-          {
-            // Everything else under the API (incl. /admin/*, /auth/*, /drivers, /reviews) — Stale While Revalidate.
-            urlPattern: /^https:\/\/[\w-]+\.supabase\.co\/functions\/v1\/.*/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'api-stable-cache',
-              expiration: { maxEntries: 150, maxAgeSeconds: 60 * 10 },
-            },
-          },
-          {
-            // JS/CSS bundles — SWR (instant, update in background).
-            urlPattern: /\.(?:js|css)$/,
-            handler: 'StaleWhileRevalidate',
-            options: { cacheName: 'static-assets', expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 } },
-          },
-          {
-            // Images — Cache First.
-            urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp)$/,
-            handler: 'CacheFirst',
-            options: { cacheName: 'image-cache', expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 } },
-          },
-        ],
       },
     }),
   ],

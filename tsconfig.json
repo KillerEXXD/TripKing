@@ -28,5 +28,11 @@
     }
   },
   "include": ["src"],
+  // src/sw.ts is the custom service worker (vite-plugin-pwa injectManifest). It uses
+  // WebWorker globals (self: ServiceWorkerGlobalScope, clients, caches) that conflict
+  // with the DOM lib above. It typechecks under its own tsconfig.worker.json — vite
+  // plays back the manifest at build time. Run worker typecheck separately when needed:
+  //   npx tsc -p tsconfig.worker.json --noEmit
+  "exclude": ["src/sw.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
