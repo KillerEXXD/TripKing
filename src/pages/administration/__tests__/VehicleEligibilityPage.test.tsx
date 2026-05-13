@@ -92,4 +92,26 @@ describe('VehicleEligibilityPage', () => {
     renderPage();
     expect(screen.getByText(/nothing to show/i)).toBeInTheDocument();
   });
+
+  it('the search box narrows the loaded list by registration or make / model', () => {
+    setVehicles({
+      data: [
+        vehicle(),
+        vehicle({ id: 'v2', driverId: 'd2', makeLabel: 'Maruti', modelName: 'Dzire', year: 2020, registrationNumber: 'TN09XY9999', eligibilityStatus: 'eligible' }),
+      ],
+    });
+    renderPage();
+    const search = screen.getByLabelText(/search vehicles/i);
+
+    fireEvent.change(search, { target: { value: 'tn09' } });
+    expect(screen.queryByText(/Toyota Innova/)).toBeNull();
+    expect(screen.getByText(/Maruti Dzire/)).toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'innova' } });
+    expect(screen.getByText(/Toyota Innova/)).toBeInTheDocument();
+    expect(screen.queryByText(/Maruti Dzire/)).toBeNull();
+
+    fireEvent.change(search, { target: { value: 'zzzz' } });
+    expect(screen.getByText(/no vehicles match that search/i)).toBeInTheDocument();
+  });
 });
