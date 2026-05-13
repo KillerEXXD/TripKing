@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CalendarClock, ShieldCheck, Video } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useAvailableVideoSlots, useBookVideoCall, useCancelVideoCall, useRescheduleVideoCall, useVideoVerification } from '@/hooks/useVideoVerification';
 import { Button, Card } from '@/components/ui';
@@ -68,8 +68,8 @@ function SlotPicker({ onPick, disabled }: { onPick: (iso: string) => void; disab
 
 export function BookVideoCallPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAgent = user?.role === 'trip_manager';
+  const effectiveRole = useEffectiveRole();
+  const isAgent = effectiveRole === 'trip_manager';
   const driverQuery = useMyDriver(!isAgent);
   const agentQuery = useMyAgent(isAgent);
   const profileQuery = isAgent ? agentQuery : driverQuery;

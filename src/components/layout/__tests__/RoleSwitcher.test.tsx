@@ -1,11 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RoleSwitcher } from '@/components/layout/RoleSwitcher';
 import { useEffectiveRole, useRoleViewStore } from '@/stores/roleViewStore';
 import type { User } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
+
+function renderWithClient(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+}
 
 const driver: User = { id: 'd', role: 'driver', phone: '+91', displayName: 'Driver', preferredLanguage: 'en', isActive: true };
 const admin: User = { ...driver, id: 'x', role: 'admin', displayName: 'Admin' };
@@ -22,13 +28,13 @@ describe('RoleSwitcher / useEffectiveRole', () => {
 
   it('renders nothing for a non-admin', () => {
     setUser(driver);
-    const { container } = render(<RoleSwitcher />);
+    const { container } = renderWithClient(<RoleSwitcher />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it('renders Admin · Driver · Agent for an admin, with Admin selected by default', () => {
     setUser(admin);
-    render(<RoleSwitcher />);
+    renderWithClient(<RoleSwitcher />);
     expect(screen.getByRole('tab', { name: /admin/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /driver/i })).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByRole('tab', { name: /agent/i })).toHaveAttribute('aria-selected', 'false');
@@ -36,7 +42,7 @@ describe('RoleSwitcher / useEffectiveRole', () => {
 
   it('switching to Driver updates the selected tab and the effective role', () => {
     setUser(admin);
-    render(<RoleSwitcher />);
+    renderWithClient(<RoleSwitcher />);
     fireEvent.click(screen.getByRole('tab', { name: /driver/i }));
     expect(screen.getByRole('tab', { name: /driver/i })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: /admin/i })).toHaveAttribute('aria-selected', 'false');

@@ -1,4 +1,5 @@
 import { Briefcase, Car, ShieldCheck, type LucideIcon } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCanSwitchRole, useEffectiveRole, useRoleViewStore } from '@/stores/roleViewStore';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -19,7 +20,15 @@ export function RoleSwitcher() {
   const canSwitch = useCanSwitchRole();
   const active = useEffectiveRole();
   const setViewRole = useRoleViewStore((s) => s.setViewRole);
+  const qc = useQueryClient();
   if (!canSwitch) return null;
+
+  function switchTo(role: UserRole) {
+    setViewRole(role);
+    // Invalidate the profile queries for the target role so fresh data is loaded.
+    if (role === 'driver') void qc.invalidateQueries({ queryKey: ['driver', 'me'] });
+    if (role === 'trip_manager') void qc.invalidateQueries({ queryKey: ['agent', 'me'] });
+  }
 
   return (
     <div className="flex items-center gap-2 border-b bg-white px-4 py-2">
@@ -33,7 +42,7 @@ export function RoleSwitcher() {
               type="button"
               role="tab"
               aria-selected={isActive}
-              onClick={() => setViewRole(role)}
+              onClick={() => switchTo(role)}
               className={cn(
                 'flex flex-1 items-center justify-center gap-1.5 rounded-full px-2 py-1.5 text-xs font-semibold transition-colors',
                 isActive ? 'bg-white text-foreground shadow-sm' : 'text-secondary hover:text-foreground',

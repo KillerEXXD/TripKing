@@ -29,9 +29,12 @@ describe('HomePage (admin home)', () => {
     const expected: [RegExp, string][] = [
       [/reference data/i, '/administration/config'],
       [/kyc review queue/i, '/administration/kyc'],
-      [/vehicle eligibility/i, '/administration/vehicles'],
       [/reviews moderation/i, '/administration/reviews'],
       [/translation manager/i, '/administration/translations'],
+      [/search by name, phone, city/i, '/administration/drivers'],
+      [/search by name, phone, business/i, '/administration/agents'],
+      [/search by name, phone, alias/i, '/administration/passengers'],
+      [/filter by eligibility and expiry/i, '/administration/vehicles'],
     ];
     for (const [name, href] of expected) {
       const link = screen.getByRole('link', { name });

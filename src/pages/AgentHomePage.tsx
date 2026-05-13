@@ -99,7 +99,7 @@ function AgentHome({ agent }: { agent: Agent }) {
       </header>
 
       <div className="space-y-3 px-4 pb-4 pt-3">
-        {agent.verification ? <GetVerifiedBanner verification={agent.verification} steps={AGENT_VERIFICATION_STEPS} /> : null}
+        {agent.verification && agent.kycStatus !== 'approved' ? <GetVerifiedBanner verification={agent.verification} steps={AGENT_VERIFICATION_STEPS} /> : null}
         <div className="grid grid-cols-3 gap-2.5">
           <HubTile icon={<Plus className="size-5" aria-hidden />} label="Post a trip" tone="violet" to="/trips/new" />
           <HubTile icon={<Sparkles className="size-5" aria-hidden />} label="My posts" tone="blue" to="/posted-trips" />

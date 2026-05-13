@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Car, LogOut, Pencil, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useUpdateAgent, useUpdateDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cityHooks } from '@/hooks/useAdminConfig';
@@ -271,9 +272,10 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
 export function ProfilePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const effectiveRole = useEffectiveRole();
   const [signingOut, setSigningOut] = useState(false);
-  const isDriver = user?.role === 'driver';
-  const isAgent = user?.role === 'trip_manager';
+  const isDriver = effectiveRole === 'driver';
+  const isAgent = effectiveRole === 'trip_manager';
   const driverQuery = useMyDriver(isDriver);
   const agentQuery = useMyAgent(isAgent);
 

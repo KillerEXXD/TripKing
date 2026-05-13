@@ -7,7 +7,7 @@ import { usePostTrip } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
@@ -87,8 +87,8 @@ function Field({ label, error, hint, children }: { label: string; error?: string
  */
 export function PostTripPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isDriver = user?.role === 'driver';
+  const effectiveRole = useEffectiveRole();
+  const isDriver = effectiveRole === 'driver';
   const myDriverQuery = useMyDriver(isDriver);
   const myAgentQuery = useMyAgent(!isDriver);
   const myKycStatus = (isDriver ? myDriverQuery.data?.kycStatus : myAgentQuery.data?.kycStatus) ?? undefined;
@@ -207,7 +207,8 @@ export function PostTripPage() {
     }
   }
 
-  if (citiesQuery.isPending || carTypesQuery.isPending) {
+  const kycQueryPending = isDriver ? myDriverQuery.isPending : myAgentQuery.isPending;
+  if (citiesQuery.isPending || carTypesQuery.isPending || kycQueryPending) {
     return (
       <div className="mx-auto max-w-md p-4">
         <h1 className="mb-3 text-xl font-bold">Post a trip</h1>

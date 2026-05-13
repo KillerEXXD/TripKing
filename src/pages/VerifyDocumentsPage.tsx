@@ -5,10 +5,10 @@
  * Submitting moves `kyc_status` → docs_submitted.
  */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useSubmitAgentKycDocs, useSubmitDriverKycDocs } from '@/hooks/useDrivers';
 import { getAgentKycDocUploadUrl, getDriverKycDocUploadUrl } from '@/lib/api/services/drivers';
 import { Button, Card, Input } from '@/components/ui';
@@ -31,7 +31,7 @@ function AlreadySubmittedNote({ show }: { show: boolean }) {
   if (!show) return null;
   return (
     <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-      <ShieldCheck className="size-4" aria-hidden /> You’ve already submitted your documents. You can re-upload below if asked.
+      <ShieldCheck className="size-4" aria-hidden /> You've already submitted your documents. You can re-upload below if asked.
     </div>
   );
 }
@@ -45,7 +45,7 @@ function ConsentRow({ checked, onChange }: { checked: boolean; onChange: (v: boo
   );
 }
 
-function DriverDocsForm() {
+function DriverDocsForm({ tripId }: { tripId: string | null }) {
   const navigate = useNavigate();
   const driverQuery = useMyDriver();
   const submit = useSubmitDriverKycDocs();
@@ -80,7 +80,7 @@ function DriverDocsForm() {
           consent: true,
         },
       });
-      toast.success('Documents submitted — we’ll review them shortly.');
+      toast.success("Documents submitted — we'll review them shortly.");
       navigate('/profile');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not submit your documents');
@@ -91,9 +91,15 @@ function DriverDocsForm() {
     <div>
       <Header onBack={() => navigate(-1)} />
       <div className="space-y-4 px-4 py-4">
+        {tripId ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
+            <p className="mt-0.5 text-xs text-blue-700">Complete your identity verification below. Once approved, you can apply for trips right away.</p>
+          </div>
+        ) : null}
         <AlreadySubmittedNote show={driver.verification?.steps.documents === 'done'} />
         <p className="text-sm text-secondary">
-          We use these to confirm you’re a real, licensed driver. <strong>Only admins</strong> see them during review, and your full Aadhaar number is never stored — only the last 4 digits.
+          We use these to confirm you're a real, licensed driver. <strong>Only admins</strong> see them during review, and your full Aadhaar number is never stored — only the last 4 digits.
         </p>
 
         <Card className="gap-4">
@@ -136,7 +142,7 @@ function DriverDocsForm() {
   );
 }
 
-function AgentDocsForm() {
+function AgentDocsForm({ tripId }: { tripId: string | null }) {
   const navigate = useNavigate();
   const agentQuery = useMyAgent();
   const submit = useSubmitAgentKycDocs();
@@ -166,7 +172,7 @@ function AgentDocsForm() {
           consent: true,
         },
       });
-      toast.success('Documents submitted — we’ll review them shortly.');
+      toast.success("Documents submitted — we'll review them shortly.");
       navigate('/profile');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not submit your documents');
@@ -177,6 +183,12 @@ function AgentDocsForm() {
     <div>
       <Header onBack={() => navigate(-1)} />
       <div className="space-y-4 px-4 py-4">
+        {tripId ? (
+          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
+            <p className="mt-0.5 text-xs text-blue-700">Complete your identity verification below. Once approved, you can apply for trips right away.</p>
+          </div>
+        ) : null}
         <AlreadySubmittedNote show={agent.verification?.steps.documents === 'done'} />
         <p className="text-sm text-secondary">
           We use these to confirm who you are. <strong>Only admins</strong> see them during review, and your full Aadhaar number is never stored — only the last 4 digits.
@@ -209,8 +221,10 @@ function AgentDocsForm() {
 }
 
 export function VerifyDocumentsPage() {
-  const { user } = useAuth();
-  return user?.role === 'trip_manager' ? <AgentDocsForm /> : <DriverDocsForm />;
+  const effectiveRole = useEffectiveRole();
+  const [searchParams] = useSearchParams();
+  const tripId = searchParams.get('tripId');
+  return effectiveRole === 'trip_manager' ? <AgentDocsForm tripId={tripId} /> : <DriverDocsForm tripId={tripId} />;
 }
 
 export default VerifyDocumentsPage;
