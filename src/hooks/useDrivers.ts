@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import {
   createMyAgentProfile,
@@ -9,6 +9,7 @@ import {
   getDriver,
   getDriverKycDocs,
   getDrivers,
+  getDriversPage,
   getMyAgent,
   getMyDriver,
   submitAgentKycDocs,
@@ -33,6 +34,22 @@ import type {
 
 export function useDrivers(params?: DriversQueryParams) {
   return useQuery({ queryKey: ['drivers', params ?? {}], queryFn: () => getDrivers(params), staleTime: STALE.profile });
+}
+
+/**
+ * Paginated `GET /drivers` for infinite-scroll admin directories. Same filter
+ * params as `useDrivers` minus `page` (the hook drives the pageParam itself).
+ * `data.pages[i].data` is the rows for page i+1; `data.pages[i].meta.total`
+ * is the unfiltered count for the header.
+ */
+export function useInfiniteDrivers(params?: Omit<DriversQueryParams, 'page'>, limit = 50) {
+  return useInfiniteQuery({
+    queryKey: ['drivers', 'infinite', { ...(params ?? {}), limit }],
+    queryFn: ({ pageParam }) => getDriversPage({ ...(params ?? {}), page: pageParam as number, limit }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.meta.hasMore ? last.meta.page + 1 : undefined),
+    staleTime: STALE.profile,
+  });
 }
 export function useDriver(id: string | undefined) {
   return useQuery({ queryKey: ['driver', id], queryFn: () => getDriver(id as string), enabled: !!id, staleTime: STALE.profile });

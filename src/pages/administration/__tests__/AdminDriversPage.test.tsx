@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { AdminDriversPage } from '@/pages/administration/AdminDriversPage';
 import type { Driver } from '@/types';
 
-vi.mock('@/hooks/useDrivers', () => ({ useDrivers: vi.fn() }));
-import { useDrivers } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useDrivers', () => ({ useInfiniteDrivers: vi.fn() }));
+import { useInfiniteDrivers } from '@/hooks/useDrivers';
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeDriver(over: Partial<Driver> = {}): Driver {
@@ -29,9 +29,20 @@ function makeDriver(over: Partial<Driver> = {}): Driver {
   } as Driver;
 }
 
-type Q = { isPending?: boolean; isError?: boolean; data?: Driver[]; refetch?: () => void };
-function setDrivers(q: Q = {}) {
-  vi.mocked(useDrivers).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn(), ...q } as never);
+interface PageMeta { page: number; limit: number; total: number; hasMore: boolean }
+type State = { isPending?: boolean; isError?: boolean; rows?: Driver[]; total?: number; hasNextPage?: boolean; isFetchingNextPage?: boolean };
+function setDrivers(s: State = {}) {
+  const rows = s.rows ?? [];
+  const total = s.total ?? rows.length;
+  vi.mocked(useInfiniteDrivers).mockReturnValue({
+    isPending: s.isPending ?? false,
+    isError: s.isError ?? false,
+    data: s.isPending || s.isError ? undefined : { pages: [{ data: rows, meta: { page: 1, limit: 50, total, hasMore: s.hasNextPage ?? false } as PageMeta }], pageParams: [1] },
+    hasNextPage: s.hasNextPage ?? false,
+    isFetchingNextPage: s.isFetchingNextPage ?? false,
+    fetchNextPage: vi.fn(),
+    refetch: vi.fn(),
+  } as never);
 }
 function renderPage() {
   return render(<MemoryRouter><AdminDriversPage /></MemoryRouter>);
@@ -39,12 +50,12 @@ function renderPage() {
 
 describe('AdminDriversPage', () => {
   beforeEach(() => {
-    vi.mocked(useDrivers).mockReset();
-    setDrivers({ data: [] });
+    vi.mocked(useInfiniteDrivers).mockReset();
+    setDrivers({ rows: [] });
   });
 
   it('lists drivers with their KYC badge, rating and a profile link', () => {
-    setDrivers({ data: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', kycStatus: 'pending', ratingCount: 0, totalTripsCompleted: 0, vehicles: [] })] });
+    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', kycStatus: 'pending', ratingCount: 0, totalTripsCompleted: 0, vehicles: [] })] });
     renderPage();
     expect(screen.getByRole('heading', { name: /^drivers$/i })).toBeInTheDocument();
     expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();
@@ -58,8 +69,14 @@ describe('AdminDriversPage', () => {
     expect(profileLinks[0]).toHaveAttribute('href', '/drivers/d1');
   });
 
+  it('shows the total count from the server in the header', () => {
+    setDrivers({ rows: [makeDriver()], total: 1234 });
+    renderPage();
+    expect(screen.getByText(/1,234 total/)).toBeInTheDocument();
+  });
+
   it('filters the loaded list by the search box (name / phone)', () => {
-    setDrivers({ data: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', phone: '+918000000000' })] });
+    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', phone: '+918000000000' })] });
     renderPage();
     fireEvent.change(screen.getByLabelText(/search drivers/i), { target: { value: 'suresh' } });
     expect(screen.queryByText('Ravi Kumar')).toBeNull();
@@ -69,17 +86,17 @@ describe('AdminDriversPage', () => {
     expect(screen.queryByText('Suresh P')).toBeNull();
   });
 
-  it('a KYC chip narrows the server query', () => {
-    setDrivers({ data: [makeDriver()] });
+  it('defaults to All and a KYC chip narrows the server query', () => {
+    setDrivers({ rows: [makeDriver()] });
     renderPage();
-    const lastCallArg = () => {
-      const calls = vi.mocked(useDrivers).mock.calls;
-      return calls[calls.length - 1]?.[0];
+    const lastCallArgs = () => {
+      const calls = vi.mocked(useInfiniteDrivers).mock.calls;
+      return calls[calls.length - 1];
     };
-    // initial render: no kycStatus, limit 200
-    expect(lastCallArg()).toEqual({ limit: 200 });
+    // initial render: no kycStatus (filter=all → undefined), page size 50
+    expect(lastCallArgs()).toEqual([undefined, 50]);
     fireEvent.click(screen.getByRole('button', { name: 'Pending' }));
-    expect(lastCallArg()).toEqual({ kycStatus: 'pending', limit: 200 });
+    expect(lastCallArgs()).toEqual([{ kycStatus: 'pending' }, 50]);
   });
 
   it('shows loading, error and empty states', () => {
@@ -89,7 +106,7 @@ describe('AdminDriversPage', () => {
     setDrivers({ isError: true });
     rerender(<MemoryRouter><AdminDriversPage /></MemoryRouter>);
     expect(screen.getByText(/couldn't load drivers/i)).toBeInTheDocument();
-    setDrivers({ data: [] });
+    setDrivers({ rows: [] });
     rerender(<MemoryRouter><AdminDriversPage /></MemoryRouter>);
     expect(screen.getByText('No drivers')).toBeInTheDocument();
   });

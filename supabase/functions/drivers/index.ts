@@ -194,9 +194,17 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (u && u.role !== 'admin' && u.role !== role) await db.from('users').update({ role }).eq('id', userId);
   }
 
-  // ── GET /drivers (list — public; private KYC fields stripped) ─────────────
+  // ── GET /drivers (list — public; private KYC fields stripped; paginated) ──
+  // Query: ?page= (1-based, default 1) ?limit= (default 50, max 200). Returns
+  // `meta: { total, page, limit, has_more }`. The `near=` radius branch keeps
+  // its in-memory sort by distance and applies pagination after the radius cut.
   if (!id && req.method === 'GET') {
-    let q = db.from('drivers').select(DRIVER_SELECT);
+    const limit = Math.min(Math.max(1, Number(url.searchParams.get('limit') ?? '50') || 50), 200);
+    const page = Math.max(1, Number(url.searchParams.get('page') ?? '1') || 1);
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    let q = db.from('drivers').select(DRIVER_SELECT, { count: 'exact' });
     const city = url.searchParams.get('current_city_id');
     if (city) q = q.eq('current_city_id', city);
     const kyc = csv(url.searchParams.get('kyc_status'));
@@ -209,27 +217,36 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     // Phase D radius filter: drivers whose (fresh) current position is within radius_km of (near_lat, near_lng).
     const near = parseNearRadius(url);
     let distById: Map<string, number> | null = null;
+    let nearTotal = 0;
     if (near) {
       const { data: rad, error: radErr } = await db.rpc('drivers_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM, p_stale_minutes: DRIVER_LOCATION_STALE_MINUTES });
       if (radErr) return fail('DB_ERROR', radErr.message, 500);
       const list = (rad ?? []) as { id: string; distance_m: number }[];
-      if (list.length === 0) return ok([]);
+      nearTotal = list.length;
+      if (list.length === 0) return ok([], { total: 0, page, limit, has_more: false });
       distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
       q = q.in('id', [...distById.keys()]);
     }
-    const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
-    if (!near) q = q.order('rating_avg', { ascending: false }).order('created_at', { ascending: false });
-    const { data, error } = await q;
+    if (!near) {
+      q = q.order('rating_avg', { ascending: false }).order('created_at', { ascending: false }).range(from, to);
+    }
+    const { data, error, count } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
     let rows = (data ?? []) as Row[];
+    let total: number;
     if (distById) {
-      rows = rows.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
-                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+      rows = rows
+        .map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
+        .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity))
+        .slice(from, to + 1);
+      total = nearTotal;
+    } else {
+      total = typeof count === 'number' ? count : rows.length;
     }
     // the admin KYC queue passes a kyc_status filter + Bearer — give admins the full rows
     const u = await authUser(db, req);
-    return ok(isAdmin(u) ? rows : rows.map(stripPrivateKyc));
+    const out = isAdmin(u) ? rows : rows.map(stripPrivateKyc);
+    return ok(out, { total, page, limit, has_more: from + rows.length < total });
   }
 
   // ── POST /drivers (create my profile; role='trip_manager' → an agent) ────

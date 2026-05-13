@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Car, Users } from 'lucide-react';
-import { useDrivers } from '@/hooks/useDrivers';
-import { Badge, Card, Input } from '@/components/ui';
+import { useInfiniteDrivers } from '@/hooks/useDrivers';
+import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatRating, initials } from '@/lib/utils';
 import type { Driver, KycStatus } from '@/types';
@@ -78,30 +78,48 @@ function DriverCard({ d }: { d: Driver }) {
   );
 }
 
+const PAGE_SIZE = 50;
+
 /**
- * `/administration/drivers` — a read-only admin driver directory (admin-only). Filter chips drive
- * `useDrivers({ kycStatus })` server-side (the KYC review queue uses the same filter); the search
- * box narrows the loaded list by name/phone client-side. Each row links to the public profile.
- * (Moving a driver through KYC is the KYC review queue; deactivating one isn't exposed yet.)
+ * `/administration/drivers` — read-only admin driver directory (admin-only). Defaults to "All"
+ * (no KYC filter). Loads pages of 50 via `useInfiniteDrivers`; the IntersectionObserver sentinel
+ * at the bottom auto-fetches the next page. The header shows the live total from the server.
  */
 export function AdminDriversPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  const driversQuery = useDrivers({ ...(filter === 'all' ? {} : { kycStatus: filter }), limit: 200 });
+  const driversQuery = useInfiniteDrivers(filter === 'all' ? undefined : { kycStatus: filter }, PAGE_SIZE);
+
+  const rows = useMemo(() => (driversQuery.data?.pages.flatMap((p) => p.data) ?? []), [driversQuery.data]);
+  const total = driversQuery.data?.pages[0]?.meta.total;
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const list = driversQuery.data ?? [];
-    if (!term) return list;
-    return list.filter((d) => d.fullName.toLowerCase().includes(term) || (d.phone ?? '').toLowerCase().includes(term) || (d.email ?? '').toLowerCase().includes(term));
-  }, [driversQuery.data, q]);
+    if (!term) return rows;
+    return rows.filter((d) => d.fullName.toLowerCase().includes(term) || (d.phone ?? '').toLowerCase().includes(term) || (d.email ?? '').toLowerCase().includes(term));
+  }, [rows, q]);
+
+  // Auto-fetch the next page when the bottom sentinel scrolls into view.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !driversQuery.hasNextPage) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !driversQuery.isFetchingNextPage) void driversQuery.fetchNextPage();
+    }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [driversQuery]);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
-      <h1 className="text-2xl font-bold">Drivers</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-2xl font-bold">Drivers</h1>
+        {typeof total === 'number' ? <span className="text-sm text-secondary">{total.toLocaleString('en-IN')} total</span> : null}
+      </div>
       <p className="text-sm text-secondary">
         Read-only directory. Move a driver through verification in the{' '}
         <Link to="/administration/kyc" className="text-primary underline">
@@ -137,6 +155,16 @@ export function AdminDriversPage() {
           {filtered.map((d) => (
             <DriverCard key={d.id} d={d} />
           ))}
+          <div ref={sentinelRef} aria-hidden className="h-1" />
+          {driversQuery.isFetchingNextPage ? <LoadingSkeleton rows={2} /> : null}
+          {!driversQuery.hasNextPage && rows.length > PAGE_SIZE ? (
+            <p className="py-2 text-center text-xs text-secondary">— end of list ({rows.length.toLocaleString('en-IN')} loaded) —</p>
+          ) : null}
+          {driversQuery.hasNextPage && !driversQuery.isFetchingNextPage ? (
+            <div className="flex justify-center pt-1">
+              <Button size="sm" variant="outline" onClick={() => void driversQuery.fetchNextPage()}>Load more</Button>
+            </div>
+          ) : null}
         </div>
       )}
     </main>

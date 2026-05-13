@@ -62,6 +62,36 @@ export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {
   if (params?.sort) q.sort = params.sort;
   return apiClient.get<Api[]>('/drivers', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformDriver));
 }
+
+/** Paginated `GET /drivers` — returns the page rows plus `{ total, page, limit, hasMore }` meta. */
+export function getDriversPage(params?: DriversQueryParams): Promise<{ data: Driver[]; meta: { page: number; limit: number; total: number; hasMore: boolean } }> {
+  const q: Record<string, unknown> = {};
+  if (params?.currentCityId) q.current_city_id = params.currentCityId;
+  if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.near) {
+    q.near_lat = params.near.lat;
+    q.near_lng = params.near.lng;
+    q.radius_km = params.near.radiusKm;
+  }
+  if (params?.page) q.page = params.page;
+  if (params?.limit) q.limit = params.limit;
+  if (params?.sort) q.sort = params.sort;
+  return apiClient.get<Api[]>('/drivers', Object.keys(q).length ? q : undefined).then((r) => {
+    const rawMeta = (r as { meta?: { total?: number; page?: number; limit?: number; has_more?: boolean } }).meta;
+    const page = Number(rawMeta?.page ?? params?.page ?? 1);
+    const limit = Number(rawMeta?.limit ?? params?.limit ?? 50);
+    const data = (r.data ?? []).map(transformDriver);
+    return {
+      data,
+      meta: {
+        page,
+        limit,
+        total: Number(rawMeta?.total ?? data.length),
+        hasMore: Boolean(rawMeta?.has_more ?? false),
+      },
+    };
+  });
+}
 export function getDriver(id: string): Promise<Driver> {
   return apiClient.get<Api>(`/drivers/${id}`).then((r) => transformDriver(unwrap(r.data)));
 }

@@ -6,12 +6,12 @@
  * format is `snake_case`; domain types are `camelCase` (transforms bridge it).
  */
 
-/** Pagination metadata returned on list endpoints. */
+/** Pagination metadata returned on list endpoints (wire `has_more` is normalised to `hasMore` in services). */
 export interface PaginationMeta {
   page: number;
   limit: number;
   total: number;
-  pages: number;
+  hasMore: boolean;
 }
 
 /** Error body shape from the API. */
