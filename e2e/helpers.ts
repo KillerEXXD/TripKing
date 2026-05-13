@@ -27,6 +27,16 @@ export const AGENT_USER = {
   is_active: true,
 };
 
+export const ADMIN_USER = {
+  id: 'u-e2e-admin',
+  role: 'admin',
+  phone: '+919876500002',
+  email: null,
+  display_name: 'E2E Admin',
+  preferred_language: 'en',
+  is_active: true,
+};
+
 const CITY = { id: 'city-e2e', name: 'Vellore', state: 'TN', lat: 12.92, lng: 79.13, sort_order: 1, is_active: true };
 const CITY_DEST = { id: 'city-e2e-2', name: 'Chennai', state: 'TN', lat: 13.08, lng: 80.27, sort_order: 2, is_active: true };
 
@@ -199,3 +209,4 @@ async function signInWithRole(page: Page, localPhone: string): Promise<void> {
 
 export const signInAsDriver = (page: Page) => signInWithRole(page, '9876500000');
 export const signInAsAgent = (page: Page) => signInWithRole(page, '9876500001');
+export const signInAsAdmin = (page: Page) => signInWithRole(page, '9876500002');
