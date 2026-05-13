@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Users } from 'lucide-react';
-import { usePassengers } from '@/hooks/usePassengers';
-import { Badge, Card, Input } from '@/components/ui';
+import { useInfinitePassengers } from '@/hooks/usePassengers';
+import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatShortDate, initials } from '@/lib/utils';
 import type { Passenger } from '@/types';
@@ -46,30 +46,46 @@ function PassengerRow({ p }: { p: Passenger }) {
   );
 }
 
+const PAGE_SIZE = 50;
+
 /**
- * `/administration/passengers` — the passenger directory (admin-only). Every trip captures the
- * passenger's name + phone; the first trip to introduce a phone registers the passenger and
- * records who added them (the referrer; later trips with a different name append to `aliases`).
- * Read-only — `usePassengers` (newest first); the search box narrows the loaded list by name /
- * phone / alias client-side. Backed by `GET /passengers` (lands with the backend lane).
+ * `/administration/passengers` — passenger directory (admin-only). Server-paginated via
+ * `useInfinitePassengers` (50/page), IntersectionObserver auto-fetches the next page,
+ * header shows the server total. The search box narrows the loaded set client-side.
  */
 export function PassengersPage() {
   const [q, setQ] = useState('');
-  const passengersQuery = usePassengers({ limit: 200 });
+  const passengersQuery = useInfinitePassengers(undefined, PAGE_SIZE);
+
+  const rows = useMemo(() => (passengersQuery.data?.pages.flatMap((p) => p.data) ?? []), [passengersQuery.data]);
+  const total = passengersQuery.data?.pages[0]?.meta.total;
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    const list = passengersQuery.data ?? [];
-    if (!term) return list;
-    return list.filter((p) => p.name.toLowerCase().includes(term) || p.phone.toLowerCase().includes(term) || p.aliases.some((a) => a.toLowerCase().includes(term)));
-  }, [passengersQuery.data, q]);
+    if (!term) return rows;
+    return rows.filter((p) => p.name.toLowerCase().includes(term) || p.phone.toLowerCase().includes(term) || p.aliases.some((a) => a.toLowerCase().includes(term)));
+  }, [rows, q]);
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !passengersQuery.hasNextPage) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting && !passengersQuery.isFetchingNextPage) void passengersQuery.fetchNextPage();
+    }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [passengersQuery]);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
       <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
-      <h1 className="text-2xl font-bold">Passengers</h1>
+      <div className="flex items-baseline justify-between gap-2">
+        <h1 className="text-2xl font-bold">Passengers</h1>
+        {typeof total === 'number' ? <span className="text-sm text-secondary">{total.toLocaleString('en-IN')} total</span> : null}
+      </div>
       <p className="text-sm text-secondary">Auto-registered from posted trips, newest first. "Added by" is whoever first entered this phone number — your referral record.</p>
 
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone or alias" aria-label="Search passengers" />
@@ -85,6 +101,16 @@ export function PassengersPage() {
           {filtered.map((p) => (
             <PassengerRow key={p.id} p={p} />
           ))}
+          <div ref={sentinelRef} aria-hidden className="h-1" />
+          {passengersQuery.isFetchingNextPage ? <LoadingSkeleton rows={2} /> : null}
+          {!passengersQuery.hasNextPage && rows.length > PAGE_SIZE ? (
+            <p className="py-2 text-center text-xs text-secondary">— end of list ({rows.length.toLocaleString('en-IN')} loaded) —</p>
+          ) : null}
+          {passengersQuery.hasNextPage && !passengersQuery.isFetchingNextPage ? (
+            <div className="flex justify-center pt-1">
+              <Button size="sm" variant="outline" onClick={() => void passengersQuery.fetchNextPage()}>Load more</Button>
+            </div>
+          ) : null}
         </div>
       )}
     </main>

@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { PassengersPage } from '@/pages/administration/PassengersPage';
 import type { Passenger } from '@/types';
 
-vi.mock('@/hooks/usePassengers', () => ({ usePassengers: vi.fn() }));
-import { usePassengers } from '@/hooks/usePassengers';
+vi.mock('@/hooks/usePassengers', () => ({ useInfinitePassengers: vi.fn() }));
+import { useInfinitePassengers } from '@/hooks/usePassengers';
 
 function makePassenger(over: Partial<Passenger> = {}): Passenger {
   return {
@@ -22,9 +22,20 @@ function makePassenger(over: Partial<Passenger> = {}): Passenger {
   };
 }
 
-type Q = { isPending?: boolean; isError?: boolean; data?: Passenger[]; refetch?: () => void };
-function setPassengers(s: Q) {
-  vi.mocked(usePassengers).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn(), ...s } as never);
+interface PageMeta { page: number; limit: number; total: number; hasMore: boolean }
+type State = { isPending?: boolean; isError?: boolean; rows?: Passenger[]; total?: number; hasNextPage?: boolean; refetch?: () => void };
+function setPassengers(s: State = {}) {
+  const rows = s.rows ?? [];
+  const total = s.total ?? rows.length;
+  vi.mocked(useInfinitePassengers).mockReturnValue({
+    isPending: s.isPending ?? false,
+    isError: s.isError ?? false,
+    data: s.isPending || s.isError ? undefined : { pages: [{ data: rows, meta: { page: 1, limit: 50, total, hasMore: s.hasNextPage ?? false } as PageMeta }], pageParams: [1] },
+    hasNextPage: s.hasNextPage ?? false,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: s.refetch ?? vi.fn(),
+  } as never);
 }
 function renderPage() {
   return render(
@@ -35,7 +46,7 @@ function renderPage() {
 }
 
 describe('PassengersPage', () => {
-  beforeEach(() => vi.mocked(usePassengers).mockReset());
+  beforeEach(() => vi.mocked(useInfinitePassengers).mockReset());
 
   it('renders a skeleton while loading', () => {
     setPassengers({ isPending: true });
@@ -53,14 +64,20 @@ describe('PassengersPage', () => {
   });
 
   it('renders an empty state when there are no passengers', () => {
-    setPassengers({ data: [] });
+    setPassengers({ rows: [] });
     renderPage();
     expect(screen.getByText(/no passengers/i)).toBeInTheDocument();
   });
 
+  it('shows the server total in the header', () => {
+    setPassengers({ rows: [makePassenger()], total: 12345 });
+    renderPage();
+    expect(screen.getByText(/12,345 total/)).toBeInTheDocument();
+  });
+
   it('lists passengers with name / phone / referrer / trip count, and filters by name, phone or alias', () => {
     setPassengers({
-      data: [
+      rows: [
         makePassenger(),
         makePassenger({ id: 'p2', name: 'Ravi Kumar', phone: '+918888888888', aliases: ['Ravindra'], referredBy: { id: 'u3', displayName: 'Driver D', role: 'driver' }, tripsCount: 1 }),
       ],

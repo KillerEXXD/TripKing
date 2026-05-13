@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { getPassengers, lookupPassengerByPhone } from '@/lib/api/services/passengers';
+import { getPassengers, getPassengersPage, lookupPassengerByPhone } from '@/lib/api/services/passengers';
 import type { PassengersQueryParams } from '@/types';
 
 /** A phone "complete enough" to look up — at least 10 digits (an Indian mobile, with or without +91). */
@@ -11,6 +11,17 @@ export function isLookupablePhone(phone: string | undefined): boolean {
 /** `GET /passengers` — the admin passengers directory. */
 export function usePassengers(params?: PassengersQueryParams) {
   return useQuery({ queryKey: ['passengers', params ?? {}], queryFn: () => getPassengers(params), staleTime: STALE.profile });
+}
+
+/** Paginated `GET /passengers` for infinite-scroll admin directory. */
+export function useInfinitePassengers(params?: Omit<PassengersQueryParams, 'page'>, limit = 50) {
+  return useInfiniteQuery({
+    queryKey: ['passengers', 'infinite', { ...(params ?? {}), limit }],
+    queryFn: ({ pageParam }) => getPassengersPage({ ...(params ?? {}), page: pageParam as number, limit }),
+    initialPageParam: 1,
+    getNextPageParam: (last) => (last.meta.hasMore ? last.meta.page + 1 : undefined),
+    staleTime: STALE.profile,
+  });
 }
 
 /**

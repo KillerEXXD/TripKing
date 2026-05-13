@@ -99,7 +99,8 @@ const handler = withTiming('passengers', async (req: Request): Promise<Response>
     if (error) return fail('DB_ERROR', error.message, 500);
     const total = count ?? (data?.length ?? 0);
     const pages = Math.max(1, Math.ceil(total / limit));
-    return ok((data ?? []) as Row[], { page, limit, total, pages });
+    const rows = (data ?? []) as Row[];
+    return ok(rows, { page, limit, total, pages, has_more: offset + rows.length < total });
   }
 
   return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on this route`, 405);
