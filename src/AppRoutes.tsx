@@ -13,6 +13,7 @@ const HomeForRole = lazyWithRetry(() => import('@/pages/HomeForRole'));
 const TripFeedPage = lazyWithRetry(() => import('@/pages/TripFeedPage'));
 const PostTripPage = lazyWithRetry(() => import('@/pages/PostTripPage'));
 const PostedTripsPage = lazyWithRetry(() => import('@/pages/PostedTripsPage'));
+const DriverActivityPage = lazyWithRetry(() => import('@/pages/DriverActivityPage'));
 const TripDetailPage = lazyWithRetry(() => import('@/pages/TripDetailPage'));
 const ApplicantReviewPage = lazyWithRetry(() => import('@/pages/ApplicantReviewPage'));
 const DriverProfilePage = lazyWithRetry(() => import('@/pages/DriverProfilePage'));
@@ -76,6 +77,7 @@ export function AppRoutes() {
             <Route path="/trips/:id" element={<TripDetailPage />} />
             <Route path="/trips/:id/applicants" element={<ApplicantReviewPage />} />
             <Route path="/posted-trips" element={<PostedTripsPage />} />
+            <Route path="/my-trips" element={<DriverActivityPage />} />
             <Route path="/drivers/:id" element={<DriverProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/analytics" element={<AgentAnalyticsPage />} />
