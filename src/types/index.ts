@@ -11,3 +11,4 @@ export * from './alert';
 export * from './review';
 export * from './notification';
 export * from './analytics';
+export * from './passenger';
