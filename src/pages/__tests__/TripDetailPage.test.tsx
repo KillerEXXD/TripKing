@@ -132,6 +132,7 @@ function renderDetail(entries: string[] = ['/trips/t1']) {
         <Route path="/trips/:id" element={<TripDetailPage />} />
         <Route path="/trips" element={<div>trip feed</div>} />
         <Route path="/profile" element={<div>profile page</div>} />
+        <Route path="/verify/documents" element={<div>verify documents page</div>} />
         <Route path="/trips/:id/applicants" element={<div>applicant review</div>} />
       </Routes>
     </MemoryRouter>,
@@ -242,13 +243,12 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('profile page')).toBeInTheDocument();
   });
 
-  it('blocks an unverified driver from applying and points them to verification', () => {
+  it('routes an unverified driver to the verification screen when they tap Apply', () => {
     setTrip({ data: makeTrip() });
     setMyDriver({ data: { id: 'd1', kycStatus: 'docs_submitted' } });
     renderDetail();
-    expect(screen.queryByRole('button', { name: /apply for this trip/i })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /get verified to apply/i }));
-    expect(screen.getByText('profile page')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /apply for this trip/i }));
+    expect(screen.getByText('verify documents page')).toBeInTheDocument();
   });
 
   it('shows the agent a link to review applicants on their own trip — and no apply bar', () => {
