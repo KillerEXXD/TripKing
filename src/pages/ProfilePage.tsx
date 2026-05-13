@@ -187,6 +187,10 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
         )}
       </Card>
 
+      <Link to="/my-earnings" className="block rounded-xl border bg-white px-4 py-3 text-sm font-medium text-primary underline">
+        Your earnings &amp; history →
+      </Link>
+
       <Button variant="outline" onClick={onSignOut} disabled={signingOut} className="w-full">
         <LogOut className="size-4" aria-hidden /> {signingOut ? 'Signing out…' : 'Sign out'}
       </Button>

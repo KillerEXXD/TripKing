@@ -1,11 +1,20 @@
-/** Server-computed analytics blobs — the `/analytics/admin`, `/analytics/agent`, `/analytics/api-metrics` payloads. */
+/** Server-computed analytics blobs — the `/analytics/{admin,agent,driver,api-metrics}` payloads. */
 
-/** A point on the rolling 6-month trip series (`trips_monthly` / `monthly`). */
+/** A point on the rolling 6-month trip series (`trips_monthly` / agent `monthly`). */
 export interface MonthlyTripPoint {
   /** `YYYY-MM`. */
   month: string;
   posted: number;
   completed: number;
+}
+
+/** A point on a driver's rolling 6-month earnings series (`monthly` on `/analytics/driver`). */
+export interface MonthlyEarningsPoint {
+  /** `YYYY-MM`. */
+  month: string;
+  completed: number;
+  /** ₹ — sum of `driver_payout` over the trips completed that month. */
+  earnings: number;
 }
 
 /** `GET /analytics/admin` — platform-wide dashboard (admin only). */
@@ -47,6 +56,28 @@ export interface AgentAnalytics {
   reviewsReceived: number;
   avgReviewScore: number;
   monthly: MonthlyTripPoint[];
+  generatedAt: string;
+}
+
+/** `GET /analytics/driver` — one driver's earnings & history (their own, or `?user_id=` for admins). */
+export interface DriverAnalytics {
+  driverUserId: string;
+  /** false (and every count 0) if the user isn't a driver. */
+  hasDriverProfile: boolean;
+  tripsAssigned: number;
+  tripsByStatus: Record<string, number>;
+  tripsCompleted: number;
+  /** ₹ — sum of `driver_payout` over completed trips. */
+  earningsTotal: number;
+  /** ₹ — sum of `driver_payout` over assigned + in-progress trips (not yet earned). */
+  earningsPending: number;
+  distanceCompletedKm: number;
+  applicationsTotal: number;
+  applicationsPending: number;
+  applicationsSelected: number;
+  reviewsReceived: number;
+  avgReviewScore: number;
+  monthly: MonthlyEarningsPoint[];
   generatedAt: string;
 }
 

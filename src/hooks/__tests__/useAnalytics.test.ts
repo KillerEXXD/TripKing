@@ -2,11 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
-import { useAdminDashboard, useAgentAnalytics, useApiMetricsSummary } from '@/hooks/useAnalytics';
-import type { AdminDashboard, AgentAnalytics, ApiMetricsSummary } from '@/types';
+import { useAdminDashboard, useAgentAnalytics, useApiMetricsSummary, useDriverAnalytics } from '@/hooks/useAnalytics';
+import type { AdminDashboard, AgentAnalytics, ApiMetricsSummary, DriverAnalytics } from '@/types';
 
 vi.mock('@/lib/api/services/analytics');
-import { getAdminDashboard, getAgentAnalytics, getApiMetricsSummary } from '@/lib/api/services/analytics';
+import { getAdminDashboard, getAgentAnalytics, getApiMetricsSummary, getDriverAnalytics } from '@/lib/api/services/analytics';
 
 function wrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -40,5 +40,18 @@ describe('useAnalytics', () => {
     const { result } = renderHook(() => useApiMetricsSummary(48), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(getApiMetricsSummary).toHaveBeenCalledWith(48);
+  });
+
+  it('useDriverAnalytics fetches the caller\'s earnings blob (or a specific driver for admins)', async () => {
+    vi.mocked(getDriverAnalytics).mockResolvedValue({ driverUserId: 'me', earningsTotal: 12000 } as DriverAnalytics);
+    const { result } = renderHook(() => useDriverAnalytics(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(getDriverAnalytics).toHaveBeenCalledWith(undefined);
+    expect(result.current.data?.earningsTotal).toBe(12000);
+
+    vi.mocked(getDriverAnalytics).mockClear();
+    const { result: r2 } = renderHook(() => useDriverAnalytics('u-3'), { wrapper: wrapper() });
+    await waitFor(() => expect(r2.current.isSuccess).toBe(true));
+    expect(getDriverAnalytics).toHaveBeenCalledWith('u-3');
   });
 });

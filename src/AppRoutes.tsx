@@ -19,6 +19,7 @@ const ApplicantReviewPage = lazyWithRetry(() => import('@/pages/ApplicantReviewP
 const DriverProfilePage = lazyWithRetry(() => import('@/pages/DriverProfilePage'));
 const ProfilePage = lazyWithRetry(() => import('@/pages/ProfilePage'));
 const AgentAnalyticsPage = lazyWithRetry(() => import('@/pages/AgentAnalyticsPage'));
+const DriverEarningsPage = lazyWithRetry(() => import('@/pages/DriverEarningsPage'));
 const VerifyDocumentsPage = lazyWithRetry(() => import('@/pages/VerifyDocumentsPage'));
 const VehicleFormPage = lazyWithRetry(() => import('@/pages/VehicleFormPage'));
 const VehiclePhotosPage = lazyWithRetry(() => import('@/pages/VehiclePhotosPage'));
@@ -81,6 +82,7 @@ export function AppRoutes() {
             <Route path="/drivers/:id" element={<DriverProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/analytics" element={<AgentAnalyticsPage />} />
+            <Route path="/my-earnings" element={<DriverEarningsPage />} />
             <Route path="/verify/documents" element={<VerifyDocumentsPage />} />
             <Route path="/verify/video-call" element={<BookVideoCallPage />} />
             <Route path="/vehicles/new" element={<VehicleFormPage />} />

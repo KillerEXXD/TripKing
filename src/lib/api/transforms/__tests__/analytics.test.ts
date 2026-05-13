@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AnalyticsTransformError, transformAdminDashboard, transformAgentAnalytics, transformApiMetricsSummary } from '@/lib/api/transforms/analytics';
+import { AnalyticsTransformError, transformAdminDashboard, transformAgentAnalytics, transformApiMetricsSummary, transformDriverAnalytics } from '@/lib/api/transforms/analytics';
 
 const ADMIN = {
   users_total: 12,
@@ -43,6 +43,24 @@ const AGENT = {
   generated_at: '2026-05-13T00:00:00.000Z',
 };
 
+const DRIVER = {
+  driver_user_id: 'u-7',
+  has_driver_profile: true,
+  trips_assigned: 6,
+  trips_by_status: { assigned: 1, completed: 5 },
+  trips_completed: 5,
+  earnings_total: 110000,
+  earnings_pending: 22000,
+  distance_completed_km: 700,
+  applications_total: 12,
+  applications_pending: 2,
+  applications_selected: 5,
+  reviews_received: 3,
+  avg_review_score: 4.6,
+  monthly: [{ month: '2026-05', completed: 2, earnings: 44000 }],
+  generated_at: '2026-05-13T00:00:00.000Z',
+};
+
 const METRICS = {
   hours: 24,
   since: '2026-05-12T00:00:00.000Z',
@@ -79,6 +97,40 @@ describe('analytics transforms', () => {
     expect(a.monthly).toEqual([{ month: '2026-05', posted: 2, completed: 1 }]);
   });
 
+  it('transformDriverAnalytics maps a driver (earnings) blob', () => {
+    const d = transformDriverAnalytics(DRIVER);
+    expect(d.driverUserId).toBe('u-7');
+    expect(d.hasDriverProfile).toBe(true);
+    expect(d.earningsTotal).toBe(110000);
+    expect(d.earningsPending).toBe(22000);
+    expect(d.distanceCompletedKm).toBe(700);
+    expect(d.tripsByStatus.completed).toBe(5);
+    expect(d.applicationsSelected).toBe(5);
+    expect(d.monthly).toEqual([{ month: '2026-05', completed: 2, earnings: 44000 }]);
+  });
+
+  it('a no-driver blob is all-zero with hasDriverProfile false', () => {
+    const d = transformDriverAnalytics({
+      ...DRIVER,
+      has_driver_profile: false,
+      trips_assigned: 0,
+      trips_by_status: {},
+      trips_completed: 0,
+      earnings_total: 0,
+      earnings_pending: 0,
+      distance_completed_km: 0,
+      applications_total: 0,
+      applications_pending: 0,
+      applications_selected: 0,
+      reviews_received: 0,
+      avg_review_score: 0,
+      monthly: [],
+    });
+    expect(d.hasDriverProfile).toBe(false);
+    expect(d.earningsTotal).toBe(0);
+    expect(d.monthly).toEqual([]);
+  });
+
   it('transformApiMetricsSummary maps the rollup + per-endpoint rows', () => {
     const m = transformApiMetricsSummary(METRICS);
     expect(m.hours).toBe(24);
@@ -91,12 +143,14 @@ describe('analytics transforms', () => {
     expect(() => transformAdminDashboard({ ...ADMIN, users_total: undefined })).toThrow(AnalyticsTransformError);
     expect(() => transformAdminDashboard({ ...ADMIN, generated_at: '' })).toThrow(AnalyticsTransformError);
     expect(() => transformAgentAnalytics({ ...AGENT, agent_user_id: undefined })).toThrow(AnalyticsTransformError);
+    expect(() => transformDriverAnalytics({ ...DRIVER, earnings_total: undefined })).toThrow(AnalyticsTransformError);
   });
 
   it('throws on a non-numeric count or a malformed series', () => {
     expect(() => transformAdminDashboard({ ...ADMIN, users_by_role: { driver: 'lots' } })).toThrow(AnalyticsTransformError);
     expect(() => transformAdminDashboard({ ...ADMIN, trips_monthly: [{ month: '2026-01', posted: 'x', completed: 1 }] })).toThrow(AnalyticsTransformError);
     expect(() => transformAdminDashboard({ ...ADMIN, trips_monthly: 'nope' })).toThrow(AnalyticsTransformError);
+    expect(() => transformDriverAnalytics({ ...DRIVER, monthly: [{ month: '2026-05', completed: 1, earnings: 'lots' }] })).toThrow(AnalyticsTransformError);
   });
 
   it('throws when the blob is null or not an object', () => {

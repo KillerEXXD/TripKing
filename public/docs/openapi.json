@@ -65,7 +65,7 @@
     },
     {
       "name": "debug",
-      "description": "Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See docs/EXCEPTION_HANDLING.md."
+      "description": "Admin-only deliberate-failure endpoints — exercise the exception pipeline (front end / edge functions → Sentry). Safe to leave deployed. See `docs/EXCEPTION_HANDLING.md`."
     }
   ],
   "components": {
@@ -3134,7 +3134,7 @@
         "tags": [
           "analytics"
         ],
-        "summary": "Agent analytics (Bearer) — the caller's own, or ?user_id=<id> for admins. Trips posted/by-status, fare totals, applicants received, unique drivers used, reviews received, a 6-month series.",
+        "summary": "Agent (trip-posting) analytics (Bearer) — the caller's own, or ?user_id=<id> for admins. Trips posted/by-status, fare totals, applicants received, unique drivers used, reviews received, a 6-month series.",
         "parameters": [
           {
             "name": "user_id",
@@ -3143,6 +3143,35 @@
               "type": "string"
             },
             "description": "admin only — a specific agent's user id (defaults to the caller)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/analytics/driver": {
+      "get": {
+        "tags": [
+          "analytics"
+        ],
+        "summary": "Driver (earnings & history) analytics (Bearer) — the caller's own, or ?user_id=<id> for admins. Trips assigned/by-status, trips completed, earnings_total (sum driver_payout over completed) + earnings_pending, distance completed, applications total/pending/selected, reviews received + avg score, a 6-month {completed, earnings} series; has_driver_profile is false (and the counts are 0) if the user isn't a driver.",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "admin only — a specific driver's user id (defaults to the caller)"
           }
         ],
         "responses": {
