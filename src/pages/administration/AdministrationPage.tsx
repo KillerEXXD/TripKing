@@ -39,6 +39,11 @@ export function AdministrationPage() {
             </Link>
           </li>
           <li>
+            <Link to="/administration/passengers" className="text-primary underline">
+              Passengers directory →
+            </Link>
+          </li>
+          <li>
             <Link to="/administration/video-calls" className="text-primary underline">
               Video call console →
             </Link>

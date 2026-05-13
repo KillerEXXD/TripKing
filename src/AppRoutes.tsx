@@ -40,6 +40,7 @@ const ReviewModerationPage = lazyWithRetry(() => import('@/pages/administration/
 const TranslationManagerPage = lazyWithRetry(() => import('@/pages/administration/TranslationManagerPage'));
 const AdminDashboardPage = lazyWithRetry(() => import('@/pages/administration/AdminDashboardPage'));
 const AdminDriversPage = lazyWithRetry(() => import('@/pages/administration/AdminDriversPage'));
+const PassengersPage = lazyWithRetry(() => import('@/pages/administration/PassengersPage'));
 // Public marketing pages — no auth, no app layout.
 const WebsitePage = lazyWithRetry(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazyWithRetry(() => import('@/pages/ForAgentsPage'));
@@ -99,6 +100,7 @@ export function AppRoutes() {
             <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
             <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
             <Route path="/administration/drivers" element={<AdminRoute><AdminDriversPage /></AdminRoute>} />
+            <Route path="/administration/passengers" element={<AdminRoute><PassengersPage /></AdminRoute>} />
             <Route path="/administration/video-calls" element={<AdminRoute><VideoCallConsolePage /></AdminRoute>} />
             <Route path="/administration/vehicles" element={<AdminRoute><VehicleEligibilityPage /></AdminRoute>} />
             <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
