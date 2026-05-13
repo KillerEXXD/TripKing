@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Car, LogOut, Pencil, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Car, LogOut, Pencil, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffectiveRole } from '@/stores/roleViewStore';
@@ -80,10 +80,10 @@ function EditForm({
         <Input value={photo} onChange={(e) => setPhoto(e.target.value)} placeholder="https://…" />
       </label>
       <div className="flex gap-2">
-        <Button variant="outline" size="sm" onClick={onCancel} disabled={saving}>
+        <Button variant="outline" size="sm" onClick={onCancel} disabled={saving} className="flex-1">
           Cancel
         </Button>
-        <Button variant="full" size="sm" onClick={() => onSave({ fullName: fullName.trim(), email: email.trim(), cityId, profilePhotoUrl: photo.trim() })} disabled={saving || fullName.trim().length === 0}>
+        <Button variant="full" size="sm" onClick={() => onSave({ fullName: fullName.trim(), email: email.trim(), cityId, profilePhotoUrl: photo.trim() })} disabled={saving || fullName.trim().length === 0} className="flex-1">
           {saving ? 'Saving…' : 'Save'}
         </Button>
       </div>
@@ -190,10 +190,6 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
         )}
       </Card>
 
-      <Link to="/my-earnings" className="block rounded-xl border bg-white px-4 py-3 text-sm font-medium text-primary underline">
-        Your earnings &amp; history →
-      </Link>
-
       <Button variant="outline" onClick={onSignOut} disabled={signingOut} className="w-full">
         <LogOut className="size-4" aria-hidden /> {signingOut ? 'Signing out…' : 'Sign out'}
       </Button>
@@ -256,10 +252,6 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
         </div>
       ) : null}
 
-      <Link to="/analytics" className="block rounded-xl border bg-white px-4 py-3 text-sm font-medium text-primary underline">
-        View your analytics →
-      </Link>
-
       <Button variant="outline" onClick={onSignOut} disabled={signingOut} className="w-full">
         <LogOut className="size-4" aria-hidden /> {signingOut ? 'Signing out…' : 'Sign out'}
       </Button>
@@ -298,6 +290,9 @@ export function ProfilePage() {
   return (
     <main className="mx-auto max-w-md space-y-4 p-4">
       <h1 className="sr-only">Profile</h1>
+      <button type="button" onClick={() => navigate(-1)} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Back
+      </button>
       {!isDriver && !isAgent ? (
         <>
           <Card className="gap-2">
