@@ -13,7 +13,10 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: [
+      'src/**/*.{test,spec}.{ts,tsx}',
+      'cloudflare/**/__tests__/**/*.{test,spec}.{js,ts}',
+    ],
     exclude: ['node_modules', 'dist'],
     coverage: {
       provider: 'v8',

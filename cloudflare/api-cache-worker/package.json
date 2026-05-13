@@ -1,0 +1,16 @@
+{
+  "name": "tripking-api-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker that fronts api.tripkingapp.com → Supabase Edge Functions, with edge caching. Resolves the CNAME-cross-user 403 (error 1014) and turns docs/CLOUDFLARE_CACHE_RULES.md into live caching.",
+  "scripts": {
+    "deploy": "wrangler deploy --env production",
+    "dev": "wrangler dev --env production",
+    "tail": "wrangler tail --env production",
+    "secret:set-anon": "wrangler secret put SUPABASE_ANON_KEY --env production"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
