@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { driverRow, openTripRow, signInAsDriver, stubApi, VERIFICATION_APPROVED } from './helpers';
 
 /**
@@ -28,5 +29,11 @@ test.describe('driver apply flow', () => {
     // Drive trip-detail navigation directly — proves the route + auth gate hold for an approved driver.
     await page.goto(`/trips/${trip.id}`);
     await expect(page).toHaveURL(new RegExp(`/trips/${trip.id}$`));
+
+    // a11y scan on the trip-detail page — serious/critical violations only.
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze();
+    expect(results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);
   });
 });

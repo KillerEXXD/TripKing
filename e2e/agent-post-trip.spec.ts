@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { AGENT_USER, AGENT_VERIFICATION_APPROVED, agentRow, openTripRow, signInAsAgent, stubApi } from './helpers';
 
 /**
@@ -22,5 +23,12 @@ test.describe('agent post-trip flow', () => {
     // The post-trip form renders something — assert the route is reachable for a verified agent
     // (an unverified one would be intercepted by the KYC gate).
     await expect(page.locator('body').first()).toBeVisible();
+
+    // a11y scan — fail on serious/critical violations only (minor styling-tag warnings
+    // are noisy at this layer; the unit-level axe tests catch them).
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa'])
+      .analyze();
+    expect(results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);
   });
 });

@@ -43,7 +43,7 @@ function NotificationRow({ n, onRead }: { n: Notification; onRead: (id: string) 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="truncate font-semibold">{n.title}</span>
-            {n.isRead ? null : <span className="size-2 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+            {n.isRead ? null : <span role="img" aria-label="Unread" className="size-2 shrink-0 rounded-full bg-primary" />}
           </div>
           {n.body ? <p className="mt-0.5 text-sm text-secondary">{n.body}</p> : null}
           <div className="mt-1.5 flex items-center gap-3 text-xs">

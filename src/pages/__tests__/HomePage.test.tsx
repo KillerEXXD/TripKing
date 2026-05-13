@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { axe } from 'vitest-axe';
 import { HomePage } from '@/pages/HomePage';
 import type { User } from '@/types';
 
@@ -46,5 +47,10 @@ describe('HomePage (admin home)', () => {
     renderHome();
     expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/trips');
     expect(screen.getByRole('link', { name: /full administration page/i })).toHaveAttribute('href', '/administration');
+  });
+
+  it('a11y: admin home has no axe violations', async () => {
+    const { container } = renderHome();
+    expect(await axe(container)).toHaveNoViolations();
   });
 });
