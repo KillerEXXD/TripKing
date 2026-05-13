@@ -220,6 +220,17 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       notes: strOrNull(b.notes),
       status: 'active',
     };
+    // Max 2 ACTIVE vacancies per driver. Checked AFTER body validation so 422s for malformed
+    // bodies still fire first (validation errors take precedence over resource-limit errors).
+    // Matches the "I'm available" card on /vacancies (src/components/vacancy/IAmAvailableCard.tsx).
+    const { count: activeCount } = await db
+      .from('vacancies')
+      .select('id', { count: 'exact', head: true })
+      .eq('driver_id', did)
+      .eq('status', 'active');
+    if ((activeCount ?? 0) >= 2) {
+      return fail('CONFLICT', 'You already have 2 active vacancies. Cancel one before posting a new one.', 409);
+    }
     const { data: created, error } = await db.from('vacancies').insert(insert).select('id').single();
     if (error) return pgFail(error); // 23503 (bad current_place_id / current_city_id) → 422
     const vacancyId = created.id as string;

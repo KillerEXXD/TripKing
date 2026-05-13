@@ -88,7 +88,14 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('POST /vacancies joins destination cities', hasCity(destCities, dest1), `dests=${JSON.stringify(destCities.map((c) => c.id))}`);
   if (!vacancyId) process.exit(1);
 
+  // Max-2-active rule: cancel `posted` here so the place-plumbing & destinations-array sub-tests
+  // below have room to POST without hitting the limit. We resurrect a fresh vacancy for the
+  // cancel-endpoint test block further down.
+  await j('POST', `/vacancies/${vacancyId}/cancel`, { token: driverToken });
+
   // ── place_id plumbing (Phase C-2) + radius search (Phase D) ────────────
+  // The "max 2 active vacancies per driver" rule means we cancel the first one before
+  // posting the next, so each sub-test runs against a fresh 0/2 slot.
   const ppid = `vac-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   const placeA = await j('POST', '/places', { body: { provider: 'smoketest', providerPlaceId: `${ppid}-a`, name: 'Vac Place A', lat: 12.97, lng: 77.59 } });
   const placeB = await j('POST', '/places', { body: { provider: 'smoketest', providerPlaceId: `${ppid}-b`, name: 'Vac Place B', lat: 13.34, lng: 77.10 } });
@@ -102,6 +109,10 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   const badPlace = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, current_place_id: NONE } });
   check('POST /vacancies with a bad current_place_id → 422', badPlace.status === 422, `status=${badPlace.status}`);
 
+  // The "max 2 active vacancies per driver" rule means `posted` + `vac2` already = 2 active.
+  // Cancel `vac2` here so the rest of this script can post one more without 409ing.
+  if (vac2Id) await j('POST', `/vacancies/${vac2Id}/cancel`, { token: driverToken });
+
   // ── unified `destinations` array — mix a curated city, a precise place, and both ─
   const vac3 = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destinations: [{ cityId: dest1 }, { placeId: placeBId }, { cityId: dest2, placeId: placeAId }] } });
   const vac3Id = vac3.json?.data?.id;
@@ -114,6 +125,9 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('`destinations` both-ids entry joined city + place', vds3.some((vd) => vd.city?.id === dest2 && vd.place?.id === placeAId), dbg3);
   const badDest = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destinations: [{}] } });
   check('POST /vacancies with an empty `destinations` entry → 422', badDest.status === 422, `status=${badDest.status}`);
+
+  // Cancel vac3 too — the max-2 block below needs to start at 0 active and set up exactly 2 fresh ones.
+  if (vac3Id) await j('POST', `/vacancies/${vac3Id}/cancel`, { token: driverToken });
 
   const nearHit = await j('GET', '/vacancies?near_lat=12.97&near_lng=77.59&radius_km=5');
   const hit = (nearHit.json?.data || []).find((v) => v.id === vac2Id);
@@ -133,14 +147,42 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   const byNoDest = await j('GET', `/vacancies?destination_city_id=${NONE}`);
   check('GET /vacancies?destination_city_id=<none> → 200 + empty array', byNoDest.status === 200 && Array.isArray(byNoDest.json?.data) && byNoDest.json.data.length === 0, `status=${byNoDest.status} len=${byNoDest.json?.data?.length}`);
 
-  // ── cancel ─────────────────────────────────────────────────────────────
-  const cancelNoAuth = await j('POST', `/vacancies/${vacancyId}/cancel`, {});
+  // ── max 2 ACTIVE per driver — the limit matches `IAmAvailableCard`'s X/2 counter ─
+  // Setup: at this point all prior posts have been cancelled (active=0). Fill the 2 slots first.
+  const limitSetup1 = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  const limitSetup2 = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  const limit1Id = limitSetup1.json?.data?.id, limit2Id = limitSetup2.json?.data?.id;
+  check('max-2 setup: 2 fresh active vacancies posted', limitSetup1.status === 200 && limitSetup2.status === 200, `s1=${limitSetup1.status} s2=${limitSetup2.status}`);
+  const overLimit = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  check(
+    'POST /vacancies past 2 active → 409 CONFLICT (limit per driver)',
+    overLimit.status === 409 && /already have 2 active/i.test(overLimit.json?.error?.message ?? ''),
+    `status=${overLimit.status} ${JSON.stringify(overLimit.json?.error || '')}`,
+  );
+  // Free a slot, the next POST succeeds again.
+  if (limit1Id) await j('POST', `/vacancies/${limit1Id}/cancel`, { token: driverToken });
+  const afterCancel = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  check(
+    'POST /vacancies after cancelling one → 200 (slot freed)',
+    afterCancel.status === 200 && !!afterCancel.json?.data?.id,
+    `status=${afterCancel.status} ${JSON.stringify(afterCancel.json?.error || '')}`,
+  );
+  // Reset to 0 active for the cancel-endpoint block below.
+  if (afterCancel.json?.data?.id) await j('POST', `/vacancies/${afterCancel.json.data.id}/cancel`, { token: driverToken });
+  if (limit2Id) await j('POST', `/vacancies/${limit2Id}/cancel`, { token: driverToken });
+
+  // ── cancel endpoint ────────────────────────────────────────────────────
+  // Resurrect a fresh active vacancy so the owner-cancel test below has something to cancel
+  // (the earlier `vacancyId` is already cancelled).
+  const cancelFresh = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId } });
+  const cancelTargetId = cancelFresh.json?.data?.id ?? vacancyId;
+  const cancelNoAuth = await j('POST', `/vacancies/${cancelTargetId}/cancel`, {});
   check('POST /vacancies/:id/cancel without auth → 401', cancelNoAuth.status === 401, `status=${cancelNoAuth.status}`);
-  const cancelNotOwner = await j('POST', `/vacancies/${vacancyId}/cancel`, { token: otherToken });
+  const cancelNotOwner = await j('POST', `/vacancies/${cancelTargetId}/cancel`, { token: otherToken });
   check('POST /vacancies/:id/cancel by a non-owner → 403', cancelNotOwner.status === 403, `status=${cancelNotOwner.status}`);
-  const cancelled = await j('POST', `/vacancies/${vacancyId}/cancel`, { token: driverToken });
+  const cancelled = await j('POST', `/vacancies/${cancelTargetId}/cancel`, { token: driverToken });
   check('POST /vacancies/:id/cancel (owner) → 200 + status cancelled', cancelled.status === 200 && cancelled.json?.data?.status === 'cancelled', `status=${cancelled.status} ${JSON.stringify(cancelled.json?.error || '')}`);
-  const cancelAgain = await j('POST', `/vacancies/${vacancyId}/cancel`, { token: driverToken });
+  const cancelAgain = await j('POST', `/vacancies/${cancelTargetId}/cancel`, { token: driverToken });
   check('POST /vacancies/:id/cancel again → 409', cancelAgain.status === 409, `status=${cancelAgain.status}`);
   const byStatus = await j('GET', '/vacancies?status=cancelled');
   check('GET /vacancies?status=cancelled → contains my vacancy', byStatus.status === 200 && (byStatus.json?.data || []).some((v) => v.id === vacancyId), `len=${byStatus.json?.data?.length}`);

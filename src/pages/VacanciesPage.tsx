@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Car, MapPin, Star } from 'lucide-react';
 import { useVacancies } from '@/hooks/useVacancies';
+import { useMyDriver } from '@/hooks/useDrivers';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
-import { Badge, Button, Card } from '@/components/ui';
+import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
+import { Badge, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
 import type { NearRadius, Vacancy } from '@/types';
@@ -83,22 +86,26 @@ export function VacanciesPage() {
   const vacancies = vacanciesQuery.data ?? [];
   const anyFilter = !!currentCityId || !!destinationCityId || near != null;
 
+  // Driver-only "I'm available" card. Admins viewing-as-agent (or anyone non-driver) see only the list.
+  // The role gate matches the pattern used by HomeForRole + BottomNav (src/stores/roleViewStore.ts).
+  const effectiveRole = useEffectiveRole();
+  const isDriverView = effectiveRole === 'driver';
+  const myDriver = useMyDriver(isDriverView);
+  const myDriverId = myDriver.data?.id;
+
   const chipSelect = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
   return (
     <div className="mx-auto max-w-md">
-      <header className="flex items-center gap-2 border-b bg-white px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold">Available drivers</h1>
-          <p className="text-xs text-secondary">
-            {vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm">
-          <Link to="/vacancies/new">Post availability</Link>
-        </Button>
+      <header className="border-b bg-white px-4 py-3">
+        <h1 className="text-base font-semibold">Available drivers</h1>
+        <p className="text-xs text-secondary">
+          {vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
+        </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
+      {isDriverView && myDriverId ? <IAmAvailableCard driverId={myDriverId} /> : null}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
         <label className="sr-only" htmlFor="vac-current">
           Filter by where the driver is
         </label>

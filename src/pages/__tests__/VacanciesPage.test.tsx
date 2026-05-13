@@ -5,10 +5,14 @@ import { VacanciesPage } from '@/pages/VacanciesPage';
 import { formatClockTime } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
-vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
-import { useVacancies } from '@/hooks/useVacancies';
+vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn(), useMyActiveVacancies: vi.fn() }));
+import { useVacancies, useMyActiveVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
+import { useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/stores/roleViewStore', () => ({ useEffectiveRole: vi.fn() }));
+import { useEffectiveRole } from '@/stores/roleViewStore';
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeVacancy(over: Partial<Vacancy> = {}): Vacancy {
@@ -47,7 +51,11 @@ function renderVacancies() {
 describe('VacanciesPage', () => {
   beforeEach(() => {
     vi.mocked(useVacancies).mockReset();
+    vi.mocked(useMyActiveVacancies).mockReset().mockReturnValue({ isPending: false, data: [] } as never);
     vi.mocked(cityHooks.useList).mockReset().mockReturnValue({ data: [city('c1', 'Vellore'), city('c2', 'Chennai')] } as never);
+    // Default to agent view: card hidden, button-area unchanged.
+    vi.mocked(useEffectiveRole).mockReset().mockReturnValue('trip_manager');
+    vi.mocked(useMyDriver).mockReset().mockReturnValue({ data: undefined } as never);
   });
 
   it('renders a skeleton while loading', () => {
@@ -104,5 +112,41 @@ describe('VacanciesPage', () => {
     renderVacancies();
     expect(screen.getByRole('button', { name: /near me/i })).toBeInTheDocument();
     expect(screen.getByText(/3\.1 km away/i)).toBeInTheDocument();
+  });
+
+  // ── role / limit gate for the "I'm available" hero card ─────────────────
+  it('an agent (or admin viewing-as-agent) does NOT see the I\'m-available card', () => {
+    vi.mocked(useEffectiveRole).mockReturnValue('trip_manager');
+    vi.mocked(useMyDriver).mockReturnValue({ data: undefined } as never);
+    setVacancies({ data: [] });
+    renderVacancies();
+    expect(screen.queryByTestId('i-am-available-card')).toBeNull();
+    expect(screen.queryByRole('link', { name: /post availability/i })).toBeNull();
+  });
+
+  it('a driver with a profile sees the card with the Post button enabled', () => {
+    vi.mocked(useEffectiveRole).mockReturnValue('driver');
+    vi.mocked(useMyDriver).mockReturnValue({ data: { id: 'd1' } } as never);
+    vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, data: [] } as never);
+    setVacancies({ data: [] });
+    renderVacancies();
+    expect(screen.getByTestId('i-am-available-card')).toBeInTheDocument();
+    expect(screen.getByText(/0 \/ 2 active/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /post availability/i })).toHaveAttribute('href', '/vacancies/new');
+  });
+
+  it('a driver at 2/2 active sees the card with the Post button disabled', () => {
+    vi.mocked(useEffectiveRole).mockReturnValue('driver');
+    vi.mocked(useMyDriver).mockReturnValue({ data: { id: 'd1' } } as never);
+    vi.mocked(useMyActiveVacancies).mockReturnValue({
+      isPending: false,
+      data: [makeVacancy({ id: 'mine-1' }), makeVacancy({ id: 'mine-2' })],
+    } as never);
+    setVacancies({ data: [] });
+    renderVacancies();
+    expect(screen.getByText(/2 \/ 2 active — max reached/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /post availability/i })).toBeNull();
+    const btn = screen.getByRole('button', { name: /post availability \(disabled/i });
+    expect(btn).toBeDisabled();
   });
 });
