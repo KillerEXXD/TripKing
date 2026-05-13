@@ -112,6 +112,7 @@ describe('transformAppSettings', () => {
     default_driver_bata: 300,
     default_extras_paid_by_passenger: true,
     default_driver_instructions: '1. Call before arrival',
+    max_active_vacancies_per_driver: 2,
   };
   it('maps a full row', () => {
     expect(transformAppSettings(full)).toEqual({
@@ -123,11 +124,16 @@ describe('transformAppSettings', () => {
       defaultDriverBata: 300,
       defaultExtrasPaidByPassenger: true,
       defaultDriverInstructions: '1. Call before arrival',
+      maxActiveVacanciesPerDriver: 2,
     });
   });
   it('throws when a numeric setting is missing', () => {
     const { min_vehicle_year: _omit, ...rest } = full;
     expect(() => transformAppSettings(rest)).toThrow(/no min_vehicle_year/);
+  });
+  it('throws when max_active_vacancies_per_driver is missing', () => {
+    const { max_active_vacancies_per_driver: _omit, ...rest } = full;
+    expect(() => transformAppSettings(rest)).toThrow(/no max_active_vacancies_per_driver/);
   });
 });
 
@@ -142,5 +148,6 @@ describe('toApi* writers — camelCase → snake_case, drop undefined', () => {
   });
   it('toApiAppSettings', () => {
     expect(toApiAppSettings({ minVehicleYear: 2016, defaultCommissionPct: 12 })).toEqual({ min_vehicle_year: 2016, default_commission_pct: 12 });
+    expect(toApiAppSettings({ maxActiveVacanciesPerDriver: 3 })).toEqual({ max_active_vacancies_per_driver: 3 });
   });
 });

@@ -220,16 +220,22 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       notes: strOrNull(b.notes),
       status: 'active',
     };
-    // Max 2 ACTIVE vacancies per driver. Checked AFTER body validation so 422s for malformed
-    // bodies still fire first (validation errors take precedence over resource-limit errors).
-    // Matches the "I'm available" card on /vacancies (src/components/vacancy/IAmAvailableCard.tsx).
+    // Max ACTIVE vacancies per driver — admin-configurable via app_settings (default 2,
+    // migration 022). Checked AFTER body validation so 422s for malformed bodies fire first
+    // (validation errors take precedence over resource-limit errors). The "I'm available" card
+    // on /vacancies (src/components/vacancy/IAmAvailableCard.tsx) reads the same value.
+    //
+    // Soft enforcement: an admin lowering the cap doesn't auto-cancel anyone's existing
+    // vacancies — only NEW posts see the new ceiling.
+    const { data: appSettings } = await db.from('app_settings').select('max_active_vacancies_per_driver').eq('id', 1).maybeSingle();
+    const maxActive = Number(appSettings?.max_active_vacancies_per_driver ?? 2);
     const { count: activeCount } = await db
       .from('vacancies')
       .select('id', { count: 'exact', head: true })
       .eq('driver_id', did)
       .eq('status', 'active');
-    if ((activeCount ?? 0) >= 2) {
-      return fail('CONFLICT', 'You already have 2 active vacancies. Cancel one before posting a new one.', 409);
+    if ((activeCount ?? 0) >= maxActive) {
+      return fail('CONFLICT', `You already have ${maxActive} active vacanc${maxActive === 1 ? 'y' : 'ies'}. Cancel one before posting a new one.`, 409);
     }
     const { data: created, error } = await db.from('vacancies').insert(insert).select('id').single();
     if (error) return pgFail(error); // 23503 (bad current_place_id / current_city_id) → 422

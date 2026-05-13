@@ -7,8 +7,8 @@ import type { Vacancy } from '@/types';
 
 vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn(), useMyActiveVacancies: vi.fn() }));
 import { useVacancies, useMyActiveVacancies } from '@/hooks/useVacancies';
-vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
-import { cityHooks } from '@/hooks/useAdminConfig';
+vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
+import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/stores/roleViewStore', () => ({ useEffectiveRole: vi.fn() }));
@@ -53,6 +53,7 @@ describe('VacanciesPage', () => {
     vi.mocked(useVacancies).mockReset();
     vi.mocked(useMyActiveVacancies).mockReset().mockReturnValue({ isPending: false, data: [] } as never);
     vi.mocked(cityHooks.useList).mockReset().mockReturnValue({ data: [city('c1', 'Vellore'), city('c2', 'Chennai')] } as never);
+    vi.mocked(useAppSettings).mockReset().mockReturnValue({ data: { maxActiveVacanciesPerDriver: 2 } } as never);
     // Default to agent view: card hidden, button-area unchanged.
     vi.mocked(useEffectiveRole).mockReset().mockReturnValue('trip_manager');
     vi.mocked(useMyDriver).mockReset().mockReturnValue({ data: undefined } as never);

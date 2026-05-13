@@ -65,6 +65,7 @@ describe('admin-config service', () => {
       default_driver_bata: 300,
       default_extras_paid_by_passenger: true,
       default_driver_instructions: 'x',
+      max_active_vacancies_per_driver: 2,
     };
     vi.spyOn(apiClient, 'get').mockReturnValue(ok(settings) as never);
     const s = await getAppSettings();

@@ -11,7 +11,8 @@ type NumericKey =
   | 'defaultAlertRadiusKm'
   | 'defaultCommissionPct'
   | 'defaultGstPct'
-  | 'defaultDriverBata';
+  | 'defaultDriverBata'
+  | 'maxActiveVacanciesPerDriver';
 
 const NUMERIC_FIELDS: { key: NumericKey; label: string; min?: number; max?: number; hint?: string }[] = [
   { key: 'minVehicleYear', label: 'Minimum vehicle year', min: 2000, hint: 'Vehicles older than this are rejected at registration and become ineligible.' },
@@ -20,6 +21,7 @@ const NUMERIC_FIELDS: { key: NumericKey; label: string; min?: number; max?: numb
   { key: 'defaultCommissionPct', label: 'Default commission %', min: 0, max: 30, hint: 'Pre-fills the Post-a-trip form.' },
   { key: 'defaultGstPct', label: 'Default GST %', min: 0, max: 100 },
   { key: 'defaultDriverBata', label: 'Default driver bata (₹)', min: 0 },
+  { key: 'maxActiveVacanciesPerDriver', label: 'Max active "I\'m available" posts per driver', min: 1, max: 10, hint: 'Soft enforcement — lowering this doesn\'t cancel existing posts; only new posts see the new ceiling.' },
 ];
 
 /** Single-row platform config — the 8 `app_settings` fields. */

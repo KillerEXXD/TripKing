@@ -78,6 +78,8 @@ export interface AppSettings {
   defaultDriverBata: number;
   defaultExtrasPaidByPassenger: boolean;
   defaultDriverInstructions: string;
+  /** How many ACTIVE vacancies a driver may have at once. CHECK [1,10] in the DB. */
+  maxActiveVacanciesPerDriver: number;
 }
 
 // ── write-side input shapes ─────────────────────────────────────────────────
