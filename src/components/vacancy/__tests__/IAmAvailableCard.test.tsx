@@ -6,6 +6,15 @@ import type { Vacancy } from '@/types';
 
 vi.mock('@/hooks/useVacancies', () => ({ useMyActiveVacancies: vi.fn() }));
 import { useMyActiveVacancies } from '@/hooks/useVacancies';
+vi.mock('@/hooks/useAdminConfig', () => ({ useAppSettings: vi.fn() }));
+import { useAppSettings } from '@/hooks/useAdminConfig';
+
+function setAppSettings(max: number | undefined): void {
+  vi.mocked(useAppSettings).mockReturnValue({
+    isPending: false,
+    data: max === undefined ? undefined : { maxActiveVacanciesPerDriver: max },
+  } as never);
+}
 
 function vacancy(id: string): Vacancy {
   return {
@@ -36,6 +45,8 @@ function renderCard() {
 describe('IAmAvailableCard', () => {
   beforeEach(() => {
     vi.mocked(useMyActiveVacancies).mockReset();
+    vi.mocked(useAppSettings).mockReset();
+    setAppSettings(2); // matches DB default; tests that need a different max override per case
   });
 
   it('renders 0/2 with the empty-state subtitle and an enabled Post button', () => {
@@ -71,5 +82,31 @@ describe('IAmAvailableCard', () => {
     setState({ isPending: true, data: undefined });
     renderCard();
     expect(screen.getByText(/— \/ 2 active/)).toBeInTheDocument();
+  });
+
+  it('respects the admin-configured max from app_settings (e.g. 5)', () => {
+    setAppSettings(5);
+    setState({ data: [vacancy('v1'), vacancy('v2'), vacancy('v3')] });
+    renderCard();
+    expect(screen.getByText(/3 \/ 5 active/)).toBeInTheDocument();
+    // 3 < 5 → Post still enabled
+    expect(screen.getByRole('link', { name: /post availability/i })).toBeInTheDocument();
+  });
+
+  it('disables the Post button when count >= configured max (e.g. 1/1)', () => {
+    setAppSettings(1);
+    setState({ data: [vacancy('v1')] });
+    renderCard();
+    expect(screen.getByText(/1 \/ 1 active — max reached/)).toBeInTheDocument();
+    const btn = screen.getByRole('button', { name: /post availability \(disabled/i });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('title', expect.stringContaining('Max 1 active vacancy'));
+  });
+
+  it('falls back to 2 when app_settings has not loaded yet', () => {
+    setAppSettings(undefined);
+    setState({ data: [vacancy('v1'), vacancy('v2')] });
+    renderCard();
+    expect(screen.getByText(/2 \/ 2 active — max reached/)).toBeInTheDocument();
   });
 });

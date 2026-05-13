@@ -2,22 +2,28 @@ import { Link } from 'react-router-dom';
 import { MapPinned, Plus } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useMyActiveVacancies } from '@/hooks/useVacancies';
+import { useAppSettings } from '@/hooks/useAdminConfig';
 
-const MAX_ACTIVE = 2;
+// Hard fallback if app_settings hasn't loaded yet — matches the DB DEFAULT 2 from
+// migration 022 + the backend's no-data fallback in supabase/functions/vacancies/index.ts.
+const MAX_ACTIVE_FALLBACK = 2;
 
 interface Props {
   driverId: string;
 }
 
 /**
- * "I'm available" hero for drivers on `/vacancies`. Shows `X/2 active` and the
- * Post button (disabled at the limit). The matching backend constraint lives in
- * `supabase/functions/vacancies/index.ts` (POST returns 409 CONFLICT on the 3rd).
+ * "I'm available" hero for drivers on `/vacancies`. Shows `X / max active` where `max`
+ * is admin-configurable via `app_settings.max_active_vacancies_per_driver` (migration
+ * 022, default 2). The matching backend constraint lives in
+ * `supabase/functions/vacancies/index.ts` (POST returns 409 CONFLICT past the limit).
  */
 export function IAmAvailableCard({ driverId }: Props) {
   const query = useMyActiveVacancies(driverId);
+  const settings = useAppSettings();
+  const max = settings.data?.maxActiveVacanciesPerDriver ?? MAX_ACTIVE_FALLBACK;
   const count = query.data?.length ?? 0;
-  const atLimit = count >= MAX_ACTIVE;
+  const atLimit = count >= max;
   const loading = query.isPending;
 
   return (
@@ -37,7 +43,7 @@ export function IAmAvailableCard({ driverId }: Props) {
         </p>
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-emerald-900">
-            {loading ? '— / 2 active' : `${count} / ${MAX_ACTIVE} active`}
+            {loading ? `— / ${max} active` : `${count} / ${max} active`}
             {atLimit ? ' — max reached' : ''}
           </span>
           {atLimit ? (
@@ -45,8 +51,8 @@ export function IAmAvailableCard({ driverId }: Props) {
               size="sm"
               variant="outline"
               disabled
-              title="Max 2 active vacancies — cancel one before posting another."
-              aria-label="Post availability (disabled — at the 2-active limit)"
+              title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — cancel one before posting another.`}
+              aria-label={`Post availability (disabled — at the ${max}-active limit)`}
             >
               <Plus className="size-4" aria-hidden /> Post
             </Button>
