@@ -94,7 +94,7 @@ function EditForm({
 function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSignOut: () => void; signingOut: boolean }) {
   const { hash } = useLocation();
   const [editing, setEditing] = useState(hash === '#edit');
-  useEffect(() => { if (hash === '#edit') setEditing(true); }, [hash]);
+  useEffect(() => { setEditing(hash === '#edit'); }, [hash]);
   const update = useUpdateDriver();
   const vehiclesQuery = useDriverVehicles(driver.id);
   const kyc = KYC_BADGE[driver.kycStatus] ?? KYC_BADGE.pending;
@@ -200,7 +200,7 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
 function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOut: () => void; signingOut: boolean }) {
   const { hash } = useLocation();
   const [editing, setEditing] = useState(hash === '#edit');
-  useEffect(() => { if (hash === '#edit') setEditing(true); }, [hash]);
+  useEffect(() => { setEditing(hash === '#edit'); }, [hash]);
   const update = useUpdateAgent();
   const kyc = KYC_BADGE[agent.kycStatus] ?? KYC_BADGE.pending;
 
