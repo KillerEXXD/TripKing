@@ -1,20 +1,23 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Plus } from 'lucide-react';
+import { ChevronRight, MapPin, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
+import { useMyDriver } from '@/hooks/useDrivers';
+import { useMyActiveVacancies } from '@/hooks/useVacancies';
 import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
-import type { AcceptanceStatus, MyApplication, Trip } from '@/types';
+import { cn, formatClockTime, formatINR, formatKm, formatPickupTime, formatShortDate } from '@/lib/utils';
+import type { AcceptanceStatus, MyApplication, Trip, Vacancy } from '@/types';
 
-type Tab = 'driving' | 'invited' | 'applied' | 'posted';
+type Tab = 'driving' | 'invited' | 'applied' | 'available' | 'posted';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'driving', label: 'Driving' },
   { id: 'invited', label: 'Invited' },
   { id: 'applied', label: 'Applied' },
+  { id: 'available', label: "I'm available" },
   { id: 'posted', label: 'Posted by me' },
 ];
 const tabBtn = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
@@ -104,11 +107,15 @@ export function DriverActivityPage() {
   const postedQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
   const appliedQuery = useMyApplications();
   const invitedQuery = useTrips({ invited: 'me' });
+  const myDriverQuery = useMyDriver();
+  const myDriverId = myDriverQuery.data?.id ?? '';
+  const availableQuery = useMyActiveVacancies(myDriverId);
 
   const counts = {
     driving: drivingQuery.data?.length,
     invited: invitedQuery.data?.length,
     applied: appliedQuery.data?.length,
+    available: availableQuery.data?.length,
     posted: postedQuery.data?.length,
   };
 
@@ -161,6 +168,7 @@ export function DriverActivityPage() {
           />
         )}
         {tab === 'applied' && <AppliedList query={appliedQuery} />}
+        {tab === 'available' && <AvailableList query={availableQuery} />}
       </div>
 
       {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
@@ -189,6 +197,67 @@ function AppliedList({ query }: { query: ReturnType<typeof useMyApplications> })
     <div className="space-y-3">
       {apps.map((a) => (
         <ApplicationRow key={a.acceptanceId} app={a} />
+      ))}
+    </div>
+  );
+}
+
+function vacancyWindow(v: Vacancy): string {
+  const from = new Date(v.availableFrom);
+  if (Number.isNaN(from.getTime())) return v.availableFrom;
+  const to = v.availableUntil ? new Date(v.availableUntil) : null;
+  if (!to || Number.isNaN(to.getTime())) return `from ${formatShortDate(from)}, ${formatClockTime(from)}`;
+  const sameDay = from.toDateString() === to.toDateString();
+  return sameDay
+    ? `${formatShortDate(from)}, ${formatClockTime(from)} – ${formatClockTime(to)}`
+    : `${formatShortDate(from)} ${formatClockTime(from)} – ${formatShortDate(to)} ${formatClockTime(to)}`;
+}
+
+function VacancyRow({ vacancy }: { vacancy: Vacancy }) {
+  const where = vacancy.currentPlace?.name ?? vacancy.currentCity.name;
+  const destinations = vacancy.destinationCities.map((c) => c.name).join(', ');
+  return (
+    <Card className="gap-1.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 truncate font-bold">
+            <MapPin className="size-4 text-secondary" aria-hidden /> {where}
+          </div>
+          <div className="mt-0.5 text-xs text-secondary">{vacancyWindow(vacancy)}</div>
+        </div>
+        {vacancy.minRatePerKm ? <Badge variant="muted" className="shrink-0">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+      </div>
+      {destinations ? (
+        <div className="text-xs text-secondary">
+          <span className="font-medium text-foreground">Will drive to:</span> {destinations}
+        </div>
+      ) : null}
+      {vacancy.notes ? <p className="text-xs text-secondary">{vacancy.notes}</p> : null}
+    </Card>
+  );
+}
+
+function AvailableList({ query }: { query: ReturnType<typeof useMyActiveVacancies> }) {
+  if (query.isPending) return <LoadingSkeleton rows={3} />;
+  if (query.isError) return <ErrorState title="Couldn't load your availability" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
+  const vacancies = query.data ?? [];
+  if (vacancies.length === 0) {
+    return (
+      <EmptyState
+        title="You're not listed anywhere yet"
+        message="Post your availability so agents can find you for trips going from your city."
+        action={
+          <Button asChild size="sm">
+            <Link to="/vacancies/new">Post availability</Link>
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {vacancies.map((v) => (
+        <VacancyRow key={v.id} vacancy={v} />
       ))}
     </div>
   );
