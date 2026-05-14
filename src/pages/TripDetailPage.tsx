@@ -806,7 +806,9 @@ export function TripDetailPage() {
   const myDriverQuery = useMyDriver(isDriver);
   const myDriverMissing = isDriver && myDriverQuery.isError && myDriverQuery.error instanceof ApiError && myDriverQuery.error.status === 404;
 
-  const goBack = () => (location.key === 'default' ? navigate('/trips') : navigate(-1));
+  // Always route to the user's own listing instead of history-back — otherwise the
+  // Trip Detail ⇄ Applicants pair creates a circular trap with no exit.
+  const goBack = () => navigate(isDriver ? '/my-trips' : '/posted-trips');
   const notFound = !id || (tripQuery.isError && tripQuery.error instanceof ApiError && tripQuery.error.status === 404);
 
   return (
