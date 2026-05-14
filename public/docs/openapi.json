@@ -48,6 +48,10 @@
       "description": "Saved searches that fire a notification on a matching trip/vacancy (owner-scoped)."
     },
     {
+      "name": "vacancy-invitations",
+      "description": "An agent invites a vacancy-posting driver to one of their open trips; the driver accepts (inserts a trip_acceptances row — the PII reveal gate) or declines."
+    },
+    {
       "name": "reviews",
       "description": "Post-trip ratings (passenger→driver, manager→driver, driver→manager)."
     },
@@ -72,8 +76,8 @@
       "description": "Passenger directory — one row per passenger phone seen on a trip. Read-only API; the canonical row is upserted by the `trips` POST handler (migration 019). Admin reads the full list; any authenticated user can do a phone-exact lookup to prefill the post-trip form."
     },
     {
-      "name": "vacancy-invitations",
-      "description": "An agent invites a vacancy-posting driver to one of their open trips; the driver accepts (inserts a trip_acceptances row — the PII reveal gate) or declines."
+      "name": "bug-reports",
+      "description": "Bug tracker. Submission is gated by `users.can_report_bugs` (admins always allowed); admins manage status / comments / attachments. Storage bucket `bug-attachments` is private (signed UPLOAD/DOWNLOAD URLs only). Notification fan-out — every admin gets a `bug_reported` on create; the reporter gets `bug_resolved` on transition to resolved; comments mirror-notify the other party."
     }
   ],
   "components": {
@@ -761,7 +765,7 @@
         "tags": [
           "admin"
         ],
-        "summary": "Update a user account (admin) — { is_active?, role?, display_name?, reason? }. is_active is the ACCOUNT-level kill switch: when false the account can't get a new session (/auth verify-otp & refresh → 403) and gets an account_status_change notification; this is distinct from PATCH /drivers|/agents/{id}/active, which only deactivates the marketplace *profile* (the user can still sign in & see a \"suspended\" banner). role grants/revokes administrator (or driver / trip_manager). You cannot deactivate or demote your own account (422). Audit-logged with the actor's id (+ the reason).",
+        "summary": "Update a user account (admin) — { is_active?, role?, display_name?, can_report_bugs?, reason? }. can_report_bugs flips the per-user gate that lets the user submit /bug-reports (admins are always allowed regardless of the flag). is_active is the ACCOUNT-level kill switch: when false the account can't get a new session (/auth verify-otp & refresh → 403) and gets an account_status_change notification; this is distinct from PATCH /drivers|/agents/{id}/active, which only deactivates the marketplace *profile* (the user can still sign in & see a \"suspended\" banner). role grants/revokes administrator (or driver / trip_manager). You cannot deactivate or demote your own account (422). Audit-logged with the actor's id (+ the reason).",
         "security": [
           {
             "BearerAuth": []
@@ -792,6 +796,10 @@
                   },
                   "display_name": {
                     "type": "string"
+                  },
+                  "can_report_bugs": {
+                    "type": "boolean",
+                    "description": "gate for /bug-reports submission (admins always allowed)"
                   },
                   "reason": {
                     "type": "string",
@@ -1462,6 +1470,482 @@
             "$ref": "#/components/responses/Envelope"
           },
           "409": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/bug-reports": {
+      "get": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "List bug reports (admin; Bearer) — filters: status, priority, category, reporter_id, q (ILIKE title); pagination via page/limit (default 50, max 200), newest first.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "open",
+                "in_progress",
+                "needs_info",
+                "resolved",
+                "verified",
+                "reopened",
+                "closed"
+              ]
+            }
+          },
+          {
+            "name": "priority",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "low",
+                "medium",
+                "high",
+                "critical"
+              ]
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "auth_otp",
+                "trip_post",
+                "trip_apply",
+                "kyc_docs",
+                "video_call",
+                "vehicle_eligibility",
+                "map_location",
+                "notification",
+                "ui",
+                "other"
+              ]
+            }
+          },
+          {
+            "name": "reporter_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "Submit a bug report (Bearer). Gated: 403 BUG_REPORTS_NOT_ENABLED unless users.role=admin OR users.can_report_bugs=true. Inserts the row (server-assigns BUG-NNN via sequence) and fan-out notifies every admin (type=bug_reported).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "steps_to_reproduce": {
+                    "type": "string"
+                  },
+                  "expected": {
+                    "type": "string"
+                  },
+                  "actual": {
+                    "type": "string"
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high",
+                      "critical"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "auth_otp",
+                      "trip_post",
+                      "trip_apply",
+                      "kyc_docs",
+                      "video_call",
+                      "vehicle_eligibility",
+                      "map_location",
+                      "notification",
+                      "ui",
+                      "other"
+                    ]
+                  },
+                  "page_url": {
+                    "type": "string"
+                  },
+                  "route": {
+                    "type": "string"
+                  },
+                  "browser_info": {
+                    "type": "object"
+                  },
+                  "app_version": {
+                    "type": "string"
+                  },
+                  "console_logs": {
+                    "type": "string"
+                  },
+                  "breadcrumbs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "context": {
+                    "type": "object"
+                  },
+                  "query_cache_snapshot": {
+                    "type": "array",
+                    "items": {
+                      "type": "object"
+                    }
+                  },
+                  "sentry_replay_url": {
+                    "type": "string"
+                  },
+                  "posthog_session_url": {
+                    "type": "string"
+                  },
+                  "posthog_session_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/bug-reports/{id}": {
+      "get": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "Get a bug report (admin or its reporter; Bearer). Joins comments + attachments (with 5-min signed download URLs).",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "Update a bug report (admin; Bearer) — { status?, priority?, category?, assigned_to?, resolution_notes? }. Transitioning to status=resolved sets resolved_at/resolved_by and fires a bug_resolved notification to the reporter.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "open",
+                      "in_progress",
+                      "needs_info",
+                      "resolved",
+                      "verified",
+                      "reopened",
+                      "closed"
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high",
+                      "critical"
+                    ]
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "auth_otp",
+                      "trip_post",
+                      "trip_apply",
+                      "kyc_docs",
+                      "video_call",
+                      "vehicle_eligibility",
+                      "map_location",
+                      "notification",
+                      "ui",
+                      "other"
+                    ]
+                  },
+                  "assigned_to": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "resolution_notes": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/bug-reports/{id}/attachment-upload-url": {
+      "post": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "Short-lived signed UPLOAD URL into the private bug-attachments bucket (admin or reporter; Bearer). Pre-records the attachment row so the GET join reflects it after the client PUTs the bytes. Path layout: <bug_id>/<timestamp>-<file_name>.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_name": {
+                    "type": "string"
+                  },
+                  "file_size": {
+                    "type": "integer"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/bug-reports/{id}/comments": {
+      "get": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "List comments on a bug (admin or reporter; Bearer)",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bug-reports"
+        ],
+        "summary": "Add a comment (admin or reporter; Bearer). Mirror-notifies the other party (admin → reporter; reporter → all admins) with type=bug_commented.",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "content"
+                ],
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
             "$ref": "#/components/responses/Envelope"
           }
         }
@@ -3194,6 +3678,169 @@
         }
       }
     },
+    "/vacancy-invitations": {
+      "get": {
+        "tags": [
+          "vacancy-invitations"
+        ],
+        "summary": "List my invitations (Bearer) — ?role=driver returns mine-received, ?role=agent returns mine-sent, default both. Admin sees all. Driver PII on the joined driver row is redacted (handle + trust signals only) until the invitation is accepted; the inviter's display_name is surfaced as inviter_name + inviter_handle.",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "driver",
+                "agent"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "vacancy-invitations"
+        ],
+        "summary": "Invite a driver (agent — Bearer; caller must own the trip and the trip must be open|has_applicants; vacancy's driver must be is_active + KYC-approved). Inserts the row + fires a trip_invitation notification. Unique (vacancy_id, trip_id) ⇒ 409 on duplicate. Per-user rate-limited (20 / 10 min — 429 RATE_LIMITED on excess).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "vacancy_id",
+                  "trip_id"
+                ],
+                "properties": {
+                  "vacancy_id": {
+                    "type": "string"
+                  },
+                  "trip_id": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/vacancy-invitations/{id}": {
+      "get": {
+        "tags": [
+          "vacancy-invitations"
+        ],
+        "summary": "Get an invitation (driver, inviting agent, or admin; Bearer) — driver PII revealed for admin/driver and for the agent only after status=accepted",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "vacancy-invitations"
+        ],
+        "summary": "Accept or decline an invitation (driver-only on own row; admin allowed). On accepted: inserts a trip_acceptances row with status=applied (the PII reveal gate); pre-existing acceptance ⇒ idempotent. Either outcome fires an invitation_accepted | invitation_declined notification to the inviting agent.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "accepted",
+                      "declined"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/reviews": {
       "get": {
         "tags": [
@@ -4092,169 +4739,6 @@
             "$ref": "#/components/responses/Envelope"
           },
           "404": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "422": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
-    "/vacancy-invitations": {
-      "get": {
-        "tags": [
-          "vacancy-invitations"
-        ],
-        "summary": "List my invitations (Bearer) — ?role=driver mine-received, ?role=agent mine-sent, default both. Admin sees all. Driver PII redacted until accepted.",
-        "parameters": [
-          {
-            "name": "role",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "enum": [
-                "driver",
-                "agent"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "vacancy-invitations"
-        ],
-        "summary": "Invite a driver (agent — Bearer; caller must own the trip and trip status must be open|has_applicants; vacancy driver must be is_active + KYC-approved). Fires trip_invitation notification. Unique (vacancy_id, trip_id). Per-user rate-limited (20 / 10 min).",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "vacancy_id",
-                  "trip_id"
-                ],
-                "properties": {
-                  "vacancy_id": {
-                    "type": "string"
-                  },
-                  "trip_id": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "403": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "409": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "422": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "429": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      }
-    },
-    "/vacancy-invitations/{id}": {
-      "get": {
-        "tags": [
-          "vacancy-invitations"
-        ],
-        "summary": "Get an invitation (driver, inviting agent, or admin; Bearer) — driver PII revealed for admin/driver and for the agent only after status=accepted",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ],
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "403": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          }
-        }
-      },
-      "patch": {
-        "tags": [
-          "vacancy-invitations"
-        ],
-        "summary": "Accept or decline an invitation (driver-only on own row; admin allowed). On accepted: inserts a trip_acceptances row with status=applied (the PII reveal gate); pre-existing acceptance ⇒ idempotent. Fires invitation_accepted | invitation_declined notification to the agent.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/id"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "status"
-                ],
-                "properties": {
-                  "status": {
-                    "type": "string",
-                    "enum": [
-                      "accepted",
-                      "declined"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "401": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "403": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "404": {
-            "$ref": "#/components/responses/Envelope"
-          },
-          "409": {
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
