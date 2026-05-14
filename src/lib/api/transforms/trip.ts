@@ -6,11 +6,13 @@
 import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
+import { transformVerification } from '@/lib/api/transforms/driver';
 import type {
   AcceptanceStatus,
   AssignedDriver,
   CityRow,
   DriverSummary,
+  KycStatus,
   MyApplication,
   PosterRole,
   PostTripInput,
@@ -21,6 +23,11 @@ import type {
   VehicleSummary,
   Waypoint,
 } from '@/types';
+
+const KYC_STATUSES: KycStatus[] = ['pending', 'docs_submitted', 'video_pending', 'ready_for_approval', 'approved', 'rejected', 'resubmit_required'];
+function kycStatusOpt(v: unknown): KycStatus | undefined {
+  return typeof v === 'string' && (KYC_STATUSES as string[]).includes(v) ? (v as KycStatus) : undefined;
+}
 
 export type TripTransformErrorCode =
   | 'MISSING_ID'
@@ -129,6 +136,7 @@ export function transformTrip(api: Api): Trip {
     assignedAt: str(api.assigned_at),
     assignedDriverHandle: str(api.assigned_driver_handle),
     assignedDriver: assignedDriverOf(api.assigned_driver),
+    postedByVerification: transformVerification(api.posted_by_verification),
     distanceToDestinationKm: numOpt(api.distance_to_destination_km),
     showFareToPassenger: bool(api.show_fare_to_passenger, true),
     hidePassengerPhone: bool(api.hide_passenger_phone, false),
@@ -157,12 +165,14 @@ function assignedDriverOf(v: unknown): AssignedDriver | undefined {
     fullName: str(a.full_name),
     phone: str(a.phone),
     profilePhotoUrl: str(a.profile_photo_url),
+    kycStatus: kycStatusOpt(a.kyc_status),
     ratingAvg: num(a.rating_avg, 0),
     ratingCount: num(a.rating_count, 0),
     totalTripsCompleted: num(a.total_trips_completed, 0),
     currentLat: numOpt(a.current_lat),
     currentLng: numOpt(a.current_lng),
     currentLocationAt: str(a.current_location_at),
+    verification: transformVerification(a.verification),
   };
 }
 

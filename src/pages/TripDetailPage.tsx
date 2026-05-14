@@ -16,6 +16,8 @@ import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
+import { DriverIdentity } from '@/components/driver/DriverIdentity';
+import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
 import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -330,6 +332,14 @@ function PostedBy({ trip }: { trip: Trip }) {
           </Button>
         </div>
       ) : null}
+      {/* Server attaches this only when the viewer is the assigned driver — they get to see how
+          thoroughly the poster who hired them is verified. No document URLs. */}
+      {trip.postedByVerification ? (
+        <CounterpartyChecklist
+          verification={trip.postedByVerification}
+          steps={isAgentPost ? AGENT_VERIFICATION_STEPS : DRIVER_VERIFICATION_STEPS}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -597,10 +607,24 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
         </Card>
       ) : null}
 
-      {trip.assignedDriverId ? (
-        <Card>
-          <Link to={`/drivers/${trip.assignedDriverId}`} className="flex items-center gap-2 text-sm font-medium text-primary">
-            <User className="size-4" aria-hidden /> View the assigned driver&apos;s profile →
+      {trip.assignedDriverId && trip.assignedDriver ? (
+        <Card className="gap-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Assigned driver</div>
+          <DriverIdentity
+            driver={trip.assignedDriver}
+            size="lg"
+            sub={
+              trip.assignedDriver.ratingCount > 0
+                ? <span>★ {trip.assignedDriver.ratingAvg.toFixed(1)} · {trip.assignedDriver.totalTripsCompleted} trips</span>
+                : <span>{trip.assignedDriver.totalTripsCompleted} trips</span>
+            }
+          />
+          {/* The checklist is server-attached only for poster / admin views — no document URLs, just step status. */}
+          {trip.assignedDriver.verification ? (
+            <CounterpartyChecklist verification={trip.assignedDriver.verification} steps={DRIVER_VERIFICATION_STEPS} />
+          ) : null}
+          <Link to={`/drivers/${trip.assignedDriverId}`} className="flex items-center gap-1 text-sm font-medium text-primary">
+            View full profile <User className="size-4" aria-hidden />
           </Link>
         </Card>
       ) : null}
