@@ -171,9 +171,12 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
   if (apps.length === 0) return null;
   const first = apps[0]!;
   const more = apps.length - 1;
+  // One trip → land directly on its detail so the driver can Accept / Decline in one tap.
+  // Multiple → list view (Applied tab) where they pick which to review.
+  const href = apps.length === 1 ? `/trips/${first.trip.id}` : '/my-trips?tab=applied';
   return (
     <Link
-      to="/my-trips?tab=applied"
+      to={href}
       className="block rounded-2xl border-2 border-blue-300 bg-blue-50 p-4 transition-colors hover:bg-blue-100"
     >
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">
