@@ -6,6 +6,7 @@ import type { Trip } from '@/types';
 
 vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn() }));
 import { useTrips } from '@/hooks/useTrips';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(() => ({ data: undefined, isPending: false, isError: false })) }));
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carTypeHooks: { useList: vi.fn() } }));
 import { carTypeHooks, cityHooks } from '@/hooks/useAdminConfig';
 
@@ -98,19 +99,11 @@ describe('TripFeedPage', () => {
     expect(screen.getByRole('button', { name: /near me/i })).toBeInTheDocument();
   });
 
-  it('the "AC only" toggle hides non-AC trips', () => {
-    setTrips({ data: [makeTrip({ id: 't1', acRequired: true, fromCity: city('c1', 'Vellore') }), makeTrip({ id: 't2', acRequired: false, fromCity: city('c3', 'Mysore') })] });
+  it('"Clear filters" restores trips hidden by the car-type filter', () => {
+    vi.mocked(carTypeHooks.useList).mockReturnValue({ data: [{ id: 'ct1', label: 'Sedan', sortOrder: 1, isActive: true }, { id: 'ct2', label: 'SUV', sortOrder: 2, isActive: true }] } as never);
+    setTrips({ data: [makeTrip({ id: 't1', carTypeId: 'ct1', fromCity: city('c1', 'Vellore') })] });
     renderFeed();
-    expect(screen.getByText(/mysore → chennai/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /ac only/i }));
-    expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
-    expect(screen.queryByText(/mysore → chennai/i)).toBeNull();
-  });
-
-  it('"Clear filters" restores trips hidden by a filter', () => {
-    setTrips({ data: [makeTrip({ id: 't1', acRequired: false, fromCity: city('c1', 'Vellore') })] });
-    renderFeed();
-    fireEvent.click(screen.getByRole('button', { name: /ac only/i }));
+    fireEvent.change(screen.getByLabelText(/filter by car type/i), { target: { value: 'ct2' } });
     expect(screen.getByText(/no trips match/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /clear filters/i }));
     expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
