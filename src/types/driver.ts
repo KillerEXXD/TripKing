@@ -91,7 +91,10 @@ export interface Agent extends AgentPublic {
 
 export interface DriversQueryParams {
   currentCityId?: string;
-  kycStatus?: KycStatus;
+  /** Single status or CSV-joined list (e.g. for the KYC "needs review" composite). */
+  kycStatus?: KycStatus | KycStatus[];
+  /** Admin-only ILIKE match across `full_name | phone | email`. */
+  search?: string;
   /** Restrict to drivers whose (fresh) current position is within the radius (nearest first). */
   near?: NearRadius;
   page?: number;

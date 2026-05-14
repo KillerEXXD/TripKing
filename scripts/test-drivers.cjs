@@ -190,6 +190,16 @@ async function tokenFor(role) {
     check('PATCH /agents/:id/active {is_active:true} (admin) → 200 + is_active true', agReact.status === 200 && agReact.json?.data?.is_active === true && !agReact.json?.data?.deactivated_at, `status=${agReact.status}`);
   }
 
+  // ?search= — admin-only ILIKE across full_name | phone | email
+  const searchAnon = await j('GET', '/drivers?search=ravi');
+  check('GET /drivers?search= without admin Bearer → 403', searchAnon.status === 403, `status=${searchAnon.status}`);
+  const searchAdmin = await j('GET', '/drivers?search=Smoke', { token: adminToken });
+  check('GET /drivers?search=Smoke (admin) → 200 + only matching rows', searchAdmin.status === 200 && Array.isArray(searchAdmin.json?.data) && (searchAdmin.json.data.length === 0 || searchAdmin.json.data.every((d) => /smoke/i.test([d.full_name, d.phone, d.email].filter(Boolean).join(' ')))), `status=${searchAdmin.status} len=${searchAdmin.json?.data?.length}`);
+  const searchAgents = await j('GET', '/agents?search=Smoke', { token: adminToken });
+  check('GET /agents?search=Smoke (admin) → 200 + only matching rows', searchAgents.status === 200 && Array.isArray(searchAgents.json?.data) && (searchAgents.json.data.length === 0 || searchAgents.json.data.every((a) => /smoke/i.test([a.full_name, a.phone, a.email].filter(Boolean).join(' ')))), `status=${searchAgents.status} len=${searchAgents.json?.data?.length}`);
+  const searchAgentsAnon = await j('GET', '/agents?search=ravi');
+  check('GET /agents?search= without admin Bearer → 403', searchAgentsAnon.status === 403, `status=${searchAgentsAnon.status}`);
+
   if (failures) { console.error(`[test-drivers] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-drivers] all checks passed');
 })().catch((e) => { console.error('[test-drivers] error:', e); process.exit(1); });

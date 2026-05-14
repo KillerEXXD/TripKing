@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminDriversPage } from '@/pages/administration/AdminDriversPage';
 import type { Driver } from '@/types';
@@ -76,15 +76,19 @@ describe('AdminDriversPage', () => {
     expect(screen.getByText(/1,234 total/)).toBeInTheDocument();
   });
 
-  it('filters the loaded list by the search box (name / phone)', () => {
-    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A1B2C3D', phone: '+918000000000' })] });
-    renderPage();
-    fireEvent.change(screen.getByLabelText(/search drivers/i), { target: { value: 'suresh' } });
-    expect(screen.queryByText('Ravi Kumar')).toBeNull();
-    expect(screen.getByText('Suresh P')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText(/search drivers/i), { target: { value: '987650' } });
-    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();
-    expect(screen.queryByText('Suresh P')).toBeNull();
+  it('forwards the (debounced) search box to the server as a `search` param', () => {
+    vi.useFakeTimers();
+    try {
+      setDrivers({ rows: [makeDriver()] });
+      renderPage();
+      fireEvent.change(screen.getByLabelText(/search drivers/i), { target: { value: 'suresh' } });
+      act(() => { vi.advanceTimersByTime(300); });
+      const calls = vi.mocked(useInfiniteDrivers).mock.calls;
+      const last = calls[calls.length - 1];
+      expect((last[0] as { search?: string }).search).toBe('suresh');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('defaults to All and a KYC chip narrows the server query', () => {

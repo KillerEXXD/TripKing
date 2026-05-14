@@ -48,10 +48,11 @@ export function createMyAgentProfile(input: CreateAgentProfileInput): Promise<Ag
   return apiClient.post<Api>('/drivers', toApiCreateAgentProfile(input)).then((r) => transformAgent(unwrap(r.data)));
 }
 
-export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {
+function driverQuery(params?: DriversQueryParams): Record<string, unknown> {
   const q: Record<string, unknown> = {};
   if (params?.currentCityId) q.current_city_id = params.currentCityId;
-  if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.kycStatus) q.kyc_status = Array.isArray(params.kycStatus) ? params.kycStatus.join(',') : params.kycStatus;
+  if (params?.search && params.search.trim()) q.search = params.search.trim();
   if (params?.near) {
     q.near_lat = params.near.lat;
     q.near_lng = params.near.lng;
@@ -60,22 +61,17 @@ export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   if (params?.sort) q.sort = params.sort;
+  return q;
+}
+
+export function getDrivers(params?: DriversQueryParams): Promise<Driver[]> {
+  const q = driverQuery(params);
   return apiClient.get<Api[]>('/drivers', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformDriver));
 }
 
 /** Paginated `GET /drivers` — returns the page rows plus `{ total, page, limit, hasMore }` meta. */
 export function getDriversPage(params?: DriversQueryParams): Promise<{ data: Driver[]; meta: { page: number; limit: number; total: number; hasMore: boolean } }> {
-  const q: Record<string, unknown> = {};
-  if (params?.currentCityId) q.current_city_id = params.currentCityId;
-  if (params?.kycStatus) q.kyc_status = params.kycStatus;
-  if (params?.near) {
-    q.near_lat = params.near.lat;
-    q.near_lng = params.near.lng;
-    q.radius_km = params.near.radiusKm;
-  }
-  if (params?.page) q.page = params.page;
-  if (params?.limit) q.limit = params.limit;
-  if (params?.sort) q.sort = params.sort;
+  const q = driverQuery(params);
   return apiClient.get<Api[]>('/drivers', Object.keys(q).length ? q : undefined).then((r) => {
     const rawMeta = (r as { meta?: { total?: number; page?: number; limit?: number; has_more?: boolean } }).meta;
     const page = Number(rawMeta?.page ?? params?.page ?? 1);
@@ -112,26 +108,30 @@ export function updateDriverKyc(id: string, kycStatus: KycStatus, note?: string)
 
 export interface AgentsQueryParams {
   businessCityId?: string;
-  kycStatus?: KycStatus;
+  /** Single status or CSV-joined list (e.g. for the KYC "needs review" composite). */
+  kycStatus?: KycStatus | KycStatus[];
+  /** Admin-only ILIKE match across `full_name | phone | email`. */
+  search?: string;
   page?: number;
   limit?: number;
 }
-export function getAgents(params?: AgentsQueryParams): Promise<Agent[]> {
+function agentQuery(params?: AgentsQueryParams): Record<string, unknown> {
   const q: Record<string, unknown> = {};
   if (params?.businessCityId) q.business_city_id = params.businessCityId;
-  if (params?.kycStatus) q.kyc_status = params.kycStatus;
+  if (params?.kycStatus) q.kyc_status = Array.isArray(params.kycStatus) ? params.kycStatus.join(',') : params.kycStatus;
+  if (params?.search && params.search.trim()) q.search = params.search.trim();
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
+  return q;
+}
+export function getAgents(params?: AgentsQueryParams): Promise<Agent[]> {
+  const q = agentQuery(params);
   return apiClient.get<Api[]>('/agents', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformAgent));
 }
 
 /** Paginated `GET /agents` — page rows + `{ total, page, limit, hasMore }` meta. */
 export function getAgentsPage(params?: AgentsQueryParams): Promise<{ data: Agent[]; meta: { page: number; limit: number; total: number; hasMore: boolean } }> {
-  const q: Record<string, unknown> = {};
-  if (params?.businessCityId) q.business_city_id = params.businessCityId;
-  if (params?.kycStatus) q.kyc_status = params.kycStatus;
-  if (params?.page) q.page = params.page;
-  if (params?.limit) q.limit = params.limit;
+  const q = agentQuery(params);
   return apiClient.get<Api[]>('/agents', Object.keys(q).length ? q : undefined).then((r) => {
     const rawMeta = (r as { meta?: { total?: number; page?: number; limit?: number; has_more?: boolean } }).meta;
     const data = (r.data ?? []).map(transformAgent);
