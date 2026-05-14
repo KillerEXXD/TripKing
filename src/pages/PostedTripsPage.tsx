@@ -26,7 +26,7 @@ export const STATUS_META: Record<TripStatus, { label: string; variant: 'success'
  *  "Invited" iff it has pending invitations AND its status is `open` or `has_applicants`; once a
  *  driver applies / is selected / etc., the trip moves on to its real status bucket. */
 type Filter = 'all' | 'invited' | TripStatus;
-const FILTERS: Filter[] = ['all', 'open', 'invited', 'has_applicants', 'selected', 'accepted', 'in_progress', 'completed', 'cancelled'];
+const FILTERS: Filter[] = ['all', 'in_progress', 'open', 'invited', 'has_applicants', 'selected', 'accepted', 'completed', 'cancelled'];
 const FILTER_LABEL: Record<Filter, string> = {
   all: 'All',
   invited: 'Invited',
@@ -43,9 +43,11 @@ function bucketFor(trip: Trip): Filter {
   if (trip.pendingInvitationCount > 0 && (trip.status === 'open' || trip.status === 'has_applicants')) return 'invited';
   return trip.status;
 }
-/** Lifecycle priority for the "All" sort — live/actionable buckets bubble above terminal ones. */
+/** Lifecycle priority for the "All" sort — live/actionable buckets bubble above terminal ones.
+ *  In progress is the live "happening right now" bucket — sort it above everything else so the
+ *  agent's eye lands on the trip they need to be tracking. */
 const FILTER_PRIORITY: Record<Filter, number> = {
-  all: 99, open: 0, invited: 1, has_applicants: 2, selected: 3, accepted: 4, in_progress: 5, completed: 6, cancelled: 7,
+  all: 99, in_progress: 0, open: 1, invited: 2, has_applicants: 3, selected: 4, accepted: 5, completed: 6, cancelled: 7,
 };
 
 const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');

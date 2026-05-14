@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, CheckCircle2, ChevronRight, Hand, MapPin, Navigation, Sparkles, Star, TrendingUp } from 'lucide-react';
+import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
@@ -270,22 +271,7 @@ function DriverHome({ driver }: { driver: Driver }) {
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
             <Badge variant="success">Driver</Badge>
-            {nearCity ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
-                <MapPin className="size-3" aria-hidden />
-                <span className="font-semibold">Near {nearCity.name}</span>
-                {cities.length > 0 ? (
-                  <select aria-label="Change the area to browse near" value={nearCityId} onChange={(e) => setNearCityId(e.target.value)} className="bg-transparent text-[11px] text-emerald-700 outline-none">
-                    <option value="">— anywhere —</option>
-                    {cities.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-              </span>
-            ) : null}
+            {cities.length > 0 ? <NearCityPicker cities={cities} value={nearCityId} onChange={setNearCityId} /> : null}
           </div>
         </div>
         <div className="flex items-center gap-1">
