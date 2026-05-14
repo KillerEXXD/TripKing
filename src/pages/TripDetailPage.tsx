@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
-import { useApplyToTrip, useCancelTrip, useCompleteTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
@@ -444,6 +444,105 @@ function PassengerEditForm({ trip, onSaved }: { trip: Trip; onSaved?: () => void
   );
 }
 
+/**
+ * Phase 2 of the two-step handshake — shown to the driver while the trip sits in `selected`.
+ * Accept generates the passenger OTP and flips the trip to `assigned`. Decline (or letting the
+ * server-side cron expire) bumps the trip back to `has_applicants`.
+ */
+function SelectedDriverCard({ trip }: { trip: Trip }) {
+  const acceptMutation = useAcceptTrip();
+  const declineMutation = useDeclineTrip();
+  const deadline = trip.acceptanceDeadlineAt ? new Date(trip.acceptanceDeadlineAt) : null;
+  const deadlineLabel = deadline
+    ? deadline.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+    : `${trip.acceptanceWindowMinutes} min after selection`;
+  const callHref = trip.postedByPhone ? `tel:${trip.postedByPhone}` : undefined;
+
+  async function onAccept() {
+    try {
+      await acceptMutation.mutateAsync({ tripId: trip.id });
+      toast.success("You're confirmed — the passenger will get an OTP shortly.");
+    } catch {
+      toast.error("Couldn't accept — please try again.");
+    }
+  }
+  async function onDecline() {
+    if (!window.confirm("Decline this trip? You won't be re-offered it.")) return;
+    try {
+      await declineMutation.mutateAsync({ tripId: trip.id });
+      toast.success('Trip declined.');
+    } catch {
+      toast.error("Couldn't decline — please try again.");
+    }
+  }
+  const busy = acceptMutation.isPending || declineMutation.isPending;
+  return (
+    <Card className="border-emerald-300 bg-emerald-50">
+      <div className="space-y-1.5">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
+        <div className="text-base font-bold text-emerald-900">Accept this trip to start.</div>
+        <p className="text-xs text-emerald-800">
+          Decision needed by <b>{deadlineLabel}</b>. If you don&apos;t respond it&apos;ll go back to other applicants.
+        </p>
+        {trip.postedByName ? (
+          <p className="text-xs text-emerald-800">
+            Picked by <b>{trip.postedByName}</b>
+            {callHref ? <> · <a href={callHref} className="underline">Call to confirm</a></> : null}
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="full" size="lg" className="flex-1" onClick={() => void onAccept()} disabled={busy}>
+          {acceptMutation.isPending ? 'Accepting…' : 'Accept'}
+        </Button>
+        <Button variant="outline" size="lg" className="text-destructive" onClick={() => void onDecline()} disabled={busy}>
+          {declineMutation.isPending ? 'Declining…' : 'Decline'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Trip creator's view while waiting for the driver to Accept. */
+function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
+  const cancelMutation = useCancelAssignment();
+  const deadline = trip.acceptanceDeadlineAt ? new Date(trip.acceptanceDeadlineAt) : null;
+  const deadlineLabel = deadline
+    ? deadline.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+    : null;
+  const driverName = trip.assignedDriver?.fullName ?? (trip.assignedDriverHandle ? `Driver ${trip.assignedDriverHandle}` : 'the driver');
+  const driverPhone = trip.assignedDriver?.phone;
+  async function onCancel() {
+    if (!window.confirm(`Withdraw the selection of ${driverName}? Other applicants stay available.`)) return;
+    try {
+      await cancelMutation.mutateAsync({ tripId: trip.id });
+      toast.success('Selection withdrawn. Pick another applicant.');
+    } catch {
+      toast.error("Couldn't withdraw — please try again.");
+    }
+  }
+  return (
+    <Card className="border-amber-300 bg-amber-50">
+      <div className="space-y-1.5">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Awaiting acceptance</div>
+        <div className="text-sm font-semibold text-amber-900">
+          Waiting for <b>{driverName}</b> to accept{deadlineLabel ? <> · by {deadlineLabel}</> : null}.
+        </div>
+        {driverPhone ? (
+          <p className="text-xs text-amber-800">
+            <a href={`tel:${driverPhone}`} className="underline">Call them</a> to confirm.
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-2 flex justify-end">
+        <Button variant="outline" size="sm" className="text-destructive" onClick={() => void onCancel()} disabled={cancelMutation.isPending}>
+          {cancelMutation.isPending ? 'Withdrawing…' : 'Withdraw selection'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
   const badge = STATUS_BADGE[trip.status];
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
@@ -473,6 +572,8 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
   return (
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
+      {viewer.isAssignedDriver && trip.status === 'selected' ? <SelectedDriverCard trip={trip} /> : null}
+      {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
       {showApplyBar && myApplication ? (
         <Card className="border-emerald-200 bg-emerald-50">
           <div className="flex items-start gap-2">

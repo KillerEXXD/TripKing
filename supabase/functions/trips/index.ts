@@ -309,14 +309,23 @@ const TRIP_PII_COLS = ['passenger_name', 'passenger_phone', 'posted_by_name', 'p
 const DRIVER_POSITION_COLS = ['current_lat', 'current_lng', 'current_location_at'] as const;
 const DRIVER_PII_COLS = ['full_name', 'phone', 'email', 'profile_photo_url'] as const;
 const TRIP_TEXT_FIELDS = ['driver_instructions', 'luggage_notes', 'special_requests'] as const;
-type ViewerRel = 'owner' | 'admin' | 'assigned' | 'browse';
+type ViewerRel = 'owner' | 'admin' | 'assigned' | 'selected' | 'browse';
 
-/** Who is `u` to this trip? owner (the poster) | admin | assigned (the assigned driver) | browse (anyone else). */
+/** Who is `u` to this trip?
+ *   owner    — the poster (or an admin)
+ *   admin    — site admin
+ *   selected — the driver the agent just picked, before they Accept (status='selected'). Mutual reveal
+ *              (agent name+phone) so they can call to confirm; passenger details still hidden.
+ *   assigned — the driver, after they've Accepted (status='assigned' or later). Full reveal.
+ *   browse   — everyone else.
+ */
 function relationshipFor(raw: Record<string, unknown>, u: { id: string; role: string } | null, myDriverId: string | null): ViewerRel {
   if (!u) return 'browse';
   if (u.role === 'admin') return 'admin';
   if (raw.posted_by_user_id === u.id) return 'owner';
-  if (myDriverId && raw.assigned_driver_id === myDriverId) return 'assigned';
+  if (myDriverId && raw.assigned_driver_id === myDriverId) {
+    return raw.status === 'selected' ? 'selected' : 'assigned';
+  }
   return 'browse';
 }
 /** Flatten `driver.user.display_handle` onto the joined driver row + scrub free-text on acceptances. */
@@ -404,6 +413,13 @@ function redactTrip(raw: Record<string, unknown>, rel: ViewerRel, posterReveal =
     out.assigned_driver = shaped.driver; // their own — full identity + own position
     const dist = distanceToDest(raw);
     if (dist != null) out.distance_to_destination_km = dist;
+  } else if (rel === 'selected') {
+    // Phase 2 of two-step handshake: reveal agent's name + phone to the picked
+    // driver so they can call to confirm BEFORE committing. Passenger details
+    // stay hidden until /accept. No live position yet (no driver has accepted).
+    out.posted_by_name = raw.posted_by_name;
+    out.posted_by_phone = raw.posted_by_phone;
+    out.assigned_driver = shaped.driver; // driver sees themselves
   } else {
     // browse: strip assigned-driver identity + position; optionally reveal poster name/phone if applicant
     if (shaped.driver) {
@@ -439,10 +455,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   async function loadTrip(id: string) {
     const { data } = await db
       .from('trips')
-      .select('id, posted_by_user_id, assigned_driver_id, status, passenger_otp_hash')
+      .select('id, posted_by_user_id, assigned_driver_id, assigned_acceptance_id, status, passenger_otp_hash, acceptance_window_minutes, acceptance_deadline_at, driver_acceptance_status')
       .eq('id', id)
       .maybeSingle();
-    return data as { id: string; posted_by_user_id: string; assigned_driver_id: string | null; status: string; passenger_otp_hash: string | null } | null;
+    return data as {
+      id: string;
+      posted_by_user_id: string;
+      assigned_driver_id: string | null;
+      assigned_acceptance_id: string | null;
+      status: string;
+      passenger_otp_hash: string | null;
+      acceptance_window_minutes: number | null;
+      acceptance_deadline_at: string | null;
+      driver_acceptance_status: 'pending' | 'accepted' | 'declined' | 'expired' | null;
+    } | null;
   }
   async function driverIdFor(userId: string): Promise<string | null> {
     const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
@@ -906,33 +932,168 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
   }
 
-  // ── POST /trips/trips/:id/assign ─────────────────────────────────────────
+  // ── POST /trips/:id/assign ─────────────────────────────────────────
+  // Phase 2 of the two-step handshake: this no longer transitions straight to
+  // `assigned`. Instead it moves the trip to `selected` and stamps an
+  // acceptance deadline. The driver must POST /trips/:id/accept within the
+  // window. If they don't, /trips/:id/decline / /trips/:id/cancel-assignment
+  // / the cron expiry job (migration 031) all route back to `has_applicants`.
+  // OTP generation moves to /accept (so a passenger never gets an OTP for a
+  // trip the driver hasn't actually committed to).
   if (sub === 'assign' && req.method === 'POST') {
     const u = await authUser(db, req);
     const trip = await loadTrip(tripId);
     if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
     if (!u || (trip.posted_by_user_id !== u.id && !isAdmin(u))) return fail('FORBIDDEN', 'Only the trip poster can assign a driver', 403);
+    if (!['open', 'has_applicants'].includes(trip.status as string)) {
+      return fail('CONFLICT', `Trip is "${trip.status}", not selectable`, 409);
+    }
     const b = await readBody(req);
     const aid = String(b.acceptance_id ?? '');
     const { data: acc } = await db.from('trip_acceptances').select('id, driver_id, vehicle_id').eq('id', aid).eq('trip_id', tripId).maybeSingle();
     if (!acc) return fail('VALIDATION', 'acceptance_id not found for this trip', 422);
     const { data: chosenDrv } = await db.from('drivers').select('is_active').eq('id', acc.driver_id).maybeSingle();
     if (chosenDrv?.is_active === false) return fail('VALIDATION', 'That driver has been deactivated — pick another applicant', 422);
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const windowMin = (trip.acceptance_window_minutes as number | null) ?? 15;
+    const deadline = new Date(now.getTime() + windowMin * 60_000).toISOString();
+    // The chosen acceptance row moves to 'selected'; sibling 'applied' rows stay applied (NOT rejected
+    // yet — the agent might withdraw or the driver might decline, and we want those other applicants
+    // still in the pool).
+    await db.from('trip_acceptances').update({ status: 'selected', decision_at: nowIso }).eq('id', aid);
+    const { error } = await db
+      .from('trips')
+      .update({
+        status: 'selected',
+        assigned_driver_id: acc.driver_id,
+        assigned_vehicle_id: (acc.vehicle_id as string | null) ?? null,
+        assigned_acceptance_id: aid,
+        assigned_at: nowIso,
+        acceptance_deadline_at: deadline,
+        driver_acceptance_status: 'pending',
+      })
+      .eq('id', tripId);
+    if (error) return pgFail(error);
+    const t = await fullTrip(tripId, u!);
+    invalidateTripsList();
+    return ok(t);
+  }
+
+  // ── POST /trips/:id/accept (Phase 2 of two-step handshake) ────────────────
+  // The driver the agent picked taps Accept. Server checks status is still
+  // 'selected', caller is the selected driver. Generates the passenger OTP,
+  // flips the trip to 'assigned', rejects the other applicants, sets up the
+  // trip_executions row, and SMSes the passenger out-of-band (placeholder
+  // here — real SMS hookup is a follow-up).
+  if (sub === 'accept' && req.method === 'POST') {
+    const u = await authUser(db, req);
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    if (trip.status !== 'selected') return fail('CONFLICT', `Trip is "${trip.status}", not "selected" — agent may have withdrawn or it expired`, 409);
+    const did = u ? await driverIdFor(u.id) : null;
+    if (!u || (trip.assigned_driver_id !== did && !isAdmin(u))) return fail('FORBIDDEN', 'Only the selected driver can accept', 403);
+    // Re-check KYC + active flags at accept time — the driver may have been deactivated
+    // between selection and now.
+    if (did) {
+      const { data: drv } = await db.from('drivers').select('is_active, kyc_status').eq('id', did).maybeSingle();
+      if (drv?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your driver account is deactivated', 403);
+      if (drv?.kyc_status !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before accepting', 403);
+    }
     const now = new Date().toISOString();
     const otp = genOtp();
     const otpHash = await sha256hex(otp);
-    await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).neq('id', aid).in('status', ['applied', 'selected']);
-    await db.from('trip_acceptances').update({ status: 'selected', decision_at: now }).eq('id', aid);
+    // Reject the other applicants now that the driver has actually committed.
+    await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).neq('id', trip.assigned_acceptance_id).in('status', ['applied']);
     const { error } = await db
       .from('trips')
-      .update({ status: 'assigned', assigned_driver_id: acc.driver_id, assigned_vehicle_id: (acc.vehicle_id as string | null) ?? null, assigned_acceptance_id: aid, assigned_at: now, passenger_otp_hash: otpHash, passenger_otp: otp })
+      .update({
+        status: 'assigned',
+        driver_acceptance_status: 'accepted',
+        passenger_otp_hash: otpHash,
+        passenger_otp: otp,
+      })
       .eq('id', tripId);
     if (error) return pgFail(error);
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
     const t = await fullTrip(tripId, u!);
     invalidateTripsList();
-    // OTP is delivered out-of-band by the agent; included here for dev convenience (the Trip transform ignores it).
+    // OTP echoed for dev parity; the agent UI uses this to copy/share with the passenger.
     return ok({ ...(t as Record<string, unknown>), passenger_otp: otp });
+  }
+
+  // ── POST /trips/:id/decline (Phase 2 of two-step handshake) ───────────────
+  // Selected driver bows out before accepting. Trip falls back to
+  // 'has_applicants'; this driver's acceptance row → 'declined' (they're out
+  // of the pool — see docs §5). Other applicants stay 'applied'.
+  if (sub === 'decline' && req.method === 'POST') {
+    const u = await authUser(db, req);
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    if (trip.status !== 'selected') return fail('CONFLICT', `Trip is "${trip.status}", not "selected"`, 409);
+    const did = u ? await driverIdFor(u.id) : null;
+    if (!u || (trip.assigned_driver_id !== did && !isAdmin(u))) return fail('FORBIDDEN', 'Only the selected driver can decline', 403);
+    const b = await readBody(req).catch(() => ({} as Record<string, unknown>));
+    const reason = typeof b.reason === 'string' && b.reason ? b.reason : null;
+    const now = new Date().toISOString();
+    await db.from('trip_acceptances').update({ status: 'declined', decision_at: now, decision_note: reason }).eq('id', trip.assigned_acceptance_id);
+    // Restore the trip's selectable state. Other applicants stay applied; the agent picks again.
+    const { data: stillApplied } = await db.from('trip_acceptances').select('id').eq('trip_id', tripId).eq('status', 'applied').limit(1);
+    const fallbackStatus = (stillApplied && stillApplied.length > 0) ? 'has_applicants' : 'open';
+    const { error } = await db
+      .from('trips')
+      .update({
+        status: fallbackStatus,
+        assigned_driver_id: null,
+        assigned_vehicle_id: null,
+        assigned_acceptance_id: null,
+        assigned_at: null,
+        acceptance_deadline_at: null,
+        driver_acceptance_status: 'declined',
+      })
+      .eq('id', tripId);
+    if (error) return pgFail(error);
+    const t = await fullTrip(tripId, u!);
+    invalidateTripsList();
+    return ok(t);
+  }
+
+  // ── POST /trips/:id/cancel-assignment (Phase 2 of two-step handshake) ─────
+  // Trip creator pulls the selection (or the assignment) back. The driver's
+  // acceptance row → 'applied' (they're still in the pool — it's the agent's
+  // change of mind, not theirs). Cannot be used after status='in_progress'.
+  if (sub === 'cancel-assignment' && req.method === 'POST') {
+    const u = await authUser(db, req);
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    if (!u || (trip.posted_by_user_id !== u.id && !isAdmin(u))) return fail('FORBIDDEN', 'Only the trip poster can cancel an assignment', 403);
+    if (!['selected', 'assigned'].includes(trip.status as string)) {
+      return fail('CONFLICT', `Trip is "${trip.status}", not selected/assigned`, 409);
+    }
+    const b = await readBody(req).catch(() => ({} as Record<string, unknown>));
+    const reason = typeof b.reason === 'string' && b.reason ? b.reason : null;
+    const now = new Date().toISOString();
+    if (trip.assigned_acceptance_id) {
+      await db.from('trip_acceptances').update({ status: 'applied', decision_at: now, decision_note: reason }).eq('id', trip.assigned_acceptance_id);
+    }
+    const { error } = await db
+      .from('trips')
+      .update({
+        status: 'has_applicants',
+        assigned_driver_id: null,
+        assigned_vehicle_id: null,
+        assigned_acceptance_id: null,
+        assigned_at: null,
+        acceptance_deadline_at: null,
+        driver_acceptance_status: null,
+        passenger_otp_hash: null,
+        passenger_otp: null,
+      })
+      .eq('id', tripId);
+    if (error) return pgFail(error);
+    const t = await fullTrip(tripId, u!);
+    invalidateTripsList();
+    return ok(t);
   }
 
   // ── POST /trips/trips/:id/start ──────────────────────────────────────────
