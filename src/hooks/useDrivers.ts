@@ -30,6 +30,7 @@ import type {
   KycStatus,
   SubmitAgentKycDocsInput,
   SubmitDriverKycDocsInput,
+  UpdateAgentInput,
   UpdateDriverInput,
   UpdateLocationInput,
 } from '@/types';
@@ -120,7 +121,7 @@ export function useUpdateDriverLocation() {
 export function useUpdateAgent() {
   const invalidate = useInvalidateAgent();
   return useMutation({
-    mutationFn: ({ id, input }: { id: string; input: { fullName?: string; email?: string; businessName?: string; businessCityId?: string; profilePhotoUrl?: string } }) =>
+    mutationFn: ({ id, input }: { id: string; input: UpdateAgentInput }) =>
       updateAgent(id, input),
     onSuccess: (_d, v) => invalidate(v.id),
   });
