@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, ChevronRight, Hand, MapPin, Navigation, Sparkles, Star, TrendingUp } from 'lucide-react';
+import { Bell, CheckCircle2, ChevronRight, MapPin, Navigation, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
-import { useVacancies } from '@/hooks/useVacancies';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
+import { cityHooks } from '@/hooks/useAdminConfig';
+import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { Badge, Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
@@ -213,27 +213,6 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
   );
 }
 
-function AvailabilitySummaryCard({ count, max }: { count: number; max: number }) {
-  if (count === 0) return null;
-  return (
-    <Link
-      to="/my-trips?tab=available"
-      className="block rounded-2xl border border-violet-200 bg-violet-50/60 p-4 transition-colors hover:bg-violet-100/60"
-    >
-      <div className="flex items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
-          <Hand className="size-5" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">You're showing as available ({count}/{max})</div>
-          <div className="truncate text-xs text-secondary">Agents can find you in the driver feed. Tap to manage.</div>
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
-      </div>
-    </Link>
-  );
-}
-
 function DriverHome({ driver }: { driver: Driver }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
@@ -245,11 +224,9 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
-  const myVacanciesQuery = useVacancies({ driverId: driver.id, status: 'active' });
 
   const nearby = nearbyQuery.data ?? [];
   const postedWithApplicants = (myPostsQuery.data ?? []).filter((t) => t.status === 'has_applicants').length;
-  const activeVacancies = (myVacanciesQuery.data ?? []).length;
 
   // Priority cards: a driver has at most one trip in each of these states at a time.
   const myDriving = myDrivingQuery.data ?? [];
@@ -257,11 +234,6 @@ function DriverHome({ driver }: { driver: Driver }) {
   const assignedTrip = myDriving.find((t) => t.status === 'accepted');
   // Selected = agent picked you, you haven't accepted/declined yet (handshake spec).
   const awaitingDecision = (myApplicationsQuery.data ?? []).filter((a) => a.status === 'selected');
-
-  // Max-active-vacancies is admin-configurable (migration 022, default 2). When at the cap the
-  // tiles below offer no path forward; the AvailabilitySummaryCard handles the manage flow.
-  const settings = useAppSettings();
-  const maxActiveVacancies = settings.data?.maxActiveVacanciesPerDriver ?? 2;
 
   return (
     <div>
@@ -283,13 +255,26 @@ function DriverHome({ driver }: { driver: Driver }) {
       <div className="space-y-3 px-4 pb-4 pt-3">
         {driver.verification && <GetVerifiedBanner verification={driver.verification} />}
 
-        {/* Priority stack — surfaces an active driving job, an accepted-but-not-started trip,
-            invitations awaiting accept/decline, and the driver's own availability listings.
-            Each card no-ops when it has nothing to show. */}
-        <CurrentTripCard trip={inProgressTrip} />
-        <AwaitingMyDecisionCard apps={awaitingDecision} />
+        {/* Priority stack — Driving now / Review / I'm vacant, with placement that follows
+            which cards have live content. Empty state of every card is rendered always so
+            the driver always sees the same shape. */}
+        {(() => {
+          const hasInProgress = !!inProgressTrip;
+          const hasReview = awaitingDecision.length > 0;
+          const driving = <CurrentTripCard key="driving" trip={inProgressTrip} />;
+          const review = <AwaitingMyDecisionCard key="review" apps={awaitingDecision} />;
+          const vacant = <IAmAvailableCard key="vacant" driverId={driver.id} />;
+          // Rules:
+          //   both empty           → vacant first (promotes the call to post availability)
+          //   driving only         → vacant between (review still empty below)
+          //   review active (any)  → vacant last
+          let order: React.ReactNode[];
+          if (!hasInProgress && !hasReview) order = [vacant, driving, review];
+          else if (hasInProgress && !hasReview) order = [driving, vacant, review];
+          else order = [driving, review, vacant];
+          return <>{order}</>;
+        })()}
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
-        <AvailabilitySummaryCard count={activeVacancies} max={maxActiveVacancies} />
 
         <ReputationCard driver={driver} />
 
