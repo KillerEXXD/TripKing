@@ -269,8 +269,10 @@ class ApiClient {
 
     const { message, code } = extractError(body);
     const apiError = new ApiError(message, response.status, code, body);
-    // 401 (bad creds / expired) and 404 (stale link) are user errors, not bugs.
-    if (response.status !== 401 && response.status !== 404) {
+    // 401 (bad creds / expired), 404 (stale link) and 409 (semantic conflict —
+    // e.g. "you already have a video call scheduled" / "vacancy limit reached" /
+    // "already applied") are user-correctable, not bugs.
+    if (response.status !== 401 && response.status !== 404 && response.status !== 409) {
       this.reportError(apiError, endpoint, method, durationMs, body, attempt);
     }
     captureEvent('api_error', { endpoint, method, status: response.status, duration_ms: durationMs, message: message.slice(0, 200) });
