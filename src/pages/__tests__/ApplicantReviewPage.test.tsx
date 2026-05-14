@@ -158,6 +158,16 @@ describe('ApplicantReviewPage', () => {
     expect(screen.getByText('Selected')).toBeInTheDocument();
   });
 
+  it('lets the poster reconsider a rejected applicant — the Reconsider button reinstates them via /assign', () => {
+    const { assignMut } = setMutations();
+    setApplicants({ data: [makeAcceptance({ id: 'acc-rej', status: 'rejected', driverId: 'd9' })] });
+    renderPage();
+    expect(screen.getByText('Rejected')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^reject$/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /reconsider/i }));
+    expect(assignMut.mutate).toHaveBeenCalledWith({ tripId: 't1', acceptanceId: 'acc-rej' }, expect.anything());
+  });
+
   it('the back button returns to the trip', () => {
     setApplicants({ data: [] });
     renderPage();
