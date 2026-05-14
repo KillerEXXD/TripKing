@@ -94,7 +94,8 @@ describe('DriverHomePage', () => {
     setMyDriver({ data: makeDriver() });
     setTrips({ data: [] });
     renderHome();
-    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();
+    // Greeting uses the first name from the loaded profile, not the role label.
+    expect(screen.getByText('Ravi')).toBeInTheDocument();
     expect(screen.getByText('Driver')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /find a trip/i })).toHaveAttribute('href', '/trips');
     expect(screen.getByRole('link', { name: /i'm available/i })).toHaveAttribute('href', '/vacancies/new');

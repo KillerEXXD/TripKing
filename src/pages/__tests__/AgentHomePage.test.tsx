@@ -72,8 +72,9 @@ describe('AgentHomePage', () => {
     setMyAgent({ data: agent });
     setTrips({ data: [] });
     renderHome();
-    expect(screen.getByText('Agent A')).toBeInTheDocument();
-    expect(screen.getByText('Agent')).toBeInTheDocument();
+    // Greeting uses the first name from the loaded agent profile (here: the first word of "Agent A").
+    expect(screen.getByText('Agent', { selector: 'span.truncate' })).toBeInTheDocument();
+    expect(screen.getByText('Agent', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
     expect(screen.getByRole('link', { name: /find a driver/i })).toHaveAttribute('href', '/vacancies');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();

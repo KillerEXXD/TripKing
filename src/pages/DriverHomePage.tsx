@@ -19,6 +19,10 @@ function pickupLabel(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
+function firstName(full: string | undefined): string {
+  if (!full) return '';
+  return full.trim().split(/\s+/)[0] ?? '';
+}
 
 function Bellish({ count }: { count: number }) {
   return (
@@ -128,7 +132,7 @@ function DriverHome({ driver }: { driver: Driver }) {
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{user?.displayName || 'Driver'}</span>
+            <span className="truncate font-semibold">{firstName(driver.fullName) || user?.displayName || 'Driver'}</span>
             <Badge variant="success">Driver</Badge>
           </div>
         </div>
