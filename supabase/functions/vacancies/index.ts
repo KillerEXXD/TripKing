@@ -52,7 +52,7 @@ function vacanciesListKey(url: URL): string {
 
 type Db = ReturnType<typeof serviceClient>;
 const VACANCY_SELECT =
-  '*, driver:drivers(id, user_id, full_name, phone, email, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, user:users!user_id(display_handle), current_city:cities!current_city_id(*)), ' +
+  '*, driver:drivers(id, user_id, full_name, phone, email, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, kyc_status, user:users!user_id(display_handle), current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label)), ' +
   'current_city:cities!current_city_id(*), current_place:places!current_place_id(*), vacancy_destinations(city:cities(*), place:places(*))';
 

@@ -140,6 +140,9 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('GET /vacancies/:id → 200 + matching id', gotOne.status === 200 && gotOne.json?.data?.id === vacancyId, `status=${gotOne.status}`);
   const byDriver = await j('GET', `/vacancies?driver_id=${driverId}`);
   check('GET /vacancies?driver_id= → contains my vacancy', byDriver.status === 200 && (byDriver.json?.data || []).some((v) => v.id === vacancyId), `len=${byDriver.json?.data?.length}`);
+  // Regression: vacancy.driver.kyc_status surfaces so the frontend can render the <VerifiedBadge> on VacancyCard.
+  const myVac = (byDriver.json?.data || []).find((v) => v.id === vacancyId);
+  check('GET /vacancies?driver_id= → vacancy.driver.kyc_status surfaced (drives VerifiedBadge)', !!myVac?.driver && typeof myVac.driver.kyc_status === 'string', `kyc_status=${JSON.stringify(myVac?.driver?.kyc_status)}`);
   const byCity = await j('GET', `/vacancies?current_city_id=${currentCityId}`);
   check('GET /vacancies?current_city_id= → contains my vacancy', byCity.status === 200 && (byCity.json?.data || []).some((v) => v.id === vacancyId), `len=${byCity.json?.data?.length}`);
   const byDest = await j('GET', `/vacancies?destination_city_id=${dest1}`);

@@ -35,6 +35,8 @@ function driverSummary(api: Api): DriverSummary {
     totalTripsCompleted: num(api.total_trips_completed) ?? 0,
     topTags: Array.isArray(api.top_tags) ? (api.top_tags as string[]) : [],
     currentCity: api.current_city && typeof api.current_city === 'object' ? transformCity(api.current_city as Api) : undefined,
+    // Optional — only set if the server populates it (used by <VerifiedBadge> on VacancyCard).
+    kycStatus: typeof api.kyc_status === 'string' ? (api.kyc_status as DriverSummary['kycStatus']) : undefined,
   };
 }
 function vehicleSummary(api: Api): VehicleSummary {
