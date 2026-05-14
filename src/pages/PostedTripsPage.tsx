@@ -12,14 +12,40 @@ import type { Trip, TripStatus } from '@/types';
 
 export const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   open: { label: 'Open', variant: 'success' },
-  has_applicants: { label: 'Needs review', variant: 'warning' },
-  selected: { label: 'Awaiting acceptance', variant: 'warning' },
+  has_applicants: { label: 'Has applicants', variant: 'warning' },
+  selected: { label: 'Selected', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'info' },
   in_progress: { label: 'In progress', variant: 'info' },
   completed: { label: 'Completed', variant: 'muted' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
-const FILTERS: ('all' | TripStatus)[] = ['all', 'open', 'has_applicants', 'selected', 'accepted', 'in_progress', 'completed', 'cancelled'];
+
+/** Virtual filter — not a real `trips.status`. Surfaces trips with ≥1 `trip_invitations` row in
+ *  status='pending' (driven by the server-derived `pendingInvitationCount`). A trip is bucketed as
+ *  "Invited" iff it has pending invitations AND its status is `open` or `has_applicants`; once a
+ *  driver applies / is selected / etc., the trip moves on to its real status bucket. */
+type Filter = 'all' | 'invited' | TripStatus;
+const FILTERS: Filter[] = ['all', 'open', 'invited', 'has_applicants', 'selected', 'accepted', 'in_progress', 'completed', 'cancelled'];
+const FILTER_LABEL: Record<Filter, string> = {
+  all: 'All',
+  invited: 'Invited',
+  open: STATUS_META.open.label,
+  has_applicants: STATUS_META.has_applicants.label,
+  selected: STATUS_META.selected.label,
+  accepted: STATUS_META.accepted.label,
+  in_progress: STATUS_META.in_progress.label,
+  completed: STATUS_META.completed.label,
+  cancelled: STATUS_META.cancelled.label,
+};
+/** Determines which chip a trip lives under — each trip belongs to exactly one bucket so chip counts add to the total. */
+function bucketFor(trip: Trip): Filter {
+  if (trip.pendingInvitationCount > 0 && (trip.status === 'open' || trip.status === 'has_applicants')) return 'invited';
+  return trip.status;
+}
+/** Lifecycle priority for the "All" sort — live/actionable buckets bubble above terminal ones. */
+const FILTER_PRIORITY: Record<Filter, number> = {
+  all: 99, open: 0, invited: 1, has_applicants: 2, selected: 3, accepted: 4, in_progress: 5, completed: 6, cancelled: 7,
+};
 
 const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
 
@@ -80,13 +106,21 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
  */
 export function PostedTripsPage() {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<'all' | TripStatus>('open');
+  const [filter, setFilter] = useState<Filter>('open');
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
   const tripsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
 
   const trips = tripsQuery.data ?? [];
-  const shown = filter === 'all' ? trips : trips.filter((t) => t.status === filter);
-  const countFor = (f: 'all' | TripStatus) => (f === 'all' ? trips.length : trips.filter((t) => t.status === f).length);
+  const shown = filter === 'all'
+    // "All" — sort by lifecycle priority (live trips first), then pickupAt ASC.
+    ? [...trips].sort((a, b) => {
+        const pa = FILTER_PRIORITY[bucketFor(a)];
+        const pb = FILTER_PRIORITY[bucketFor(b)];
+        if (pa !== pb) return pa - pb;
+        return a.pickupAt.localeCompare(b.pickupAt);
+      })
+    : trips.filter((t) => bucketFor(t) === filter);
+  const countFor = (f: Filter) => (f === 'all' ? trips.length : trips.filter((t) => bucketFor(t) === f).length);
 
   return (
     <div className="mx-auto max-w-md">
@@ -105,10 +139,10 @@ export function PostedTripsPage() {
         </Button>
       </header>
 
-      <div className="flex gap-1 overflow-x-auto whitespace-nowrap border-b bg-white px-3 py-2">
+      <div className="flex flex-wrap gap-1.5 border-b bg-white px-3 py-2">
         {FILTERS.map((f) => (
           <button key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f} className={chip(filter === f)}>
-            {f === 'all' ? 'All' : STATUS_META[f].label}
+            {FILTER_LABEL[f]}
             {tripsQuery.isSuccess ? <span className="opacity-70"> · {countFor(f)}</span> : null}
           </button>
         ))}
@@ -130,7 +164,7 @@ export function PostedTripsPage() {
             }
           />
         ) : shown.length === 0 ? (
-          <EmptyState title={`No ${STATUS_META[filter as TripStatus].label.toLowerCase()} trips`} message="Pick a different status." action={<Button variant="outline" size="sm" onClick={() => setFilter('all')}>Show all</Button>} />
+          <EmptyState title={`No ${FILTER_LABEL[filter].toLowerCase()} trips`} message="Pick a different status." action={<Button variant="outline" size="sm" onClick={() => setFilter('all')}>Show all</Button>} />
         ) : (
           shown.map((t) => <PostedTripCard key={t.id} trip={t} onShare={() => setShareTrip(t)} />)
         )}

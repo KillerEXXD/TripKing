@@ -42,6 +42,7 @@ const baseTrip: Trip = {
   showFareToPassenger: true,
   hidePassengerPhone: false,
   applicantCount: 0,
+  pendingInvitationCount: 0,
   createdAt: '2026-05-20T10:00:00Z',
   acceptanceWindowMinutes: 15,
 };
