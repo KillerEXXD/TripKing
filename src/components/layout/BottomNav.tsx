@@ -67,7 +67,9 @@ export function BottomNav() {
   const activeId = items.find((it) => it.match(pathname))?.id;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t bg-white pb-[env(safe-area-inset-bottom)]">
+    // The extra +0.75rem on top of the safe-area inset lifts the icon row clearly
+    // above the iOS home indicator pill so the two never visually collide.
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t bg-white pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-1">
       {items.map((it) => {
         const isActive = it.id === activeId;
         if (it.primary) {
@@ -87,9 +89,13 @@ export function BottomNav() {
             onClick={() => navigate(it.to)}
             aria-label={it.label}
             aria-current={isActive ? 'page' : undefined}
-            className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors', isActive ? 'text-primary' : 'text-secondary hover:text-foreground')}
+            className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2.5 transition-colors', isActive ? 'text-primary' : 'text-secondary hover:text-foreground')}
           >
-            <it.Icon className={it.bigIcon ? 'size-7' : 'size-5'} aria-hidden />
+            {/* All non-primary icons render at size-9 (36px) so they visually balance the
+                size-12 (48px) green + pill — no more tiny home / clipboard glyphs next to
+                a giant Post button. `bigIcon` is now redundant but kept on the NavItem
+                shape for clarity at the call sites. */}
+            <it.Icon className="size-9" aria-hidden />
             {it.hideLabel ? null : <span className="text-[10px] font-medium">{it.label}</span>}
           </button>
         );
