@@ -8,6 +8,7 @@ import { cityHooks } from '@/hooks/useAdminConfig';
 import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { Badge, Button, Card, Input } from '@/components/ui';
+import { DateTimeField } from '@/components/form';
 import { KycGateNotice } from '@/components/driver';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatShortDate } from '@/lib/utils';
@@ -168,7 +169,7 @@ export function PostVacancyPage() {
           <div className="grid grid-cols-2 gap-3">
             <label className="block space-y-1">
               <span className="text-sm font-medium">Available from</span>
-              <Input type="datetime-local" value={startLocal} onChange={(e) => setStartLocal(e.target.value)} />
+              <DateTimeField value={startLocal} onChange={setStartLocal} />
             </label>
             <div className="space-y-1">
               <span className="text-sm font-medium">For how long?</span>
