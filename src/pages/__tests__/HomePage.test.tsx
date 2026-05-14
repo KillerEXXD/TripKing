@@ -49,6 +49,13 @@ describe('HomePage (admin home)', () => {
     expect(screen.getByRole('link', { name: /full administration page/i })).toHaveAttribute('href', '/administration');
   });
 
+  it('has a top-right profile avatar linking to /profile (consistent across roles)', () => {
+    renderHome();
+    const avatar = screen.getByRole('link', { name: /your profile/i });
+    expect(avatar).toHaveAttribute('href', '/profile');
+    expect(avatar).toHaveTextContent('RS'); // initials of "Ravee Sundar"
+  });
+
   it('a11y: admin home has no axe violations', async () => {
     const { container } = renderHome();
     expect(await axe(container)).toHaveNoViolations();

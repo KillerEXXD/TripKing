@@ -26,14 +26,14 @@ function renderNav(initialPath = '/') {
 describe('BottomNav', () => {
   beforeEach(() => vi.mocked(useAuth).mockReset());
 
-  it('shows the driver tab set for a driver', () => {
+  it('shows the driver tab set for a driver (no Profile tab — lives in top-right avatar)', () => {
     setUser(driver);
     renderNav();
     expect(screen.getByRole('button', { name: /^home$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^browse$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /post a trip/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /my trips/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^profile$/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^profile$/i })).toBeNull();
   });
 
   it('shows the agent tab set for an agent (no Browse / Profile tab)', () => {
