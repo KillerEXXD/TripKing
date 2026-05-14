@@ -17,8 +17,8 @@ vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn((
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn(() => ({ data: [] })) } }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
 
-const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true };
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
+const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
 function makeDriver(over: Partial<Driver> = {}): Driver {
   return { id: 'd1', userId: 'u1', fullName: 'Ravi Kumar', displayHandle: 'A1B2C3D', phone: '+91', homeCity: city('c1', 'Vellore'), currentCity: city('c1', 'Vellore'), profilePhotoUrl: '', kycStatus: 'approved', ratingAvg: 4.7, ratingCount: 9, ratingDistribution: { '1': 0, '2': 0, '3': 1, '4': 2, '5': 6 }, topTags: ['Punctual'], managerTopTags: [], totalTripsCompleted: 20, vehicles: [], ...over };
 }
@@ -90,7 +90,7 @@ describe('DriverHomePage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders the driver home — greeting, action tiles, reputation, empty feed', () => {
+  it('renders the driver home â€” greeting, action tiles, reputation, empty feed', () => {
     setMyDriver({ data: makeDriver() });
     setTrips({ data: [] });
     renderHome();
@@ -106,7 +106,7 @@ describe('DriverHomePage', () => {
   it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {
     setTrips([{ data: [makeTrip({ id: 't1' })] }, { data: [makeTrip({ id: 'p1', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
     renderHome();
-    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
+    expect(screen.getByText('Vellore â†’ Chennai')).toBeInTheDocument();
     expect(screen.getByText(/trip you posted has applicants/i)).toBeInTheDocument();
   });
 });

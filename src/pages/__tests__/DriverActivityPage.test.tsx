@@ -10,8 +10,8 @@ vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
 vi.mock('@/components/share/ShareTripModal', () => ({ ShareTripModal: () => <div>share modal</div> }));
 
-const user: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi', preferredLanguage: 'en', isActive: true };
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
+const user: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi', preferredLanguage: 'en', isActive: true, canReportBugs: false };
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
     id: 't1',
@@ -74,7 +74,7 @@ describe('DriverActivityPage', () => {
     expect(screen.getByRole('button', { name: /^driving/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^applied/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /posted by me/i })).toBeInTheDocument();
-    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
+    expect(screen.getByText('Vellore â†’ Chennai')).toBeInTheDocument();
   });
 
   it('the Applied tab lists your applications with their status and a trip link', () => {
@@ -89,10 +89,10 @@ describe('DriverActivityPage', () => {
     setUp({ posted: tripsState({ data: [makeTrip({ id: 'p-1', toCity: city('c9', 'Salem') })] }) });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /posted by me/i }));
-    expect(screen.getByText('Vellore → Salem')).toBeInTheDocument();
+    expect(screen.getByText('Vellore â†’ Salem')).toBeInTheDocument();
   });
 
-  it('empty states — no assigned trips; no applications (with a Browse CTA)', () => {
+  it('empty states â€” no assigned trips; no applications (with a Browse CTA)', () => {
     setUp();
     renderPage();
     expect(screen.getByText(/no trips assigned to you yet/i)).toBeInTheDocument();

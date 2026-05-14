@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/components/reviews/ReviewForm', () => ({ ReviewForm: (p: { direction: string }) => <div>review form: {p.direction}</div> }));
 vi.mock('@/components/reviews/ReviewList', () => ({ ReviewList: ({ reviews }: { reviews: Review[] }) => <div>review list ({reviews.length})</div> }));
 
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
     id: 't1',
@@ -43,9 +43,9 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     ...over,
   };
 }
-const agent: User = { id: 'agent1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true };
-const driver: User = { id: 'driver1', role: 'driver', phone: '+91', displayName: 'Driver D', preferredLanguage: 'en', isActive: true };
-const admin: User = { id: 'admin1', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
+const agent: User = { id: 'agent1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
+const driver: User = { id: 'driver1', role: 'driver', phone: '+91', displayName: 'Driver D', preferredLanguage: 'en', isActive: true, canReportBugs: false };
+const admin: User = { id: 'admin1', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 
 function setAuth(user: User) {
   vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });

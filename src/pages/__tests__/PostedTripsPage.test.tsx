@@ -10,8 +10,8 @@ vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn() }));
 import { useTrips } from '@/hooks/useTrips';
 vi.mock('@/components/share/ShareTripModal', () => ({ ShareTripModal: () => <div>share modal</div> }));
 
-const user: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true };
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
+const user: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
     id: 't1',
@@ -95,11 +95,11 @@ describe('PostedTripsPage', () => {
   it('lists the caller\'s trips and filters by status', () => {
     setTrips({ data: [makeTrip({ id: 't1', status: 'open', fromCity: city('c1', 'Vellore') }), makeTrip({ id: 't2', status: 'completed', fromCity: city('c3', 'Bangalore') })] });
     renderPosted();
-    expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
-    expect(screen.getByText(/bangalore → chennai/i)).toBeInTheDocument();
+    expect(screen.getByText(/vellore â†’ chennai/i)).toBeInTheDocument();
+    expect(screen.getByText(/bangalore â†’ chennai/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^completed/i }));
-    expect(screen.getByText(/bangalore → chennai/i)).toBeInTheDocument();
-    expect(screen.queryByText(/vellore → chennai/i)).toBeNull();
+    expect(screen.getByText(/bangalore â†’ chennai/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore â†’ chennai/i)).toBeNull();
   });
 
   it('shows a per-status empty state when the active filter matches nothing', () => {
@@ -108,7 +108,7 @@ describe('PostedTripsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^cancelled/i }));
     expect(screen.getByText(/no cancelled trips/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /show all/i }));
-    expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
+    expect(screen.getByText(/vellore â†’ chennai/i)).toBeInTheDocument();
   });
 
   it('opens the share sheet from a card and links a needs-review trip to its applicants', () => {

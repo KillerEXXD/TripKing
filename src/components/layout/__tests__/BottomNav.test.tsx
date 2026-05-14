@@ -7,7 +7,7 @@ import type { User } from '@/types';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 
-const driver: User = { id: 'd', role: 'driver', phone: '+91', displayName: 'Driver', preferredLanguage: 'en', isActive: true };
+const driver: User = { id: 'd', role: 'driver', phone: '+91', displayName: 'Driver', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const agent: User = { ...driver, id: 'a', role: 'trip_manager', displayName: 'Agent' };
 
 function setUser(user: User) {

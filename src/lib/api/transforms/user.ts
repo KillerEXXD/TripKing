@@ -25,6 +25,7 @@ export interface ApiUser {
   display_name?: string | null;
   preferred_language?: string | null;
   is_active?: boolean;
+  can_report_bugs?: boolean;
 }
 
 export function transformUser(api: ApiUser): User {
@@ -42,5 +43,6 @@ export function transformUser(api: ApiUser): User {
     displayName: api.display_name ?? '',
     preferredLanguage: api.preferred_language ?? 'en',
     isActive: api.is_active ?? true,
+    canReportBugs: api.can_report_bugs === true,
   };
 }

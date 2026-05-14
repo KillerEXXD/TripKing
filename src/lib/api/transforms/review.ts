@@ -55,7 +55,11 @@ export function toApiReview(input: ReviewInput): Record<string, unknown> {
   };
 }
 
-const NOTIFICATION_TYPES: readonly NotificationType[] = ['alert_match', 'kyc_status_change', 'trip_assigned', 'trip_cancelled', 'trip_completed', 'review_received'];
+const NOTIFICATION_TYPES: readonly NotificationType[] = [
+  'alert_match', 'kyc_status_change', 'trip_assigned', 'trip_cancelled', 'trip_completed', 'review_received',
+  'account_status_change', 'trip_invitation', 'invitation_accepted', 'invitation_declined',
+  'bug_reported', 'bug_resolved', 'bug_commented',
+];
 export function transformNotification(api: Api): Notification {
   const id = str(api.id);
   if (!id) throw new Error('notification has no id');

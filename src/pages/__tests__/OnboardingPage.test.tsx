@@ -16,7 +16,7 @@ import { useCreateMyAgentProfile, useCreateMyDriverProfile } from '@/hooks/useDr
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
 
-const driver: User = { id: 'u1', role: 'driver', phone: '+919876543210', displayName: 'Driver D', preferredLanguage: 'en', isActive: true };
+const driver: User = { id: 'u1', role: 'driver', phone: '+919876543210', displayName: 'Driver D', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 
 function setUser(user: User | null) {
   vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: user !== null, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
@@ -49,8 +49,8 @@ function renderOnboarding() {
 
 /** Walk from the intro carousel to the driver profile form. */
 function gotoDriverProfile() {
-  fireEvent.click(screen.getByRole('button', { name: /^skip$/i })); // intro → role
-  fireEvent.click(screen.getByRole('button', { name: /i'm a driver/i })); // role → profile
+  fireEvent.click(screen.getByRole('button', { name: /^skip$/i })); // intro â†’ role
+  fireEvent.click(screen.getByRole('button', { name: /i'm a driver/i })); // role â†’ profile
 }
 
 describe('OnboardingPage', () => {

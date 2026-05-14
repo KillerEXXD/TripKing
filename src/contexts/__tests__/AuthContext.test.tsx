@@ -22,7 +22,7 @@ const driver: User = {
   phone: '+919999999999',
   displayName: 'Ravi',
   preferredLanguage: 'en',
-  isActive: true,
+  isActive: true, canReportBugs: false,
 };
 
 function Probe() {

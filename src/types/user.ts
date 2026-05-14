@@ -11,6 +11,8 @@ export interface User {
   /** BCP-47 short code, FK → `languages.code` (e.g. `'en'`, `'ta'`, `'hi'`). */
   preferredLanguage: string;
   isActive: boolean;
+  /** Per-user gate for `POST /bug-reports`. Admins are always allowed regardless. */
+  canReportBugs: boolean;
 }
 
 /** Token pair + user returned by `/auth/verify-otp`. */
