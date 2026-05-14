@@ -6,7 +6,7 @@ import { useMyDriver } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
 import { useVacancies } from '@/hooks/useVacancies';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { cityHooks } from '@/hooks/useAdminConfig';
+import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
@@ -124,6 +124,13 @@ function DriverHome({ driver }: { driver: Driver }) {
   const postedWithApplicants = (myPostsQuery.data ?? []).filter((t) => t.status === 'has_applicants').length;
   const activeVacancies = (myVacanciesQuery.data ?? []).length;
 
+  // Max-active-vacancies is admin-configurable (migration 022, default 2). When the driver has
+  // already hit the cap, the "I'm available" tile should take them to the list to manage what
+  // they've posted instead of into a form that the backend will 409 on submit.
+  const settings = useAppSettings();
+  const maxActiveVacancies = settings.data?.maxActiveVacanciesPerDriver ?? 2;
+  const availableTileTarget = activeVacancies >= maxActiveVacancies ? '/my-trips?tab=available' : '/vacancies/new';
+
   return (
     <div>
       <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
@@ -162,7 +169,7 @@ function DriverHome({ driver }: { driver: Driver }) {
         <div className="grid grid-cols-3 gap-2.5">
           <HubTile icon={<Search className="size-5" aria-hidden />} label="Find a trip" tone="blue" to="/trips" />
           <HubTile icon={<Plus className="size-5" aria-hidden />} label="Post a trip" tone="violet" to="/trips/new" />
-          <HubTile icon={<Hand className="size-5" aria-hidden />} label="I'm available" tone="emerald" to="/vacancies/new" />
+          <HubTile icon={<Hand className="size-5" aria-hidden />} label="I'm available" tone="emerald" to={availableTileTarget} />
         </div>
 
         <ReputationCard driver={driver} />

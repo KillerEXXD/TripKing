@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +22,10 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'posted', label: 'Posted by me' },
 ];
 const tabBtn = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
+const TAB_IDS = TABS.map((t) => t.id);
+function isTab(v: string | null): v is Tab {
+  return !!v && (TAB_IDS as string[]).includes(v);
+}
 
 const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   applied: { label: 'Awaiting decision', variant: 'info' },
@@ -101,7 +105,17 @@ function TripList({
  */
 export function DriverActivityPage() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('driving');
+  // Tab selection is URL-backed so /my-trips?tab=available can be deep-linked
+  // (the driver-home "I'm available" tile + post-vacancy success redirect both rely on this).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const tab: Tab = isTab(urlTab) ? urlTab : 'driving';
+  const setTab = (next: Tab) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'driving') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  };
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
 
   const drivingQuery = useTrips({ assignedDriverId: 'me' });

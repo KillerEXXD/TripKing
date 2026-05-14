@@ -103,7 +103,7 @@ export function PostVacancyPage() {
     try {
       await postVacancy.mutateAsync(input);
       toast.success('Availability posted');
-      navigate('/vacancies');
+      navigate('/my-trips?tab=available');
     } catch {
       toast.error("Couldn't post your availability — try again.");
     }
