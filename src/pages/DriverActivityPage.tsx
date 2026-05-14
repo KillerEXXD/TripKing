@@ -33,7 +33,8 @@ function isTab(v: string | null): v is Tab {
 
 const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   applied: { label: 'Awaiting decision', variant: 'info' },
-  selected: { label: 'Selected — you got it!', variant: 'success' },
+  selected: { label: 'Selected — accept it!', variant: 'warning' },
+  accepted: { label: 'Accepted', variant: 'success' },
   rejected: { label: 'Not selected', variant: 'muted' },
   withdrawn: { label: 'Withdrawn', variant: 'muted' },
   expired: { label: 'Expired', variant: 'muted' },

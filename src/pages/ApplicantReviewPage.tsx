@@ -13,7 +13,8 @@ import type { AcceptanceStatus, Trip, TripAcceptance } from '@/types';
 
 const STATUS_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   applied: { label: 'Applied', variant: 'warning' },
-  selected: { label: 'Selected', variant: 'success' },
+  selected: { label: 'Selected', variant: 'info' },
+  accepted: { label: 'Accepted', variant: 'success' },
   rejected: { label: 'Rejected', variant: 'muted' },
   withdrawn: { label: 'Withdrawn', variant: 'muted' },
   expired: { label: 'Expired', variant: 'muted' },
@@ -50,7 +51,7 @@ function ApplicantCard({
   const meta = STATUS_BADGE[acceptance.status];
   const dim = acceptance.status === 'rejected' || acceptance.status === 'withdrawn' || acceptance.status === 'expired';
   return (
-    <Card className={`gap-3 ${acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : dim ? 'opacity-70' : ''}`}>
+    <Card className={`gap-3 ${acceptance.status === 'accepted' || acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : dim ? 'opacity-70' : ''}`}>
       <div className="flex items-start gap-3">
         <Link to={`/drivers/${acceptance.driverId}`} aria-label={`${d?.fullName || 'driver'} profile`}>
           <Avatar className="size-11">
@@ -71,7 +72,7 @@ function ApplicantCard({
           </div>
         </div>
         <Badge variant={meta.variant} className="shrink-0">
-          {acceptance.status === 'selected' ? <CheckCircle2 className="size-3" aria-hidden /> : null} {meta.label}
+          {acceptance.status === 'accepted' || acceptance.status === 'selected' ? <CheckCircle2 className="size-3" aria-hidden /> : null} {meta.label}
         </Badge>
       </div>
       {d && d.topTags.length > 0 ? (

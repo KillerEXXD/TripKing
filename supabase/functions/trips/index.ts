@@ -1201,6 +1201,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
 
     // Reject the other applicants now that the driver has actually committed.
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).neq('id', trip.assigned_acceptance_id).in('status', ['applied']);
+    // Flip the accepting driver's acceptance row to 'accepted' so the row's status
+    // agrees with the trip's. (Migration 037 broadened the CHECK to allow this value.)
+    if (trip.assigned_acceptance_id) {
+      await db.from('trip_acceptances').update({ status: 'accepted', decision_at: now }).eq('id', trip.assigned_acceptance_id);
+    }
     const { error } = await db
       .from('trips')
       .update({
