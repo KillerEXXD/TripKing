@@ -102,12 +102,12 @@ const isoIn = (ms) => new Date(Date.now() + ms).toISOString();
   }});
   check('5. round_trip last ≠ first → 422 VALIDATION', bad1.status === 422 && bad1.json?.error?.code === 'VALIDATION', `status=${bad1.status}`);
 
-  // 6. Bad: multi_way last == first
-  const bad2 = await j('POST', '/trips', { token: tok, body: {
+  // 6. multi_way is allowed to loop back (last == first) — share-text will read "Multi-way return back"
+  const loop = await j('POST', '/trips', { token: tok, body: {
     ...baseBody, pickup_at: pickupAt, trip_type: 'multi_way',
     waypoints: [{ city_id: cities[0].id }, { city_id: cities[1].id, arrive_at: isoIn(86_400_000 + 3_600_000) }, { city_id: cities[0].id, arrive_at: isoIn(86_400_000 + 6 * 3_600_000) }],
   }});
-  check('6. multi_way looping back → 422 VALIDATION', bad2.status === 422 && bad2.json?.error?.code === 'VALIDATION', `status=${bad2.status}`);
+  check('6. multi_way looping back → 200 (allowed; client labels it as "return back")', loop.status === 200 && loop.json?.data?.trip_type === 'multi_way' && loop.json?.data?.waypoints?.length === 3, `status=${loop.status}`);
 
   // 7. Non-monotonic arrive_at
   const bad3 = await j('POST', '/trips', { token: tok, body: {

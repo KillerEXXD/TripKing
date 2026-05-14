@@ -161,7 +161,7 @@ async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAt
   const sameEndpoints = (firstCity && lastCity && firstCity === lastCity) || (firstPlace && lastPlace && firstPlace === lastPlace);
   if (tripType === 'round_trip' && !sameEndpoints) return fail('VALIDATION', 'round_trip requires the last waypoint to match the first city/place', 422);
   if (tripType === 'multi_way' && raw.length < 3) return fail('VALIDATION', 'multi_way requires ≥3 waypoints', 422);
-  if (tripType === 'multi_way' && sameEndpoints) return fail('VALIDATION', 'multi_way last waypoint must differ from the first (use round_trip for a loop)', 422);
+  // multi_way may loop back (last == first) — the client distinguishes "drop" vs "return back" for share text.
   if (tripType === 'one_way' && sameEndpoints) return fail('VALIDATION', 'one_way last waypoint must differ from the first (use round_trip for a loop)', 422);
 
   // monotonic arrive_at; phones scrubbed; defaults applied
