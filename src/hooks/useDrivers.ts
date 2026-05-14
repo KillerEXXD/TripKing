@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
+import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
   createMyAgentProfile,
   createMyDriverProfile,
@@ -80,20 +81,8 @@ export function useMyAgent(enabled = true) {
   return useQuery({ queryKey: ['agent', 'me'], queryFn: getMyAgent, enabled, staleTime: STALE.profile, retry: false });
 }
 
-function useInvalidateDriver() {
-  const qc = useQueryClient();
-  return (id: string) => {
-    void qc.invalidateQueries({ queryKey: ['driver', id] });
-    void qc.invalidateQueries({ queryKey: ['drivers'] });
-  };
-}
-function useInvalidateAgent() {
-  const qc = useQueryClient();
-  return (id: string) => {
-    void qc.invalidateQueries({ queryKey: ['agent', id] });
-    void qc.invalidateQueries({ queryKey: ['agents'] });
-  };
-}
+const useInvalidateDriver = createInvalidator('drivers', 'driver');
+const useInvalidateAgent = createInvalidator('agents', 'agent');
 
 /** Create the signed-in user's driver profile (onboarding). */
 export function useCreateMyDriverProfile() {
@@ -105,10 +94,10 @@ export function useCreateMyDriverProfile() {
 }
 /** Create the signed-in user's agent (trip_manager) profile (onboarding). */
 export function useCreateMyAgentProfile() {
-  const qc = useQueryClient();
+  const invalidate = useInvalidateAgent();
   return useMutation({
     mutationFn: (input: CreateAgentProfileInput) => createMyAgentProfile(input),
-    onSuccess: (a) => void qc.invalidateQueries({ queryKey: ['agent', a.id] }),
+    onSuccess: (a) => invalidate(a.id),
   });
 }
 

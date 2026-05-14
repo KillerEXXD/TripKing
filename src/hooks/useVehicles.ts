@@ -1,5 +1,6 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
+import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import { addVehicle, deleteVehicle, getAdminVehicles, getAdminVehiclesPage, getDriverVehicles, getVehicle, setVehicleActive, updateVehicle, type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
 import type { VehicleInput } from '@/types';
 
@@ -24,23 +25,20 @@ export function useInfiniteAdminVehicles(params?: Omit<AdminVehiclesQueryParams,
   });
 }
 
-function useInvalidateVehicles() {
-  const qc = useQueryClient();
-  return () => void qc.invalidateQueries({ queryKey: ['vehicles'] });
-}
+const useInvalidateVehicles = createInvalidator('vehicles', 'vehicle');
 export function useAddVehicle() {
   const invalidate = useInvalidateVehicles();
-  return useMutation({ mutationFn: (input: VehicleInput) => addVehicle(input), onSuccess: invalidate });
+  return useMutation({ mutationFn: (input: VehicleInput) => addVehicle(input), onSuccess: () => invalidate() });
 }
 export function useUpdateVehicle() {
   const invalidate = useInvalidateVehicles();
-  return useMutation({ mutationFn: ({ id, patch }: { id: string; patch: Partial<VehicleInput> }) => updateVehicle(id, patch), onSuccess: invalidate });
+  return useMutation({ mutationFn: ({ id, patch }: { id: string; patch: Partial<VehicleInput> }) => updateVehicle(id, patch), onSuccess: (_d, v) => invalidate(v.id) });
 }
 export function useSetVehicleActive() {
   const invalidate = useInvalidateVehicles();
-  return useMutation({ mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setVehicleActive(id, isActive), onSuccess: invalidate });
+  return useMutation({ mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setVehicleActive(id, isActive), onSuccess: (_d, v) => invalidate(v.id) });
 }
 export function useDeleteVehicle() {
   const invalidate = useInvalidateVehicles();
-  return useMutation({ mutationFn: (id: string) => deleteVehicle(id), onSuccess: invalidate });
+  return useMutation({ mutationFn: (id: string) => deleteVehicle(id), onSuccess: (_d, id) => invalidate(id) });
 }

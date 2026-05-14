@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
+import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import { cancelVacancy, getVacancies, getVacancy, postVacancy } from '@/lib/api/services/vacancies';
 import type { PostVacancyInput, VacanciesQueryParams } from '@/types';
 
@@ -26,13 +27,7 @@ export function useMyActiveVacancies(driverId: string | undefined) {
   });
 }
 
-function useInvalidateVacancies() {
-  const qc = useQueryClient();
-  return (id?: string) => {
-    void qc.invalidateQueries({ queryKey: ['vacancies'] });
-    if (id) void qc.invalidateQueries({ queryKey: ['vacancy', id] });
-  };
-}
+const useInvalidateVacancies = createInvalidator('vacancies', 'vacancy');
 export function usePostVacancy() {
   const invalidate = useInvalidateVacancies();
   return useMutation({ mutationFn: (input: PostVacancyInput) => postVacancy(input), onSuccess: () => invalidate() });

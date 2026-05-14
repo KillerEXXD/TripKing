@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
+import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import { createAlert, deleteAlert, getAlert, getMyAlerts, setAlertActive, updateAlert } from '@/lib/api/services/alerts';
 import type { AlertInput } from '@/types';
 
@@ -10,13 +11,7 @@ export function useAlert(id: string | undefined) {
   return useQuery({ queryKey: ['alert', id], queryFn: () => getAlert(id as string), enabled: !!id, staleTime: STALE.profile });
 }
 
-function useInvalidateAlerts() {
-  const qc = useQueryClient();
-  return (id?: string) => {
-    void qc.invalidateQueries({ queryKey: ['alerts'] });
-    if (id) void qc.invalidateQueries({ queryKey: ['alert', id] });
-  };
-}
+const useInvalidateAlerts = createInvalidator('alerts', 'alert');
 export function useCreateAlert() {
   const invalidate = useInvalidateAlerts();
   return useMutation({ mutationFn: (input: AlertInput) => createAlert(input), onSuccess: () => invalidate() });
