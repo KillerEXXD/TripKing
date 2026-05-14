@@ -3,7 +3,6 @@ import { BarChart3, Bell, ChevronRight, Plus, Sparkles, Star, Users } from 'luci
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
-import { useVacancies } from '@/hooks/useVacancies';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Badge, Button, Card } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
@@ -11,7 +10,7 @@ import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
-import type { Agent, Trip, Vacancy } from '@/types';
+import type { Agent, Trip } from '@/types';
 
 const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', selected: 'Awaiting acceptance', accepted: 'Accepted', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
 
@@ -60,33 +59,13 @@ function PostedTripRow({ trip }: { trip: Trip }) {
     </Link>
   );
 }
-function AvailableDriverRow({ v }: { v: Vacancy }) {
-  return (
-    <Link to={`/drivers/${v.driverId}`} className="block">
-      <Card className="gap-1 transition-colors hover:border-primary/40">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-bold">{v.driver?.fullName || 'A driver'}</div>
-            <div className="text-xs text-secondary">In {v.currentCity.name} · will drive to {v.destinationCities.map((c) => c.name).join(', ') || 'anywhere'}</div>
-          </div>
-          {v.driver && v.driver.ratingCount > 0 ? (
-            <span className="shrink-0 text-xs font-semibold text-amber-600">★ {v.driver.ratingAvg.toFixed(1)}</span>
-          ) : null}
-        </div>
-      </Card>
-    </Link>
-  );
-}
-
 function AgentHome({ agent }: { agent: Agent }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
-  const driversQuery = useVacancies({ status: 'active' });
 
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
-  const available = driversQuery.data ?? [];
 
   return (
     <div>
@@ -181,28 +160,12 @@ function AgentHome({ agent }: { agent: Agent }) {
           )}
         </div>
 
-        {available.length > 0 ? (
-          <div>
-            <div className="mb-2 flex items-center justify-between px-1">
-              <h2 className="text-sm font-semibold">Available drivers</h2>
-              <Badge variant="muted">{available.length}</Badge>
-            </div>
-            <div className="space-y-2">
-              {available.slice(0, 3).map((v) => (
-                <AvailableDriverRow key={v.id} v={v} />
-              ))}
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/vacancies">Browse available drivers →</Link>
-              </Button>
-            </div>
-          </div>
-        ) : null}
       </div>
     </div>
   );
 }
 
-/** `/` for an agent — post-and-shepherd home: actions, reputation, posts with applicants, your recent posts, available drivers. Built on `useMyAgent` / `useTrips` / `useVacancies` / `useNotifications`. */
+/** `/` for an agent — post-and-shepherd home: actions, reputation, posts with applicants, recent posts. Built on `useMyAgent` / `useTrips` / `useNotifications`. */
 export function AgentHomePage() {
   const navigate = useNavigate();
   const agentQuery = useMyAgent(true);
