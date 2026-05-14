@@ -151,7 +151,7 @@ describe('ApplicantReviewPage', () => {
   });
 
   it('hides the actions when the trip is no longer assignable', () => {
-    setTrip({ data: makeTrip({ status: 'assigned' }) });
+    setTrip({ data: makeTrip({ status: 'accepted' }) });
     setApplicants({ data: [makeAcceptance({ status: 'selected' })] });
     renderPage();
     expect(screen.queryByRole('button', { name: /select this driver/i })).toBeNull();

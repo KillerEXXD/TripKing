@@ -37,7 +37,7 @@ function mapsDirLink(fromLat: number, fromLng: number, toLat: number, toLng: num
  * Renders nothing unless the trip is `assigned`/`in_progress`.
  */
 export function TripTracking({ trip }: { trip: Trip }) {
-  if (trip.status !== 'assigned' && trip.status !== 'in_progress') return null;
+  if (trip.status !== 'accepted' && trip.status !== 'in_progress') return null;
   const d = trip.assignedDriver;
   const hasPosition = d && typeof d.currentLat === 'number' && typeof d.currentLng === 'number';
   const inProgress = trip.status === 'in_progress';

@@ -11,7 +11,7 @@ Today the assign step is a single hop:
 
 ```
 agent picks an applicant
-  → trip.status = 'assigned' + passenger OTP generated server-side
+  → trip.status = 'accepted' + passenger OTP generated server-side
   → notification fires to the driver
   → driver enters OTP + odometer to start
 ```
@@ -49,7 +49,7 @@ selected                                   ← NEW intermediate state
   │   driver gets a notification + Accept / Decline card.
   │   trip carries `acceptance_deadline_at` (now + window minutes).
   │
-  ├── driver accepts            → assigned (passenger OTP generated)
+  ├── driver accepts            → accepted (passenger OTP generated)
   ├── driver declines           → has_applicants (rejoins applicant pool? no — see §5)
   ├── deadline elapses          → has_applicants (auto-expiry job)
   └── agent withdraws selection → has_applicants
@@ -154,7 +154,7 @@ collect them for now).
 | Event | OTP exists? | Who sees `passenger_otp` plaintext? | Who sees `passenger_otp_hash`? |
 |---|---|---|---|
 | Open / has_applicants / selected | No | — | — |
-| Driver accepts (status → assigned) | Generated server-side | Trip creator (poster) **only** | Server (used to validate) |
+| Driver accepts (status → accepted) | Generated server-side | Trip creator (poster) **only** | Server (used to validate) |
 | In progress / completed | Persisted | Trip creator only | Server |
 
 - OTP is a 5-digit numeric (today: `ddddd`). Stays the same.
@@ -264,7 +264,7 @@ POST  /trips/:id/decline            (selected driver; Bearer)
 POST  /trips/:id/cancel-assignment  (poster/admin; Bearer)
   body: { reason?: string }
   200: { ok: true, trip: <updated row, back to has_applicants> }
-  409: trip is not in 'selected'/'assigned'
+  409: trip is not in 'selected'/'accepted'
 
 POST  /trips/:id/invites            (poster/admin; Bearer)
   body: { driver_ids: string[] }
@@ -295,7 +295,7 @@ POST  /trips                        (poster; Bearer)
 POST  /trips/:id/assign             (poster/admin; Bearer)
   body: { acceptance_id }
   Effect changes:
-    - trip.status → 'selected' (not 'assigned')
+    - trip.status → 'selected' (not 'accepted')
     - acceptance_deadline_at = now() + acceptance_window_minutes * '1 min'
     - DOES NOT generate passenger_otp yet
     - notification 'trip_selected' fires to the driver (push + SMS fallback)
@@ -341,17 +341,17 @@ alter table public.trips
 -- broaden the status CHECK to allow the new 'selected' state
 alter table public.trips drop constraint trips_status_check;
 alter table public.trips add constraint trips_status_check
-  check (status in ('open', 'has_applicants', 'selected', 'assigned',
+  check (status in ('open', 'has_applicants', 'selected', 'accepted',
                     'in_progress', 'completed', 'cancelled'));
 
 -- trip_invitations table (see §7 sketch above)
 create table public.trip_invitations (...);
 
--- backfill: any existing 'assigned' row keeps that status; driver_acceptance_status
+-- backfill: any existing 'accepted' row keeps that status; driver_acceptance_status
 -- defaults to 'accepted' so the migration is non-destructive.
 update public.trips
    set driver_acceptance_status = 'accepted'
- where status in ('assigned', 'in_progress', 'completed');
+ where status in ('accepted', 'in_progress', 'completed');
 
 -- cron job: expire stale selections every minute
 select cron.schedule(

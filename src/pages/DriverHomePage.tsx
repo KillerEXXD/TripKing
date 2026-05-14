@@ -136,7 +136,7 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
 }
 
 /**
- * Driver has accepted but hasn't yet entered the OTP + odometer to start (`status='assigned'`).
+ * Driver has accepted but hasn't yet entered the OTP + odometer to start (`status='accepted'`).
  * Amber to nudge action but distinct from the live-in-progress emerald.
  */
 function AssignedTripCard({ trip }: { trip: Trip }) {
@@ -233,7 +233,7 @@ function DriverHome({ driver }: { driver: Driver }) {
   // Priority cards: a driver has at most one trip in each of these states at a time.
   const myDriving = myDrivingQuery.data ?? [];
   const inProgressTrip = myDriving.find((t) => t.status === 'in_progress');
-  const assignedTrip = myDriving.find((t) => t.status === 'assigned');
+  const assignedTrip = myDriving.find((t) => t.status === 'accepted');
   // Selected = agent picked you, you haven't accepted/declined yet (handshake spec).
   const awaitingDecision = (myApplicationsQuery.data ?? []).filter((a) => a.status === 'selected');
 

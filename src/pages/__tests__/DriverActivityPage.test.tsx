@@ -69,7 +69,7 @@ describe('DriverActivityPage', () => {
   });
 
   it('shows the three tabs and lists the trips assigned to you by default', () => {
-    setUp({ driving: tripsState({ data: [makeTrip({ id: 'd-1', status: 'assigned' })] }) });
+    setUp({ driving: tripsState({ data: [makeTrip({ id: 'd-1', status: 'accepted' })] }) });
     renderPage();
     expect(screen.getByRole('heading', { name: /my trips/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^driving/i })).toBeInTheDocument();

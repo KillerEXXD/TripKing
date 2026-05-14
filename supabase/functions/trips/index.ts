@@ -309,14 +309,14 @@ const TRIP_PII_COLS = ['passenger_name', 'passenger_phone', 'posted_by_name', 'p
 const DRIVER_POSITION_COLS = ['current_lat', 'current_lng', 'current_location_at'] as const;
 const DRIVER_PII_COLS = ['full_name', 'phone', 'email', 'profile_photo_url'] as const;
 const TRIP_TEXT_FIELDS = ['driver_instructions', 'luggage_notes', 'special_requests'] as const;
-type ViewerRel = 'owner' | 'admin' | 'assigned' | 'selected' | 'browse';
+type ViewerRel = 'owner' | 'admin' | 'accepted' | 'selected' | 'browse';
 
 /** Who is `u` to this trip?
  *   owner    — the poster (or an admin)
  *   admin    — site admin
  *   selected — the driver the agent just picked, before they Accept (status='selected'). Mutual reveal
  *              (agent name+phone) so they can call to confirm; passenger details still hidden.
- *   assigned — the driver, after they've Accepted (status='assigned' or later). Full reveal.
+ *   assigned — the driver, after they've Accepted (status='accepted' or later). Full reveal.
  *   browse   — everyone else.
  */
 function relationshipFor(raw: Record<string, unknown>, u: { id: string; role: string } | null, myDriverId: string | null): ViewerRel {
@@ -324,7 +324,7 @@ function relationshipFor(raw: Record<string, unknown>, u: { id: string; role: st
   if (u.role === 'admin') return 'admin';
   if (raw.posted_by_user_id === u.id) return 'owner';
   if (myDriverId && raw.assigned_driver_id === myDriverId) {
-    return raw.status === 'selected' ? 'selected' : 'assigned';
+    return raw.status === 'selected' ? 'selected' : 'accepted';
   }
   return 'browse';
 }
@@ -405,7 +405,7 @@ function redactTrip(raw: Record<string, unknown>, rel: ViewerRel, posterReveal =
     if (typeof raw.passenger_otp === 'string' && raw.passenger_otp) out.passenger_otp = raw.passenger_otp;
     const dist = distanceToDest(raw);
     if (dist != null) out.distance_to_destination_km = dist;
-  } else if (rel === 'assigned') {
+  } else if (rel === 'accepted') {
     out.passenger_name = raw.passenger_name;
     out.posted_by_phone = raw.posted_by_phone;
     out.posted_by_name = raw.posted_by_name;
@@ -455,7 +455,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   async function loadTrip(id: string) {
     const { data } = await db
       .from('trips')
-      .select('id, posted_by_user_id, assigned_driver_id, assigned_acceptance_id, status, passenger_otp_hash, acceptance_window_minutes, acceptance_deadline_at, driver_acceptance_status, from_city_id')
+      .select('id, posted_by_user_id, assigned_driver_id, assigned_acceptance_id, status, passenger_otp_hash, acceptance_window_minutes, acceptance_deadline_at, driver_acceptance_status, from_city_id, pickup_at, expected_end_at')
       .eq('id', id)
       .maybeSingle();
     return data as {
@@ -469,6 +469,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       acceptance_deadline_at: string | null;
       driver_acceptance_status: 'pending' | 'accepted' | 'declined' | 'expired' | null;
       from_city_id: string | null;
+      pickup_at: string | null;
+      expected_end_at: string | null;
     } | null;
   }
   /** Haversine distance in km — keeping it inline to avoid a PostGIS round-trip per driver. */
@@ -879,7 +881,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const drv = redacted.assigned_driver as Record<string, unknown> | null | undefined;
       if (drv && v) (drv as Record<string, unknown>).verification = v;
     }
-    if (rel === 'assigned') {
+    if (rel === 'accepted') {
       const posterUserId = raw.posted_by_user_id as string | undefined;
       const posterRole = raw.posted_by_role as string | undefined;
       if (posterUserId) {
@@ -1059,10 +1061,50 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return ok(t);
   }
 
+  // ── GET /trips/:id/overlapping-applications ──────────────────────────────
+  // The currently-selected driver, before tapping Accept, asks: "which other
+  // trips have I applied to that overlap this one?" The driver can then check
+  // them off in the AcceptTripDialog and have those applications withdrawn
+  // when accepting. Returns rows from trip_acceptances joined with their trip
+  // (route + pickup + status); status IN ('applied','selected') only.
+  if (sub === 'overlapping-applications' && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in', 401);
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    const did = await driverIdFor(u.id);
+    if (!did || (trip.assigned_driver_id !== did && !isAdmin(u))) {
+      return fail('FORBIDDEN', 'Only the selected driver can see this list', 403);
+    }
+    if (!trip.pickup_at || !trip.expected_end_at) return ok([]);
+    // Standard interval-overlap: other.pickup_at < A.expected_end_at
+    // AND other.expected_end_at > A.pickup_at. We can't do the cross-row
+    // predicate in one PostgREST query, so we filter in two steps: pull
+    // applied/selected acceptances for this driver excluding this trip,
+    // then filter in JS by the joined trip's times.
+    const { data: rows, error } = await db
+      .from('trip_acceptances')
+      .select('id, trip_id, status, applied_at, applicant_quoted_rate_per_km, applicant_message, trip:trips!trip_id(id, status, pickup_at, expected_end_at, expected_distance_km, total_fare, driver_payout, rate_per_km, from_city:cities!from_city_id(id, name), to_city:cities!to_city_id(id, name))')
+      .eq('driver_id', did)
+      .neq('trip_id', tripId)
+      .in('status', ['applied', 'selected']);
+    if (error) return pgFail(error);
+    type Row = { id: string; trip_id: string; status: string; applied_at: string; applicant_quoted_rate_per_km: number | null; applicant_message: string | null; trip: { pickup_at: string | null; expected_end_at: string | null } & Record<string, unknown> };
+    const startA = new Date(trip.pickup_at).getTime();
+    const endA = new Date(trip.expected_end_at).getTime();
+    const overlapping = (rows as Row[] | null ?? []).filter((r) => {
+      const ts = r.trip?.pickup_at ? new Date(r.trip.pickup_at).getTime() : NaN;
+      const te = r.trip?.expected_end_at ? new Date(r.trip.expected_end_at).getTime() : NaN;
+      if (!isFinite(ts) || !isFinite(te)) return false;
+      return ts < endA && te > startA;
+    });
+    return ok(overlapping);
+  }
+
   // ── POST /trips/:id/accept (Phase 2 of two-step handshake) ────────────────
   // The driver the agent picked taps Accept. Server checks status is still
   // 'selected', caller is the selected driver. Generates the passenger OTP,
-  // flips the trip to 'assigned', rejects the other applicants, sets up the
+  // flips the trip to 'accepted', rejects the other applicants, sets up the
   // trip_executions row, and SMSes the passenger out-of-band (placeholder
   // here — real SMS hookup is a follow-up).
   if (sub === 'accept' && req.method === 'POST') {
@@ -1082,12 +1124,59 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const now = new Date().toISOString();
     const otp = genOtp();
     const otpHash = await sha256hex(otp);
+
+    // Optional: withdraw the driver's other applications they confirmed via
+    // the AcceptTripDialog. Each id must belong to the caller's driver. If the
+    // sibling trip was 'selected' with this driver pending acceptance, also
+    // revert that trip — same path as POST /decline (status → has_applicants,
+    // clear assigned_*, fire trip_assignment_cancelled to its poster).
+    const b = await readBody(req).catch(() => ({} as Record<string, unknown>));
+    const withdrawIds = Array.isArray(b.withdraw_acceptance_ids)
+      ? (b.withdraw_acceptance_ids as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
+      : [];
+    if (withdrawIds.length > 0 && did) {
+      const { data: rowsToWithdraw } = await db
+        .from('trip_acceptances')
+        .select('id, trip_id, status')
+        .in('id', withdrawIds)
+        .eq('driver_id', did);
+      const ownedIds = (rowsToWithdraw ?? []).map((r) => r.id as string);
+      if (ownedIds.length > 0) {
+        await db.from('trip_acceptances').update({ status: 'withdrawn', decision_at: now }).in('id', ownedIds);
+      }
+      for (const r of (rowsToWithdraw ?? []) as { id: string; trip_id: string; status: string }[]) {
+        if (r.status !== 'selected') continue; // only `selected` siblings need trip-side revert
+        const { data: stillApplied } = await db.from('trip_acceptances').select('id').eq('trip_id', r.trip_id).eq('status', 'applied').limit(1);
+        const fallbackStatus = (stillApplied && stillApplied.length > 0) ? 'has_applicants' : 'open';
+        await db.from('trips').update({
+          status: fallbackStatus,
+          assigned_driver_id: null,
+          assigned_vehicle_id: null,
+          assigned_acceptance_id: null,
+          assigned_at: null,
+          acceptance_deadline_at: null,
+          driver_acceptance_status: 'declined',
+        }).eq('id', r.trip_id);
+        // Notify the OTHER trip's poster — the driver took a different trip.
+        const { data: otherTrip } = await db.from('trips').select('posted_by_user_id').eq('id', r.trip_id).maybeSingle();
+        if (otherTrip?.posted_by_user_id) {
+          await db.from('notifications').insert({
+            user_id: otherTrip.posted_by_user_id,
+            type: 'trip_assignment_cancelled',
+            title: 'Driver took another trip',
+            body: 'The selected driver accepted a different trip. Pick another applicant.',
+            payload_json: { trip_id: r.trip_id, accepted_trip_id: tripId },
+          });
+        }
+      }
+    }
+
     // Reject the other applicants now that the driver has actually committed.
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).neq('id', trip.assigned_acceptance_id).in('status', ['applied']);
     const { error } = await db
       .from('trips')
       .update({
-        status: 'assigned',
+        status: 'accepted',
         driver_acceptance_status: 'accepted',
         passenger_otp_hash: otpHash,
         passenger_otp: otp,
@@ -1162,7 +1251,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const trip = await loadTrip(tripId);
     if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
     if (!u || (trip.posted_by_user_id !== u.id && !isAdmin(u))) return fail('FORBIDDEN', 'Only the trip poster can cancel an assignment', 403);
-    if (!['selected', 'assigned'].includes(trip.status as string)) {
+    if (!['selected', 'accepted'].includes(trip.status as string)) {
       return fail('CONFLICT', `Trip is "${trip.status}", not selected/assigned`, 409);
     }
     const b = await readBody(req).catch(() => ({} as Record<string, unknown>));
@@ -1351,7 +1440,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
     const did = u ? await driverIdFor(u.id) : null;
     if (!u || (trip.assigned_driver_id !== did && !isAdmin(u))) return fail('FORBIDDEN', 'Only the assigned driver can start the trip', 403);
-    if (trip.status !== 'assigned') return fail('CONFLICT', `Trip is "${trip.status}", not "assigned"`, 409);
+    if (trip.status !== 'accepted') return fail('CONFLICT', `Trip is "${trip.status}", not "accepted"`, 409);
     const b = await readBody(req);
     const otpHash = await sha256hex(String(b.passenger_otp ?? ''));
     if (!trip.passenger_otp_hash || otpHash !== trip.passenger_otp_hash) return fail('INVALID_OTP', 'Incorrect passenger OTP', 401);

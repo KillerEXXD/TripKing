@@ -2,7 +2,7 @@ import type { CityRow } from './adminConfig';
 import type { NearRadius, Place } from './place';
 import type { KycStatus, VerificationSummary } from './driver';
 
-export type TripStatus = 'open' | 'has_applicants' | 'selected' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+export type TripStatus = 'open' | 'has_applicants' | 'selected' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
 /** Phase 2 of the two-step handshake — drives the driver's Accept/Decline card. Null on trips that pre-date the handshake. */
 export type DriverAcceptanceStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 export type PosterRole = 'driver' | 'trip_manager';

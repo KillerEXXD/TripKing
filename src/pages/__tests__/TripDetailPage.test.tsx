@@ -265,7 +265,7 @@ describe('TripDetailPage', () => {
   });
 
   it('lets the assigned driver start the trip with the passenger OTP', async () => {
-    setTrip({ data: makeTrip({ status: 'assigned', assignedDriverId: 'd1' }) });
+    setTrip({ data: makeTrip({ status: 'accepted', assignedDriverId: 'd1' }) });
     renderDetail();
     expect(screen.getByText(/you're driving this trip/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
@@ -283,7 +283,7 @@ describe('TripDetailPage', () => {
 
   it('lets the poster open the passenger share link once a driver is assigned', () => {
     vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
-    setTrip({ data: makeTrip({ status: 'assigned', passengerOtp: '123456' }) });
+    setTrip({ data: makeTrip({ status: 'accepted', passengerOtp: '123456' }) });
     renderDetail();
     expect(screen.getByText(/share the trip with your passenger/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /share the passenger link/i }));

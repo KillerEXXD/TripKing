@@ -100,7 +100,7 @@ Rules:
 
 ### 4.1 Principles
 - **PostgreSQL on Supabase.** One schema (`public`) for v1.
-- **Use `TEXT` + `CHECK` constraints, never native `ENUM` types** — easier to evolve (this is a documented hudr/TournamentPro rule and we keep it). Example: `status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','has_applicants','assigned','in_progress','completed','cancelled'))`.
+- **Use `TEXT` + `CHECK` constraints, never native `ENUM` types** — easier to evolve (this is a documented hudr/TournamentPro rule and we keep it). Example: `status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','has_applicants','accepted','in_progress','completed','cancelled'))`.
 - **Surrogate keys:** `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` for everything except lookup tables that have a natural stable code (e.g. `languages.code = 'ta'`).
 - **Timestamps:** `created_at TIMESTAMPTZ NOT NULL DEFAULT now()`, `updated_at TIMESTAMPTZ NOT NULL DEFAULT now()` with an `update_updated_at` trigger on every mutable table.
 - **Soft-disable lookup rows, never hard-delete** once referenced — `is_active BOOLEAN NOT NULL DEFAULT true`. The API returns active rows by default; admin can see all.

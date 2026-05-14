@@ -13,7 +13,7 @@ import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
 import type { Agent, Trip, Vacancy } from '@/types';
 
-const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', selected: 'Awaiting acceptance', assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
+const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', selected: 'Awaiting acceptance', accepted: 'Accepted', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
@@ -49,7 +49,7 @@ function PostedTripRow({ trip }: { trip: Trip }) {
             <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
             <div className="text-xs text-secondary">{formatPickupTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout</div>
           </div>
-          <Badge variant={trip.status === 'has_applicants' ? 'warning' : trip.status === 'assigned' || trip.status === 'in_progress' ? 'info' : trip.status === 'completed' ? 'muted' : trip.status === 'cancelled' ? 'destructive' : 'success'}>{STATUS_LABEL[trip.status]}</Badge>
+          <Badge variant={trip.status === 'has_applicants' ? 'warning' : trip.status === 'accepted' || trip.status === 'in_progress' ? 'info' : trip.status === 'completed' ? 'muted' : trip.status === 'cancelled' ? 'destructive' : 'success'}>{STATUS_LABEL[trip.status]}</Badge>
         </div>
         {trip.applicantCount > 0 ? (
           <div className="flex items-center gap-1 text-xs text-amber-700">

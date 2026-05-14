@@ -48,7 +48,7 @@ describe('useTrip — live polling', () => {
   });
 
   it('polls every ~15s for an assigned trip (driver awaiting OTP)', async () => {
-    vi.mocked(getTrip).mockResolvedValue(trip({ status: 'assigned' }));
+    vi.mocked(getTrip).mockResolvedValue(trip({ status: 'accepted' }));
     renderHook(() => useTrip('t1'), { wrapper: wrapper() });
     await tick(0);
     expect(getTrip).toHaveBeenCalledTimes(1);
@@ -68,7 +68,7 @@ describe('useTripByOtp — passenger-portal polling', () => {
   afterEach(() => vi.useRealTimers());
 
   it('refetches every ~12s while assigned/in_progress, then stops once completed', async () => {
-    vi.mocked(getTripByOtp).mockResolvedValue(trip({ status: 'assigned' }));
+    vi.mocked(getTripByOtp).mockResolvedValue(trip({ status: 'accepted' }));
     renderHook(() => useTripByOtp('654321'), { wrapper: wrapper() });
     await tick(0);
     expect(getTripByOtp).toHaveBeenCalledTimes(1);
