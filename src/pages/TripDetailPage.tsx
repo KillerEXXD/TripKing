@@ -20,6 +20,7 @@ import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
 import { Badge, Button, Card } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
+import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { toast } from 'sonner';
@@ -453,18 +454,18 @@ function PassengerEditForm({ trip, onSaved }: { trip: Trip; onSaved?: () => void
 function SelectedDriverCard({ trip }: { trip: Trip }) {
   const acceptMutation = useAcceptTrip();
   const declineMutation = useDeclineTrip();
-  const deadline = trip.acceptanceDeadlineAt ? new Date(trip.acceptanceDeadlineAt) : null;
-  const deadlineLabel = deadline
-    ? deadline.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
-    : `${trip.acceptanceWindowMinutes} min after selection`;
   const callHref = trip.postedByPhone ? `tel:${trip.postedByPhone}` : undefined;
 
   async function onAccept() {
     try {
       await acceptMutation.mutateAsync({ tripId: trip.id });
       toast.success("You're confirmed — the passenger will get an OTP shortly.");
-    } catch {
-      toast.error("Couldn't accept — please try again.");
+    } catch (e) {
+      // 409 = race condition (agent withdrew or selection expired between render and tap).
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('Too late — this trip is no longer available to you. The page has been refreshed.');
+      else if (status === 403) toast.error('You need an active KYC-approved profile to accept.');
+      else toast.error("Couldn't accept — please try again.");
     }
   }
   async function onDecline() {
@@ -472,18 +473,30 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
     try {
       await declineMutation.mutateAsync({ tripId: trip.id });
       toast.success('Trip declined.');
-    } catch {
-      toast.error("Couldn't decline — please try again.");
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('This trip is no longer available — nothing to decline.');
+      else toast.error("Couldn't decline — please try again.");
     }
   }
   const busy = acceptMutation.isPending || declineMutation.isPending;
   return (
     <Card className="border-emerald-300 bg-emerald-50">
       <div className="space-y-1.5">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
+          {trip.acceptanceDeadlineAt ? (
+            <CountdownTimer
+              deadline={trip.acceptanceDeadlineAt}
+              prefix="Accept within"
+              expiredLabel="Expired — being reassigned…"
+              className="text-xs text-emerald-800"
+            />
+          ) : null}
+        </div>
         <div className="text-base font-bold text-emerald-900">Accept this trip to start.</div>
         <p className="text-xs text-emerald-800">
-          Decision needed by <b>{deadlineLabel}</b>. If you don&apos;t respond it&apos;ll go back to other applicants.
+          If you don&apos;t respond before the timer hits zero, it&apos;ll go back to other applicants.
         </p>
         {trip.postedByName ? (
           <p className="text-xs text-emerald-800">
@@ -507,10 +520,6 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
 /** Trip creator's view while waiting for the driver to Accept. */
 function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
   const cancelMutation = useCancelAssignment();
-  const deadline = trip.acceptanceDeadlineAt ? new Date(trip.acceptanceDeadlineAt) : null;
-  const deadlineLabel = deadline
-    ? deadline.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
-    : null;
   const driverName = trip.assignedDriver?.fullName ?? (trip.assignedDriverHandle ? `Driver ${trip.assignedDriverHandle}` : 'the driver');
   const driverPhone = trip.assignedDriver?.phone;
   async function onCancel() {
@@ -518,16 +527,28 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
     try {
       await cancelMutation.mutateAsync({ tripId: trip.id });
       toast.success('Selection withdrawn. Pick another applicant.');
-    } catch {
-      toast.error("Couldn't withdraw — please try again.");
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('Trip already moved on — page refreshed.');
+      else toast.error("Couldn't withdraw — please try again.");
     }
   }
   return (
     <Card className="border-amber-300 bg-amber-50">
       <div className="space-y-1.5">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Awaiting acceptance</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Awaiting acceptance</div>
+          {trip.acceptanceDeadlineAt ? (
+            <CountdownTimer
+              deadline={trip.acceptanceDeadlineAt}
+              prefix="Decides within"
+              expiredLabel="Expired — finding another driver…"
+              className="text-xs text-amber-800"
+            />
+          ) : null}
+        </div>
         <div className="text-sm font-semibold text-amber-900">
-          Waiting for <b>{driverName}</b> to accept{deadlineLabel ? <> · by {deadlineLabel}</> : null}.
+          Waiting for <b>{driverName}</b> to accept.
         </div>
         {driverPhone ? (
           <p className="text-xs text-amber-800">

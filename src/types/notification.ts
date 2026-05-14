@@ -11,7 +11,12 @@ export type NotificationType =
   | 'invitation_declined'
   | 'bug_reported'
   | 'bug_resolved'
-  | 'bug_commented';
+  | 'bug_commented'
+  // Phase 3 of the two-step handshake (migration 032):
+  | 'trip_selected'
+  | 'trip_assignment_cancelled'
+  | 'selection_expired'
+  | 'driver_declined';
 
 export interface Notification {
   id: string;
