@@ -15,7 +15,7 @@ vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 const driverUser: User = { id: 'u1', role: 'driver', phone: '+919876500000', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const adminUser: User = { ...driverUser, id: 'admin', role: 'admin', displayName: 'Admin' };
 function makeDriver(over: Partial<Driver> = {}): Driver {

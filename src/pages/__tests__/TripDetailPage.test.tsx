@@ -24,7 +24,7 @@ import { toast } from 'sonner';
 
 const driver: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Driver D', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const agent: User = { id: 'u9', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
@@ -114,8 +114,8 @@ function setMutations() {
   vi.mocked(useUpdateTripPassenger).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false, isError: false } as never);
 }
 const CANCEL_REASONS = [
-  { id: 'cr1', label: 'Passenger no longer needs the ride', appliesTo: 'both', sortOrder: 1, isActive: true, canReportBugs: false },
-  { id: 'cr2', label: 'Driver-only reason', appliesTo: 'driver', sortOrder: 2, isActive: true, canReportBugs: false },
+  { id: 'cr1', label: 'Passenger no longer needs the ride', appliesTo: 'both', sortOrder: 1, isActive: true },
+  { id: 'cr2', label: 'Driver-only reason', appliesTo: 'driver', sortOrder: 2, isActive: true },
 ];
 function setCancelReasons(over: { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void } = {}) {
   vi.mocked(cancelReasonHooks.useList).mockReturnValue({ isPending: false, isError: false, data: CANCEL_REASONS, refetch: vi.fn(), ...over } as never);
@@ -185,14 +185,14 @@ describe('TripDetailPage', () => {
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
   });
 
-  it('renders the trip details â€” route, payout, posted-by (driver view)', () => {
+  it('renders the trip details — route, payout, posted-by (driver view)', () => {
     setTrip({ data: makeTrip() });
     renderDetail();
-    expect(screen.getByText('Vellore â†’ Chennai')).toBeInTheDocument();
+    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/payout breakdown/i)).toBeInTheDocument();
     expect(screen.getByText(/driver payout/i)).toBeInTheDocument();
     // Passenger card is not shown to a browsing driver (PII not visible before assignment)
-    expect(screen.queryByText('Passenger P Â· 2 pax')).toBeNull();
+    expect(screen.queryByText('Passenger P · 2 pax')).toBeNull();
     expect(screen.getByRole('link', { name: /call agent a/i })).toBeInTheDocument();
   });
 
@@ -200,7 +200,7 @@ describe('TripDetailPage', () => {
     vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
     setTrip({ data: makeTrip() });
     renderDetail();
-    expect(screen.getByText('Passenger P Â· 2 pax')).toBeInTheDocument();
+    expect(screen.getByText('Passenger P · 2 pax')).toBeInTheDocument();
   });
 
   it('shows the review section on a completed trip', () => {
@@ -253,7 +253,7 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('profile page')).toBeInTheDocument();
   });
 
-  it('shows the agent a link to review applicants on their own trip â€” and no apply bar', () => {
+  it('shows the agent a link to review applicants on their own trip — and no apply bar', () => {
     vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
     setTrip({ data: makeTrip({ status: 'has_applicants', applicantCount: 3 }) });
     renderDetail();

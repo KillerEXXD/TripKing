@@ -125,9 +125,7 @@ export function BugReportModal({ onClose }: BugReportModalProps) {
           await upload.mutateAsync({ bugId: created.id, file: p.file });
         } catch (err) {
           // Log + continue — the bug is already filed, attachments are best-effort.
-          toast.error(`Couldn't attach ${p.file.name}`);
-          // eslint-disable-next-line no-console
-          console.warn('bug-report attachment upload failed', err);
+          toast.error(`Couldn't attach ${p.file.name}: ${err instanceof Error ? err.message : 'upload failed'}`);
         }
       }
 

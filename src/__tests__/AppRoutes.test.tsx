@@ -7,7 +7,7 @@ import type { User } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
-// These pages' data hooks are exercised in their own tests â€” here we only check routing.
+// These pages' data hooks are exercised in their own tests — here we only check routing.
 vi.mock('@/pages/OnboardingPage', () => ({ default: () => <div>onboarding screen</div> }));
 vi.mock('@/pages/HomeForRole', () => ({ default: () => <div>home for role</div> }));
 vi.mock('@/pages/TripFeedPage', () => ({ default: () => <div>trip feed</div> }));

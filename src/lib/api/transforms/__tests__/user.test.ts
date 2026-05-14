@@ -26,7 +26,7 @@ describe('transformUser', () => {
     });
   });
 
-  it('defaults optional fields (emailâ†’undefined, displayNameâ†’"", langâ†’en, activeâ†’true, canReportBugsâ†’false)', () => {
+  it('defaults optional fields (email→undefined, displayName→"", lang→en, active→true, canReportBugs→false)', () => {
     const u = transformUser({ id: 'u2', role: 'admin', phone: '+910000000000' });
     expect(u.email).toBeUndefined();
     expect(u.displayName).toBe('');
@@ -35,7 +35,7 @@ describe('transformUser', () => {
     expect(u.canReportBugs).toBe(false);
   });
 
-  it('canReportBugs is strict â€” only the boolean `true` enables it', () => {
+  it('canReportBugs is strict — only the boolean `true` enables it', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(transformUser({ id: 'u', role: 'driver', phone: '+91', can_report_bugs: 'true' as any }).canReportBugs).toBe(false);
     expect(transformUser({ id: 'u', role: 'driver', phone: '+91', can_report_bugs: false }).canReportBugs).toBe(false);

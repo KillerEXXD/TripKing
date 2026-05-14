@@ -42,8 +42,8 @@ vi.mock('@/components/location/PlacePinField', () => ({
     ),
 }));
 
-const city = (id: string, name: string, lat = 12.9, lng = 79.1) => ({ id, name, state: 'TN', lat, lng, sortOrder: 1, isActive: true, canReportBugs: false });
-const carType = (id: string, label: string) => ({ id, label, sortOrder: 1, isActive: true, canReportBugs: false });
+const city = (id: string, name: string, lat = 12.9, lng = 79.1) => ({ id, name, state: 'TN', lat, lng, sortOrder: 1, isActive: true });
+const carType = (id: string, label: string) => ({ id, label, sortOrder: 1, isActive: true });
 
 type ListState = { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void };
 function setLists(citiesOver: ListState = {}, carTypesOver: ListState = {}) {
@@ -90,7 +90,7 @@ function expandPassengerSection() {
 }
 
 /** Fill the step-1 form (route + vehicle, + pin an exact pickup point) and advance to step 2.
- *  The distance is computed automatically from the route â€” we wait for it before clicking Next. */
+ *  The distance is computed automatically from the route — we wait for it before clicking Next. */
 async function completeStep1(container: HTMLElement) {
   set(container, 'fromCityId', 'c1');
   set(container, 'toCityId', 'c2');
@@ -134,7 +134,7 @@ describe('PostTripPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('starts on step 1 â€” route + vehicle, with the city + car-type choices', () => {
+  it('starts on step 1 — route + vehicle, with the city + car-type choices', () => {
     renderPost();
     expect(screen.getByRole('heading', { name: /post a trip/i })).toBeInTheDocument();
     expect(screen.getByText(/step 1 of 2/i)).toBeInTheDocument();
@@ -154,18 +154,18 @@ describe('PostTripPage', () => {
     const { container } = renderPost();
     expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
     set(container, 'fromCityId', 'c1');
-    set(container, 'toCityId', 'c1'); // same as pickup â€” and so no distance is computed
+    set(container, 'toCityId', 'c1'); // same as pickup — and so no distance is computed
     set(container, 'pickupAt', '2099-06-01T09:00');
     fireEvent.click(screen.getByRole('button', { name: 'Sedan' }));
     expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
   });
 
-  it('computes the expected distance from the route â€” read-only, with a spinner while working, and re-runs when an exact point is pinned', async () => {
+  it('computes the expected distance from the route — read-only, with a spinner while working, and re-runs when an exact point is pinned', async () => {
     const { container } = renderPost();
     const distanceInput = () => container.querySelector<HTMLInputElement>('[name="expectedDistanceKm"]')!;
     expect(distanceInput()).toHaveAttribute('readonly'); // the agent / driver can't type it
     set(container, 'fromCityId', 'c1');
-    set(container, 'toCityId', 'c2'); // distinct coords â†’ triggers a calculation
+    set(container, 'toCityId', 'c2'); // distinct coords → triggers a calculation
     expect(screen.getByText(/calculating route/i)).toBeInTheDocument(); // the processing indicator
     await waitFor(() => expect(Number(distanceInput().value)).toBeGreaterThanOrEqual(1));
     expect(screen.queryByText(/calculating route/i)).toBeNull();
@@ -223,7 +223,7 @@ describe('PostTripPage', () => {
     expandPassengerSection();
     setPassengerLookup({ isSuccess: true, data: { id: 'p1', phone: '+919876543210', name: 'Jane Sharma', aliases: [], referredByUserId: 'u9', referredBy: { id: 'u9', displayName: 'Agent A', role: 'trip_manager' }, firstSeenAt: '2026-05-01T00:00:00.000Z', tripsCount: 4 } });
     set(container, 'passengerPhone', '+919876543210'); // note: name left blank
-    await waitFor(() => expect(screen.getByText(/existing passenger â€” jane sharma/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/existing passenger — jane sharma/i)).toBeInTheDocument());
     expect(container.querySelector<HTMLInputElement>('[name="passengerName"]')!.value).toBe('Jane Sharma');
   });
 

@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/components/reviews/ReviewForm', () => ({ ReviewForm: (p: { direction: string }) => <div>review form: {p.direction}</div> }));
 vi.mock('@/components/reviews/ReviewList', () => ({ ReviewList: ({ reviews }: { reviews: Review[] }) => <div>review list ({reviews.length})</div> }));
 
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false });
+const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
     id: 't1',

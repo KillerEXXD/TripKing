@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- this file deliberately wraps the console API. */
 /**
  * Console log ring buffer for the bug-reporter.
  *

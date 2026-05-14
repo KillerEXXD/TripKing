@@ -51,7 +51,7 @@ describe('SignInPage', () => {
     expect(screen.getByRole('button', { name: /send otp/i })).toBeDisabled();
   });
 
-  it('phone â†’ OTP â†’ verify calls the auth functions with the E.164 number, then goes to /onboarding', async () => {
+  it('phone → OTP → verify calls the auth functions with the E.164 number, then goes to /onboarding', async () => {
     mockAuth();
     verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
     renderSignIn();

@@ -3,7 +3,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import BugsPage, { buildClaudeMarkdown } from '@/pages/administration/BugsPage';
+import BugsPage from '@/pages/administration/BugsPage';
+import { buildClaudeMarkdown } from '@/pages/administration/buildBugMarkdown';
 import type { BugReport } from '@/types';
 
 vi.mock('@/lib/api/services/bugReports');

@@ -49,8 +49,8 @@ function renderOnboarding() {
 
 /** Walk from the intro carousel to the driver profile form. */
 function gotoDriverProfile() {
-  fireEvent.click(screen.getByRole('button', { name: /^skip$/i })); // intro â†’ role
-  fireEvent.click(screen.getByRole('button', { name: /i'm a driver/i })); // role â†’ profile
+  fireEvent.click(screen.getByRole('button', { name: /^skip$/i })); // intro → role
+  fireEvent.click(screen.getByRole('button', { name: /i'm a driver/i })); // role → profile
 }
 
 describe('OnboardingPage', () => {

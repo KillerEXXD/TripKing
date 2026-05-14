@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- this test deliberately exercises console wrapping. */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { __clearLogBufferForTests, formatLogBuffer, getLogBuffer, installConsoleHook } from '@/lib/logBuffer';
 

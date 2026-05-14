@@ -16,7 +16,7 @@ vi.mock('@/components/form', () => ({
   ),
 }));
 
-const city = { id: 'c1', name: 'Vellore', state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true, canReportBugs: false };
+const city = { id: 'c1', name: 'Vellore', state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true };
 const driver: Driver = { id: 'd1', userId: 'u1', fullName: 'Ravi', displayHandle: 'A1B2C3D', phone: '+91', homeCity: city, currentCity: city, profilePhotoUrl: '', kycStatus: 'pending', ratingAvg: 0, ratingCount: 0, ratingDistribution: { '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 }, topTags: [], managerTopTags: [], totalTripsCompleted: 0, vehicles: [], verification: { kycStatus: 'pending', steps: { details: 'done', documents: 'todo' }, stepsDone: 1, stepsTotal: 5 } };
 const agent: Agent = { id: 'a1', userId: 'u2', fullName: 'Agent A', displayHandle: 'A1B2C3D', phone: '+91', businessName: 'A Travels', businessCity: city, profilePhotoUrl: '', kycStatus: 'pending', topTags: [], totalTripsPosted: 0, verification: { kycStatus: 'pending', steps: { details: 'done', documents: 'todo', video_call: 'todo' }, stepsDone: 1, stepsTotal: 3 } };
 
@@ -74,17 +74,17 @@ describe('VerifyDocumentsPage', () => {
     const submitBtn = screen.getByRole('button', { name: /submit for verification/i });
     expect(submitBtn).toBeDisabled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Aadhaar â€” front' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Aadhaar â€” back' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aadhaar — front' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Aadhaar — back' }));
     fireEvent.click(screen.getByRole('button', { name: 'Selfie' }));
-    fireEvent.change(screen.getByLabelText(/Aadhaar â€” last 4 digits/i), { target: { value: '1234' } });
+    fireEvent.change(screen.getByLabelText(/Aadhaar — last 4 digits/i), { target: { value: '1234' } });
     fireEvent.click(screen.getByRole('checkbox'));
 
     expect(submitBtn).toBeEnabled();
     fireEvent.click(submitBtn);
     await waitFor(() => expect(submit.mutateAsync).toHaveBeenCalledWith({
       agentId: 'a1',
-      input: { aadhaarFrontPath: 'path/Aadhaar â€” front', aadhaarBackPath: 'path/Aadhaar â€” back', aadhaarLast4: '1234', selfiePath: 'path/Selfie', consent: true },
+      input: { aadhaarFrontPath: 'path/Aadhaar — front', aadhaarBackPath: 'path/Aadhaar — back', aadhaarLast4: '1234', selfiePath: 'path/Selfie', consent: true },
     }));
     expect(await screen.findByText('profile page')).toBeInTheDocument();
   });
