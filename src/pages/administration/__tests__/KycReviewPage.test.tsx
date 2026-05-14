@@ -96,4 +96,35 @@ describe('KycReviewPage', () => {
     renderKyc();
     expect(screen.getByText(/nothing here/i)).toBeInTheDocument();
   });
+
+  it('filters drivers by name, phone or email via the search box', () => {
+    setDrivers({ data: [
+      { id: 'd1', fullName: 'Ravi Kumar', phone: '9111111111', email: 'ravi@example.com', kycStatus: 'docs_submitted' },
+      { id: 'd2', fullName: 'Priya Devi', phone: '9222222222', email: 'priya@example.com', kycStatus: 'docs_submitted' },
+    ] });
+    renderKyc();
+    const input = screen.getByLabelText(/search kyc queue/i);
+    fireEvent.change(input, { target: { value: 'ravi' } });
+    expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();
+    expect(screen.queryByText('Priya Devi')).toBeNull();
+    fireEvent.change(input, { target: { value: '9222' } });
+    expect(screen.getByText('Priya Devi')).toBeInTheDocument();
+    expect(screen.queryByText('Ravi Kumar')).toBeNull();
+    fireEvent.change(input, { target: { value: 'priya@example' } });
+    expect(screen.getByText('Priya Devi')).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'zzzzz' } });
+    expect(screen.getByText(/no drivers match that search/i)).toBeInTheDocument();
+  });
+
+  it('search also filters the agents queue', () => {
+    setAgents({ data: [
+      { id: 'a1', fullName: 'Agent X', phone: '9333333333', email: 'x@ex.com', kycStatus: 'docs_submitted' },
+      { id: 'a2', fullName: 'Agent Y', phone: '9444444444', email: 'y@ex.com', kycStatus: 'docs_submitted' },
+    ] });
+    renderKyc();
+    fireEvent.click(screen.getByRole('button', { name: /^agents$/i }));
+    fireEvent.change(screen.getByLabelText(/search kyc queue/i), { target: { value: 'y@ex' } });
+    expect(screen.getByText('Agent Y')).toBeInTheDocument();
+    expect(screen.queryByText('Agent X')).toBeNull();
+  });
 });
