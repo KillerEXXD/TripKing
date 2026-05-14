@@ -56,12 +56,28 @@ describe('KycReviewPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('passes the "needs review" kycStatus CSV (incl. ready_for_approval) to the server by default', () => {
-    setDrivers({ rows: [{ id: 'd1', fullName: 'X', kycStatus: 'docs_submitted' }] });
+  it('defaults to the Approved filter (kycStatus="approved")', () => {
+    setDrivers({ rows: [{ id: 'd1', fullName: 'X', kycStatus: 'approved' }] });
     renderKyc();
     const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
-    expect(lastCall[0]).toMatchObject({ kycStatus: ['pending', 'docs_submitted', 'video_pending', 'ready_for_approval', 'resubmit_required'] });
+    expect(lastCall[0]).toMatchObject({ kycStatus: 'approved' });
     expect(lastCall[0]).not.toHaveProperty('search');
+  });
+
+  it('clicking the "All" filter sends no kyc_status (kycStatus: undefined)', () => {
+    setDrivers({ rows: [] });
+    renderKyc();
+    fireEvent.click(screen.getByRole('tab', { name: /^all$/i }));
+    const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
+    expect((lastCall[0] as { kycStatus?: unknown }).kycStatus).toBeUndefined();
+  });
+
+  it('clicking the "Needs review" filter sends the composite kycStatus CSV', () => {
+    setDrivers({ rows: [] });
+    renderKyc();
+    fireEvent.click(screen.getByRole('tab', { name: /needs review/i }));
+    const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
+    expect(lastCall[0]).toMatchObject({ kycStatus: ['pending', 'docs_submitted', 'video_pending', 'ready_for_approval', 'resubmit_required'] });
   });
 
   it('cards are links to the per-applicant detail page (driver)', () => {

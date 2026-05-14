@@ -7,8 +7,9 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { KYC_LABEL, KYC_VARIANT, NEEDS_REVIEW } from './kycConstants';
 import type { KycStatus } from '@/types';
 
-type Filter = 'needs_review' | KycStatus;
+type Filter = 'all' | 'needs_review' | KycStatus;
 const FILTERS: { value: Filter; label: string; description?: string }[] = [
+  { value: 'all', label: 'All', description: 'Every applicant, regardless of KYC status' },
   { value: 'needs_review', label: 'Needs review', description: 'Not yet approved or rejected' },
   { value: 'pending', label: KYC_LABEL.pending },
   { value: 'docs_submitted', label: KYC_LABEL.docs_submitted },
@@ -19,8 +20,10 @@ const FILTERS: { value: Filter; label: string; description?: string }[] = [
   { value: 'rejected', label: KYC_LABEL.rejected },
 ];
 
-function filterToKycStatus(f: Filter): KycStatus | KycStatus[] {
-  return f === 'needs_review' ? NEEDS_REVIEW : f;
+function filterToKycStatus(f: Filter): KycStatus | KycStatus[] | undefined {
+  if (f === 'all') return undefined;
+  if (f === 'needs_review') return NEEDS_REVIEW;
+  return f;
 }
 
 interface KycEntry {
@@ -112,7 +115,7 @@ function AgentsQueue({ filter, search }: { filter: Filter; search: string }) {
  */
 export function KycReviewPage() {
   const [subject, setSubject] = useState<'drivers' | 'agents'>('drivers');
-  const [filter, setFilter] = useState<Filter>('needs_review');
+  const [filter, setFilter] = useState<Filter>('approved');
   const [q, setQ] = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
 
