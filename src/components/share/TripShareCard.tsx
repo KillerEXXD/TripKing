@@ -5,6 +5,7 @@
  * URL — the deep link travels in the text caption only. */
 import { forwardRef } from 'react';
 import { formatINR, formatKm } from '@/lib/utils';
+import { shareVariant, VARIANT_LABEL } from '@/lib/share/tripShare';
 import type { Trip } from '@/types';
 
 const FONT = "'Inter', 'Noto Sans Tamil', 'Noto Sans Devanagari', system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
@@ -34,6 +35,7 @@ export const TripShareCard = forwardRef<HTMLDivElement, { trip: Trip }>(function
   const hoursToPickup = (new Date(trip.pickupAt).getTime() - Date.now()) / 3_600_000;
   const isUrgent = hoursToPickup > 0 && hoursToPickup <= 6;
   const contact = trip.postedByPhone ?? '';
+  const variantLabel = VARIANT_LABEL[shareVariant(trip)];
 
   return (
     <div ref={ref} style={{ width: '1080px', height: '1200px', fontFamily: FONT }} className="flex flex-col bg-white text-gray-900">
@@ -53,6 +55,9 @@ export const TripShareCard = forwardRef<HTMLDivElement, { trip: Trip }>(function
         <div className="flex flex-col items-end gap-1.5">
           <div className="font-bold uppercase tracking-[0.2em] text-white/95" style={{ fontSize: '12px' }}>
             New trip
+          </div>
+          <div style={{ background: 'rgba(255,255,255,0.18)', color: '#ffffff', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            🧭 {variantLabel}
           </div>
           {isUrgent ? (
             <div style={{ background: '#fef3c7', color: '#92400e', fontSize: '12px', padding: '3px 10px', borderRadius: '999px', fontWeight: 800, letterSpacing: '0.06em' }}>

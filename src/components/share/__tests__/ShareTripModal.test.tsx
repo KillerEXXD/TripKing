@@ -11,6 +11,9 @@ vi.mock('@/lib/share/tripShare', () => ({
   nodeToPngBlob: vi.fn().mockResolvedValue(new Blob(['x'], { type: 'image/png' })),
   nativeShareTrip: vi.fn().mockResolvedValue('shared'),
   downloadBlob: vi.fn(),
+  // TripShareCard imports these (migration 024 — Phase 4 share variants).
+  shareVariant: () => 'one_way_drop',
+  VARIANT_LABEL: { one_way_drop: 'One-way drop', round_trip_return: 'Round-trip return back', multi_way_drop: 'Multi-way drop', multi_way_return: 'Multi-way return back' },
 }));
 import { downloadBlob, nativeShareTrip, nodeToPngBlob } from '@/lib/share/tripShare';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
