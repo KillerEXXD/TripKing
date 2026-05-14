@@ -22,8 +22,9 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
+import { readBody, pgFail } from '../_shared/http.ts';
 
-type Db = ReturnType<typeof serviceClient>;
 const ALERT_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*)';
 const WRITABLE = [
   'name', 'from_city_id', 'from_place_id', 'from_radius_km', 'to_city_id', 'to_place_id', 'to_radius_km',
@@ -31,33 +32,6 @@ const WRITABLE = [
   'pickup_window_start', 'pickup_window_end', 'notify_via', 'is_active', 'paused_at',
 ];
 
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
-async function readBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
-}
 function pick(src: Record<string, unknown>, keys: string[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const k of keys) if (src[k] !== undefined) out[k] = src[k];

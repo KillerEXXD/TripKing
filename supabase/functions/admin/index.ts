@@ -40,6 +40,9 @@ import { CacheTTL } from '../_shared/cache.ts';
 import { sharedCacheInvalidateType } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
+import { readBody, pgFail as pgFailShared } from '../_shared/http.ts';
+
+const pgFail = (e: { code?: string; message: string }) => pgFailShared(e, { fkAs: 'IN_USE' });
 
 /**
  * Purge URLs that Cloudflare's Worker may have cached for an admin resource.
@@ -103,22 +106,6 @@ async function requireAdmin(db: Db, req: Request): Promise<{ id: string } | Resp
 
 async function audit(db: Db, actorId: string, action: string, entity: string, entityId: string | null, before: unknown, after: unknown): Promise<void> {
   await db.from('admin_audit_log').insert({ actor_user_id: actorId, action, entity, entity_id: entityId, before_json: before ?? null, after_json: after ?? null });
-}
-
-async function readBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('IN_USE', `${error.message} — it is referenced; disable it instead of deleting`, 409);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
 }
 
 const handler = withTiming('admin', async (req: Request): Promise<Response> => {

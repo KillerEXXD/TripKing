@@ -21,27 +21,13 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
 
-type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
 
 const PASSENGER_SELECT =
   'id, phone, name, aliases, referred_by_user_id, first_trip_id, first_seen_at, trips_count, created_at, updated_at, ' +
   'referred_by:users!referred_by_user_id(id, display_name, role, phone)';
-
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
 
 const handler = withTiming('passengers', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);

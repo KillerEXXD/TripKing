@@ -12,11 +12,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
-
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
+import { bearer } from '../_shared/auth.ts';
 
 const handler = withTiming('notifications', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);

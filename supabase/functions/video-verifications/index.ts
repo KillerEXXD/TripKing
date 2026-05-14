@@ -19,6 +19,11 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
+import { readBody, pgFail as pgFailShared } from '../_shared/http.ts';
+
+const pgFail = (e: { code?: string; message: string }) =>
+  pgFailShared(e, { dupMessage: 'You already have a video call scheduled' });
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -28,28 +33,6 @@ const VV_SELECT =
   'manager:trip_managers!manager_id(id, full_name, phone, kyc_status, business_city:cities!business_city_id(name))';
 const OUTCOMES = ['approved', 'rejected', 'resubmit_required'] as const;
 
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
-async function readBody(req: Request): Promise<Row> {
-  try { const b = await req.json(); return b && typeof b === 'object' ? (b as Row) : {}; } catch { return {}; }
-}
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', 'You already have a video call scheduled', 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
-}
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const istDateStr = (d: Date): string => new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
 const hhmm = (t: string): [number, number] => { const [h, m] = String(t).slice(0, 5).split(':').map(Number); return [h || 0, m || 0]; };

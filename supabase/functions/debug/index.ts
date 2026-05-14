@@ -17,13 +17,9 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { ERROR_CODES, type ErrorCode } from '../_shared/codes.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { bearer } from '../_shared/auth.ts';
 
 type Db = ReturnType<typeof serviceClient>;
-
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
 
 async function adminUser(db: Db, req: Request): Promise<{ id: string } | null> {
   const token = bearer(req);

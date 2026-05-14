@@ -30,6 +30,8 @@ import { cacheDelete } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
 import { revealCache, redactDriver, logPiiReveal } from '../_shared/pii.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
+import { readBody, pgFail } from '../_shared/http.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
 const CACHE_EPOCH = 'v1';
@@ -80,33 +82,6 @@ const REQUIRED_VEHICLE_PHOTO_COLS = [
 ] as const;
 const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'approved', 'rejected', 'resubmit_required'] as const;
 
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
-async function readBody(req: Request): Promise<Row> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Row) : {};
-  } catch {
-    return {};
-  }
-}
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
-}
 function pick(src: Row, keys: string[]): Row {
   const out: Row = {};
   for (const k of keys) if (src[k] !== undefined) out[k] = src[k];
