@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { MapPin, Snowflake, Sparkles } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowLeft, MapPin, Sparkles } from 'lucide-react';
 import { useTrips } from '@/hooks/useTrips';
+import { useMyDriver } from '@/hooks/useDrivers';
 import { carTypeHooks, cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
@@ -60,34 +61,55 @@ const chipClass = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
  * Prototype layout: a white header strip, a white filter strip, then the cards
  * on the page background.
  */
+const DEFAULT_RADIUS_KM = 25;
+
 export function TripFeedPage() {
+  const navigate = useNavigate();
   const [fromCityId, setFromCityId] = useState('');
   const [carTypeId, setCarTypeId] = useState('');
-  const [acOnly, setAcOnly] = useState(false);
   const [near, setNear] = useState<NearRadius | null>(null);
+
+  // Seed filters from the driver's profile on first load — default the pickup city to
+  // their `currentCity` and turn Near-me on around their stored coords. Driver can change
+  // both. We only seed once per mount; later edits are user-driven.
+  const myDriverQuery = useMyDriver();
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (seeded.current || !myDriverQuery.data) return;
+    const d = myDriverQuery.data;
+    if (d.currentCity?.id) setFromCityId(d.currentCity.id);
+    if (typeof d.currentLat === 'number' && typeof d.currentLng === 'number') {
+      setNear({ lat: d.currentLat, lng: d.currentLng, radiusKm: DEFAULT_RADIUS_KM });
+    }
+    seeded.current = true;
+  }, [myDriverQuery.data]);
 
   const tripsQuery = useTrips({ status: FEED_STATUSES, fromCityId: fromCityId || undefined, ...(near ? { near } : {}) });
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
 
   const trips = tripsQuery.data ?? [];
-  const filtered = trips.filter((t) => (carTypeId === '' || t.carTypeId === carTypeId) && (!acOnly || t.acRequired));
-  const anyFilter = carTypeId !== '' || acOnly || fromCityId !== '' || near != null;
+  const filtered = trips.filter((t) => carTypeId === '' || t.carTypeId === carTypeId);
+  const anyFilter = carTypeId !== '' || fromCityId !== '' || near != null;
 
   function clearFilters() {
     setCarTypeId('');
-    setAcOnly(false);
     setFromCityId('');
     setNear(null);
   }
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="border-b bg-white px-4 py-3">
-        <h1 className="text-base font-semibold">Open trips</h1>
-        <p className="text-xs text-secondary">
-          {tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''} you can apply to` : 'Trips that still need a driver'}
-        </p>
+      <header className="flex items-center gap-3 border-b bg-white px-4 py-3">
+        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <ArrowLeft className="size-5" aria-hidden />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base font-semibold">Open trips</h1>
+          <p className="text-xs text-secondary">
+            {tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''} you can apply to` : 'Trips that still need a driver'}
+          </p>
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
@@ -113,14 +135,6 @@ export function TripFeedPage() {
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={() => setAcOnly((v) => !v)}
-          aria-pressed={acOnly}
-          className={`flex h-8 items-center gap-1 rounded-full border px-3 text-xs font-medium ${acOnly ? 'border-blue-300 bg-blue-100 text-blue-800' : 'border-input bg-white'}`}
-        >
-          <Snowflake className="size-3.5" aria-hidden /> AC only
-        </button>
         <NearMeFilter value={near} onChange={setNear} />
       </div>
 
@@ -137,7 +151,7 @@ export function TripFeedPage() {
               anyFilter
                 ? near
                   ? 'Try a bigger radius, or clear the location filter.'
-                  : 'Try clearing the car-type / AC filter or picking a different pickup city.'
+                  : 'Try clearing the car-type filter or picking a different pickup city.'
                 : 'New trips from your area will show up here.'
             }
             action={
