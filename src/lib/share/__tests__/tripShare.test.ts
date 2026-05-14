@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { buildShareCaption, buildShareUrl, nativeShareTrip, shareFilename } from '@/lib/share/tripShare';
+import { buildShareCaption, buildShareUrl, nativeShareTrip, shareFilename, shareVariant, VARIANT_LABEL } from '@/lib/share/tripShare';
 import type { Trip } from '@/types';
 
 const city = (id: string, name: string, state = 'Tamil Nadu') => ({ id, name, state, lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
@@ -66,6 +66,43 @@ describe('buildShareCaption', () => {
     const caption = buildShareCaption(makeTrip(), { withUrl: false });
     expect(caption).not.toContain('/trips/t1');
     expect(caption).toContain('🔗 Link below');
+  });
+});
+
+describe('shareVariant + VARIANT_LABEL', () => {
+  const wp = (id: string, cityId: string) => ({ id, seq: 0, city: city(cityId, cityId), waitMinutes: 0, isDestination: true });
+  it('one_way (or missing tripType) → "One-way drop"', () => {
+    expect(shareVariant(makeTrip())).toBe('one_way_drop');
+    expect(shareVariant(makeTrip({ tripType: 'one_way' }))).toBe('one_way_drop');
+    expect(VARIANT_LABEL.one_way_drop).toBe('One-way drop');
+  });
+  it('round_trip → "Round-trip return back"', () => {
+    expect(shareVariant(makeTrip({ tripType: 'round_trip' }))).toBe('round_trip_return');
+    expect(VARIANT_LABEL.round_trip_return).toBe('Round-trip return back');
+  });
+  it('multi_way with last city ≠ first → "Multi-way drop"', () => {
+    const t = makeTrip({ tripType: 'multi_way', waypoints: [{ ...wp('w1', 'c1'), seq: 0 }, { ...wp('w2', 'c2'), seq: 1 }, { ...wp('w3', 'c3'), seq: 2 }] });
+    expect(shareVariant(t)).toBe('multi_way_drop');
+    expect(VARIANT_LABEL.multi_way_drop).toBe('Multi-way drop');
+  });
+  it('multi_way with last city == first → "Multi-way return back"', () => {
+    const t = makeTrip({ tripType: 'multi_way', waypoints: [{ ...wp('w1', 'c1'), seq: 0 }, { ...wp('w2', 'c2'), seq: 1 }, { ...wp('w3', 'c1'), seq: 2 }] });
+    expect(shareVariant(t)).toBe('multi_way_return');
+    expect(VARIANT_LABEL.multi_way_return).toBe('Multi-way return back');
+  });
+  it('caption prepends the 🧭 variant label', () => {
+    expect(buildShareCaption(makeTrip())).toContain('🧭 One-way drop');
+    expect(buildShareCaption(makeTrip({ tripType: 'round_trip' }))).toContain('🧭 Round-trip return back');
+    const dropT = makeTrip({ tripType: 'multi_way', waypoints: [{ ...wp('w1', 'c1'), seq: 0 }, { ...wp('w2', 'c2'), seq: 1 }, { ...wp('w3', 'c3'), seq: 2 }] });
+    expect(buildShareCaption(dropT)).toContain('🧭 Multi-way drop');
+    const retT = makeTrip({ tripType: 'multi_way', waypoints: [{ ...wp('w1', 'c1'), seq: 0 }, { ...wp('w2', 'c2'), seq: 1 }, { ...wp('w3', 'c1'), seq: 2 }] });
+    expect(buildShareCaption(retT)).toContain('🧭 Multi-way return back');
+  });
+  it('caption renders a route chain when waypoints.length ≥ 3', () => {
+    const t = makeTrip({ tripType: 'multi_way', waypoints: [{ ...wp('w1', 'c1'), seq: 0 }, { ...wp('w2', 'c2'), seq: 1 }, { ...wp('w3', 'c3'), seq: 2 }] });
+    const caption = buildShareCaption(t);
+    expect(caption).toMatch(/→ c2/);
+    expect(caption).toMatch(/→ c3/);
   });
 });
 

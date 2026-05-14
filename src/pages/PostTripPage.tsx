@@ -11,10 +11,12 @@ import { useEffectiveRole } from '@/stores/roleViewStore';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
+import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
+import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
-import type { Place, PostTripInput, Trip } from '@/types';
+import type { Place, PostTripInput, Trip, TripType, WaypointInput } from '@/types';
 
 interface PostTripForm {
   fromCityId: string;
@@ -100,6 +102,11 @@ export function PostTripPage() {
   const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
   const [fromPlace, setFromPlace] = useState<Place | null>(null);
   const [toPlace, setToPlace] = useState<Place | null>(null);
+  // ── trip-type state (migration 024) ────────────────────────────────────────
+  const [tripType, setTripType] = useState<TripType>('one_way');
+  const [expectedEndAt, setExpectedEndAt] = useState<string>('');     // datetime-local; required for round_trip + multi_way
+  const [waypoints, setWaypoints] = useState<WaypointDraft[]>([]);    // multi_way destinations only
+  const [returnToStart, setReturnToStart] = useState<boolean>(false); // multi_way only — appends origin as final waypoint
   const [distanceCalculating, setDistanceCalculating] = useState(false);
   const [passengerSectionOpen, setPassengerSectionOpen] = useState(false);
   const passengerSectionRef = useRef<HTMLDivElement>(null);
@@ -158,27 +165,74 @@ export function PostTripPage() {
   }, [passengerLookup.data, getValues, setValue]);
 
   async function onNext() {
-    const ok = await trigger([...STEP1_FIELDS]);
+    // Multi-way uses the WaypointEditor instead of `toCityId`; skip that field's validation.
+    const fields = tripType === 'multi_way'
+      ? STEP1_FIELDS.filter((f) => f !== 'toCityId')
+      : [...STEP1_FIELDS];
+    const ok = await trigger(fields as readonly (keyof PostTripForm)[]);
     if (!ok) return;
-    if (getValues('fromCityId') === getValues('toCityId')) {
-      toast.error('Pickup and drop-off cities must be different');
+    if (tripType !== 'multi_way' && getValues('fromCityId') === getValues('toCityId')) {
+      toast.error(tripType === 'round_trip' ? 'Starting city and turnaround must be different' : 'Pickup and drop-off cities must be different');
+      return;
+    }
+    if (tripType === 'multi_way') {
+      if (waypoints.length < 2 || waypoints.some((w) => !w.cityId)) {
+        toast.error('Add at least 2 destinations (each with a city)');
+        return;
+      }
+    }
+    if (tripType !== 'one_way' && !expectedEndAt) {
+      toast.error('Set when the trip ends');
       return;
     }
     setStep(2);
   }
 
   async function onSubmit(values: PostTripForm) {
-    if (values.fromCityId === values.toCityId) {
-      toast.error('Pickup and drop-off cities must be different');
+    // One-way + round-trip use from/to fields and they must differ.
+    if (tripType !== 'multi_way' && values.fromCityId === values.toCityId) {
+      toast.error(tripType === 'round_trip' ? 'Starting city and turnaround must be different' : 'Pickup and drop-off cities must be different');
       setStep(1);
       return;
     }
+    // Multi-way needs ≥2 destinations, each with a city.
+    if (tripType === 'multi_way') {
+      const bad = waypoints.findIndex((w) => !w.cityId);
+      if (waypoints.length < 2) { toast.error('Multi-way trips need at least 2 destinations'); setStep(1); return; }
+      if (bad >= 0) { toast.error(`Destination ${bad + 1} needs a city`); setStep(1); return; }
+    }
+    // Build a waypoints array for the server only when the trip is round-trip or multi-way;
+    // one-way keeps today's body (the server synthesises a 2-waypoint plan).
+    const pickupIso = new Date(values.pickupAt).toISOString();
+    const endIso = expectedEndAt ? new Date(expectedEndAt).toISOString() : undefined;
+    let waypointInputs: WaypointInput[] | undefined;
+    if (tripType === 'round_trip') {
+      waypointInputs = [
+        { cityId: values.fromCityId, placeId: fromPlace?.id },
+        { cityId: values.toCityId, placeId: toPlace?.id, arriveAt: pickupIso, waitMinutes: 0, isDestination: true },
+        { cityId: values.fromCityId, placeId: fromPlace?.id, arriveAt: endIso, waitMinutes: 0, isDestination: true },
+      ];
+    } else if (tripType === 'multi_way') {
+      const rows: WaypointInput[] = waypoints.map((w) => ({
+        cityId: w.cityId,
+        arriveAt: w.arriveAt ? new Date(w.arriveAt).toISOString() : undefined,
+        waitMinutes: w.waitMinutes,
+        isDestination: true,
+        notes: w.notes.trim() || undefined,
+      }));
+      const list: WaypointInput[] = [{ cityId: values.fromCityId, placeId: fromPlace?.id }, ...rows];
+      if (returnToStart) list.push({ cityId: values.fromCityId, placeId: fromPlace?.id, arriveAt: endIso, waitMinutes: 0, isDestination: true });
+      waypointInputs = list;
+    }
     const input: PostTripInput = {
+      tripType: tripType === 'one_way' ? undefined : tripType,
+      waypoints: waypointInputs,
+      expectedEndAt: endIso,
       fromCityId: values.fromCityId,
-      toCityId: values.toCityId,
+      toCityId: tripType === 'multi_way' ? (returnToStart ? values.fromCityId : (waypoints[waypoints.length - 1]?.cityId ?? '')) : values.toCityId,
       fromPlaceId: fromPlace?.id,
       toPlaceId: toPlace?.id,
-      pickupAt: new Date(values.pickupAt).toISOString(),
+      pickupAt: pickupIso,
       expectedDistanceKm: Number(values.expectedDistanceKm),
       carTypeId: values.carTypeId,
       seatsRequired: Number(values.seatsRequired),
@@ -239,7 +293,12 @@ export function PostTripPage() {
   const cities = citiesQuery.data ?? [];
   const carTypes = (carTypesQuery.data ?? []).filter((c) => c.isActive);
   const submitting = isSubmitting || postTrip.isPending;
-  const step1Ready = !!fromCityId && !!toCityId && fromCityId !== toCityId && !!getValues('pickupAt') && distance >= 1 && !distanceCalculating && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
+  const multiWayReady = waypoints.length >= 2 && waypoints.every((w) => !!w.cityId);
+  const routeReady = tripType === 'multi_way'
+    ? !!fromCityId && multiWayReady
+    : !!fromCityId && !!toCityId && fromCityId !== toCityId;
+  const endTimeReady = tripType === 'one_way' || !!expectedEndAt;
+  const step1Ready = routeReady && !!getValues('pickupAt') && endTimeReady && distance >= 1 && !distanceCalculating && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
   const summary = [cityName(fromCityId) && cityName(toCityId) ? `${cityName(fromCityId)} → ${cityName(toCityId)}` : null, distance > 0 ? `${distance} km` : null, carTypeName(carTypeId) ?? null, acRequired ? 'AC' : null].filter(Boolean).join(' · ');
 
   return (
@@ -262,11 +321,14 @@ export function PostTripPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-3 p-4 pb-28">
         {step === 1 ? (
           <>
+            <TripTypeTabs value={tripType} onChange={setTripType} />
             <Card className="gap-3">
-              <div className={sectionLabel}>Route &amp; schedule</div>
+              <div className={sectionLabel}>
+                {tripType === 'one_way' ? 'Route & schedule' : tripType === 'round_trip' ? 'Round-trip plan' : 'Multi-way itinerary'}
+              </div>
               <div className="space-y-1.5">
-                <Field label="From (pickup city)" error={errors.fromCityId?.message}>
-                  <select className={selectClass} {...register('fromCityId', { required: 'Pick a pickup city' })}>
+                <Field label={tripType === 'one_way' ? 'From (pickup city)' : 'Trip starts from (city)'} error={errors.fromCityId?.message}>
+                  <select className={selectClass} {...register('fromCityId', { required: 'Pick a starting city' })}>
                     <option value="">Select a city</option>
                     {cities.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -275,20 +337,52 @@ export function PostTripPage() {
                 </Field>
                 <PlacePinField value={fromPlace} onChange={setFromPlace} pinLabel="Pin the exact pickup point" pickerTitle="Pickup location" />
               </div>
-              <div className="space-y-1.5">
-                <Field label="To (drop-off city)" error={errors.toCityId?.message}>
-                  <select className={selectClass} {...register('toCityId', { required: 'Pick a drop-off city' })}>
-                    <option value="">Select a city</option>
-                    {cities.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </Field>
-                <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact drop-off point" pickerTitle="Drop-off location" />
-              </div>
-              <Field label="Pickup date &amp; time" error={errors.pickupAt?.message}>
-                <Input type="datetime-local" {...register('pickupAt', { required: 'Set the pickup time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Pickup must be in the future' })} />
+              {tripType !== 'multi_way' ? (
+                <div className="space-y-1.5">
+                  <Field label={tripType === 'round_trip' ? 'Turnaround city' : 'To (drop-off city)'} error={errors.toCityId?.message}>
+                    <select className={selectClass} {...register('toCityId', { required: 'Pick a destination city' })}>
+                      <option value="">Select a city</option>
+                      {cities.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact drop-off point" pickerTitle="Drop-off location" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Destinations (in order)</div>
+                  <WaypointEditor
+                    value={waypoints}
+                    onChange={setWaypoints}
+                    cities={cities}
+                    rowLabel="Destination"
+                    minRows={0}
+                    addLabel="Add destination"
+                  />
+                  <label className="mt-1 flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={returnToStart}
+                      onChange={(e) => setReturnToStart(e.target.checked)}
+                      className="size-4 rounded border-input"
+                    />
+                    Return to start (the trip ends back at the origin)
+                  </label>
+                </div>
+              )}
+              <Field label={tripType === 'one_way' ? 'Pickup date & time' : 'Trip starts (date & time)'} error={errors.pickupAt?.message}>
+                <Input type="datetime-local" {...register('pickupAt', { required: 'Set the start time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Start time must be in the future' })} />
               </Field>
+              {tripType !== 'one_way' ? (
+                <Field label="Trip ends (date & time)" hint={tripType === 'round_trip' ? 'When the driver is back at the start city.' : 'Auto-fills from the last destination — you can override.'}>
+                  <Input
+                    type="datetime-local"
+                    value={expectedEndAt}
+                    onChange={(e) => setExpectedEndAt(e.target.value)}
+                  />
+                </Field>
+              ) : null}
               <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message} hint="Worked out from the route — you don't need to enter it">
                 <div className="relative">
                   <Input
