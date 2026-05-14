@@ -462,6 +462,22 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
   return (
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
+      {showApplyBar && myApplication ? (
+        <Card className="border-emerald-200 bg-emerald-50">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-emerald-900">
+                You&apos;ve applied — waiting for the trip manager
+                {trip.applicantCount > 0 ? (
+                  <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
+                ) : null}
+              </div>
+              <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
       <Card className="gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="text-2xl font-bold leading-tight">
@@ -597,17 +613,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
         </Card>
       ) : null}
 
-      {showApplyBar && myApplication ? (
-        <Card className="border-emerald-200 bg-emerald-50">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-emerald-900">You&apos;ve applied — waiting for the trip manager</div>
-              <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
-            </div>
-          </div>
-        </Card>
-      ) : viewer.isDriver && !viewer.isPoster && trip.applicantCount > 0 && applyable ? (
+      {!showApplyBar && viewer.isDriver && !viewer.isPoster && trip.applicantCount > 0 && applyable ? (
         <Card>
           <p className="text-sm text-secondary">🤝 {trip.applicantCount} driver{trip.applicantCount === 1 ? '' : 's'} applied — a sharp rate helps you stand out.</p>
         </Card>
