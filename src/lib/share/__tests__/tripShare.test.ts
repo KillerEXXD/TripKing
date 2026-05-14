@@ -67,6 +67,9 @@ describe('buildShareCaption', () => {
     expect(caption).not.toContain('/trips/t1');
     expect(caption).toContain('🔗 Link below');
   });
+  it('does not include a "Posted by" line (poster identity stays in-app)', () => {
+    expect(buildShareCaption(makeTrip())).not.toContain('Posted by');
+  });
 });
 
 describe('shareVariant + VARIANT_LABEL', () => {
