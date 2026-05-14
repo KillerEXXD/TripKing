@@ -1009,6 +1009,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       })
       .eq('id', tripId);
     if (error) return pgFail(error);
+    // Phase 3: notify the selected driver. Best-effort — a failed insert shouldn't
+    // break the assign call. The handshake state is the source of truth; the
+    // notification is just a heads-up.
+    const { data: drvRow } = await db.from('drivers').select('user_id').eq('id', acc.driver_id).maybeSingle();
+    const driverUserId = drvRow?.user_id as string | undefined;
+    if (driverUserId) {
+      await db.from('notifications').insert({
+        user_id: driverUserId,
+        type: 'trip_selected',
+        title: 'You\'ve been selected for a trip',
+        body: `Accept within ${windowMin} minutes or the trip goes back to other applicants.`,
+        payload_json: { trip_id: tripId, deadline },
+      });
+    }
     const t = await fullTrip(tripId, u!);
     invalidateTripsList();
     return ok(t);
@@ -1050,6 +1064,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       .eq('id', tripId);
     if (error) return pgFail(error);
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
+    // Phase 3: notify the agent that the driver accepted (the OTP is now in play).
+    await db.from('notifications').insert({
+      user_id: trip.posted_by_user_id,
+      type: 'trip_assigned',
+      title: 'Driver accepted — share the OTP with your passenger',
+      body: 'The driver confirmed. Open the trip to copy the passenger OTP.',
+      payload_json: { trip_id: tripId },
+    });
     const t = await fullTrip(tripId, u!);
     invalidateTripsList();
     // OTP echoed for dev parity; the agent UI uses this to copy/share with the passenger.
@@ -1087,6 +1109,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       })
       .eq('id', tripId);
     if (error) return pgFail(error);
+    // Phase 3: notify the agent that the driver declined — they need to pick another.
+    await db.from('notifications').insert({
+      user_id: trip.posted_by_user_id,
+      type: 'driver_declined',
+      title: 'Driver declined the trip',
+      body: reason ? `Reason: ${reason}. Pick another applicant.` : 'They\'re no longer in the pool. Pick another applicant.',
+      payload_json: { trip_id: tripId, reason },
+    });
     const t = await fullTrip(tripId, u!);
     invalidateTripsList();
     return ok(t);
@@ -1125,6 +1155,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       })
       .eq('id', tripId);
     if (error) return pgFail(error);
+    // Phase 3: notify the driver that the agent withdrew. They're back to 'applied'.
+    if (trip.assigned_driver_id) {
+      const { data: drvRow } = await db.from('drivers').select('user_id').eq('id', trip.assigned_driver_id).maybeSingle();
+      const driverUserId = drvRow?.user_id as string | undefined;
+      if (driverUserId) {
+        await db.from('notifications').insert({
+          user_id: driverUserId,
+          type: 'trip_assignment_cancelled',
+          title: 'Agent withdrew the assignment',
+          body: reason ? `Reason: ${reason}. You\'re back in the applicant pool.` : 'You\'re back in the applicant pool.',
+          payload_json: { trip_id: tripId, reason },
+        });
+      }
+    }
     const t = await fullTrip(tripId, u!);
     invalidateTripsList();
     return ok(t);
