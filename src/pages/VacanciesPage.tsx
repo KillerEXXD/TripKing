@@ -203,9 +203,9 @@ export function VacanciesPage() {
   return (
     <div className="mx-auto max-w-md">
       <header className="border-b bg-white px-4 py-3">
-        <h1 className="text-base font-semibold">Available drivers</h1>
+        <h1 className="text-base font-semibold">Vacant drivers</h1>
         <p className="text-xs text-secondary">
-          {vacanciesQuery.isSuccess ? `${vacancies.length} driver${vacancies.length === 1 ? '' : 's'} available${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
+          {vacanciesQuery.isSuccess ? `${vacancies.length} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
         </p>
       </header>
 

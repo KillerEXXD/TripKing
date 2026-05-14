@@ -52,7 +52,7 @@ describe('IAmAvailableCard', () => {
   it('renders 0/2 with the empty-state subtitle and an enabled Post button', () => {
     setState({ data: [] });
     renderCard();
-    expect(screen.getByText(/I'm available/i)).toBeInTheDocument();
+    expect(screen.getByText(/I'm vacant/i)).toBeInTheDocument();
     expect(screen.getByText(/Let agents find you/i)).toBeInTheDocument();
     expect(screen.getByText(/0 \/ 2 active/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /post availability/i });

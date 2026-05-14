@@ -328,7 +328,7 @@ function DriverHome({ driver }: { driver: Driver }) {
           <Card className="items-center text-center">
             <MapPin className="size-6 opacity-30" aria-hidden />
             <div className="text-sm font-medium">No open trips {nearCity ? `from ${nearCity.name}` : ''} right now</div>
-            <div className="text-xs text-secondary">Try another area, or tap “I'm available” so agents can find you.</div>
+            <div className="text-xs text-secondary">Try another area, or tap “I&apos;m vacant” so agents can find you.</div>
           </Card>
         ) : (
           <div className="space-y-2">
