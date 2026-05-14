@@ -9,9 +9,12 @@
  * bad-slot 422; book-before-docs 422; submit driver KYC docs → docs_submitted; available-slots;
  * book a slot → video_pending + Jitsi meeting url; double-book 409; post-trip/post-vacancy
  * KYC_REQUIRED 403 while unverified; admin finalize-without-all-gates 422; admin finalize
- * approved → kyc_status approved + kyc_status_change notification; post-trip succeeds after;
- * admin console list; manager (trip_manager) KYC: create agent (steps_total 3) + doc-upload-url
- * + submit docs → docs_submitted.
+ * approved while vehicle photos still missing → kyc_status stays video_pending (no auto-promote);
+ * admin fills vehicle photos via PATCH /vehicles/:id → kyc_status auto-promotes to
+ * ready_for_approval; admin PATCH /drivers/:id/kyc { kyc_status: 'approved' } → approved +
+ * kyc_status_change notification; admin PATCH /video-verifications/:id/status (the new manual
+ * override endpoint) round-trips; post-trip succeeds after; admin console list; manager
+ * (trip_manager) KYC: create agent (steps_total 3) + doc-upload-url + submit docs → docs_submitted.
  */
 const BASE = (process.env.KYC_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) { console.log('[test-kyc-flow] KYC_API_BASE not set — skipping.'); process.exit(0); }
@@ -82,13 +85,27 @@ async function tokenFor(role) {
   // admin finalize
   ck('finalize approve without all 3 gates → 422', (await j('PATCH', `/video-verifications/${vvid}/finalize`, { token: at, body: { outcome: 'approved', face_match_confirmed: true, documents_confirmed: true, liveness_check_passed: false } })).status === 422);
   const fin = await j('PATCH', `/video-verifications/${vvid}/finalize`, { token: at, body: { outcome: 'approved', face_match_confirmed: true, documents_confirmed: true, liveness_check_passed: true, notes: 'all good' } });
-  ck('finalize approved', fin.status === 200 && fin.json?.data?.status === 'completed' && fin.json?.data?.outcome === 'approved');
+  ck('finalize approved (video row)', fin.status === 200 && fin.json?.data?.status === 'completed' && fin.json?.data?.outcome === 'approved');
+  // Vehicle photos still missing → no auto-promote; subject sits at video_pending until photos arrive.
   const me2 = await j('GET', '/drivers/me', { token: dt });
-  ck('driver kyc → approved (step done)', me2.json?.data?.verification?.kyc_status === 'approved' && me2.json?.data?.verification?.steps?.video_call === 'done');
+  ck('finalize w/ missing vehicle photos → kyc stays video_pending (step video_call done)', me2.json?.data?.verification?.kyc_status === 'video_pending' && me2.json?.data?.verification?.steps?.video_call === 'done');
+  // Backfill vehicle photos (admin) → maybePromoteToReadyForApproval kicks in.
+  const fakeUrl = 'https://example.com/photo.jpg';
+  const photoPatch = await j('PATCH', `/vehicles/${vid}`, { token: at, body: { photo_front_url: fakeUrl, photo_back_url: fakeUrl, photo_left_url: fakeUrl, photo_right_url: fakeUrl, photo_plate_url: fakeUrl, rc_book_url: fakeUrl, insurance_url: fakeUrl } });
+  ck('admin backfill vehicle photos', photoPatch.status === 200, JSON.stringify(photoPatch.json?.error));
+  const me3 = await j('GET', '/drivers/me', { token: dt });
+  ck('all steps done → kyc auto-promoted to ready_for_approval', me3.json?.data?.verification?.kyc_status === 'ready_for_approval' && me3.json?.data?.verification?.steps_done === 5);
+  // Admin clicks Approve.
+  const approvePatch = await j('PATCH', `/drivers/${did}/kyc`, { token: at, body: { kyc_status: 'approved' } });
+  ck('admin approves ready_for_approval → approved', approvePatch.status === 200 && approvePatch.json?.data?.verification?.kyc_status === 'approved');
   const notifs = await j('GET', '/notifications', { token: dt });
   ck('kyc_status_change notification fired', (notifs.json?.data || []).some((n) => n.type === 'kyc_status_change'));
   ck('post trip after approval → 200', (await j('POST', '/trips', { token: dt, body: { from_city_id: cityId, to_city_id: cityId2, pickup_at: new Date(Date.now() + 172800000).toISOString(), car_type_id: ctId, expected_distance_km: 120, rate_per_km: 14, hide_passenger_phone: false, passenger_count: 1 } })).status === 200);
   ck('admin console list (status=completed)', (await j('GET', '/video-verifications?status=completed', { token: at })).status === 200);
+  // PATCH /video-verifications/:id/status (admin manual override) — re-set notes; subject already approved so we leave outcome alone.
+  const statusPatch = await j('PATCH', `/video-verifications/${vvid}/status`, { token: at, body: { notes: 'admin override note (smoke)' } });
+  ck('admin PATCH /video-verifications/:id/status → 200', statusPatch.status === 200 && statusPatch.json?.data?.notes === 'admin override note (smoke)', JSON.stringify(statusPatch.json?.error));
+  ck('PATCH /video-verifications/:id/status as non-admin → 403', (await j('PATCH', `/video-verifications/${vvid}/status`, { token: dt, body: { notes: 'nope' } })).status === 403);
 
   // manager KYC
   const mt = await tokenFor('trip_manager');

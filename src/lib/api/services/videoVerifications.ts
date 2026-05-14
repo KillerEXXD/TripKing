@@ -48,3 +48,20 @@ export function finalizeVideoCall(id: string, input: FinalizeVideoCallInput): Pr
 export function markVideoCallNoShow(id: string): Promise<VideoVerification> {
   return apiClient.patch<Api>(`/video-verifications/${id}`, { no_show: true }).then((r) => transformVideoVerification(unwrap(r.data)));
 }
+/**
+ * Admin-only: flip a video verification's status (or outcome / notes) directly — for
+ * off-platform calls, re-opens, manual corrections. Mirrors the subject's `kyc_status`
+ * the same way `finalize` does, including auto-promote to `ready_for_approval`.
+ */
+export interface SetVideoCallStatusInput {
+  status?: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+  outcome?: 'approved' | 'rejected' | 'resubmit_required' | null;
+  notes?: string;
+}
+export function setVideoCallStatus(id: string, input: SetVideoCallStatusInput): Promise<VideoVerification> {
+  const body: Record<string, unknown> = {};
+  if (input.status !== undefined) body.status = input.status;
+  if (input.outcome !== undefined) body.outcome = input.outcome;
+  if (input.notes !== undefined) body.notes = input.notes;
+  return apiClient.patch<Api>(`/video-verifications/${id}/status`, body).then((r) => transformVideoVerification(unwrap(r.data)));
+}

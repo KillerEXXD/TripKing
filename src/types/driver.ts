@@ -3,7 +3,7 @@ import type { NearRadius, Place } from './place';
 import type { VehicleSummary } from './trip';
 import type { VideoOutcome, VideoVerificationStatus } from './videoVerification';
 
-export type KycStatus = 'pending' | 'docs_submitted' | 'video_pending' | 'approved' | 'rejected' | 'resubmit_required';
+export type KycStatus = 'pending' | 'docs_submitted' | 'video_pending' | 'ready_for_approval' | 'approved' | 'rejected' | 'resubmit_required';
 
 /** Status of one onboarding/verification step (the server-computed checklist). */
 export type VerificationStepStatus = 'todo' | 'done' | 'action_needed' | 'scheduled';

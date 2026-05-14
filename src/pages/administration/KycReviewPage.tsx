@@ -1,82 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAgentKycDocs, useDriverKycDocs, useInfiniteAgents, useInfiniteDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
-import { Badge, Button, Card, Input } from '@/components/ui';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { useInfiniteAgents, useInfiniteDrivers } from '@/hooks/useDrivers';
+import { Badge, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import type { KycDocs, KycStatus } from '@/types';
+import { KYC_LABEL, KYC_VARIANT, NEEDS_REVIEW } from './kycConstants';
+import type { KycStatus } from '@/types';
 
-/** A doc thumbnail (opens the 5-min signed URL in a new tab) or a "not uploaded" placeholder. */
-function DocTile({ label, url }: { label: string; url?: string }) {
-  return (
-    <div className="space-y-1">
-      <div className="text-[11px] font-semibold text-secondary">{label}</div>
-      {url ? (
-        <a href={url} target="_blank" rel="noreferrer" className="block aspect-[4/3] overflow-hidden rounded-lg border hover:ring-2 hover:ring-primary/40">
-          <img src={url} alt={label} className="size-full object-cover" />
-        </a>
-      ) : (
-        <div className="flex aspect-[4/3] items-center justify-center rounded-lg border border-dashed text-xs text-secondary">not uploaded</div>
-      )}
-    </div>
-  );
-}
-
-function KycDocsViewer({ kind, subjectId }: { kind: 'driver' | 'agent'; subjectId: string }) {
-  const driverDocs = useDriverKycDocs(subjectId, kind === 'driver');
-  const agentDocs = useAgentKycDocs(subjectId, kind === 'agent');
-  const q = kind === 'driver' ? driverDocs : agentDocs;
-  if (q.isPending) return <LoadingSkeleton rows={2} />;
-  if (q.isError) return <ErrorState title="Couldn't load documents" onRetry={() => void q.refetch()} />;
-  const docs = (q.data ?? {}) as KycDocs;
-  return (
-    <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-      <div className="text-xs text-secondary">
-        Aadhaar: {docs.aadhaarNumberMasked ?? '—'}
-        {kind === 'driver' ? ` · Licence: ${docs.driverLicenseNumber ?? '—'}${docs.driverLicenseExpiry ? ` (exp ${docs.driverLicenseExpiry})` : ''}` : ''}
-        {docs.kycDocsSubmittedAt ? ` · submitted ${new Date(docs.kycDocsSubmittedAt).toLocaleDateString('en-IN')}` : ''}
-      </div>
-      <div className={`grid gap-2 ${kind === 'driver' ? 'grid-cols-2' : 'grid-cols-3'}`}>
-        <DocTile label="Aadhaar — front" url={docs.aadhaarFrontUrl} />
-        <DocTile label="Aadhaar — back" url={docs.aadhaarBackUrl} />
-        {kind === 'driver' ? <DocTile label="Driving licence" url={docs.driverLicenseUrl} /> : null}
-        <DocTile label="Selfie" url={docs.selfieUrl} />
-      </div>
-    </div>
-  );
-}
-
-const KYC_LABEL: Record<KycStatus, string> = {
-  pending: 'Pending',
-  docs_submitted: 'Docs submitted',
-  video_pending: 'Video pending',
-  approved: 'Approved',
-  rejected: 'Rejected',
-  resubmit_required: 'Resubmit required',
-};
-const KYC_VARIANT: Record<KycStatus, 'success' | 'warning' | 'info' | 'muted' | 'destructive'> = {
-  pending: 'muted',
-  docs_submitted: 'info',
-  video_pending: 'info',
-  approved: 'success',
-  rejected: 'destructive',
-  resubmit_required: 'warning',
-};
-const NEEDS_REVIEW: KycStatus[] = ['pending', 'docs_submitted', 'video_pending', 'resubmit_required'];
-// Transitions an admin can apply (the row of action buttons), shortest-path first.
-const ACTIONS: { status: KycStatus; label: string }[] = [
-  { status: 'docs_submitted', label: 'Docs in' },
-  { status: 'video_pending', label: 'Video call' },
-  { status: 'approved', label: 'Approve' },
-  { status: 'resubmit_required', label: 'Resubmit' },
-  { status: 'rejected', label: 'Reject' },
-];
 type Filter = 'needs_review' | KycStatus;
-const FILTERS: { value: Filter; label: string }[] = [
-  { value: 'needs_review', label: 'Needs review' },
+const FILTERS: { value: Filter; label: string; description?: string }[] = [
+  { value: 'needs_review', label: 'Needs review', description: 'Not yet approved or rejected' },
   { value: 'pending', label: KYC_LABEL.pending },
   { value: 'docs_submitted', label: KYC_LABEL.docs_submitted },
   { value: 'video_pending', label: KYC_LABEL.video_pending },
+  { value: 'ready_for_approval', label: KYC_LABEL.ready_for_approval },
   { value: 'resubmit_required', label: KYC_LABEL.resubmit_required },
   { value: 'approved', label: KYC_LABEL.approved },
   { value: 'rejected', label: KYC_LABEL.rejected },
@@ -93,39 +30,21 @@ interface KycEntry {
   kycStatus: KycStatus;
 }
 
-function EntryCard({ entry, kind, onTransition, pending }: { entry: KycEntry; kind: 'driver' | 'agent'; onTransition: (status: KycStatus) => void; pending: boolean }) {
-  const [showDocs, setShowDocs] = useState(false);
-  const profileHref = kind === 'driver' ? `/drivers/${entry.id}` : `/agents/${entry.id}`;
+function EntryCard({ entry, kind }: { entry: KycEntry; kind: 'driver' | 'agent' }) {
+  const detailHref = `/administration/kyc/${kind}/${entry.id}`;
   return (
-    <Card className="gap-2">
-      <button
-        type="button"
-        onClick={() => setShowDocs((v) => !v)}
-        aria-expanded={showDocs ? 'true' : 'false'}
-        className="-mx-1 -mt-1 flex items-start justify-between gap-3 rounded-lg p-1 text-left transition-colors hover:bg-muted/40"
-      >
+    <Link to={detailHref} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-2xl">
+      <Card className="flex items-center justify-between gap-3 transition-colors hover:bg-muted/40">
         <div className="min-w-0">
-          <div className="font-bold">{entry.name || '—'}</div>
-          {entry.subtitle ? <div className="text-xs text-secondary">{entry.subtitle}</div> : null}
+          <div className="truncate font-bold">{entry.name || '—'}</div>
+          {entry.subtitle ? <div className="truncate text-xs text-secondary">{entry.subtitle}</div> : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <Badge variant={KYC_VARIANT[entry.kycStatus]}>{KYC_LABEL[entry.kycStatus]}</Badge>
-          {showDocs ? <ChevronUp className="size-4 text-secondary" aria-hidden /> : <ChevronDown className="size-4 text-secondary" aria-hidden />}
+          <ChevronRight className="size-4 text-secondary" aria-hidden />
         </div>
-      </button>
-      <div className="flex flex-wrap gap-1.5">
-        <Button size="sm" variant="ghost" onClick={() => setShowDocs((v) => !v)}>{showDocs ? 'Hide documents' : 'View documents'}</Button>
-        <Link to={profileHref} className="inline-flex h-8 items-center rounded-full border border-input bg-background px-3 text-sm font-medium hover:bg-muted">
-          Open profile
-        </Link>
-        {ACTIONS.map((a) => (
-          <Button key={a.status} size="sm" variant={a.status === 'approved' ? 'full' : a.status === 'rejected' ? 'destructive' : 'outline'} disabled={pending || entry.kycStatus === a.status} onClick={() => onTransition(a.status)}>
-            {a.label}
-          </Button>
-        ))}
-      </div>
-      {showDocs ? <KycDocsViewer kind={kind} subjectId={entry.id} /> : null}
-    </Card>
+      </Card>
+    </Link>
   );
 }
 
@@ -145,7 +64,6 @@ function InfiniteSentinel({ onIntersect, enabled }: { onIntersect: () => void; e
 
 function DriversQueue({ filter, search }: { filter: Filter; search: string }) {
   const query = useInfiniteDrivers({ kycStatus: filterToKycStatus(filter), ...(search ? { search } : {}) }, PAGE_SIZE);
-  const updateKyc = useUpdateDriverKyc();
   const rows = useMemo(() => query.data?.pages.flatMap((p) => p.data) ?? [], [query.data]);
   if (query.isPending) return <LoadingSkeleton rows={4} />;
   if (query.isError) return <ErrorState title="Couldn't load drivers" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
@@ -157,8 +75,6 @@ function DriversQueue({ filter, search }: { filter: Filter; search: string }) {
           key={d.id}
           kind="driver"
           entry={{ id: d.id, name: d.fullName, subtitle: d.currentCity?.name ?? d.homeCity?.name, kycStatus: d.kycStatus }}
-          pending={updateKyc.isPending}
-          onTransition={(kycStatus) => updateKyc.mutate({ id: d.id, kycStatus })}
         />
       ))}
       <InfiniteSentinel enabled={!!query.hasNextPage && !query.isFetchingNextPage} onIntersect={() => void query.fetchNextPage()} />
@@ -169,7 +85,6 @@ function DriversQueue({ filter, search }: { filter: Filter; search: string }) {
 
 function AgentsQueue({ filter, search }: { filter: Filter; search: string }) {
   const query = useInfiniteAgents({ kycStatus: filterToKycStatus(filter), ...(search ? { search } : {}) }, PAGE_SIZE);
-  const updateKyc = useUpdateAgentKyc();
   const rows = useMemo(() => query.data?.pages.flatMap((p) => p.data) ?? [], [query.data]);
   if (query.isPending) return <LoadingSkeleton rows={4} />;
   if (query.isError) return <ErrorState title="Couldn't load agents" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
@@ -181,8 +96,6 @@ function AgentsQueue({ filter, search }: { filter: Filter; search: string }) {
           key={a.id}
           kind="agent"
           entry={{ id: a.id, name: a.fullName, subtitle: a.businessName ?? a.businessCity?.name, kycStatus: a.kycStatus }}
-          pending={updateKyc.isPending}
-          onTransition={(kycStatus) => updateKyc.mutate({ id: a.id, kycStatus })}
         />
       ))}
       <InfiniteSentinel enabled={!!query.hasNextPage && !query.isFetchingNextPage} onIntersect={() => void query.fetchNextPage()} />
@@ -192,11 +105,10 @@ function AgentsQueue({ filter, search }: { filter: Filter; search: string }) {
 }
 
 /**
- * `/administration/kyc` — the KYC review queue (admin-only). Move drivers and
- * agents through `pending → docs_submitted → video_pending → approved | rejected
- * | resubmit_required` (each transition fires a `kyc_status_change` notification).
- * Status filter + name/phone/email search both run server-side; results paginate
- * via infinite scroll.
+ * `/administration/kyc` — the KYC review queue (admin-only). Two-row header:
+ * row 1 chooses Drivers/Agents, row 2 filters by KYC status. Each card links to
+ * the per-applicant detail page where the admin can drill into each checklist
+ * step's evidence and finalize the decision.
  */
 export function KycReviewPage() {
   const [subject, setSubject] = useState<'drivers' | 'agents'>('drivers');
@@ -216,18 +128,36 @@ export function KycReviewPage() {
       </Link>
       <h1 className="text-2xl font-bold">KYC review</h1>
 
-      <div className="flex flex-wrap items-center gap-2">
-        {(['drivers', 'agents'] as const).map((s) => (
-          <button key={s} type="button" aria-pressed={subject === s} onClick={() => setSubject(s)} className={`rounded-full border px-3 py-1 text-sm font-semibold ${subject === s ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background'}`}>
-            {s === 'drivers' ? 'Drivers' : 'Agents'}
-          </button>
-        ))}
-        <span className="mx-1 h-5 w-px bg-black/10" aria-hidden />
-        {FILTERS.map((f) => (
-          <button key={f.value} type="button" aria-pressed={filter === f.value} onClick={() => setFilter(f.value)} className={`rounded-full border px-3 py-1 text-xs font-medium ${filter === f.value ? 'border-primary bg-primary/15 text-primary' : 'border-input bg-background'}`}>
-            {f.label}
-          </button>
-        ))}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Applicant type">
+          {(['drivers', 'agents'] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              role="tab"
+              aria-selected={subject === s ? 'true' : 'false'}
+              onClick={() => setSubject(s)}
+              className={`rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors ${subject === s ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background hover:bg-muted'}`}
+            >
+              {s === 'drivers' ? 'Drivers' : 'Agents'}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="KYC status">
+          {FILTERS.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              role="tab"
+              aria-selected={filter === f.value ? 'true' : 'false'}
+              title={f.description}
+              onClick={() => setFilter(f.value)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${filter === f.value ? 'border-primary bg-primary/15 text-primary' : 'border-input bg-background hover:bg-muted'}`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone or email" aria-label="Search KYC queue" />
