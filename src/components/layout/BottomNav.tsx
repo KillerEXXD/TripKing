@@ -1,12 +1,16 @@
+import type { ComponentType, SVGProps } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ClipboardList, Home, Plus, Search, Users, type LucideIcon } from 'lucide-react';
+import { Bell, ClipboardList, Home, Plus, Search } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
+import { FindDriverIcon } from '@/components/icons/FindDriverIcon';
 import { cn } from '@/lib/utils';
+
+type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface NavItem {
   id: string;
   label: string;
-  Icon: LucideIcon;
+  Icon: NavIcon;
   to: string;
   /** Emphasised centre action (the ⊕ Post pill). */
   primary?: boolean;
@@ -25,13 +29,13 @@ const AGENT_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
   { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, match: (p) => p === '/trips/new' },
   { id: 'mine', label: 'My posts', Icon: ClipboardList, to: '/posted-trips', match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
-  { id: 'find', label: 'Find driver', Icon: Users, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
+  { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
 ];
 // Admins oversee the marketplace — they don't post or run trips, so no Post / My trips tabs.
 const ADMIN_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
   { id: 'browse', label: 'Browse', Icon: Search, to: '/trips', match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
-  { id: 'find', label: 'Drivers', Icon: Users, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
+  { id: 'find', label: 'Drivers', Icon: FindDriverIcon, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
   { id: 'alerts', label: 'Notifications', Icon: Bell, to: '/notifications', match: (p) => p.startsWith('/notifications') },
 ];
 
