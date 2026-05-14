@@ -205,6 +205,7 @@ export function transformAppSettings(api: Record<string, unknown>): AppSettings 
     defaultExtrasPaidByPassenger: api.default_extras_paid_by_passenger !== false,
     defaultDriverInstructions: typeof api.default_driver_instructions === 'string' ? api.default_driver_instructions : '',
     maxActiveVacanciesPerDriver: reqNum(api.max_active_vacancies_per_driver, 'max_active_vacancies_per_driver', { api }),
+    inviteMaxRadiusKm: reqNum(api.invite_max_radius_km, 'invite_max_radius_km', { api }),
   };
 }
 export function toApiAppSettings(input: AppSettingsInput): Record<string, unknown> {
@@ -218,5 +219,6 @@ export function toApiAppSettings(input: AppSettingsInput): Record<string, unknow
   if (input.defaultExtrasPaidByPassenger !== undefined) out.default_extras_paid_by_passenger = input.defaultExtrasPaidByPassenger;
   if (input.defaultDriverInstructions !== undefined) out.default_driver_instructions = input.defaultDriverInstructions;
   if (input.maxActiveVacanciesPerDriver !== undefined) out.max_active_vacancies_per_driver = input.maxActiveVacanciesPerDriver;
+  if (input.inviteMaxRadiusKm !== undefined) out.invite_max_radius_km = input.inviteMaxRadiusKm;
   return out;
 }

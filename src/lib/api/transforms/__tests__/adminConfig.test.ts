@@ -113,6 +113,7 @@ describe('transformAppSettings', () => {
     default_extras_paid_by_passenger: true,
     default_driver_instructions: '1. Call before arrival',
     max_active_vacancies_per_driver: 2,
+    invite_max_radius_km: 15,
   };
   it('maps a full row', () => {
     expect(transformAppSettings(full)).toEqual({
@@ -125,6 +126,7 @@ describe('transformAppSettings', () => {
       defaultExtrasPaidByPassenger: true,
       defaultDriverInstructions: '1. Call before arrival',
       maxActiveVacanciesPerDriver: 2,
+      inviteMaxRadiusKm: 15,
     });
   });
   it('throws when a numeric setting is missing', () => {
@@ -149,5 +151,6 @@ describe('toApi* writers — camelCase → snake_case, drop undefined', () => {
   it('toApiAppSettings', () => {
     expect(toApiAppSettings({ minVehicleYear: 2016, defaultCommissionPct: 12 })).toEqual({ min_vehicle_year: 2016, default_commission_pct: 12 });
     expect(toApiAppSettings({ maxActiveVacanciesPerDriver: 3 })).toEqual({ max_active_vacancies_per_driver: 3 });
+    expect(toApiAppSettings({ inviteMaxRadiusKm: 20 })).toEqual({ invite_max_radius_km: 20 });
   });
 });
