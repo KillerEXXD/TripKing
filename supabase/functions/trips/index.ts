@@ -865,14 +865,48 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
         throw e;
       }
-      const { data, error } = await db
+      // A unique index on (trip_id, driver_id) prevents two acceptance rows for the same
+      // driver+trip, even after withdraw/reject (DELETE soft-marks status='withdrawn',
+      // doesn't remove the row). So re-applying after withdraw/reject = resurrect the
+      // existing row back to 'applied'; only block if it's still in an open or decided-good
+      // terminal state.
+      const { data: existing } = await db
         .from('trip_acceptances')
-        .insert({ trip_id: tripId, driver_id: did, vehicle_id: (b.vehicle_id as string | null) ?? null, applicant_quoted_rate_per_km: (b.applicant_quoted_rate_per_km as number | null) ?? null, applicant_message: (b.applicant_message as string | null) ?? null, status: 'applied' })
-        .select('id')
-        .single();
-      if (error) return error.code === '23505' ? fail('CONFLICT', 'You already applied to this trip', 409) : pgFail(error);
+        .select('id, status')
+        .eq('trip_id', tripId)
+        .eq('driver_id', did)
+        .maybeSingle();
+      let accId: string;
+      if (existing) {
+        const prev = String((existing as Record<string, unknown>).status);
+        if (prev === 'applied' || prev === 'selected' || prev === 'expired') {
+          return fail('CONFLICT', 'You already applied to this trip', 409);
+        }
+        // prev ∈ withdrawn | rejected — resurrect.
+        const { error: updErr } = await db.from('trip_acceptances')
+          .update({
+            status: 'applied',
+            applied_at: new Date().toISOString(),
+            decision_at: null,
+            decision_note: null,
+            vehicle_id: (b.vehicle_id as string | null) ?? null,
+            applicant_quoted_rate_per_km: (b.applicant_quoted_rate_per_km as number | null) ?? null,
+            applicant_message: (b.applicant_message as string | null) ?? null,
+          })
+          .eq('id', (existing as Record<string, unknown>).id as string);
+        if (updErr) return pgFail(updErr);
+        accId = (existing as Record<string, unknown>).id as string;
+      } else {
+        const { data, error } = await db
+          .from('trip_acceptances')
+          .insert({ trip_id: tripId, driver_id: did, vehicle_id: (b.vehicle_id as string | null) ?? null, applicant_quoted_rate_per_km: (b.applicant_quoted_rate_per_km as number | null) ?? null, applicant_message: (b.applicant_message as string | null) ?? null, status: 'applied' })
+          .select('id')
+          .single();
+        if (error) return error.code === '23505' ? fail('CONFLICT', 'You already applied to this trip', 409) : pgFail(error);
+        accId = data.id as string;
+      }
       await db.from('trips').update({ status: 'has_applicants' }).eq('id', tripId).eq('status', 'open');
-      const { data: full } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('id', data.id as string).single();
+      const { data: full } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('id', accId).single();
       invalidateTripsList();
       return ok(shapeAcceptance(full as Record<string, unknown>));
     }
