@@ -79,6 +79,7 @@ describe('AgentHomePage', () => {
     expect(screen.getByRole('link', { name: /find a driver/i })).toHaveAttribute('href', '/vacancies');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
   it('lists the agent\'s recent posts and an applicants prompt', () => {

@@ -10,7 +10,7 @@ import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR } from '@/lib/utils';
+import { formatINR, initials } from '@/lib/utils';
 import type { Agent, Trip, Vacancy } from '@/types';
 
 const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
@@ -23,6 +23,13 @@ function firstName(full: string | undefined): string {
   return full.trim().split(/\s+/)[0] ?? '';
 }
 
+function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
+  return (
+    <Link to="/profile" aria-label="Your profile" className="flex size-9 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-sm font-bold text-primary hover:ring-2 hover:ring-primary/40">
+      {photoUrl ? <img src={photoUrl} alt="" className="size-full object-cover" /> : <span>{name ? initials(name) : '?'}</span>}
+    </Link>
+  );
+}
 function Bellish({ count }: { count: number }) {
   return (
     <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative -mr-1 flex size-9 items-center justify-center rounded-full text-secondary hover:bg-muted">
@@ -99,7 +106,10 @@ function AgentHome({ agent }: { agent: Agent }) {
             <Badge variant="secondary">Agent</Badge>
           </div>
         </div>
-        <Bellish count={unread} />
+        <div className="flex items-center gap-1">
+          <Bellish count={unread} />
+          <ProfileAvatar name={agent.fullName || user?.displayName || 'Agent'} photoUrl={agent.profilePhotoUrl} />
+        </div>
       </header>
 
       <div className="space-y-3 px-4 pb-4 pt-3">

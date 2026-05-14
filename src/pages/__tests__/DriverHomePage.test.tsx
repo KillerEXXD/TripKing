@@ -101,6 +101,7 @@ describe('DriverHomePage', () => {
     expect(screen.getByRole('link', { name: /i'm available/i })).toHaveAttribute('href', '/vacancies/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
   it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {
