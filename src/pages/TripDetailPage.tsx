@@ -8,6 +8,7 @@ import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cancelReasonHooks } from '@/hooks/useAdminConfig';
 import { useAuth } from '@/contexts/AuthContext';
+import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/myApplicationsStore';
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
@@ -638,7 +639,11 @@ export function TripDetailPage() {
   const location = useLocation();
   const fillPassenger = new URLSearchParams(location.search).get('fillPassenger') === '1';
   const { user } = useAuth();
-  const isDriver = user?.role === 'driver';
+  // Effective role honours the admin role-switcher — an admin viewing-as-driver gets the
+  // driver flow (Apply bar), not the poster/admin flow.
+  const effectiveRole = useEffectiveRole();
+  const isDriver = effectiveRole === 'driver';
+  const isAdminView = user?.role === 'admin' && effectiveRole === 'admin';
   const tripQuery = useTrip(id);
   const myDriverQuery = useMyDriver(isDriver);
   const myDriverMissing = isDriver && myDriverQuery.isError && myDriverQuery.error instanceof ApiError && myDriverQuery.error.status === 404;
@@ -673,8 +678,10 @@ export function TripDetailPage() {
           fillPassenger={fillPassenger}
           viewer={{
             isDriver,
-            isPoster: !!user && tripQuery.data.postedByUserId === user.id,
-            isAdmin: user?.role === 'admin',
+            // An admin viewing-as-driver isn't a poster for this purpose, even if they posted
+            // the trip under their agent identity (postedByUserId === user.id).
+            isPoster: !isDriver && !!user && tripQuery.data.postedByUserId === user.id,
+            isAdmin: isAdminView,
             isAssignedDriver: !!myDriverQuery.data?.id && tripQuery.data.assignedDriverId === myDriverQuery.data.id,
             myDriverId: myDriverQuery.data?.id,
             myDriverPending: isDriver && myDriverQuery.isPending,
