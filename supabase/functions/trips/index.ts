@@ -47,6 +47,8 @@ import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { stripPhones, assertNoPhones, PhoneInTextError, revealCache, logPiiReveal } from '../_shared/pii.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
+import { readBody, pgFail } from '../_shared/http.ts';
 
 const CACHE_EPOCH = 'v2';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
@@ -82,27 +84,6 @@ const ACCEPTANCE_SELECT =
   '*, driver:drivers(id, user_id, full_name, phone, email, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, user:users!user_id(display_handle), current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
-async function readBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
 async function sha256hex(s: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
@@ -236,12 +217,6 @@ function sortWaypoints(row: Record<string, unknown> | null | undefined): void {
   if (Array.isArray(wp)) wp.sort((a, b) => Number(a.seq) - Number(b.seq));
 }
 const genOtp = () => String(Math.floor(100000 + Math.random() * 900000));
-function pgFail(error: { code?: string; message: string }, fallbackStatus = 400): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, fallbackStatus);
-}
 function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null;
 }
@@ -438,7 +413,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       assignedDriver = did;
     }
     const near = parseNearRadius(url);
-    const limit = Math.min(Number.isFinite(Number(url.searchParams.get('limit'))) ? Number(url.searchParams.get('limit')) : 50, 100);
+    // `searchParams.get('limit')` returns null when the param is absent; Number(null) === 0 and is
+    // finite, so the previous form fell through to limit=0 (empty list) on every unfiltered call.
+    // Guard the null/empty case so the 50 default actually kicks in.
+    const limitRaw = url.searchParams.get('limit');
+    const limit = Math.min(limitRaw && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : 50, 100);
 
     // Cache eligibility — skip when status would touch live-tracked trips: 'in_progress' includes
     // the driver's live position in the row, which a 30s cache would stale. Open / has_applicants
