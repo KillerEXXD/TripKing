@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AdminAgentsPage } from '@/pages/administration/AdminAgentsPage';
@@ -78,27 +78,19 @@ describe('AdminAgentsPage', () => {
     expect(screen.getByText(/567 total/)).toBeInTheDocument();
   });
 
-  it('filters the loaded list by the search box (name / phone / email / business)', () => {
-    setAgents({
-      rows: [
-        makeAgent(),
-        makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A2B2C3D', canReportBugs: false, phone: '+918000000000', email: 'suresh@example.com', businessName: 'SP Tours' }),
-      ],
-    });
-    renderPage();
-    const search = screen.getByLabelText(/search agents/i);
-
-    fireEvent.change(search, { target: { value: 'suresh' } });
-    expect(screen.queryByText('Priya Ramesh')).toBeNull();
-    expect(screen.getByText('Suresh P')).toBeInTheDocument();
-
-    fireEvent.change(search, { target: { value: 'sp tours' } });
-    expect(screen.getByText('Suresh P')).toBeInTheDocument();
-    expect(screen.queryByText('Priya Ramesh')).toBeNull();
-
-    fireEvent.change(search, { target: { value: '987650' } });
-    expect(screen.getByText('Priya Ramesh')).toBeInTheDocument();
-    expect(screen.queryByText('Suresh P')).toBeNull();
+  it('forwards the (debounced) search box to the server as a `search` param', () => {
+    vi.useFakeTimers();
+    try {
+      setAgents({ rows: [makeAgent()] });
+      renderPage();
+      fireEvent.change(screen.getByLabelText(/search agents/i), { target: { value: 'suresh' } });
+      act(() => { vi.advanceTimersByTime(300); });
+      const calls = vi.mocked(useInfiniteAgents).mock.calls;
+      const last = calls[calls.length - 1];
+      expect((last[0] as { search?: string }).search).toBe('suresh');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('defaults to All and a KYC chip narrows the server query', () => {
