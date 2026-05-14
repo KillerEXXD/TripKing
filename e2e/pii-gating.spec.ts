@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { AGENT_USER, agentRow, driverRow, openTripRow, signInAsAgent, stubApi, VERIFICATION_APPROVED } from './helpers';
+import { AGENT_USER, agentRow, openTripRow, signInAsAgent, stubApi, VERIFICATION_APPROVED } from './helpers';
 
 /**
  * Step-5 UI invariant: a pre-reveal driver/vacancy/trip row never exposes a name/phone the server
