@@ -37,12 +37,11 @@ async function driverNonVideoStepsDone(db: Db, driverId: string): Promise<boolea
 /** Returns true if every non-video checklist step for an agent is done. */
 async function agentNonVideoStepsDone(db: Db, agentId: string): Promise<boolean> {
   const { data: a } = await db.from('trip_managers')
-    .select('full_name, business_city_id, home_city_id, aadhaar_front_path, aadhaar_back_path, selfie_path')
+    .select('full_name, business_city_id, aadhaar_front_path, aadhaar_back_path, selfie_path')
     .eq('id', agentId).maybeSingle();
   if (!a) return false;
   const ag = a as Row;
-  const cityDone = !!ag.business_city_id || !!ag.home_city_id;
-  const detailsDone = !!str(ag.full_name) && cityDone;
+  const detailsDone = !!str(ag.full_name) && !!ag.business_city_id;
   const docsDone = !!ag.aadhaar_front_path && !!ag.aadhaar_back_path && !!ag.selfie_path;
   return detailsDone && docsDone;
 }
