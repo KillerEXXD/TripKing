@@ -100,6 +100,14 @@ function ApplicantCard({
             {rejecting ? 'Rejecting…' : 'Reject'}
           </Button>
         </div>
+      ) : canAct && acceptance.status === 'rejected' ? (
+        // Agents change their mind — backend /assign doesn't filter by acceptance status, so a
+        // rejected applicant can be reinstated by selecting them directly. No unreject step needed.
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onAssign} disabled={assigning || rejecting}>
+            {assigning ? 'Selecting…' : 'Reconsider — select this driver'}
+          </Button>
+        </div>
       ) : null}
     </Card>
   );
