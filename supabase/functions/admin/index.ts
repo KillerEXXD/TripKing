@@ -16,7 +16,7 @@
  *   DELETE /admin/places/<id>            (admin) — 409 IN_USE if referenced (deactivate or merge instead)
  *   GET    /admin/users[?role=&active=true|false&q=&limit=]   (admin) — list accounts (filter by role / active / phone|email|name)
  *   GET    /admin/users/<id>             (admin) — one account
- *   PATCH  /admin/users/<id>             (admin) — { is_active?, role?, display_name?, reason? } — the account-level kill switch + role grant
+ *   PATCH  /admin/users/<id>             (admin) — { is_active?, role?, display_name?, can_report_bugs?, reason? } — the account-level kill switch + role grant + bug-reporter toggle
  *                                        (is_active=false ⇒ the account can't get a new session — /auth verify-otp & refresh 403; fires an account_status_change notification.
  *                                         Distinct from PATCH /drivers|/agents/<id>/active, which deactivates the marketplace *profile* but still lets the user sign in. You can't deactivate / demote your own account.)
  *
@@ -237,7 +237,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
   // this one stops the account from getting a new session at all (/auth verify-otp & refresh → 403).
   if (segments[0] === 'users') {
     const USER_ROLES = ['driver', 'trip_manager', 'admin'];
-    const USER_SELECT = 'id, role, phone, email, display_name, preferred_language, is_active, created_at, updated_at';
+    const USER_SELECT = 'id, role, phone, email, display_name, preferred_language, is_active, can_report_bugs, created_at, updated_at';
     if (segments.length === 1 && req.method === 'GET') {
       const a = await requireAdmin(db, req);
       if (a instanceof Response) return a;
@@ -275,11 +275,12 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
           patch.role = body.role;
         }
         if (typeof body.display_name === 'string') patch.display_name = body.display_name;
-        if (Object.keys(patch).length === 0) return fail('VALIDATION', 'nothing to update — allowed: is_active, role, display_name', 422);
+        if (typeof body.can_report_bugs === 'boolean') patch.can_report_bugs = body.can_report_bugs;
+        if (Object.keys(patch).length === 0) return fail('VALIDATION', 'nothing to update — allowed: is_active, role, display_name, can_report_bugs', 422);
         // can't lock yourself out
         if (patch.is_active === false && id === a.id) return fail('VALIDATION', 'you cannot deactivate your own account', 422);
         if (patch.role !== undefined && patch.role !== 'admin' && id === a.id) return fail('VALIDATION', 'you cannot remove your own admin role', 422);
-        const { data: before } = await db.from('users').select('id, role, phone, email, display_name, is_active').eq('id', id).maybeSingle();
+        const { data: before } = await db.from('users').select('id, role, phone, email, display_name, is_active, can_report_bugs').eq('id', id).maybeSingle();
         if (!before) return fail('NOT_FOUND', `user "${id}" not found`, 404);
         const { data, error } = await db.from('users').update(patch).eq('id', id).select(USER_SELECT).single();
         if (error) return pgFail(error);
