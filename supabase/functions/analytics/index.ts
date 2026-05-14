@@ -97,7 +97,23 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
     return setCacheControl(tagCacheHit(ok(data), hit), { ttl: 60, scope: 'private' });
   }
 
-  return fail('NOT_FOUND', 'Use /analytics/admin, /analytics/agent, /analytics/driver or /analytics/api-metrics', 404);
+  // ── GET /analytics/handshake?days=30 (Phase 6 — handshake telemetry) ──
+  if (resource === 'handshake') {
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const raw = parseInt(url.searchParams.get('days') ?? '30', 10);
+    const days = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 365) : 30;
+    const { data, hit } = await withCache<unknown>(
+      { key: `analytics:handshake:days-${days}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      async () => {
+        const { data, error } = await db.rpc('get_handshake_metrics', { p_days: days });
+        if (error) throw new Error(error.message);
+        return data;
+      },
+    );
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: 60, scope: 'private' });
+  }
+
+  return fail('NOT_FOUND', 'Use /analytics/admin, /analytics/agent, /analytics/driver, /analytics/api-metrics or /analytics/handshake', 404);
 });
 
 serve(handler);
