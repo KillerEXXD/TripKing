@@ -17,6 +17,42 @@ type NotifState = { isPending?: boolean; isError?: boolean; isSuccess?: boolean;
 function setNotifs(state: NotifState) {
   vi.mocked(useNotifications).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...state } as never);
 }
+const navigateSpy = vi.fn();
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  return { ...actual, useNavigate: () => navigateSpy };
+});
+
+describe('back button', () => {
+  beforeEach(() => navigateSpy.mockReset());
+
+  function mountWithMutations() {
+    setNotifs({ data: [] });
+    vi.mocked(useMarkNotificationRead).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    vi.mocked(useMarkAllNotificationsRead).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+    render(<MemoryRouter><NotificationsPage /></MemoryRouter>);
+  }
+
+  it('renders a Back button at the top of the page', () => {
+    mountWithMutations();
+    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
+  });
+
+  it('navigates back one entry when history is non-empty', () => {
+    Object.defineProperty(window.history, 'length', { configurable: true, value: 5 });
+    mountWithMutations();
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(navigateSpy).toHaveBeenCalledWith(-1);
+  });
+
+  it('falls back to / when the history stack is empty', () => {
+    Object.defineProperty(window.history, 'length', { configurable: true, value: 1 });
+    mountWithMutations();
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
+    expect(navigateSpy).toHaveBeenCalledWith('/');
+  });
+});
+
 function setMutations() {
   const markReadMut = { mutate: vi.fn(), isPending: false };
   const markAllMut = { mutate: vi.fn(), isPending: false };
