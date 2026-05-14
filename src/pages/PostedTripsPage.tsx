@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Plus, Share2, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
+import { AgentInProgressTripCard } from '@/components/trip/AgentInProgressTripCard';
 import { Badge, Button, Card } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -48,6 +49,9 @@ const FILTER_PRIORITY: Record<Filter, number> = {
 };
 
 const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
+function isFilter(v: string | null): v is Filter {
+  return !!v && (FILTERS as string[]).includes(v);
+}
 
 export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => void }) {
   const meta = STATUS_META[trip.status];
@@ -106,7 +110,17 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
  */
 export function PostedTripsPage() {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<Filter>('open');
+  // Filter is URL-backed (`?status=`) so deep links from /home priority cards work and
+  // changing tabs updates the URL — mirrors the DriverActivityPage `?tab=` pattern (PR #64).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlFilter = searchParams.get('status');
+  const filter: Filter = isFilter(urlFilter) ? urlFilter : 'open';
+  const setFilter = (next: Filter) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'open') params.delete('status');
+    else params.set('status', next);
+    setSearchParams(params, { replace: true });
+  };
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
   const tripsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
 
@@ -166,7 +180,11 @@ export function PostedTripsPage() {
         ) : shown.length === 0 ? (
           <EmptyState title={`No ${FILTER_LABEL[filter].toLowerCase()} trips`} message="Pick a different status." action={<Button variant="outline" size="sm" onClick={() => setFilter('all')}>Show all</Button>} />
         ) : (
-          shown.map((t) => <PostedTripCard key={t.id} trip={t} onShare={() => setShareTrip(t)} />)
+          shown.map((t) => (
+            t.status === 'in_progress'
+              ? <AgentInProgressTripCard key={t.id} trip={t} />
+              : <PostedTripCard key={t.id} trip={t} onShare={() => setShareTrip(t)} />
+          ))
         )}
       </div>
 

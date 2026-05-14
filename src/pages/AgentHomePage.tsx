@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, ChevronRight, Plus, Sparkles, Star, Users } from 'lucide-react';
+import { BarChart3, Bell, ChevronRight, Navigation, Plus, Sparkles, Star, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -39,6 +39,57 @@ function HubTile({ icon, label, tone, to }: { icon: React.ReactNode; label: stri
   );
 }
 
+/** Top-of-home tile-style card showing the agent how many of their posted trips are
+ *  actively running. Click → /posted-trips?status=in_progress for the rich list. */
+function TripsInProgressCard({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <Link
+      to="/posted-trips?status=in_progress"
+      className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
+    >
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+        <Navigation className="size-3.5" aria-hidden /> Driving now
+      </div>
+      <div className="mt-1 text-lg font-bold text-emerald-950">
+        {count} trip{count === 1 ? '' : 's'} in progress
+      </div>
+      <div className="mt-0.5 text-xs text-emerald-800">
+        Tap to see drivers, passengers, and ETA for each.
+      </div>
+      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-1.5 text-sm font-semibold text-white">
+        View all <ChevronRight className="size-4" aria-hidden />
+      </div>
+    </Link>
+  );
+}
+
+/** Trips the agent posted that have applicants but no driver selected yet. Replaces
+ *  the previous "X of your trips have applicants" amber banner with the same intent
+ *  + summary stats + a consistent visual style. Click → /posted-trips?status=has_applicants. */
+function NeedsActionCard({ tripCount, totalApplicants }: { tripCount: number; totalApplicants: number }) {
+  if (tripCount === 0) return null;
+  return (
+    <Link
+      to="/posted-trips?status=has_applicants"
+      className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
+    >
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+        <Sparkles className="size-3.5" aria-hidden /> Waiting for your decision
+      </div>
+      <div className="mt-1 text-lg font-bold text-amber-950">
+        {tripCount} trip{tripCount === 1 ? '' : 's'} need a driver
+      </div>
+      <div className="mt-0.5 text-xs text-amber-800">
+        {totalApplicants} driver{totalApplicants === 1 ? '' : 's'} applied across {tripCount === 1 ? 'this trip' : 'these trips'}. Pick one.
+      </div>
+      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
+        Review <ChevronRight className="size-4" aria-hidden />
+      </div>
+    </Link>
+  );
+}
+
 function PostedTripRow({ trip }: { trip: Trip }) {
   return (
     <Link to={trip.status === 'has_applicants' ? `/trips/${trip.id}/applicants` : `/trips/${trip.id}`} className="block">
@@ -65,7 +116,9 @@ function AgentHome({ agent }: { agent: Agent }) {
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
 
   const myPosts = myPostsQuery.data ?? [];
-  const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
+  const inProgressCount = myPosts.filter((t) => t.status === 'in_progress').length;
+  const needsActionTrips = myPosts.filter((t) => t.status === 'has_applicants');
+  const needsActionApplicants = needsActionTrips.reduce((sum, t) => sum + (t.applicantCount ?? 0), 0);
 
   return (
     <div>
@@ -85,6 +138,12 @@ function AgentHome({ agent }: { agent: Agent }) {
 
       <div className="space-y-3 px-4 pb-4 pt-3">
         {agent.verification && agent.kycStatus !== 'approved' ? <GetVerifiedBanner verification={agent.verification} steps={AGENT_VERIFICATION_STEPS} /> : null}
+
+        {/* Priority stack — surfaces in-flight work and decisions awaiting the agent.
+            Each card no-ops when its count is zero. Mirrors the Driver-home pattern (PR #66). */}
+        <TripsInProgressCard count={inProgressCount} />
+        <NeedsActionCard tripCount={needsActionTrips.length} totalApplicants={needsActionApplicants} />
+
         <div className="grid grid-cols-3 gap-2.5">
           <HubTile icon={<Plus className="size-5" aria-hidden />} label="Post a trip" tone="violet" to="/trips/new" />
           <HubTile icon={<Sparkles className="size-5" aria-hidden />} label="My posts" tone="blue" to="/posted-trips" />
@@ -119,19 +178,6 @@ function AgentHome({ agent }: { agent: Agent }) {
       </div>
 
       <div className="space-y-3 px-4">
-        {postedWithApplicants > 0 ? (
-          <Link to="/posted-trips" className="block rounded-2xl border border-amber-200 bg-amber-50/50 p-4 transition-colors hover:brightness-[0.98]">
-            <div className="flex items-center gap-3">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700"><Sparkles className="size-5" aria-hidden /></span>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold">{postedWithApplicants} of your trips {postedWithApplicants > 1 ? 'have' : 'has'} applicants</div>
-                <div className="truncate text-xs text-secondary">Review applicants and assign a driver.</div>
-              </div>
-              <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
-            </div>
-          </Link>
-        ) : null}
-
         <div>
           <div className="mb-2 flex items-center justify-between px-1">
             <h2 className="text-sm font-semibold">Your recent trips</h2>
