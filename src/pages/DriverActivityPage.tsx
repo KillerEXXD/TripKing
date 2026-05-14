@@ -22,7 +22,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'selected', label: 'Selected' },
   { id: 'completed', label: 'Completed' },
   { id: 'cancelled', label: 'Cancelled' },
-  { id: 'available', label: "I'm available" },
+  { id: 'available', label: "I'm vacant" },
   { id: 'posted', label: 'Posted by me' },
 ];
 const tabBtn = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');

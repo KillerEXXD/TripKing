@@ -113,7 +113,7 @@ export function HomePage() {
           <p className="text-xs text-secondary">Browse the live marketplace, or use the switcher above to act as a driver or an agent.</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <Link to="/trips" className="text-primary underline">Browse trips</Link>
-            <Link to="/vacancies" className="text-primary underline">Available drivers</Link>
+            <Link to="/vacancies" className="text-primary underline">Vacant drivers</Link>
             <Link to="/posted-trips" className="text-primary underline">Posted trips</Link>
             <Link to="/notifications" className="text-primary underline">Notifications</Link>
           </div>

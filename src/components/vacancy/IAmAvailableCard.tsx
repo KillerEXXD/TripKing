@@ -102,7 +102,7 @@ export function IAmAvailableCard({ driverId }: Props) {
           <MapPinned className="size-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-emerald-900">I'm available</div>
+          <div className="font-semibold text-emerald-900">I&apos;m vacant</div>
           <p className="mt-0.5 text-xs text-emerald-800">
             {count === 0
               ? 'Let agents find you for trips going from your city.'
