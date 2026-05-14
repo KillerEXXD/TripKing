@@ -9,6 +9,7 @@ vi.mock('@/hooks/useDrivers', () => ({ useAgent: vi.fn() }));
 import { useAgent } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useReviews', () => ({ useDriverReviews: vi.fn() }));
 import { useDriverReviews } from '@/hooks/useReviews';
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => ({ user: null }) }));
 
 const city = (id: string, name: string) => ({ id, name, state: 'Tamil Nadu', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeAgent(over: Partial<Agent> = {}): Agent {

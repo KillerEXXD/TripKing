@@ -2,7 +2,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Car, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useDriver } from '@/hooks/useDrivers';
 import { useDriverReviews } from '@/hooks/useReviews';
+import { useAuth } from '@/contexts/AuthContext';
 import { ReviewList } from '@/components/reviews/ReviewList';
+import { AdminKycChecklist } from '@/components/admin/kyc/AdminKycChecklist';
 import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -68,6 +70,8 @@ function VehicleRow({ v }: { v: VehicleSummary }) {
 }
 
 function DriverDetail({ driver }: { driver: Driver }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const kyc = KYC_BADGE[driver.kycStatus] ?? KYC_BADGE.pending;
   // `phone` is required on the revealed `Driver` shape but the server may send a pre-reveal row
   // (empty / missing identity); guard before rendering tel: links.
@@ -182,6 +186,21 @@ function DriverDetail({ driver }: { driver: Driver }) {
           </div>
         )}
       </Card>
+
+      {isAdmin && driver.verification ? (
+        <AdminKycChecklist
+          kind="driver"
+          subject={{
+            id: driver.id,
+            fullName: driver.fullName,
+            phone: driver.phone,
+            email: driver.email,
+            cityName: driver.currentCity?.name ?? driver.homeCity?.name,
+            profilePhotoUrl: driver.profilePhotoUrl,
+            verification: driver.verification,
+          }}
+        />
+      ) : null}
 
       <div className="space-y-2">
         <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Reviews</div>

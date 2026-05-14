@@ -2,7 +2,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Building2, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useAgent } from '@/hooks/useDrivers';
 import { useDriverReviews } from '@/hooks/useReviews';
+import { useAuth } from '@/contexts/AuthContext';
 import { ReviewList } from '@/components/reviews/ReviewList';
+import { AdminKycChecklist } from '@/components/admin/kyc/AdminKycChecklist';
 import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -29,6 +31,8 @@ function Avatar({ name, url }: { name: string; url?: string }) {
 }
 
 function AgentDetail({ agent }: { agent: Agent }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const kyc = KYC_BADGE[agent.kycStatus] ?? KYC_BADGE.pending;
   // `phone` is required on the revealed `Agent` shape but the server returns a pre-reveal row
   // (no identity fields) to viewers who haven't crossed the reveal gate — guard before rendering.
@@ -95,6 +99,21 @@ function AgentDetail({ agent }: { agent: Agent }) {
             </div>
           ) : null}
         </Card>
+      ) : null}
+
+      {isAdmin && agent.verification ? (
+        <AdminKycChecklist
+          kind="agent"
+          subject={{
+            id: agent.id,
+            fullName: agent.fullName,
+            phone: agent.phone,
+            email: agent.email,
+            cityName: agent.businessCity?.name,
+            profilePhotoUrl: agent.profilePhotoUrl,
+            verification: agent.verification,
+          }}
+        />
       ) : null}
 
       <div className="space-y-2">
