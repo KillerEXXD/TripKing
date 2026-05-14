@@ -90,7 +90,13 @@ export function BottomNav() {
             className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors', isActive ? 'text-primary' : 'text-secondary hover:text-foreground')}
           >
             <it.Icon className={it.bigIcon ? 'size-8' : 'size-7'} aria-hidden />
-            {it.hideLabel ? null : <span className="text-[10px] font-medium">{it.label}</span>}
+            {/* When the label is hidden, render an invisible placeholder so the icon's vertical
+                centre matches the labelled tabs sitting next to it. */}
+            {it.hideLabel ? (
+              <span className='invisible select-none text-[10px] font-medium' aria-hidden>&#x00a0;</span>
+            ) : (
+              <span className='text-[10px] font-medium'>{it.label}</span>
+            )}
           </button>
         );
       })}

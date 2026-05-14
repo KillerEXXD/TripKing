@@ -1,11 +1,11 @@
 import type { SVGProps } from 'react';
 
 /**
- * Browse-trips glyph for the driver's bottom-nav. Reads as "search trips" —
- * a car in motion (bold smoke puffs trailing left) with a magnifying lens
- * sitting **on** the car's windscreen (the two shapes overlap, so the
- * silhouette reads as one). Single-stroke, `currentColor`. Designed to be
- * legible at the 28 px bigIcon size used by the nav.
+ * Browse-trips glyph for the driver's bottom-nav. Reads as "search trips":
+ * a hatchback-style car in motion (puffs trailing behind), with a small
+ * magnifying lens at the bottom-right corner — as if you're zooming in on
+ * the car. Single-stroke, `currentColor`, fills the 24×24 viewBox top-to-bottom
+ * so the icon centres cleanly inside its tab cell.
  */
 export function BrowseTripsIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -18,19 +18,24 @@ export function BrowseTripsIcon(props: SVGProps<SVGSVGElement>) {
       strokeLinejoin="round"
       {...props}
     >
-      {/* Smoke puffs — bigger, bolder, trailing left of the car */}
-      <path d="M0.5 13 q2.5 -1 5 0" strokeWidth="2" />
-      <path d="M0.5 16 q2.5 -1 5 0" strokeWidth="2" />
-      <path d="M1.5 19 q2 -1 4 0" strokeWidth="2" />
-      {/* Car body — bigger, fills the lower 2/3 of the icon */}
-      <path d="M5.5 19.5 L8 12 L14 12 L17.5 15.5 L21 15.5 L21 19.5 Z" strokeWidth="2.25" />
-      {/* Wheels — bigger so they pop */}
-      <circle cx="9" cy="20.3" r="1.7" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="20.3" r="1.7" fill="currentColor" stroke="none" />
-      {/* Magnifying lens — overlaps the windscreen so the two shapes merge */}
-      <circle cx="13.5" cy="8" r="5" strokeWidth="2.25" />
-      {/* Handle — heavy stroke to keep it readable at small sizes */}
-      <line x1="17.2" y1="11.6" x2="20.5" y2="14.9" strokeWidth="2.5" />
+      {/* Smoke puffs trailing behind the car — three small horizontal squiggles */}
+      <path d="M0.8 8.5 q1.3 -0.6 2.5 0" />
+      <path d="M0.5 12 q1.5 -0.6 3 0" />
+      <path d="M1 15.5 q1.3 -0.6 2.5 0" />
+      {/* Car body — hatchback silhouette filling the centre of the viewBox.
+          Trunk → roof → windshield → hood → bumper → rocker. */}
+      <path
+        d="M3.5 17 L3.5 13.5 L6 9 L14.5 9 L17.5 13.5 L21.5 13.5 L21.5 17 Z"
+        strokeWidth="2"
+      />
+      {/* Wheels — filled so they pop, slightly proud of the rocker line */}
+      <circle cx="7" cy="18" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="17" cy="18" r="1.7" fill="currentColor" stroke="none" />
+      {/* Cabin pillar — subtle tick to read the car as a car, not a box */}
+      <line x1="10" y1="9.5" x2="10" y2="13" />
+      {/* Magnifying lens — bottom-right, overlapping the front bumper area */}
+      <circle cx="19" cy="20" r="2.8" strokeWidth="2" />
+      <line x1="21" y1="22" x2="23" y2="23.5" strokeWidth="2" />
     </svg>
   );
 }
