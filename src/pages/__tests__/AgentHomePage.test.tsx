@@ -68,26 +68,27 @@ describe('AgentHomePage', () => {
     expect(screen.getByText('onboarding page')).toBeInTheDocument();
   });
 
-  it('renders the agent home — greeting, action tiles, reputation', () => {
+  it('renders the agent home — greeting, the two always-on cards, reputation', () => {
     setMyAgent({ data: agent });
     setTrips({ data: [] });
     renderHome();
     // Greeting uses the first name from the loaded agent profile (here: the first word of "Agent A").
     expect(screen.getByText('Agent', { selector: 'span.truncate' })).toBeInTheDocument();
     expect(screen.getByText('Agent', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
-    expect(screen.getByRole('link', { name: /find a driver/i })).toHaveAttribute('href', '/vacancies');
+    // The Driving-now and Review cards are always rendered — empty-state copy with no posts.
+    expect(screen.getByText(/no trips in progress/i)).toBeInTheDocument();
+    expect(screen.getByText(/no applicants waiting/i)).toBeInTheDocument();
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
-  it('lists the agent\'s recent posts and an applicants prompt', () => {
-    setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', status: 'has_applicants', fromCity: city('c3', 'Bangalore') })] });
+  it('lists the agent\'s recent posts and surfaces the Review card when a post has applicants', () => {
+    setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', status: 'has_applicants', applicantCount: 1, fromCity: city('c3', 'Bangalore') })] });
     renderHome();
     expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
     expect(screen.getByText('Bangalore → Chennai')).toBeInTheDocument();
-    expect(screen.getByText(/of your trips has applicants/i)).toBeInTheDocument();
+    expect(screen.getByText(/need a driver/i)).toBeInTheDocument();
   });
 
   it('shows the Get verified banner while the agent is not yet verified', () => {
