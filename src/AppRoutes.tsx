@@ -17,6 +17,7 @@ const DriverActivityPage = lazyWithRetry(() => import('@/pages/DriverActivityPag
 const TripDetailPage = lazyWithRetry(() => import('@/pages/TripDetailPage'));
 const ApplicantReviewPage = lazyWithRetry(() => import('@/pages/ApplicantReviewPage'));
 const DriverProfilePage = lazyWithRetry(() => import('@/pages/DriverProfilePage'));
+const AgentProfilePage = lazyWithRetry(() => import('@/pages/AgentProfilePage'));
 const ProfilePage = lazyWithRetry(() => import('@/pages/ProfilePage'));
 const AgentAnalyticsPage = lazyWithRetry(() => import('@/pages/AgentAnalyticsPage'));
 const DriverEarningsPage = lazyWithRetry(() => import('@/pages/DriverEarningsPage'));
@@ -82,6 +83,7 @@ export function AppRoutes() {
             <Route path="/posted-trips" element={<PostedTripsPage />} />
             <Route path="/my-trips" element={<DriverActivityPage />} />
             <Route path="/drivers/:id" element={<DriverProfilePage />} />
+            <Route path="/agents/:id" element={<AgentProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/analytics" element={<AgentAnalyticsPage />} />
             <Route path="/my-earnings" element={<DriverEarningsPage />} />
