@@ -124,9 +124,10 @@ export function buildShareCaption(trip: Trip, opts: { withUrl?: boolean } = { wi
     `🧳 Packing, toll & permit: ${trip.extrasPaidByPassenger ? 'Extra — paid by passenger' : 'Included in fare'}`,
     `≈ Driver payout: ${formatINR(trip.driverPayout)}`,
   ];
-  const posterBlock = [`👤 Posted by: ${trip.postedByName}`, ...(contact ? [`📞 Contact: ${contact}`] : [])];
+  const posterBlock = contact ? [`📞 Contact: ${contact}`] : [];
 
-  const lines = ['👑 New trip on TripKing', '', ...tripBlock, '', ...moneyBlock, '', ...posterBlock];
+  const lines = ['👑 New trip on TripKing', '', ...tripBlock, '', ...moneyBlock];
+  if (posterBlock.length) lines.push('', ...posterBlock);
   lines.push('', opts.withUrl ? `🔗 View & apply: ${buildShareUrl(trip)}` : '🔗 Link below 👇');
   return lines.join('\n');
 }
