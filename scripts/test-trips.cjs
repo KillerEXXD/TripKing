@@ -270,6 +270,38 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('POST /trips/:id/assign with a deactivated driver\'s acceptance → 422', assignDeact.status === 422, `status=${assignDeact.status} ${JSON.stringify(assignDeact.json?.error || '')}`);
   await j('PATCH', `/drivers/${drv2Id}/active`, { token: adminToken, body: { is_active: true } });
 
+  // ── Phase 4: trip invites ─────────────────────────────────────────────────────
+  // Need an invitable driver (active + KYC-approved). dToken / drvId from earlier already qualify.
+  const inviteTripId = await newTrip({ pickup_at: futureIso(4) });
+  const inviteNoAuth = await j('POST', `/trips/${inviteTripId}/invites`, { body: { driver_ids: [drvId] } });
+  check('POST /trips/:id/invites without auth → 401', inviteNoAuth.status === 401, `status=${inviteNoAuth.status}`);
+  const inviteByRando = await j('POST', `/trips/${inviteTripId}/invites`, { token: randoToken, body: { driver_ids: [drvId] } });
+  check('POST /trips/:id/invites by a non-poster → 403', inviteByRando.status === 403, `status=${inviteByRando.status}`);
+  const inviteBad = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: {} });
+  check('POST /trips/:id/invites without driver_ids → 422', inviteBad.status === 422, `status=${inviteBad.status}`);
+  const invited = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: { driver_ids: [drvId] } });
+  const inviteId = invited.json?.data?.created?.[0]?.id;
+  check('POST /trips/:id/invites (poster) → 200 + created row + invitee_count', invited.status === 200 && !!inviteId, `status=${invited.status} ${JSON.stringify(invited.json?.data || invited.json?.error || '')}`);
+  const inviteList = await j('GET', `/trips/${inviteTripId}/invites`, { token });
+  check('GET /trips/:id/invites (poster) → 200 + array with the driver attached', inviteList.status === 200 && Array.isArray(inviteList.json?.data) && inviteList.json.data.length >= 1 && !!inviteList.json.data[0]?.driver?.display_handle, `${JSON.stringify(inviteList.json?.data || '').slice(0, 200)}`);
+  // The invited driver can see the trip via ?invited=me + sees the agent's name pre-revealed.
+  const invitedTab = await j('GET', '/trips?invited=me', { token: dToken });
+  const invitedTrip = (invitedTab.json?.data || []).find((t) => t.id === inviteTripId);
+  check('GET /trips?invited=me (invited driver) → contains the trip + posted_by_name pre-revealed (Phase 4)',
+    invitedTab.status === 200 && !!invitedTrip && typeof invitedTrip.posted_by_name === 'string' && invitedTrip.posted_by_name.length > 0,
+    `len=${invitedTab.json?.data?.length} posted_by_name=${JSON.stringify(invitedTrip?.posted_by_name)}`);
+  // Driver declines the invite.
+  const declineByOther = await j('POST', `/trips/${inviteTripId}/invites/${inviteId}/decline`, { token: token, body: { reason: 'busy' } });
+  check('POST /trips/:id/invites/:invite_id/decline by non-invitee → 403', declineByOther.status === 403, `status=${declineByOther.status}`);
+  const declineInvite = await j('POST', `/trips/${inviteTripId}/invites/${inviteId}/decline`, { token: dToken, body: { reason: 'too far' } });
+  check('POST /trips/:id/invites/:invite_id/decline (invitee) → 200', declineInvite.status === 200, `status=${declineInvite.status} ${JSON.stringify(declineInvite.json?.error || '')}`);
+  // Re-invite + agent withdraws.
+  const reInvite = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: { driver_ids: [drvId] } });
+  const reInviteId = reInvite.json?.data?.created?.[0]?.id;
+  check('POST /trips/:id/invites again → 200 + same row id (upserts back to pending)', reInvite.status === 200 && !!reInviteId, `status=${reInvite.status} ${JSON.stringify(reInvite.json?.data || '')}`);
+  const withdrawInvite = await j('DELETE', `/trips/${inviteTripId}/invites/${reInviteId}`, { token });
+  check('DELETE /trips/:id/invites/:invite_id (poster) → 200', withdrawInvite.status === 200, `status=${withdrawInvite.status}`);
+
   if (failures) { console.error(`[test-trips] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-trips] all checks passed');
 })().catch((e) => { console.error('[test-trips] error:', e); process.exit(1); });
