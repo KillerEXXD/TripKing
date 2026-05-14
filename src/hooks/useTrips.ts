@@ -9,18 +9,22 @@ import {
   cancelTrip,
   completeTrip,
   declineTrip,
+  declineTripInvite,
   getMyApplications,
   getTrip,
   getTripApplicants,
   getTripByOtp,
+  getTripInvites,
   getTrips,
+  inviteDrivers,
   postTrip,
   rejectApplicant,
   startTrip,
   updateTripPassenger,
   withdrawApplication,
+  withdrawTripInvite,
 } from '@/lib/api/services/trips';
-import type { ApplyToTripInput, PostTripInput, TripsQueryParams, TripStatus, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, PostTripInput, TripInvitation, TripsQueryParams, TripStatus, UpdateTripPassengerInput } from '@/types';
 
 type StartInput = { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number };
 type CompleteInput = { endOdoUrl?: string; endOdoReading?: number; driverNotes?: string };
@@ -214,3 +218,47 @@ export function useUpdateTripPassenger() {
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
 }
+
+// ─── Phase 4 trip_invitations hooks ─────────────────────────────────────────
+
+export function useTripInvites(tripId: string | undefined) {
+  return useQuery({
+    queryKey: ['trip', tripId, 'invites'],
+    queryFn: () => getTripInvites(tripId as string),
+    enabled: !!tripId,
+    staleTime: STALE.live,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** Driver's "Invited" tab — trips the caller has been invited to (pre-reveal exception applies). */
+export function useInvitedTrips() {
+  return useTrips({ invited: 'me' });
+}
+
+export function useInviteDrivers() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, driverIds }: { tripId: string; driverIds: string[] }) => inviteDrivers(tripId, driverIds),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+
+export function useWithdrawTripInvite() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, inviteId }: { tripId: string; inviteId: string }) => withdrawTripInvite(tripId, inviteId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+
+export function useDeclineTripInvite() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, inviteId, reason }: { tripId: string; inviteId: string; reason?: string }) => declineTripInvite(tripId, inviteId, reason),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+// Re-export the invitation type so consumers can import from one place.
+export type { TripInvitation };

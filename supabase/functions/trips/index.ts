@@ -540,6 +540,17 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (!did) return ok([]); // no driver profile ⇒ nothing assigned to you
       assignedDriver = did;
     }
+    // Phase 4: ?invited=me — driver's "Invited" tab. Resolves the caller's driver_id then
+    // restricts the trip list to those carrying a pending/applied/declined trip_invitations row.
+    const invitedParam = url.searchParams.get('invited');
+    let invitedTripIds: string[] | null = null;
+    if (invitedParam === 'me') {
+      const did = await driverIdFor(u.id);
+      if (!did) return ok([]); // no driver profile → nothing invited
+      const { data: invs } = await db.from('trip_invitations').select('trip_id').eq('driver_id', did).in('status', ['pending', 'applied', 'declined']);
+      invitedTripIds = (invs ?? []).map((r) => (r as { trip_id: string }).trip_id);
+      if (invitedTripIds.length === 0) return ok([]);
+    }
     const near = parseNearRadius(url);
     // `searchParams.get('limit')` returns null when the param is absent; Number(null) === 0 and is
     // finite, so the previous form fell through to limit=0 (empty list) on every unfiltered call.
@@ -567,6 +578,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (toCity) q = q.eq('to_city_id', toCity);
       if (postedBy) q = q.eq('posted_by_user_id', postedBy);
       if (assignedDriver) q = q.eq('assigned_driver_id', assignedDriver);
+      if (invitedTripIds) q = q.in('id', invitedTripIds);
       // via_city_id: filter to trips whose waypoint chain contains this city (any seq).
       if (viaCity) {
         const { data: wpRows, error: wpErr } = await db.from('trip_waypoints').select('trip_id').eq('city_id', viaCity);
@@ -631,7 +643,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (rel === 'browse') {
         const posterUserId = r.posted_by_user_id as string | undefined;
         if (posterUserId) {
-          posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
+          // Phase 4: ?invited=me trips pre-reveal the agent unconditionally — the
+          // invited-trip-ids set we resolved above IS the reveal credential.
+          if (invitedTripIds && invitedTripIds.includes(r.id as string)) posterReveal = true;
+          else posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
           if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips', trip_id: r.id as string });
         }
       }
@@ -836,6 +851,12 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (posterUserId) {
         const rc = revealCache(db);
         posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
+        // Phase 4: invited drivers get the agent's name+phone pre-revealed BEFORE applying,
+        // so they can call to discuss. The invitation row IS the reveal credential.
+        if (!posterReveal && myDriverId) {
+          const { data: inv } = await db.from('trip_invitations').select('id').eq('trip_id', raw.id as string).eq('driver_id', myDriverId).in('status', ['pending', 'applied']).maybeSingle();
+          if (inv) posterReveal = true;
+        }
         if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips/:id', trip_id: raw.id as string });
       }
     }
@@ -1172,6 +1193,113 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const t = await fullTrip(tripId, u!);
     invalidateTripsList();
     return ok(t);
+  }
+
+  // ── /trips/:id/invites — Phase 4 of the two-step handshake ───────────────
+  // POST   /trips/:id/invites                 (poster/admin) — body: { driver_ids: string[] } — invite N drivers
+  // GET    /trips/:id/invites                 (poster/admin) — list invitees with status
+  // DELETE /trips/:id/invites/:invite_id      (poster/admin) — withdraw an invite (→ 'withdrawn')
+  // POST   /trips/:id/invites/:invite_id/decline (invited driver) — body: { reason? }
+  if (sub === 'invites') {
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in', 401);
+    const isOwner = trip.posted_by_user_id === u.id || isAdmin(u);
+
+    // POST /trips/:id/invites — bulk create
+    if (!acceptanceId && req.method === 'POST') {
+      if (!isOwner) return fail('FORBIDDEN', 'Only the trip poster can invite drivers', 403);
+      const b = await readBody(req);
+      const ids = Array.isArray(b.driver_ids)
+        ? (b.driver_ids as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
+        : [];
+      if (ids.length === 0) return fail('VALIDATION', 'driver_ids must be a non-empty array of driver UUIDs', 422);
+      // Filter to active, KYC-approved drivers (otherwise the invite leads nowhere).
+      const { data: eligible } = await db.from('drivers').select('id, user_id').in('id', ids).eq('is_active', true).eq('kyc_status', 'approved');
+      const eligibleRows = (eligible ?? []) as { id: string; user_id: string }[];
+      const skipped = ids.filter((id) => !eligibleRows.some((r) => r.id === id));
+      // Upsert — re-inviting a previously-declined/withdrawn driver bumps status back to 'pending'.
+      const now = new Date().toISOString();
+      const rows = eligibleRows.map((r) => ({
+        trip_id: tripId,
+        driver_id: r.id,
+        invited_by_user_id: u.id,
+        status: 'pending' as const,
+        declined_reason: null,
+        updated_at: now,
+      }));
+      let created: { id: string; driver_id: string }[] = [];
+      if (rows.length > 0) {
+        const { data, error } = await db.from('trip_invitations').upsert(rows, { onConflict: 'trip_id,driver_id' }).select('id, driver_id, status');
+        if (error) return pgFail(error);
+        created = (data ?? []) as { id: string; driver_id: string }[];
+        // Notify each invited driver. Best-effort — failures don't break the response.
+        const trip_label = tripId;
+        for (const r of eligibleRows) {
+          await db.from('notifications').insert({
+            user_id: r.user_id,
+            type: 'trip_invitation',
+            title: 'You\'ve been invited to a trip',
+            body: 'A trip manager picked you to view a trip. Tap to see details and apply.',
+            payload_json: { trip_id: trip_label },
+          });
+        }
+      }
+      return ok({ created, skipped });
+    }
+    // GET /trips/:id/invites — list
+    if (!acceptanceId && req.method === 'GET') {
+      if (!isOwner) return fail('FORBIDDEN', 'Only the trip poster can list invitations', 403);
+      const { data, error } = await db
+        .from('trip_invitations')
+        .select('id, driver_id, status, declined_reason, created_at, updated_at, driver:drivers!driver_id(id, user_id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, kyc_status, user:users!user_id(display_handle))')
+        .eq('trip_id', tripId)
+        .order('created_at', { ascending: false });
+      if (error) return pgFail(error);
+      const flat = (data ?? []).map((row) => {
+        const r = row as Record<string, unknown>;
+        const drv = r.driver as Record<string, unknown> | null | undefined;
+        if (drv) {
+          const flatDrv = { ...drv };
+          const uu = flatDrv.user as Record<string, unknown> | null | undefined;
+          flatDrv.display_handle = uu && typeof uu.display_handle === 'string' ? uu.display_handle : null;
+          delete flatDrv.user;
+          r.driver = flatDrv;
+        }
+        return r;
+      });
+      return ok(flat);
+    }
+    // DELETE /trips/:id/invites/:invite_id — withdraw
+    if (acceptanceId && !subsub && req.method === 'DELETE') {
+      if (!isOwner) return fail('FORBIDDEN', 'Only the trip poster can withdraw an invitation', 403);
+      const { error } = await db.from('trip_invitations').update({ status: 'withdrawn', updated_at: new Date().toISOString() }).eq('id', acceptanceId).eq('trip_id', tripId);
+      if (error) return pgFail(error);
+      return ok({ withdrawn: acceptanceId });
+    }
+    // POST /trips/:id/invites/:invite_id/decline — invited driver declines
+    if (acceptanceId && subsub === 'decline' && req.method === 'POST') {
+      const did = await driverIdFor(u.id);
+      if (!did) return fail('FORBIDDEN', 'Only the invited driver can decline', 403);
+      const { data: inv } = await db.from('trip_invitations').select('id, driver_id, status, invited_by_user_id').eq('id', acceptanceId).eq('trip_id', tripId).maybeSingle();
+      if (!inv) return fail('NOT_FOUND', 'Invitation not found', 404);
+      if ((inv as { driver_id: string }).driver_id !== did) return fail('FORBIDDEN', 'Not your invitation', 403);
+      const b = await readBody(req).catch(() => ({} as Record<string, unknown>));
+      const reason = typeof b.reason === 'string' && b.reason ? b.reason : null;
+      const { error } = await db.from('trip_invitations').update({ status: 'declined', declined_reason: reason, updated_at: new Date().toISOString() }).eq('id', acceptanceId);
+      if (error) return pgFail(error);
+      // Notify the agent that the invitee said no.
+      await db.from('notifications').insert({
+        user_id: (inv as { invited_by_user_id: string }).invited_by_user_id,
+        type: 'invitation_declined',
+        title: 'An invitee declined your trip',
+        body: reason ? `Reason: ${reason}` : 'They\'re not available for this trip.',
+        payload_json: { trip_id: tripId, invite_id: acceptanceId },
+      });
+      return ok({ declined: acceptanceId });
+    }
+    return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
   }
 
   // ── POST /trips/trips/:id/start ──────────────────────────────────────────

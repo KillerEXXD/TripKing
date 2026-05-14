@@ -5,7 +5,7 @@
  */
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiPostTrip, transformMyApplication, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
-import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripsQueryParams, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripsQueryParams, UpdateTripPassengerInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -20,6 +20,7 @@ export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
   if (params?.toCityId) q.to_city_id = params.toCityId;
   if (params?.postedByUserId) q.posted_by_user_id = params.postedByUserId;
   if (params?.assignedDriverId) q.assigned_driver_id = params.assignedDriverId;
+  if (params?.invited) q.invited = params.invited;
   if (params?.near) {
     q.near_lat = params.near.lat;
     q.near_lng = params.near.lng;
@@ -135,4 +136,55 @@ export function updateTripPassenger(tripId: string, input: UpdateTripPassengerIn
   if (input.specialRequests !== undefined) body.special_requests = input.specialRequests;
   if (input.hidePassengerPhone !== undefined) body.hide_passenger_phone = input.hidePassengerPhone;
   return apiClient.patch<Api>(`/trips/${tripId}`, body).then((r) => transformTrip(unwrap(r.data)));
+}
+
+// ─── Phase 4 trip_invitations — agent invites specific drivers ──────────────
+function transformInvitation(api: Api): TripInvitation {
+  const drv = api.driver as Api | undefined;
+  const driver = drv
+    ? {
+        id: typeof drv.id === 'string' ? drv.id : '',
+        userId: typeof drv.user_id === 'string' ? drv.user_id : '',
+        displayHandle: typeof drv.display_handle === 'string' ? drv.display_handle : '',
+        fullName: typeof drv.full_name === 'string' ? drv.full_name : undefined,
+        profilePhotoUrl: typeof drv.profile_photo_url === 'string' ? drv.profile_photo_url : undefined,
+        ratingAvg: typeof drv.rating_avg === 'number' ? drv.rating_avg : 0,
+        ratingCount: typeof drv.rating_count === 'number' ? drv.rating_count : 0,
+        totalTripsCompleted: typeof drv.total_trips_completed === 'number' ? drv.total_trips_completed : 0,
+        topTags: [],
+        kycStatus: typeof drv.kyc_status === 'string' ? (drv.kyc_status as 'pending' | 'docs_submitted' | 'video_pending' | 'approved' | 'rejected' | 'resubmit_required') : undefined,
+      }
+    : undefined;
+  return {
+    id: String(api.id),
+    tripId: typeof api.trip_id === 'string' ? api.trip_id : undefined,
+    driverId: typeof api.driver_id === 'string' ? api.driver_id : '',
+    status: (typeof api.status === 'string' ? api.status : 'pending') as TripInvitationStatus,
+    declinedReason: typeof api.declined_reason === 'string' ? api.declined_reason : undefined,
+    createdAt: typeof api.created_at === 'string' ? api.created_at : '',
+    updatedAt: typeof api.updated_at === 'string' ? api.updated_at : '',
+    driver,
+  };
+}
+
+export function inviteDrivers(tripId: string, driverIds: string[]): Promise<{ created: TripInvitation[]; skipped: string[] }> {
+  return apiClient.post<Api>(`/trips/${tripId}/invites`, { driver_ids: driverIds }).then((r) => {
+    const d = unwrap(r.data) as { created?: Api[]; skipped?: string[] };
+    return {
+      created: (d.created ?? []).map(transformInvitation),
+      skipped: d.skipped ?? [],
+    };
+  });
+}
+
+export function getTripInvites(tripId: string): Promise<TripInvitation[]> {
+  return apiClient.get<Api[]>(`/trips/${tripId}/invites`).then((r) => (r.data ?? []).map(transformInvitation));
+}
+
+export function withdrawTripInvite(tripId: string, inviteId: string): Promise<void> {
+  return apiClient.delete<unknown>(`/trips/${tripId}/invites/${inviteId}`).then(() => undefined);
+}
+
+export function declineTripInvite(tripId: string, inviteId: string, reason?: string): Promise<void> {
+  return apiClient.post<unknown>(`/trips/${tripId}/invites/${inviteId}/decline`, reason ? { reason } : {}).then(() => undefined);
 }

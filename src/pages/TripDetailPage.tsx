@@ -13,6 +13,7 @@ import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/my
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
+import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
@@ -596,6 +597,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
       {viewer.isAssignedDriver && trip.status === 'selected' ? <SelectedDriverCard trip={trip} /> : null}
       {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
+      {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
       {showApplyBar && myApplication ? (
         <Card className="border-emerald-200 bg-emerald-50">
           <div className="flex items-start gap-2">
