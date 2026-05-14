@@ -15,7 +15,10 @@ import type { MyApplication } from '@/types';
 export function AwaitingDecisionPage() {
   const navigate = useNavigate();
   const query = useMyApplications();
-  const awaiting = (query.data ?? []).filter((a) => a.status === 'selected');
+  // Acceptance row 'selected' AND trip still 'selected' — once accepted, the trip
+  // moves on (accepted / in_progress / completed) but the acceptance row stays
+  // historically 'selected'. Filter those out.
+  const awaiting = (query.data ?? []).filter((a) => a.status === 'selected' && a.trip.status === 'selected');
 
   return (
     <div className="mx-auto max-w-md">

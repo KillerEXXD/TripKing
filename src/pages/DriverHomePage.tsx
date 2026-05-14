@@ -237,8 +237,12 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myDriving = myDrivingQuery.data ?? [];
   const inProgressTrip = myDriving.find((t) => t.status === 'in_progress');
   const assignedTrip = myDriving.find((t) => t.status === 'accepted');
-  // Selected = agent picked you, you haven't accepted/declined yet (handshake spec).
-  const awaitingDecision = (myApplicationsQuery.data ?? []).filter((a) => a.status === 'selected');
+  // Awaiting your decision = acceptance row 'selected' AND the trip itself still 'selected'.
+  // Once you Accept (trip → accepted) or the agent withdraws / cron expires (→ has_applicants),
+  // the row stays historically 'selected' but the decision is no longer pending.
+  const awaitingDecision = (myApplicationsQuery.data ?? []).filter(
+    (a) => a.status === 'selected' && a.trip.status === 'selected',
+  );
 
   // Max-active-vacancies is admin-configurable (migration 022, default 2). When at the cap the
   // tiles below offer no path forward; the AvailabilitySummaryCard handles the manage flow.
