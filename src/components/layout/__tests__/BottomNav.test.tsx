@@ -30,7 +30,7 @@ describe('BottomNav', () => {
     setUser(driver);
     renderNav();
     expect(screen.getByRole('button', { name: /^home$/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^browse$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /find trips/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /post a trip/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /my trips/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^profile$/i })).toBeNull();
@@ -43,13 +43,13 @@ describe('BottomNav', () => {
     expect(screen.getByRole('button', { name: /post a trip/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /my posts/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /find driver/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^browse$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /find trips/i })).toBeNull();
   });
 
   it('marks the tab matching the current path as current', () => {
     setUser(driver);
     renderNav('/trips');
-    expect(screen.getByRole('button', { name: /^browse$/i })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('button', { name: /find trips/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: /^home$/i })).not.toHaveAttribute('aria-current');
   });
 
@@ -63,7 +63,7 @@ describe('BottomNav', () => {
         </Routes>
       </MemoryRouter>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /^browse$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /find trips/i }));
     expect(screen.getByText('trips content')).toBeInTheDocument();
   });
 });
