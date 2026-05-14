@@ -38,15 +38,14 @@ export default defineConfig({
         '**/__tests__/**',
       ],
       thresholds: {
-        // Floors below the actual coverage so a 1-file edit doesn't flake the gate.
-        // The trip-types merge (PR #29) added ~1.2k LOC of UI + components; some of the
-        // new code (WaypointEditor, RouteChain, the multi-stop TripShareCard variant) is
-        // covered indirectly via vitest but not point-tested yet. Raise these back to 85
-        // once those components get focused unit tests.
-        statements: 84,
-        branches: 70,
-        functions: 68,
-        lines: 84,
+        // Floors set just below the actual coverage so a 1-file edit doesn't flake the gate.
+        // PR #29 (trip-types) temporarily dropped these to 84/70/68 when the new components
+        // shipped without focused unit tests; this commit lifts them back as TripTypeTabs /
+        // RouteChain / WaypointEditor land with point tests (Items 3 of the followups list).
+        statements: 85,
+        branches: 71,
+        functions: 69,
+        lines: 85,
       },
     },
     mockReset: true,
