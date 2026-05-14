@@ -19,7 +19,7 @@ import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { toast } from 'sonner';
-import { cn, formatINR, formatKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { Trip, TripStatus, Vehicle } from '@/types';
 
 const STATUS_BADGE = {
@@ -31,10 +31,6 @@ const STATUS_BADGE = {
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 } as const satisfies Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }>;
 
-function dateTime(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
 function vehicleLabel(v: Vehicle): string {
   return [v.makeLabel, v.modelName].filter(Boolean).join(' ') || v.carTypeLabel || v.registrationNumber || 'Vehicle';
 }
@@ -478,7 +474,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
           <ol className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
             {(trip.waypoints ?? []).map((w, i) => {
               const name = w.place?.name ?? w.city?.name ?? '—';
-              const time = w.arriveAt ? new Date(w.arriveAt).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : null;
+              const time = w.arriveAt ? formatPickupTime(w.arriveAt) : null;
               const wait = w.waitMinutes > 0 ? (w.waitMinutes >= 60 ? `${Math.round(w.waitMinutes / 60)}h` : `${w.waitMinutes}m`) + ' wait' : null;
               const sub = [time, wait].filter(Boolean).join(' · ');
               return (
@@ -498,7 +494,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Stat icon={<MapPin />} label="Distance" value={formatKm(trip.expectedDistanceKm)} />
-          <Stat icon={<Clock />} label="Pickup" value={dateTime(trip.pickupAt)} />
+          <Stat icon={<Clock />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
           <Stat icon={<Users />} label="Passengers" value={`${trip.passengerCount} pax · ${trip.seatsRequired} seat${trip.seatsRequired === 1 ? '' : 's'}`} />
           <Stat icon={<Wallet />} label="Rate" value={`${formatINR(trip.ratePerKm)}/km`} />
         </div>

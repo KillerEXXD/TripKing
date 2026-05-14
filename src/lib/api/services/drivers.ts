@@ -28,6 +28,7 @@ import type {
   KycStatus,
   SubmitAgentKycDocsInput,
   SubmitDriverKycDocsInput,
+  UpdateAgentInput,
   UpdateDriverInput,
   UpdateLocationInput,
   UploadUrlResponse,
@@ -157,10 +158,7 @@ export function getMyAgent(): Promise<Agent> {
 export function updateAgentKyc(id: string, kycStatus: KycStatus, note?: string): Promise<Agent> {
   return apiClient.patch<Api>(`/agents/${id}/kyc`, { kyc_status: kycStatus, ...(note ? { note } : {}) }).then((r) => transformAgent(unwrap(r.data)));
 }
-export function updateAgent(
-  id: string,
-  input: { fullName?: string; email?: string; businessName?: string; businessCityId?: string; profilePhotoUrl?: string },
-): Promise<Agent> {
+export function updateAgent(id: string, input: UpdateAgentInput): Promise<Agent> {
   const body: Record<string, unknown> = {};
   if (input.fullName !== undefined) body.full_name = input.fullName;
   if (input.email !== undefined) body.email = input.email;

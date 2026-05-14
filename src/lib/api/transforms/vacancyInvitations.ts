@@ -1,4 +1,5 @@
 /** Vacancy-invitations transforms — strict on id / vacancy_id / trip_id; joined driver always pre-reveal. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { transformDriverSummary } from '@/lib/api/transforms/trip';
 import type {
@@ -6,12 +7,7 @@ import type {
 } from '@/types';
 
 export type VacancyInvitationTransformErrorCode = 'MISSING_ID' | 'MISSING_VACANCY_ID' | 'MISSING_TRIP_ID' | 'MISSING_FIELD';
-export class VacancyInvitationTransformError extends Error {
-  constructor(message: string, public code: VacancyInvitationTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'VacancyInvitationTransformError';
-  }
-}
+export class VacancyInvitationTransformError extends ApiTransformError<VacancyInvitationTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {

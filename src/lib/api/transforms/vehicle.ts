@@ -1,13 +1,9 @@
 /** Vehicle transforms — strict on id/driver_id/year/car_type_id; make/model/car_type/fuel_type joined server-side; eligibilityStatus is server-derived. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type { EligibilityStatus, Vehicle, VehicleInput } from '@/types';
 
 export type VehicleTransformErrorCode = 'MISSING_ID' | 'MISSING_DRIVER_ID' | 'MISSING_YEAR' | 'MISSING_CAR_TYPE';
-export class VehicleTransformError extends Error {
-  constructor(message: string, public code: VehicleTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'VehicleTransformError';
-  }
-}
+export class VehicleTransformError extends ApiTransformError<VehicleTransformErrorCode> {}
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined;

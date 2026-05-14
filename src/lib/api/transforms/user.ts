@@ -1,18 +1,10 @@
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type { User, UserRole } from '@/types';
 
 export type UserTransformErrorCode = 'MISSING_ID' | 'MISSING_ROLE' | 'BAD_ROLE' | 'MISSING_PHONE';
 
 /** Thrown when an `/auth` or `/me` payload is missing a field the app requires. */
-export class UserTransformError extends Error {
-  constructor(
-    message: string,
-    public code: UserTransformErrorCode,
-    public context: Record<string, unknown> = {},
-  ) {
-    super(message);
-    this.name = 'UserTransformError';
-  }
-}
+export class UserTransformError extends ApiTransformError<UserTransformErrorCode> {}
 
 const ROLES: readonly UserRole[] = ['driver', 'trip_manager', 'admin'];
 

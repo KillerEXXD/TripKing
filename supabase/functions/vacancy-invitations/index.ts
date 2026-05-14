@@ -25,6 +25,8 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { redactDriver } from '../_shared/pii.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
+import { readBody, pgFail } from '../_shared/http.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -36,33 +38,6 @@ const INVITE_SELECT =
   'trip:trips!trip_id(id, status, pickup_at, expected_distance_km, total_fare, driver_payout, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*)), ' +
   'vacancy:vacancies!vacancy_id(id, status, current_city_id, current_city:cities!current_city_id(*))';
 
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
-async function readBody(req: Request): Promise<Row> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Row) : {};
-  } catch {
-    return {};
-  }
-}
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
-}
 async function driverIdFor(db: Db, userId: string): Promise<string | null> {
   const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
   return (data?.id as string | undefined) ?? null;

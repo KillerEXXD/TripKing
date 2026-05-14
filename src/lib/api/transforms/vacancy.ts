@@ -1,15 +1,11 @@
 /** Vacancy transforms — strict on id / driver_id / current_city; driver+vehicle+cities+places joined server-side. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
 import type { CityRow, DriverSummary, Place, PostVacancyInput, Vacancy, VacancyStatus, VehicleSummary } from '@/types';
 
 export type VacancyTransformErrorCode = 'MISSING_ID' | 'MISSING_DRIVER_ID' | 'MISSING_CURRENT_CITY';
-export class VacancyTransformError extends Error {
-  constructor(message: string, public code: VacancyTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'VacancyTransformError';
-  }
-}
+export class VacancyTransformError extends ApiTransformError<VacancyTransformErrorCode> {}
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined;

@@ -1,15 +1,11 @@
 /** Video-verification transforms — strict on id/scheduled_at; subjects joined server-side. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type {
   FinalizeVideoCallInput, VideoCallSlot, VideoOutcome, VideoVerification, VideoVerificationStatus, VideoVerificationSubject,
 } from '@/types';
 
 export type VideoVerificationTransformErrorCode = 'MISSING_ID' | 'MISSING_SCHEDULED_AT';
-export class VideoVerificationTransformError extends Error {
-  constructor(message: string, public code: VideoVerificationTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'VideoVerificationTransformError';
-  }
-}
+export class VideoVerificationTransformError extends ApiTransformError<VideoVerificationTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);

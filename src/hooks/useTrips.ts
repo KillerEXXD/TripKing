@@ -1,5 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
+import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
   applyToTrip,
   assignDriver,
@@ -65,13 +66,7 @@ export function useMyApplications() {
   return useQuery({ queryKey: ['trips', 'applied'], queryFn: getMyApplications, staleTime: STALE.live });
 }
 
-function useInvalidateTrips() {
-  const qc = useQueryClient();
-  return (tripId?: string) => {
-    void qc.invalidateQueries({ queryKey: ['trips'] });
-    if (tripId) void qc.invalidateQueries({ queryKey: ['trip', tripId] });
-  };
-}
+const useInvalidateTrips = createInvalidator('trips', 'trip');
 
 export function usePostTrip() {
   const invalidate = useInvalidateTrips();

@@ -14,6 +14,8 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
+import { bearer } from '../_shared/auth.ts';
+import { readBody, pgFail } from '../_shared/http.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -25,10 +27,6 @@ const CATEGORIES = [
 ] as const;
 const STATUSES = ['open', 'in_progress', 'needs_info', 'resolved', 'verified', 'reopened', 'closed'] as const;
 
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
 interface AuthUser { id: string; role: string; phone: string; display_name: string; can_report_bugs: boolean }
 async function authUser(db: Db, req: Request): Promise<AuthUser | null> {
   const token = bearer(req);
@@ -49,20 +47,6 @@ async function authUser(db: Db, req: Request): Promise<AuthUser | null> {
 }
 const isAdmin = (u: AuthUser | null): boolean => u?.role === 'admin';
 
-async function readBody(req: Request): Promise<Row> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Row) : {};
-  } catch {
-    return {};
-  }
-}
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
-}
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Row) : {});

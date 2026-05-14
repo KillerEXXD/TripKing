@@ -3,15 +3,11 @@
  * always supplied by `GET /passengers` and `/passengers/lookup`), lenient on the
  * provenance fields. One-way snake_case → camelCase; nothing is computed here.
  */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type { Passenger, PassengerReferrer, UserRole } from '@/types';
 
 export type PassengerTransformErrorCode = 'NOT_OBJECT' | 'MISSING_FIELD';
-export class PassengerTransformError extends Error {
-  constructor(message: string, public code: PassengerTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'PassengerTransformError';
-  }
-}
+export class PassengerTransformError extends ApiTransformError<PassengerTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {

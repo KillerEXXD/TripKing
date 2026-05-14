@@ -112,6 +112,13 @@ export interface UpdateDriverInput {
   currentCityId?: string;
   profilePhotoUrl?: string;
 }
+export interface UpdateAgentInput {
+  fullName?: string;
+  email?: string;
+  businessName?: string;
+  businessCityId?: string;
+  profilePhotoUrl?: string;
+}
 
 /**
  * Body for "create my driver profile" — `POST /drivers` with `role:'driver'`

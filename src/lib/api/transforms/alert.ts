@@ -1,15 +1,11 @@
 /** Alert transforms — strict on id / user_id / from_city; cities + places joined server-side. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
 import type { Alert, AlertInput, CityRow, NotifyChannel } from '@/types';
 
 export type AlertTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID' | 'MISSING_FROM_CITY';
-export class AlertTransformError extends Error {
-  constructor(message: string, public code: AlertTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'AlertTransformError';
-  }
-}
+export class AlertTransformError extends ApiTransformError<AlertTransformErrorCode> {}
 type Api = Record<string, unknown>;
 const CHANNELS: readonly NotifyChannel[] = ['push', 'sms', 'email', 'in_app'];
 function str(v: unknown): string | undefined {

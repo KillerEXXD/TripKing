@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
-import { PostedTripCard, STATUS_META, pickupLabel } from '@/pages/PostedTripsPage';
+import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR, formatKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { AcceptanceStatus, MyApplication, Trip } from '@/types';
 
 type Tab = 'driving' | 'applied' | 'posted';
@@ -46,7 +46,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
           </Badge>
         </div>
         <div className="text-xs text-secondary">
-          Pickup: {pickupLabel(t.pickupAt)}
+          Pickup: {formatPickupTime(t.pickupAt)}
           {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
           {' · trip is '}
           {STATUS_META[t.status].label.toLowerCase()}

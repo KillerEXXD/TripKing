@@ -1,13 +1,9 @@
 /** Review + notification transforms — strict on the keys the app needs. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type { Notification, NotificationType, RaterRole, Review, ReviewDirection, ReviewInput, ReviewScore } from '@/types';
 
 export type ReviewTransformErrorCode = 'MISSING_ID' | 'MISSING_TRIP_ID' | 'BAD_DIRECTION' | 'BAD_SCORE';
-export class ReviewTransformError extends Error {
-  constructor(message: string, public code: ReviewTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'ReviewTransformError';
-  }
-}
+export class ReviewTransformError extends ApiTransformError<ReviewTransformErrorCode> {}
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined;

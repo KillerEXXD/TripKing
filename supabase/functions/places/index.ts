@@ -21,6 +21,7 @@ import { corsHeaders, corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
+import { readBody, pgFail } from '../_shared/http.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 type Provider = 'locationiq' | 'geoapify' | 'nominatim' | 'google';
@@ -36,14 +37,6 @@ interface PlaceResult {
 }
 
 // ── small helpers ───────────────────────────────────────────────────────────
-async function readBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 const strOrNull = (v: unknown): string | null => {
   const s = typeof v === 'string' ? v.trim() : '';
@@ -55,12 +48,6 @@ function num(v: unknown): number | null {
   return null;
 }
 const firstName = (s: unknown): string => (typeof s === 'string' ? s.split(',')[0].trim() : '');
-function pgFail(error: { code?: string; message: string }): Response {
-  if (error.code === '23505') return fail('CONFLICT', error.message, 409);
-  if (error.code === '23503') return fail('VALIDATION', error.message, 422);
-  if (error.code === '23502' || error.code === '23514' || error.code === '22P02') return fail('VALIDATION', error.message, 422);
-  return fail('DB_ERROR', error.message, 400);
-}
 /** Like `ok()` but with a `Cache-Control` header — `/places/search` is cacheable (same q ⇒ same result). */
 function okCached(data: unknown, maxAgeSec: number): Response {
   return new Response(JSON.stringify({ success: true, data, error: null }), {

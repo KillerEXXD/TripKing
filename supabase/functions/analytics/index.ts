@@ -19,24 +19,9 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL } from '../_shared/cache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { authUser, isAdmin } from '../_shared/auth.ts';
 
 const CACHE_EPOCH = 'v1';
-
-type Db = ReturnType<typeof serviceClient>;
-
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
-async function authUser(db: Db, req: Request): Promise<{ id: string; role: string } | null> {
-  const token = bearer(req);
-  if (!token) return null;
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data?.user) return null;
-  const { data: u } = await db.from('users').select('id, role').eq('id', data.user.id).maybeSingle();
-  return u ? { id: u.id as string, role: u.role as string } : { id: data.user.id, role: 'driver' };
-}
-const isAdmin = (u: { role: string } | null) => u?.role === 'admin';
 
 const handler = withTiming('analytics', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);

@@ -3,15 +3,11 @@
  * functions always supply every key, `coalesce`'d, so a gap means a contract break). One-way
  * snake_case → camelCase; never compute here — the numbers come straight from Postgres.
  */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type { AdminDashboard, AgentAnalytics, ApiEndpointMetric, ApiMetricsSummary, DriverAnalytics, MonthlyEarningsPoint, MonthlyTripPoint } from '@/types';
 
 export type AnalyticsTransformErrorCode = 'NOT_OBJECT' | 'MISSING_FIELD' | 'BAD_NUMBER' | 'BAD_ARRAY';
-export class AnalyticsTransformError extends Error {
-  constructor(message: string, public code: AnalyticsTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'AnalyticsTransformError';
-  }
-}
+export class AnalyticsTransformError extends ApiTransformError<AnalyticsTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 

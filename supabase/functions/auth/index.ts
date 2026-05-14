@@ -30,6 +30,8 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
+import { bearer } from '../_shared/auth.ts';
+import { readBody } from '../_shared/http.ts';
 
 const CACHE_EPOCH = 'v1';
 
@@ -48,18 +50,6 @@ async function derivedPassword(phone: string): Promise<string> {
   return 'p_' + Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-async function readBody(req: Request): Promise<Record<string, unknown>> {
-  try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
-function bearer(req: Request): string | null {
-  const h = req.headers.get('authorization') ?? req.headers.get('Authorization');
-  return h && h.startsWith('Bearer ') ? h.slice(7) : null;
-}
 
 async function findAuthUserForPhone(db: Db, phone: string): Promise<{ id: string } | null> {
   const email = syntheticEmail(phone);

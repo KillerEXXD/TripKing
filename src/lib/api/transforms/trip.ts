@@ -3,6 +3,7 @@
  * money/state). The API joins from_city / to_city / car_type server-side; for
  * acceptances it joins driver (+ its current_city) and vehicle.
  */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
 import type {
@@ -32,12 +33,7 @@ export type TripTransformErrorCode =
   | 'MISSING_CAR_TYPE'
   | 'MISSING_FIELD';
 
-export class TripTransformError extends Error {
-  constructor(message: string, public code: TripTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'TripTransformError';
-  }
-}
+export class TripTransformError extends ApiTransformError<TripTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {
