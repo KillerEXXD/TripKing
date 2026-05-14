@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Car, MapPin, Star, X } from 'lucide-react';
+import { ArrowLeft, Car, MapPin, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useVacancies } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -182,6 +182,7 @@ function TripPickRow({ trip, disabled, onPick }: { trip: Trip; disabled: boolean
  * driver action — its screen lands separately.)
  */
 export function VacanciesPage() {
+  const navigate = useNavigate();
   const [currentCityId, setCurrentCityId] = useState('');
   const [destinationCityId, setDestinationCityId] = useState('');
   const [near, setNear] = useState<NearRadius | null>(null);
@@ -202,11 +203,16 @@ export function VacanciesPage() {
   const chipSelect = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
   return (
     <div className="mx-auto max-w-md">
-      <header className="border-b bg-white px-4 py-3">
-        <h1 className="text-base font-semibold">Vacant drivers</h1>
-        <p className="text-xs text-secondary">
-          {vacanciesQuery.isSuccess ? `${vacancies.length} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
-        </p>
+      <header className="flex items-center gap-3 border-b bg-white px-4 py-3">
+        <button type="button" aria-label="Back to home" onClick={() => navigate('/')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <ArrowLeft className="size-5" aria-hidden />
+        </button>
+        <div className="min-w-0 flex-1">
+          <h1 className="text-base font-semibold">Vacant drivers</h1>
+          <p className="text-xs text-secondary">
+            {vacanciesQuery.isSuccess ? `${vacancies.length} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
+          </p>
+        </div>
       </header>
 
       {isDriverView && myDriverId ? <IAmAvailableCard driverId={myDriverId} /> : null}
