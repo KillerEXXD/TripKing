@@ -69,6 +69,19 @@ describe('SignInPage', () => {
     expect(await screen.findByText('onboarding screen')).toBeInTheDocument();
   });
 
+  it('an admin signing in lands on /, not /onboarding (so RoleSwitcher + bottom nav render)', async () => {
+    mockAuth();
+    verifyOtp.mockResolvedValue({ id: 'u1', role: 'admin', phone: '+919840780100', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
+    renderSignIn();
+
+    fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '98407 80100' } });
+    fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    const otpInput = await screen.findByLabelText('OTP code');
+    fireEvent.change(otpInput, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /verify & continue/i }));
+    expect(await screen.findByText('home page')).toBeInTheDocument();
+  });
+
   it('honours a pending "from" redirect after verify instead of /onboarding', async () => {
     mockAuth();
     verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
