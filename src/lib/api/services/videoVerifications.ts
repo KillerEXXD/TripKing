@@ -17,9 +17,15 @@ function unwrap<T>(d: T | null): T {
 export function getAvailableVideoSlots(): Promise<VideoCallSlot[]> {
   return apiClient.get<Api[]>('/video-verifications/available-slots').then((r) => (r.data ?? []).map(transformVideoCallSlot));
 }
-/** Book a slot — subject's `kyc_status` → `video_pending`; returns the row (with the Jitsi meeting URL). */
-export function bookVideoCall(slotAt: string): Promise<VideoVerification> {
-  return apiClient.post<Api>('/video-verifications', { slot_at: slotAt }).then((r) => transformVideoVerification(unwrap(r.data)));
+/**
+ * Book a slot — subject's `kyc_status` → `video_pending`; returns the row (with the Jitsi
+ * meeting URL). Pass `kind` when the caller has both driver + manager profiles (admins via
+ * the role switcher) so the backend books against the right one; without it, drivers win.
+ */
+export function bookVideoCall(slotAt: string, kind?: 'driver' | 'manager'): Promise<VideoVerification> {
+  const body: Record<string, unknown> = { slot_at: slotAt };
+  if (kind) body.kind = kind;
+  return apiClient.post<Api>('/video-verifications', body).then((r) => transformVideoVerification(unwrap(r.data)));
 }
 export function getVideoVerification(id: string): Promise<VideoVerification> {
   return apiClient.get<Api>(`/video-verifications/${id}`).then((r) => transformVideoVerification(unwrap(r.data)));

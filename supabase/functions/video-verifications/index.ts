@@ -38,13 +38,23 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const istDateStr = (d: Date): string => new Date(d.getTime() + 5.5 * 3600_000).toISOString().slice(0, 10);
 const hhmm = (t: string): [number, number] => { const [h, m] = String(t).slice(0, 5).split(':').map(Number); return [h || 0, m || 0]; };
 
-/** the caller's driver/manager subject row, or null. */
-async function subjectFor(db: Db, userId: string): Promise<{ kind: 'driver' | 'manager'; id: string; userId: string; kycStatus: string } | null> {
-  const { data: d } = await db.from('drivers').select('id, user_id, kyc_status').eq('user_id', userId).maybeSingle();
-  if (d) return { kind: 'driver', id: d.id as string, userId, kycStatus: str(d.kyc_status) || 'pending' };
-  const { data: m } = await db.from('trip_managers').select('id, user_id, kyc_status').eq('user_id', userId).maybeSingle();
-  if (m) return { kind: 'manager', id: m.id as string, userId, kycStatus: str(m.kyc_status) || 'pending' };
-  return null;
+/**
+ * The caller's driver/manager subject row, or null. Pass `prefer` when the user has
+ * both profiles (admins acting via the role switcher) — without it, drivers win,
+ * which would block an admin trying to verify their agent profile.
+ */
+async function subjectFor(db: Db, userId: string, prefer?: 'driver' | 'manager'): Promise<{ kind: 'driver' | 'manager'; id: string; userId: string; kycStatus: string } | null> {
+  async function asDriver() {
+    const { data } = await db.from('drivers').select('id, user_id, kyc_status').eq('user_id', userId).maybeSingle();
+    return data ? { kind: 'driver' as const, id: data.id as string, userId, kycStatus: str(data.kyc_status) || 'pending' } : null;
+  }
+  async function asManager() {
+    const { data } = await db.from('trip_managers').select('id, user_id, kyc_status').eq('user_id', userId).maybeSingle();
+    return data ? { kind: 'manager' as const, id: data.id as string, userId, kycStatus: str(data.kyc_status) || 'pending' } : null;
+  }
+  if (prefer === 'manager') return (await asManager()) ?? (await asDriver());
+  if (prefer === 'driver') return (await asDriver()) ?? (await asManager());
+  return (await asDriver()) ?? (await asManager());
 }
 async function setSubjectKyc(db: Db, kind: 'driver' | 'manager', subjectId: string, patch: Row): Promise<void> {
   await db.from(kind === 'driver' ? 'drivers' : 'trip_managers').update(patch).eq('id', subjectId);
@@ -125,12 +135,14 @@ const handler = withTiming('video-verifications', async (req: Request): Promise<
   if (!id && req.method === 'POST') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to book a video call', 401);
-    const subj = await subjectFor(db, u.id);
+    const b = await readBody(req);
+    const preferRaw = str(b.kind);
+    const prefer = preferRaw === 'driver' || preferRaw === 'manager' ? preferRaw : undefined;
+    const subj = await subjectFor(db, u.id, prefer);
     if (!subj) return fail('FORBIDDEN', 'Create your profile first', 403);
-    if (subj.kycStatus === 'approved') return fail('VALIDATION', 'Your KYC is already approved', 422);
+    if (subj.kycStatus === 'approved') return fail('VALIDATION', `Your ${subj.kind === 'manager' ? 'agent' : 'driver'} KYC is already approved`, 422);
     if (subj.kycStatus === 'video_pending') return fail('CONFLICT', 'You already have a video call scheduled', 409);
     if (subj.kycStatus !== 'docs_submitted') return fail('VALIDATION', 'Submit your documents (KYC) before booking the video call', 422);
-    const b = await readBody(req);
     const slotAt = str(b.slot_at);
     const parsed = slotAt ? new Date(slotAt) : null;
     if (!parsed || isNaN(parsed.getTime())) return fail('VALIDATION', 'slot_at must be an ISO timestamp', 422);

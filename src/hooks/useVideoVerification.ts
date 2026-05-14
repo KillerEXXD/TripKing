@@ -31,10 +31,10 @@ function useInvalidateSubjectAfterVideo() {
   };
 }
 
-/** Book a video-call slot — subject's kyc_status → video_pending. */
+/** Book a video-call slot — subject's kyc_status → video_pending. Pass `kind` when the caller has both driver + manager profiles (admins via the role switcher). */
 export function useBookVideoCall() {
   const invalidate = useInvalidateSubjectAfterVideo();
-  return useMutation({ mutationFn: (slotAt: string) => bookVideoCall(slotAt), onSuccess: invalidate });
+  return useMutation({ mutationFn: ({ slotAt, kind }: { slotAt: string; kind?: 'driver' | 'manager' }) => bookVideoCall(slotAt, kind), onSuccess: invalidate });
 }
 export function useCancelVideoCall() {
   const invalidate = useInvalidateSubjectAfterVideo();

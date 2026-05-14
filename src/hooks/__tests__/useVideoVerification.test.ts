@@ -41,8 +41,9 @@ describe('useVideoVerification hooks', () => {
     const { invalidate, wrapper } = setup();
     const { result } = renderHook(() => useBookVideoCall(), { wrapper });
     await act(async () => {
-      await result.current.mutateAsync('2026-06-01T10:00:00Z');
+      await result.current.mutateAsync({ slotAt: '2026-06-01T10:00:00Z', kind: 'manager' });
     });
+    expect(svc.bookVideoCall).toHaveBeenCalledWith('2026-06-01T10:00:00Z', 'manager');
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['video-verifications'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['driver', 'me'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['agent', 'me'] });

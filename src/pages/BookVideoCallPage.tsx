@@ -85,7 +85,7 @@ export function BookVideoCallPage() {
   const busy = book.isPending || cancel.isPending || reschedule.isPending;
 
   async function onBook(iso: string) {
-    try { await book.mutateAsync(iso); toast.success('Video call booked.'); } catch (e) { toast.error(e instanceof Error ? e.message : 'Could not book that slot'); }
+    try { await book.mutateAsync({ slotAt: iso, kind: isAgent ? 'manager' : 'driver' }); toast.success('Video call booked.'); } catch (e) { toast.error(e instanceof Error ? e.message : 'Could not book that slot'); }
   }
   async function onReschedule(iso: string) {
     if (!vvId) return;
