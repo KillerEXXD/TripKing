@@ -540,7 +540,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // Resolve trip shape: a `waypoints[]` array (new style) OR legacy from_city_id/to_city_id (synthesised as a 2-waypoint one_way).
     const plan = await buildWaypointPlan(db, b, pickupAtIso);
     if (plan instanceof Response) return plan;
-    const hidePassengerPhone = typeof b.hide_passenger_phone === 'boolean' ? b.hide_passenger_phone : true;
+    if (typeof b.hide_passenger_phone !== 'boolean') {
+      return fail('VALIDATION', 'hide_passenger_phone (a boolean) is required', 422);
+    }
+    const hidePassengerPhone = b.hide_passenger_phone;
     const passengerCount = Number(b.passenger_count);
     if (!Number.isInteger(passengerCount) || passengerCount < 1) {
       return fail('VALIDATION', 'passenger_count (a positive integer) is required', 422);
