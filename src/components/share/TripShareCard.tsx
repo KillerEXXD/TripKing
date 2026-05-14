@@ -22,6 +22,19 @@ function estDuration(km: number): string {
   const h = km / 50; // ~50 km/h urban-mix average
   return h < 1 ? `~ ${Math.round(h * 60)} min` : `~ ${h.toFixed(h < 10 ? 1 : 0)} hrs`;
 }
+/** ceil((end − start) / 1 day). Returns 1 for a same-day or one-day trip. */
+function tripSpanDays(trip: Trip): number {
+  if (!trip.expectedEndAt) return 1;
+  const start = new Date(trip.pickupAt).getTime();
+  const end = new Date(trip.expectedEndAt).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 1;
+  return Math.max(1, Math.ceil((end - start) / 86_400_000));
+}
+function endsLabel(trip: Trip): string {
+  if (!trip.expectedEndAt) return '';
+  const { date, time } = pickupParts(trip.expectedEndAt);
+  return `${date} · ${time}`;
+}
 
 /**
  * 1080×1200 marketing card for a posted trip — used both as the visible preview
@@ -67,19 +80,9 @@ export const TripShareCard = forwardRef<HTMLDivElement, { trip: Trip }>(function
         </div>
       </div>
 
-      {/* ROUTE HERO */}
+      {/* ROUTE HERO — chain for multi-stop, big A→B headline otherwise */}
       <div className="px-12 pb-3 pt-9">
-        <div className="font-extrabold leading-[1.05]" style={{ fontSize: '78px', letterSpacing: '-0.025em' }}>
-          {trip.fromCity.name}
-          <span style={{ color: '#10b981' }}> → </span>
-          {trip.toCity.name}
-        </div>
-        {trip.fromCity.state || trip.toCity.state ? (
-          <div className="mt-1.5 text-gray-500" style={{ fontSize: '20px' }}>
-            {trip.fromCity.state}
-            {trip.toCity.state && trip.toCity.state !== trip.fromCity.state ? ` → ${trip.toCity.state}` : ''}
-          </div>
-        ) : null}
+        <RouteHero trip={trip} />
         {trip.postedByName ? (
           <div className="mt-2.5 text-gray-600" style={{ fontSize: '17px' }}>
             Posted by{' '}
@@ -90,7 +93,7 @@ export const TripShareCard = forwardRef<HTMLDivElement, { trip: Trip }>(function
         ) : null}
       </div>
 
-      {/* PICKUP */}
+      {/* PICKUP (+ trip span for multi-day trips) */}
       <div className="px-12 pb-5 pt-2">
         <div
           className="inline-flex items-center gap-3 rounded-2xl px-6 py-3"
@@ -101,6 +104,11 @@ export const TripShareCard = forwardRef<HTMLDivElement, { trip: Trip }>(function
           <span style={{ color: '#10b981' }}>·</span>
           <span>{pickupTime}</span>
         </div>
+        {tripSpanDays(trip) > 1 ? (
+          <div className="mt-2 text-gray-600" style={{ fontSize: '17px' }}>
+            <span style={{ fontWeight: 700 }}>{tripSpanDays(trip)}-day trip</span> · ends {endsLabel(trip)}
+          </div>
+        ) : null}
       </div>
 
       {/* DISTANCE · DURATION · CAR TYPE */}
@@ -186,6 +194,47 @@ function BreakdownRow({ label, value, muted }: { label: string; value: string; m
     </div>
   );
 }
+/**
+ * Big A→B headline for one-way / round-trip-without-stops, and an ordered chain for
+ * multi-stop trips (3+ waypoints). Font scales down progressively as the chain grows
+ * so a 4-city chain still fits in the 1080px card width.
+ */
+function RouteHero({ trip }: { trip: Trip }) {
+  const wp = trip.waypoints ?? [];
+  // Use the chain layout whenever there are 3+ waypoints (e.g. multi-stop + round-trip with stops).
+  // 2-waypoint trips (one-way + simple round-trip) keep the existing 78px A→B headline.
+  if (wp.length >= 3) {
+    const nameOf = (w: typeof wp[number]) => w.place?.name ?? w.city?.name ?? '—';
+    // 3 stops → 64px, 4 → 56px, 5+ → 48px
+    const fontSize = wp.length <= 3 ? '64px' : wp.length === 4 ? '56px' : '48px';
+    return (
+      <div className="font-extrabold leading-[1.1]" style={{ fontSize, letterSpacing: '-0.02em' }}>
+        {wp.map((w, i) => (
+          <span key={w.id}>
+            {i > 0 ? <span style={{ color: '#10b981' }}> → </span> : null}
+            {nameOf(w)}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="font-extrabold leading-[1.05]" style={{ fontSize: '78px', letterSpacing: '-0.025em' }}>
+        {trip.fromCity.name}
+        <span style={{ color: '#10b981' }}> → </span>
+        {trip.toCity.name}
+      </div>
+      {trip.fromCity.state || trip.toCity.state ? (
+        <div className="mt-1.5 text-gray-500" style={{ fontSize: '20px' }}>
+          {trip.fromCity.state}
+          {trip.toCity.state && trip.toCity.state !== trip.fromCity.state ? ` → ${trip.toCity.state}` : ''}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
 type ChipTone = 'slate' | 'blue' | 'green';
 function Chip({ label, tone = 'slate' }: { label: string; tone?: ChipTone }) {
   const palette: Record<ChipTone, { bg: string; fg: string; border: string }> = {
