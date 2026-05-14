@@ -58,8 +58,8 @@ function makeAcceptance(over: Partial<TripAcceptance> = {}): TripAcceptance {
     ...over,
   };
 }
-const agent: User = { id: 'agent1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true };
-const driver: User = { id: 'driver1', role: 'driver', phone: '+91', displayName: 'Driver D', preferredLanguage: 'en', isActive: true };
+const agent: User = { id: 'agent1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
+const driver: User = { id: 'driver1', role: 'driver', phone: '+91', displayName: 'Driver D', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 
 function setAuth(user: User) {
   vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });

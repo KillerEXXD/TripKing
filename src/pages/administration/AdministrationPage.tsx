@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, Briefcase, Car, ChevronRight, Languages, LayoutDashboard,
+  AlertTriangle, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard,
   ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -35,6 +35,7 @@ const OPERATIONS_TILES: AdminSectionTile[] = [
   { to: '/administration/vehicles',     title: 'Vehicle eligibility',        desc: 'Search by registration or driver — filter by eligibility',     Icon: Car,             tone: 'orange'  },
   { to: '/administration/reviews',      title: 'Reviews moderation',         desc: 'Flagged reviews — publish, hide, clear flags',                  Icon: AlertTriangle,   tone: 'red'     },
   { to: '/administration/translations', title: 'Translation manager',        desc: 'Per-language string coverage and overrides',                   Icon: Languages,       tone: 'amber'   },
+  { to: '/administration/bugs',         title: 'Bug tracker',                 desc: 'Triage submitted bugs — status, comments, attachments',         Icon: Bug,             tone: 'red'     },
 ];
 
 const TONE: Record<AdminSectionTile['tone'], string> = {

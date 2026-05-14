@@ -5,6 +5,7 @@ import { useInfiniteAgents } from '@/hooks/useDrivers';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { initials } from '@/lib/utils';
+import { BugReporterToggle } from '@/components/bug/BugReporterToggle';
 import type { Agent, KycStatus } from '@/types';
 
 const KYC_BADGE: Record<KycStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
@@ -61,6 +62,11 @@ function AgentCard({ a }: { a: Agent }) {
           KYC →
         </Link>
       </div>
+      {a.userId ? (
+        <div className="flex justify-end">
+          <BugReporterToggle userId={a.userId} initial={a.canReportBugs} />
+        </div>
+      ) : null}
     </Card>
   );
 }

@@ -56,7 +56,7 @@ function setPostTrip(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPe
   return mutateAsync;
 }
 function setPoster(role: 'driver' | 'trip_manager' = 'trip_manager', kycStatus: string | undefined = 'approved') {
-  vi.mocked(useAuth).mockReturnValue({ user: { id: 'u1', role, displayName: 'X', phone: '+91', preferredLanguage: 'en', isActive: true }, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() } as never);
+  vi.mocked(useAuth).mockReturnValue({ user: { id: 'u1', role, displayName: 'X', phone: '+91', preferredLanguage: 'en', isActive: true, canReportBugs: false }, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() } as never);
   const profQ = { isPending: false, isError: false, data: kycStatus ? { id: 'p1', kycStatus } : undefined, refetch: vi.fn() } as never;
   const emptyQ = { isPending: false, isError: false, data: undefined, refetch: vi.fn() } as never;
   vi.mocked(useMyDriver).mockReturnValue(role === 'driver' ? profQ : emptyQ);

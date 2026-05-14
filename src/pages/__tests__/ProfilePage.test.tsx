@@ -16,14 +16,14 @@ import { cityHooks } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
-const driverUser: User = { id: 'u1', role: 'driver', phone: '+919876500000', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true };
+const driverUser: User = { id: 'u1', role: 'driver', phone: '+919876500000', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const adminUser: User = { ...driverUser, id: 'admin', role: 'admin', displayName: 'Admin' };
 function makeDriver(over: Partial<Driver> = {}): Driver {
   return {
     id: 'd1',
     userId: 'u1',
     fullName: 'Ravi Kumar',
-    displayHandle: 'A1B2C3D',
+    displayHandle: 'A1B2C3D', canReportBugs: false,
     phone: '+919876500000',
     homeCity: city('c1', 'Vellore'),
     currentCity: city('c1', 'Vellore'),
@@ -132,7 +132,7 @@ describe('ProfilePage', () => {
 
   it('renders the agent profile for an agent account', () => {
     setUser({ ...driverUser, role: 'trip_manager' });
-    setMyAgent({ data: { id: 'a1', userId: 'u1', fullName: 'Agent A', displayHandle: 'A1B2C3D', phone: '+91', businessName: 'A Travels', kycStatus: 'approved', topTags: [], totalTripsPosted: 12 } });
+    setMyAgent({ data: { id: 'a1', userId: 'u1', fullName: 'Agent A', displayHandle: 'A1B2C3D', canReportBugs: false, phone: '+91', businessName: 'A Travels', kycStatus: 'approved', topTags: [], totalTripsPosted: 12 } });
     renderProfile();
     expect(screen.getByRole('heading', { name: 'Agent A' })).toBeInTheDocument();
     expect(screen.getByText(/A Travels/)).toBeInTheDocument();
@@ -140,7 +140,7 @@ describe('ProfilePage', () => {
 
   it('shows the 3-step verification checklist on an unverified agent profile', () => {
     setUser({ ...driverUser, role: 'trip_manager' });
-    setMyAgent({ data: { id: 'a1', userId: 'u1', fullName: 'Agent A', displayHandle: 'A1B2C3D', phone: '+91', businessName: 'A Travels', kycStatus: 'docs_submitted', topTags: [], totalTripsPosted: 0, verification: { kycStatus: 'docs_submitted', steps: { details: 'done', documents: 'done', video_call: 'todo' }, stepsDone: 2, stepsTotal: 3 } } });
+    setMyAgent({ data: { id: 'a1', userId: 'u1', fullName: 'Agent A', displayHandle: 'A1B2C3D', canReportBugs: false, phone: '+91', businessName: 'A Travels', kycStatus: 'docs_submitted', topTags: [], totalTripsPosted: 0, verification: { kycStatus: 'docs_submitted', steps: { details: 'done', documents: 'done', video_call: 'todo' }, stepsDone: 2, stepsTotal: 3 } } });
     renderProfile();
     expect(screen.getByText(/get verified to start earning/i)).toBeInTheDocument();
     expect(screen.getByText('Identity documents')).toBeInTheDocument();

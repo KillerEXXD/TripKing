@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { RouteErrorBoundary } from '@/components/feedback';
+import { BugReportFAB } from '@/components/bug/BugReportFAB';
 
 /**
  * Shell for authed routes — the prototype's app frame: a soft-grey page over
@@ -21,6 +22,7 @@ export function AppLayout() {
         </RouteErrorBoundary>
       </main>
       <BottomNav />
+      <BugReportFAB />
     </div>
   );
 }

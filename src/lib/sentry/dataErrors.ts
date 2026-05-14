@@ -13,6 +13,7 @@ import * as Sentry from '@sentry/react';
 import { logger } from '@/lib/logger';
 import { isSentryInitialized } from './init';
 import { isReported, markReported } from './report';
+import { pushBreadcrumb } from '@/lib/breadcrumbBuffer';
 
 export type ErrorCategory =
   | 'network'
@@ -86,6 +87,23 @@ export function classifyError(error: unknown, ctx?: { status?: number }): ErrorC
 
 /** Add a breadcrumb tracking a data action (request start/success, navigation, mutation) leading up to a possible error. */
 export function addDataBreadcrumb(action: string, ctx: { feature?: string } & Partial<DataErrorContext>, level: Sentry.SeverityLevel = 'info'): void {
+  // Mirror into the local bug-report breadcrumb buffer (cheap, always-on; Sentry has its own).
+  try {
+    pushBreadcrumb({
+      category: 'data',
+      level,
+      message: `${ctx.feature ?? 'data'}: ${action}`,
+      data: {
+        endpoint: ctx.endpoint,
+        method: ctx.method,
+        status: ctx.status,
+        duration_ms: ctx.durationMs,
+        retry_attempt: ctx.retryAttempt,
+      },
+    });
+  } catch {
+    // never let the buffer break the host crumb
+  }
   if (!isSentryInitialized()) return;
   Sentry.addBreadcrumb({
     category: 'data',

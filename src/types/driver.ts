@@ -51,6 +51,8 @@ export interface DriverPublic {
   managerTopTags: string[];
   totalTripsCompleted: number;
   vehicles: VehicleSummary[];
+  /** Per-user gate for `POST /bug-reports`. Admins are always allowed regardless. */
+  canReportBugs: boolean;
 }
 
 /** A driver's revealed marketplace profile (+ owner-only fields when self). */
@@ -76,6 +78,8 @@ export interface AgentPublic {
   kycStatus: KycStatus;
   topTags: string[];
   totalTripsPosted: number;
+  /** Per-user gate for `POST /bug-reports`. Admins are always allowed regardless. */
+  canReportBugs: boolean;
 }
 
 /** A trip manager (agent) — revealed profile. */

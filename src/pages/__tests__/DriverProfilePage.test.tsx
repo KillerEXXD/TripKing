@@ -16,7 +16,7 @@ function makeDriver(over: Partial<Driver> = {}): Driver {
     id: 'd1',
     userId: 'u1',
     fullName: 'Ravi Kumar',
-    displayHandle: 'A1B2C3D',
+    displayHandle: 'A1B2C3D', canReportBugs: false,
     phone: '+919876500000',
     homeCity: city('c1', 'Vellore'),
     currentCity: city('c2', 'Chennai'),

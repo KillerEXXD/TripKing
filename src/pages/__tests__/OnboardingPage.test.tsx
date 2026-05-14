@@ -16,7 +16,7 @@ import { useCreateMyAgentProfile, useCreateMyDriverProfile } from '@/hooks/useDr
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
 
-const driver: User = { id: 'u1', role: 'driver', phone: '+919876543210', displayName: 'Driver D', preferredLanguage: 'en', isActive: true };
+const driver: User = { id: 'u1', role: 'driver', phone: '+919876543210', displayName: 'Driver D', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 
 function setUser(user: User | null) {
   vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: user !== null, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });

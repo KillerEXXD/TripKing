@@ -53,7 +53,7 @@ describe('SignInPage', () => {
 
   it('phone → OTP → verify calls the auth functions with the E.164 number, then goes to /onboarding', async () => {
     mockAuth();
-    verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true });
+    verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
     renderSignIn();
 
     fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '98765 43210' } });
@@ -71,7 +71,7 @@ describe('SignInPage', () => {
 
   it('honours a pending "from" redirect after verify instead of /onboarding', async () => {
     mockAuth();
-    verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true });
+    verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
     renderSignIn({ pathname: '/signin', state: { from: '/trips/abc' } });
 
     fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '9876543210' } });

@@ -28,7 +28,7 @@ vi.mock('@/pages/administration/VehicleEligibilityPage', () => ({ default: () =>
 vi.mock('@/pages/administration/ReviewModerationPage', () => ({ default: () => <div>review moderation page</div> }));
 vi.mock('@/pages/administration/TranslationManagerPage', () => ({ default: () => <div>translation manager page</div> }));
 
-const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
+const admin: User = { id: 'a', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const driver: User = { ...admin, id: 'd', role: 'driver', displayName: 'Driver' };
 
 function setAuth(user: User | null, isLoading = false) {

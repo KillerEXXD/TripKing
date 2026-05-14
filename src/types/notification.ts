@@ -8,7 +8,10 @@ export type NotificationType =
   | 'account_status_change'
   | 'trip_invitation'
   | 'invitation_accepted'
-  | 'invitation_declined';
+  | 'invitation_declined'
+  | 'bug_reported'
+  | 'bug_resolved'
+  | 'bug_commented';
 
 export interface Notification {
   id: string;

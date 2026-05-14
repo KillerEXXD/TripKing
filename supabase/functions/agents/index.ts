@@ -33,7 +33,7 @@ function invalidateAgentMe(userId: string): void {
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
-const AGENT_SELECT = '*, user:users!user_id(display_handle), business_city:cities!business_city_id(*)';
+const AGENT_SELECT = '*, user:users!user_id(display_handle, can_report_bugs), business_city:cities!business_city_id(*)';
 const PRIVATE_KYC_FIELDS = [
   'aadhaar_number_masked', 'aadhaar_front_path', 'aadhaar_back_path', 'selfie_path',
   'kyc_consent_at', 'kyc_reviewed_by', 'kyc_rejection_reason',
@@ -92,6 +92,7 @@ function flattenHandle(row: Row | null | undefined): Row | null {
   const out = { ...row };
   const u = out.user as Record<string, unknown> | null | undefined;
   out.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
+  out.can_report_bugs = u && typeof u.can_report_bugs === 'boolean' ? u.can_report_bugs : false;
   delete out.user;
   return out;
 }

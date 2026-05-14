@@ -5,6 +5,7 @@ import { useInfiniteDrivers } from '@/hooks/useDrivers';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatRating, initials } from '@/lib/utils';
+import { BugReporterToggle } from '@/components/bug/BugReporterToggle';
 import type { Driver, KycStatus } from '@/types';
 
 const KYC_BADGE: Record<KycStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
@@ -74,6 +75,11 @@ function DriverCard({ d }: { d: Driver }) {
           KYC →
         </Link>
       </div>
+      {d.userId ? (
+        <div className="flex justify-end">
+          <BugReporterToggle userId={d.userId} initial={d.canReportBugs} />
+        </div>
+      ) : null}
     </Card>
   );
 }

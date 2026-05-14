@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AdminDriversPage } from '@/pages/administration/AdminDriversPage';
 import type { Driver } from '@/types';
 
@@ -13,7 +14,7 @@ function makeDriver(over: Partial<Driver> = {}): Driver {
     id: 'd1',
     userId: 'u1',
     fullName: 'Ravi Kumar',
-    displayHandle: 'A1B2C3D',
+    displayHandle: 'A1B2C3D', canReportBugs: false,
     phone: '+919876500000',
     homeCity: city('c1', 'Vellore'),
     currentCity: city('c1', 'Vellore'),
@@ -46,7 +47,8 @@ function setDrivers(s: State = {}) {
   } as never);
 }
 function renderPage() {
-  return render(<MemoryRouter><AdminDriversPage /></MemoryRouter>);
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(<QueryClientProvider client={qc}><MemoryRouter><AdminDriversPage /></MemoryRouter></QueryClientProvider>);
 }
 
 describe('AdminDriversPage', () => {
@@ -56,7 +58,7 @@ describe('AdminDriversPage', () => {
   });
 
   it('lists drivers with their KYC badge, rating and a profile link', () => {
-    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A1B2C3D', kycStatus: 'pending', ratingCount: 0, totalTripsCompleted: 0, vehicles: [] })] });
+    setDrivers({ rows: [makeDriver(), makeDriver({ id: 'd2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A1B2C3D', canReportBugs: false, kycStatus: 'pending', ratingCount: 0, totalTripsCompleted: 0, vehicles: [] })] });
     renderPage();
     expect(screen.getByRole('heading', { name: /^drivers$/i })).toBeInTheDocument();
     expect(screen.getByText('Ravi Kumar')).toBeInTheDocument();

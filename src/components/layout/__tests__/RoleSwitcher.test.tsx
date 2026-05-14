@@ -13,7 +13,7 @@ function renderWithClient(ui: React.ReactElement) {
   return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
 }
 
-const driver: User = { id: 'd', role: 'driver', phone: '+91', displayName: 'Driver', preferredLanguage: 'en', isActive: true };
+const driver: User = { id: 'd', role: 'driver', phone: '+91', displayName: 'Driver', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const admin: User = { ...driver, id: 'x', role: 'admin', displayName: 'Admin' };
 
 function setUser(user: User | null) {
@@ -32,7 +32,7 @@ describe('RoleSwitcher / useEffectiveRole', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders Admin · Driver · Agent for an admin, with Admin selected by default', () => {
+  it('renders Admin Â· Driver Â· Agent for an admin, with Admin selected by default', () => {
     setUser(admin);
     renderWithClient(<RoleSwitcher />);
     expect(screen.getByRole('tab', { name: /admin/i })).toHaveAttribute('aria-selected', 'true');

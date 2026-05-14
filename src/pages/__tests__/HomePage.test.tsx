@@ -9,7 +9,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: () => 0 }));
 import { useAuth } from '@/contexts/AuthContext';
 
-const admin: User = { id: 'x', role: 'admin', phone: '+919840492777', displayName: 'Ravee Sundar', preferredLanguage: 'en', isActive: true };
+const admin: User = { id: 'x', role: 'admin', phone: '+919840492777', displayName: 'Ravee Sundar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 
 function renderHome() {
   vi.mocked(useAuth).mockReturnValue({ user: admin, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });

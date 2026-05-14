@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BadgeCheck, Bell, BellRing, CheckCircle2, Mail, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, XCircle, type LucideIcon } from 'lucide-react';
+import { BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Mail, MessageSquare, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, Wrench, XCircle, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
 import { useDecideVacancyInvitation } from '@/hooks/useVacancyInvitations';
@@ -18,6 +18,9 @@ const ICON: Record<NotificationType, LucideIcon> = {
   trip_invitation: Mail,
   invitation_accepted: ThumbsUp,
   invitation_declined: ThumbsDown,
+  bug_reported: Bug,
+  bug_resolved: Wrench,
+  bug_commented: MessageSquare,
 };
 
 function relTime(iso: string): string {

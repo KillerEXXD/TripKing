@@ -18,7 +18,7 @@ function setAuth(state: AuthState) {
     logout: vi.fn(),
   });
 }
-const admin: User = { id: 'a1', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true };
+const admin: User = { id: 'a1', role: 'admin', phone: '+91', displayName: 'Admin', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const driver: User = { ...admin, id: 'd1', role: 'driver', displayName: 'Driver' };
 
 function renderAt(path: string, element: ReactElement) {
