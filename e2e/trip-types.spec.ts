@@ -131,4 +131,61 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     await expect(page.getByRole('button', { name: /add destination/i })).toBeVisible();
     await expect(page.getByLabel(/return to start/i)).toBeVisible();
   });
+
+  test('one-way submit → legacy single-leg body (no trip_type, no waypoints[])', async ({ page }) => {
+    const getBody = await stubPostTripsCapture(page);
+    await signInAsAgent(page);
+    await page.goto('/trips/new');
+
+    // Step 1 — route, schedule, vehicle.
+    await page.getByLabel(/From \(pickup city\)/i).selectOption('c-vlr');
+    await page.getByLabel(/To \(drop-off city\)/i).selectOption('c-chn');
+    await page.getByLabel(/Pickup date & time/i).fill(futureLocal(2));
+    // Car type is a chip button (not a select).
+    await page.getByRole('button', { name: 'Sedan' }).click();
+    await page.getByRole('button', { name: /next/i }).click();
+
+    // Step 2 — minimum to submit.
+    await page.getByLabel(/Rate per km/i).fill('15');
+    await page.getByRole('button', { name: /post trip|create trip|publish/i }).click();
+
+    // POST body has the legacy shape — no trip_type, no waypoints[].
+    await expect.poll(getBody, { timeout: 5000 }).not.toBeNull();
+    const body = getBody();
+    expect(body).toMatchObject({ from_city_id: 'c-vlr', to_city_id: 'c-chn' });
+    expect(body?.trip_type).toBeUndefined();
+    expect(body?.waypoints).toBeUndefined();
+  });
+
+  test('round-trip submit → trip_type=round_trip + 3-waypoint chain + expected_end_at', async ({ page }) => {
+    const getBody = await stubPostTripsCapture(page);
+    await signInAsAgent(page);
+    await page.goto('/trips/new');
+
+    await page.getByRole('tab', { name: /round-trip/i }).click();
+
+    await page.getByLabel(/Trip starts from \(city\)/i).selectOption('c-vlr');
+    await page.getByLabel(/Turnaround city/i).selectOption('c-chn');
+    await page.getByLabel(/Trip starts \(date & time\)/i).fill(futureLocal(2));
+    await page.getByLabel(/Trip ends \(date & time\)/i).fill(futureLocal(3));
+    await page.getByRole('button', { name: 'Sedan' }).click();
+    await page.getByRole('button', { name: /next/i }).click();
+
+    await page.getByLabel(/Rate per km/i).fill('15');
+    await page.getByRole('button', { name: /post trip|create trip|publish/i }).click();
+
+    await expect.poll(getBody, { timeout: 5000 }).not.toBeNull();
+    const body = getBody();
+    expect(body?.trip_type).toBe('round_trip');
+    expect(typeof body?.expected_end_at).toBe('string');
+    // 3 waypoints: origin → turnaround → origin (last city == first).
+    const wp = body?.waypoints as Array<{ city_id: string | null }> | undefined;
+    expect(wp).toHaveLength(3);
+    expect(wp?.[0]?.city_id).toBe('c-vlr');
+    expect(wp?.[1]?.city_id).toBe('c-chn');
+    expect(wp?.[2]?.city_id).toBe('c-vlr');
+  });
 });
+
+// Suppress lint for unused futureIso (kept in case a future test posts a pre-built ISO body)
+void futureIso;
