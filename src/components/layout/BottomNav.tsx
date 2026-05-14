@@ -72,7 +72,7 @@ export function BottomNav() {
         const isActive = it.id === activeId;
         if (it.primary) {
           return (
-            <button key={it.id} type="button" onClick={() => navigate(it.to)} aria-label={it.label} aria-current={isActive ? 'page' : undefined} className="-mt-3 flex flex-col items-center justify-center gap-0.5 px-3 py-1.5">
+            <button key={it.id} type="button" onClick={() => navigate(it.to)} aria-label={it.label} aria-current={isActive ? 'page' : undefined} className="-mt-1 flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5">
               <span className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
                 <it.Icon className="size-7" aria-hidden />
               </span>
@@ -89,7 +89,7 @@ export function BottomNav() {
             aria-current={isActive ? 'page' : undefined}
             className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors', isActive ? 'text-primary' : 'text-secondary hover:text-foreground')}
           >
-            <it.Icon className={it.bigIcon ? 'size-8' : 'size-7'} aria-hidden />
+            <it.Icon className={it.bigIcon ? 'size-12' : 'size-9'} aria-hidden />
             {it.hideLabel ? null : <span className="text-[10px] font-medium">{it.label}</span>}
           </button>
         );

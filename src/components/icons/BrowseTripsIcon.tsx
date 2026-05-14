@@ -2,11 +2,10 @@ import type { SVGProps } from 'react';
 
 /**
  * Browse-trips glyph for the driver's bottom-nav. Reads as a fast-moving car
- * with smoke trailing behind it, plus a small magnifying lens at the bottom-
- * right corner as the "search" hint. The previous version put a big lens on
- * top of the car which read as a head + body silhouette (i.e. a person) at
- * the 28 px nav size — moving the lens to the corner (and oversizing the car)
- * fixes that. Single-stroke, `currentColor`.
+ * with smoke trailing behind it, plus a magnifying lens overlapping the
+ * front-right wheel area as the "search" hint. The lens stays below the
+ * car body so the silhouette still reads as a car (not a head + body / person).
+ * Single-stroke, `currentColor`. Sized to match the + pill in the nav.
  */
 export function BrowseTripsIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -28,10 +27,11 @@ export function BrowseTripsIcon(props: SVGProps<SVGSVGElement>) {
       {/* Wheels overlap the bottom of the body so the shape reads as a real car */}
       <circle cx="7" cy="18.5" r="2" fill="currentColor" stroke="none" />
       <circle cx="16" cy="18.5" r="2" fill="currentColor" stroke="none" />
-      {/* Magnifying lens — small, in the bottom-right corner, clearly separate
-          from the car so it doesn't read as a head. Handle exits the frame. */}
-      <circle cx="20.5" cy="20.2" r="1.8" strokeWidth="2" />
-      <line x1="21.8" y1="21.5" x2="23.4" y2="23.1" strokeWidth="2.5" />
+      {/* Magnifying lens — bigger, overlapping the front-bottom of the car
+          (front wheel area) so the two shapes merge but it still reads as a
+          car (not a head + body). Handle exits the bottom-right corner. */}
+      <circle cx="17.5" cy="17.5" r="3.5" strokeWidth="2.25" />
+      <line x1="20" y1="20" x2="22.8" y2="22.8" strokeWidth="2.5" />
     </svg>
   );
 }
