@@ -25,16 +25,19 @@ interface NavItem {
 
 // Driver and agent have genuinely different daily jobs, so the tab set follows the role.
 // Profile lives in the top-right avatar (not the bottom nav), consistent across all 3 roles.
+// Bottom nav reads as icon-only — the label stays on the NavItem for `aria-label`
+// (screen readers + hover tooltips) but never renders as text. The bigger custom
+// glyphs (BrowseTripsIcon, FindDriverIcon) carry the meaning visually.
 const DRIVER_NAV: NavItem[] = [
-  { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
+  { id: 'home', label: 'Home', Icon: Home, to: '/', hideLabel: true, match: (p) => p === '/' },
   { id: 'browse', label: 'Find trips', Icon: BrowseTripsIcon, to: '/trips', bigIcon: true, hideLabel: true, match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
-  { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, match: (p) => p === '/trips/new' },
-  { id: 'mine', label: 'My trips', Icon: ClipboardList, to: '/my-trips', match: (p) => p === '/my-trips' || p === '/posted-trips' },
+  { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, hideLabel: true, match: (p) => p === '/trips/new' },
+  { id: 'mine', label: 'My trips', Icon: ClipboardList, to: '/my-trips', hideLabel: true, match: (p) => p === '/my-trips' || p === '/posted-trips' },
 ];
 const AGENT_NAV: NavItem[] = [
-  { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
-  { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, match: (p) => p === '/trips/new' },
-  { id: 'mine', label: 'My posts', Icon: ClipboardList, to: '/posted-trips', match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
+  { id: 'home', label: 'Home', Icon: Home, to: '/', hideLabel: true, match: (p) => p === '/' },
+  { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, hideLabel: true, match: (p) => p === '/trips/new' },
+  { id: 'mine', label: 'My posts', Icon: ClipboardList, to: '/posted-trips', hideLabel: true, match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
   { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', bigIcon: true, hideLabel: true, match: (p) => p.startsWith('/vacancies') },
 ];
 // Admins oversee the marketplace — they don't post or run trips, so no Post / My trips tabs.
@@ -70,10 +73,10 @@ export function BottomNav() {
         if (it.primary) {
           return (
             <button key={it.id} type="button" onClick={() => navigate(it.to)} aria-label={it.label} aria-current={isActive ? 'page' : undefined} className="-mt-3 flex flex-col items-center justify-center gap-0.5 px-3 py-1.5">
-              <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
-                <it.Icon className="size-5" aria-hidden />
+              <span className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
+                <it.Icon className="size-6" aria-hidden />
               </span>
-              <span className="text-[10px] font-semibold text-primary">{it.label}</span>
+              {it.hideLabel ? null : <span className="text-[10px] font-semibold text-primary">{it.label}</span>}
             </button>
           );
         }
