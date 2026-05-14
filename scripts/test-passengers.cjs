@@ -9,7 +9,7 @@
  * path — POST /trips with a fresh phone creates the passenger row, POST /trips with the
  * same phone but a different name appends to aliases (keeping the canonical name).
  */
-const BASE = (process.env.PASSENGERS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}` : '')).replace(/\/+$/, '');
+const BASE = (process.env.PASSENGERS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
 if (!BASE) {
   console.log('[test-passengers] PASSENGERS_API_BASE not set — skipping.');
   process.exit(0);
