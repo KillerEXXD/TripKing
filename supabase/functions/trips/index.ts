@@ -50,7 +50,8 @@ import { stripPhones, assertNoPhones, PhoneInTextError, revealCache, logPiiRevea
 import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail } from '../_shared/http.ts';
 
-const CACHE_EPOCH = 'v2';
+// v3 (2026-05-14): added `posted_by_kyc_status` to every trip row (drives <VerifiedBadge>).
+const CACHE_EPOCH = 'v3';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the
@@ -384,11 +385,45 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
     return (data?.id as string | undefined) ?? null;
   }
+  /**
+   * Adds `posted_by_kyc_status` to each row by batch-fetching kyc_status from
+   * drivers / trip_managers keyed on the poster's user_id (split by
+   * posted_by_role: driver → drivers, anything else → trip_managers). Two
+   * queries max regardless of row count, both indexed on user_id. Feeds the
+   * client-side <VerifiedBadge> on every trip card without forcing per-row
+   * round trips.
+   */
+  async function enrichPostedByKyc(rows: Record<string, unknown>[]): Promise<void> {
+    if (rows.length === 0) return;
+    const driverUserIds = new Set<string>();
+    const agentUserIds = new Set<string>();
+    for (const r of rows) {
+      const uid = typeof r.posted_by_user_id === 'string' ? r.posted_by_user_id : '';
+      const role = typeof r.posted_by_role === 'string' ? r.posted_by_role : '';
+      if (!uid) continue;
+      if (role === 'driver') driverUserIds.add(uid);
+      else agentUserIds.add(uid);
+    }
+    const kyc = new Map<string, string>();
+    if (driverUserIds.size > 0) {
+      const { data } = await db.from('drivers').select('user_id, kyc_status').in('user_id', [...driverUserIds]);
+      for (const d of (data ?? []) as { user_id: string; kyc_status: string }[]) kyc.set(d.user_id, d.kyc_status);
+    }
+    if (agentUserIds.size > 0) {
+      const { data } = await db.from('trip_managers').select('user_id, kyc_status').in('user_id', [...agentUserIds]);
+      for (const a of (data ?? []) as { user_id: string; kyc_status: string }[]) kyc.set(a.user_id, a.kyc_status);
+    }
+    for (const r of rows) {
+      const uid = typeof r.posted_by_user_id === 'string' ? r.posted_by_user_id : '';
+      if (uid && kyc.has(uid)) r.posted_by_kyc_status = kyc.get(uid);
+    }
+  }
   /** Re-fetch a trip joined + redacted for the viewer `u` (used by POST/assign/start/complete/cancel). */
   async function fullTrip(id: string, u: { id: string; role: string }): Promise<Record<string, unknown>> {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', id).single();
     if (error) throw new Error(error.message);
     const raw = data as Record<string, unknown>;
+    await enrichPostedByKyc([raw]);
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     return redactTrip(raw, relationshipFor(raw, u, myDriverId), false);
   }
@@ -464,7 +499,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (!near) q = q.order('pickup_at', { ascending: true });
       const { data, error } = await q;
       if (error) throw new Error(error.message);
-      return { rows: (data ?? []) as Record<string, unknown>[], distEntries };
+      const rows = (data ?? []) as Record<string, unknown>[];
+      await enrichPostedByKyc(rows); // adds posted_by_kyc_status for the <VerifiedBadge>
+      return { rows, distEntries };
     };
 
     let payload: CachedShape;
@@ -696,6 +733,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
     const raw = data as Record<string, unknown>;
+    await enrichPostedByKyc([raw]);
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     const rel = relationshipFor(raw, u, myDriverId);
     let posterReveal = false;
