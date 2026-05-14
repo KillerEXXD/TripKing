@@ -1,11 +1,12 @@
 import type { SVGProps } from 'react';
 
 /**
- * Browse-trips glyph for the driver's bottom-nav. Reads as "search trips" —
- * a car in motion (bold smoke puffs trailing left) with a magnifying lens
- * sitting **on** the car's windscreen (the two shapes overlap, so the
- * silhouette reads as one). Single-stroke, `currentColor`. Designed to be
- * legible at the 28 px bigIcon size used by the nav.
+ * Browse-trips glyph for the driver's bottom-nav. Reads as a fast-moving car
+ * with smoke trailing behind it, plus a small magnifying lens at the bottom-
+ * right corner as the "search" hint. The previous version put a big lens on
+ * top of the car which read as a head + body silhouette (i.e. a person) at
+ * the 28 px nav size — moving the lens to the corner (and oversizing the car)
+ * fixes that. Single-stroke, `currentColor`.
  */
 export function BrowseTripsIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -18,19 +19,19 @@ export function BrowseTripsIcon(props: SVGProps<SVGSVGElement>) {
       strokeLinejoin="round"
       {...props}
     >
-      {/* Smoke puffs — bigger, bolder, trailing left of the car */}
-      <path d="M0.5 13 q2.5 -1 5 0" strokeWidth="2" />
-      <path d="M0.5 16 q2.5 -1 5 0" strokeWidth="2" />
-      <path d="M1.5 19 q2 -1 4 0" strokeWidth="2" />
-      {/* Car body — bigger, fills the lower 2/3 of the icon */}
-      <path d="M5.5 19.5 L8 12 L14 12 L17.5 15.5 L21 15.5 L21 19.5 Z" strokeWidth="2.25" />
-      {/* Wheels — bigger so they pop */}
-      <circle cx="9" cy="20.3" r="1.7" fill="currentColor" stroke="none" />
-      <circle cx="18" cy="20.3" r="1.7" fill="currentColor" stroke="none" />
-      {/* Magnifying lens — overlaps the windscreen so the two shapes merge */}
-      <circle cx="13.5" cy="8" r="5" strokeWidth="2.25" />
-      {/* Handle — heavy stroke to keep it readable at small sizes */}
-      <line x1="17.2" y1="11.6" x2="20.5" y2="14.9" strokeWidth="2.5" />
+      {/* Smoke puffs — bold curves trailing left */}
+      <path d="M0 9 q2.5 -1 5 0" strokeWidth="2" />
+      <path d="M0 12.5 q2.5 -1 5 0" strokeWidth="2" />
+      <path d="M0 16 q2.5 -1 5 0" strokeWidth="2" />
+      {/* Car body — big, dominant. Roof at y=6, bonnet slope, body bottom at y=17. */}
+      <path d="M3 17 L5.5 7 L11.5 7 L15.5 11.5 L20 11.5 L20 17 Z" strokeWidth="2.25" />
+      {/* Wheels overlap the bottom of the body so the shape reads as a real car */}
+      <circle cx="7" cy="18.5" r="2" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="18.5" r="2" fill="currentColor" stroke="none" />
+      {/* Magnifying lens — small, in the bottom-right corner, clearly separate
+          from the car so it doesn't read as a head. Handle exits the frame. */}
+      <circle cx="20.5" cy="20.2" r="1.8" strokeWidth="2" />
+      <line x1="21.8" y1="21.5" x2="23.4" y2="23.1" strokeWidth="2.5" />
     </svg>
   );
 }

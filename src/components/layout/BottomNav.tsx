@@ -67,7 +67,7 @@ export function BottomNav() {
   const activeId = items.find((it) => it.match(pathname))?.id;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t bg-white pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t bg-white pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {items.map((it) => {
         const isActive = it.id === activeId;
         if (it.primary) {
