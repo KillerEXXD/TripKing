@@ -122,9 +122,20 @@ export function PostTripPage() {
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
-  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone']);
+  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata']);
   const distance = Number(distanceWatch) || 0;
   const rate = Number(rateWatch) || 0;
+  // Multi-day pricing preview — driver_bata is per-day; total = bata × ceil((end − start) / 1 day).
+  // Single-leg trips (no expected_end_at typed) default to 1 day so the preview matches today's behaviour.
+  const tripDays = (() => {
+    if (!pickupAtWatch || !expectedEndAt) return 1;
+    const start = new Date(pickupAtWatch).getTime();
+    const end = new Date(expectedEndAt).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 1;
+    return Math.max(1, Math.ceil((end - start) / 86_400_000));
+  })();
+  const bataPerDay = Math.max(0, Math.round(Number(driverBataWatch) || 0));
+  const bataTotal = bataPerDay * tripDays;
   const totalFare = distance > 0 && rate > 0 ? Math.round(distance * rate) : 0;
   const cityName = (id: string) => citiesQuery.data?.find((c) => c.id === id)?.name;
   const carTypeName = (id: string) => carTypesQuery.data?.find((c) => c.id === id)?.label;
@@ -439,7 +450,15 @@ export function PostTripPage() {
                 <Field label="Rate per km (₹)" error={errors.ratePerKm?.message}>
                   <Input type="number" min={1} step={1} inputMode="numeric" {...register('ratePerKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter a rate per km' })} />
                 </Field>
-                <Field label="Driver bata (₹)" error={errors.driverBata?.message} hint="Paid straight to the driver">
+                <Field
+                  label="Driver bata (₹/day)"
+                  error={errors.driverBata?.message}
+                  hint={
+                    tripDays > 1
+                      ? `× ${tripDays} days = ${formatINR(bataTotal)} total (paid straight to the driver)`
+                      : 'Paid straight to the driver, per day of the trip'
+                  }
+                >
                   <Input type="number" min={0} step={1} inputMode="numeric" {...register('driverBata', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
                 </Field>
               </div>
