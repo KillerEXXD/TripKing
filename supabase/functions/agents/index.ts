@@ -180,6 +180,17 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     const activeParam = url.searchParams.get('active');
     if (activeParam === 'false') q = q.eq('is_active', false);
     else if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
+    // ?search= — admin-only ILIKE across full_name | phone | email (trigram-indexed).
+    const searchRaw = (url.searchParams.get('search') ?? '').trim();
+    if (searchRaw) {
+      const u0 = await authUser(db, req);
+      if (!isAdmin(u0)) return fail('FORBIDDEN', 'search is admin-only', 403);
+      const term = searchRaw.replace(/[,()*]/g, ' ').trim();
+      if (term) {
+        const esc = term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+        q = q.or(`full_name.ilike.%${esc}%,phone.ilike.%${esc}%,email.ilike.%${esc}%`);
+      }
+    }
     q = q.order('created_at', { ascending: false }).range(from, to);
     const { data, error, count } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);

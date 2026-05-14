@@ -54,4 +54,35 @@ describe('TripShareCard', () => {
     expect(screen.getByText('Any')).toBeInTheDocument();
     expect(screen.getByText(/919876500000/)).toBeInTheDocument();
   });
+
+  it('renders the route chain when the trip has 3+ waypoints (multi-stop)', () => {
+    const wp = (id: string, c: string, state = 'TN') => ({ id, seq: 0, city: city(c, c, state), waitMinutes: 0, isDestination: true });
+    const trip = makeTrip({
+      tripType: 'multi_way',
+      waypoints: [
+        { ...wp('w1', 'Chennai'), seq: 0 },
+        { ...wp('w2', 'Vellore'), seq: 1 },
+        { ...wp('w3', 'Trichy'), seq: 2 },
+        { ...wp('w4', 'Pondicherry'), seq: 3 },
+      ],
+    });
+    render(<TripShareCard trip={trip} />);
+    // each city name appears in the chain (the big A→B headline is replaced)
+    expect(screen.getByText(/Chennai/)).toBeInTheDocument();
+    expect(screen.getByText(/Vellore/)).toBeInTheDocument();
+    expect(screen.getByText(/Trichy/)).toBeInTheDocument();
+    expect(screen.getByText(/Pondicherry/)).toBeInTheDocument();
+    // variant label is in the header
+    expect(screen.getByText(/Multi-way drop/)).toBeInTheDocument();
+  });
+
+  it('shows a multi-day span line when expected_end_at is more than 1 day after pickup', () => {
+    const trip = makeTrip({
+      pickupAt: '2099-06-01T03:30:00.000Z',
+      expectedEndAt: '2099-06-03T05:00:00.000Z', // ~2 days later
+    });
+    render(<TripShareCard trip={trip} />);
+    expect(screen.getByText(/3-day trip/)).toBeInTheDocument(); // ceil(span/1d) = 3
+    expect(screen.getByText(/ends/)).toBeInTheDocument();
+  });
 });

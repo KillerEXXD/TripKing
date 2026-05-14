@@ -1066,7 +1066,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer; the poster must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver/agent profile is deactivated, 403 KYC_REQUIRED if not yet approved) — hide_passenger_phone (true|false) and passenger_count (≥1) are REQUIRED. from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422). total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a trip (Bearer; the poster must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver/agent profile is deactivated, 403 KYC_REQUIRED if not yet approved) — hide_passenger_phone (true|false) and passenger_count (≥1) are REQUIRED. Two body shapes accepted: (a) legacy single-leg (from_city_id + to_city_id, optional from_place_id / to_place_id — server synthesises a 2-waypoint one_way plan), OR (b) migration-024 shape with trip_type + waypoints[] (one_way / round_trip / multi_way). Round_trip last waypoint city/place must match the first; multi_way can either drop (last ≠ first) or loop back (last == first) — the client labels these as \"Multi-way drop\" / \"Multi-way return back\" in share text. expected_end_at must be > pickup_at and ≤ app_settings.max_trip_duration_days. driver_bata is per-day; driver_payout = (fare − commission − GST) + driver_bata × ceil(days) + wait_charges. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1074,8 +1074,6 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "from_city_id",
-                  "to_city_id",
                   "pickup_at",
                   "car_type_id",
                   "expected_distance_km",
@@ -1092,11 +1090,62 @@
                     "type": "integer",
                     "minimum": 1
                   },
+                  "from_city_id": {
+                    "type": "string",
+                    "description": "required when waypoints[] is omitted"
+                  },
+                  "to_city_id": {
+                    "type": "string",
+                    "description": "required when waypoints[] is omitted"
+                  },
                   "from_place_id": {
                     "type": "string"
                   },
                   "to_place_id": {
                     "type": "string"
+                  },
+                  "trip_type": {
+                    "type": "string",
+                    "enum": [
+                      "one_way",
+                      "round_trip",
+                      "multi_way"
+                    ],
+                    "description": "route shape; defaults to one_way"
+                  },
+                  "expected_end_at": {
+                    "type": "string",
+                    "description": "ISO timestamp; trip end (must be > pickup_at, span ≤ max_trip_duration_days). Server defaults to last-waypoint arrive_at + wait, or pickup_at + 1 day."
+                  },
+                  "waypoints": {
+                    "type": "array",
+                    "description": "Ordered list (origin → 0+ stops → final). For round_trip the last city/place must equal the first; for multi_way ≥3 entries and last can match or differ from first (drop vs return back).",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "city_id": {
+                          "type": "string"
+                        },
+                        "place_id": {
+                          "type": "string"
+                        },
+                        "arrive_at": {
+                          "type": "string",
+                          "description": "ISO timestamp; monotonic vs the previous waypoint and pickup_at"
+                        },
+                        "wait_minutes": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "is_destination": {
+                          "type": "boolean"
+                        },
+                        "notes": {
+                          "type": "string",
+                          "description": "free text; rejected if it contains a phone number"
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -2301,6 +2350,14 @@
             "description": "true ⇒ include deactivated drivers"
           },
           {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "admin-only ILIKE match across full_name | phone | email (trigram-indexed); 403 if caller is not admin"
+          },
+          {
             "name": "near_lat",
             "in": "query",
             "schema": {
@@ -2842,6 +2899,14 @@
               "type": "boolean"
             },
             "description": "true ⇒ include deactivated agents"
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "admin-only ILIKE match across full_name | phone | email (trigram-indexed); 403 if caller is not admin"
           },
           {
             "name": "limit",

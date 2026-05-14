@@ -94,16 +94,17 @@ const PAGE_SIZE = 50;
 export function AdminDriversPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  const driversQuery = useInfiniteDrivers(filter === 'all' ? undefined : { kycStatus: filter }, PAGE_SIZE);
+  const [debouncedQ, setDebouncedQ] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+  const params = { ...(filter === 'all' ? {} : { kycStatus: filter as KycStatus }), ...(debouncedQ ? { search: debouncedQ } : {}) };
+  const driversQuery = useInfiniteDrivers(Object.keys(params).length ? params : undefined, PAGE_SIZE);
 
   const rows = useMemo(() => (driversQuery.data?.pages.flatMap((p) => p.data) ?? []), [driversQuery.data]);
   const total = driversQuery.data?.pages[0]?.meta.total;
-
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter((d) => d.fullName.toLowerCase().includes(term) || (d.phone ?? '').toLowerCase().includes(term) || (d.email ?? '').toLowerCase().includes(term));
-  }, [rows, q]);
+  const filtered = rows;
 
   // Auto-fetch the next page when the bottom sentinel scrolls into view.
   const sentinelRef = useRef<HTMLDivElement | null>(null);

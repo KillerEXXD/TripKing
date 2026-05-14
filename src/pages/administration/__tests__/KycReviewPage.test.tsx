@@ -1,20 +1,32 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { KycReviewPage } from '@/pages/administration/KycReviewPage';
 
-vi.mock('@/hooks/useDrivers', () => ({ useDrivers: vi.fn(), useAgents: vi.fn(), useUpdateDriverKyc: vi.fn(), useUpdateAgentKyc: vi.fn() }));
-import { useAgents, useDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useDrivers', () => ({
+  useInfiniteDrivers: vi.fn(),
+  useInfiniteAgents: vi.fn(),
+  useUpdateDriverKyc: vi.fn(),
+  useUpdateAgentKyc: vi.fn(),
+  useDriverKycDocs: vi.fn(),
+  useAgentKycDocs: vi.fn(),
+}));
+import { useInfiniteAgents, useInfiniteDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
 
-const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 0, lng: 0, sortOrder: 1, isActive: true });
-
-type ListState = { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void };
-function setDrivers(s: ListState = {}) {
-  vi.mocked(useDrivers).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn(), ...s } as never);
+type InfState = { isPending?: boolean; isError?: boolean; rows?: unknown[]; hasNextPage?: boolean; refetch?: () => void };
+function infState(s: InfState = {}) {
+  return {
+    isPending: s.isPending ?? false,
+    isError: s.isError ?? false,
+    data: { pages: [{ data: s.rows ?? [], meta: { page: 1, limit: 50, total: (s.rows ?? []).length, hasMore: !!s.hasNextPage } }] },
+    hasNextPage: !!s.hasNextPage,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: s.refetch ?? vi.fn(),
+  } as never;
 }
-function setAgents(s: ListState = {}) {
-  vi.mocked(useAgents).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn(), ...s } as never);
-}
+function setDrivers(s: InfState = {}) { vi.mocked(useInfiniteDrivers).mockReturnValue(infState(s)); }
+function setAgents(s: InfState = {}) { vi.mocked(useInfiniteAgents).mockReturnValue(infState(s)); }
 function setMutations() {
   const dm = { mutate: vi.fn(), isPending: false };
   const am = { mutate: vi.fn(), isPending: false };
@@ -33,12 +45,13 @@ function renderKyc() {
 
 describe('KycReviewPage', () => {
   beforeEach(() => {
-    vi.mocked(useDrivers).mockReset();
-    vi.mocked(useAgents).mockReset();
+    vi.useFakeTimers();
+    vi.mocked(useInfiniteDrivers).mockReset();
+    vi.mocked(useInfiniteAgents).mockReset();
     vi.mocked(useUpdateDriverKyc).mockReset();
     vi.mocked(useUpdateAgentKyc).mockReset();
-    setDrivers({ data: [] });
-    setAgents({ data: [] });
+    setDrivers();
+    setAgents();
     setMutations();
   });
 
@@ -57,16 +70,17 @@ describe('KycReviewPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('defaults to the "needs review" filter (hides approved/rejected drivers)', () => {
-    setDrivers({ data: [{ id: 'd1', fullName: 'Needs Review', displayHandle: 'A1B2C3D', canReportBugs: false, currentCity: city('c1', 'Vellore'), kycStatus: 'docs_submitted' }, { id: 'd2', fullName: 'Already Approved', kycStatus: 'approved' }] });
+  it('passes the "needs review" kycStatus CSV to the server by default', () => {
+    setDrivers({ rows: [{ id: 'd1', fullName: 'X', kycStatus: 'docs_submitted' }] });
     renderKyc();
-    expect(screen.getByText('Needs Review')).toBeInTheDocument();
-    expect(screen.queryByText('Already Approved')).toBeNull();
+    const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
+    expect(lastCall[0]).toMatchObject({ kycStatus: ['pending', 'docs_submitted', 'video_pending', 'resubmit_required'] });
+    expect(lastCall[0]).not.toHaveProperty('search');
   });
 
   it('approving a driver calls useUpdateDriverKyc; the current-status button is disabled', () => {
     const { dm } = setMutations();
-    setDrivers({ data: [{ id: 'd1', fullName: 'Ravi', displayHandle: 'A1B2C3D', canReportBugs: false, kycStatus: 'docs_submitted' }] });
+    setDrivers({ rows: [{ id: 'd1', fullName: 'Ravi', kycStatus: 'docs_submitted' }] });
     renderKyc();
     expect(screen.getByRole('button', { name: /docs in/i })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: /^approve$/i }));
@@ -75,7 +89,7 @@ describe('KycReviewPage', () => {
 
   it('switching to "Agents" shows the agent queue, and approving an agent calls useUpdateAgentKyc', () => {
     const { am } = setMutations();
-    setAgents({ data: [{ id: 'a1', fullName: 'Agent X', displayHandle: 'A1B2C3D', canReportBugs: false, businessName: 'X Travels', kycStatus: 'pending' }] });
+    setAgents({ rows: [{ id: 'a1', fullName: 'Agent X', businessName: 'X Travels', kycStatus: 'pending' }] });
     renderKyc();
     fireEvent.click(screen.getByRole('button', { name: /^agents$/i }));
     expect(screen.getByText('Agent X')).toBeInTheDocument();
@@ -83,17 +97,44 @@ describe('KycReviewPage', () => {
     expect(am.mutate).toHaveBeenCalledWith({ id: 'a1', kycStatus: 'approved' });
   });
 
-  it('the "Approved" filter shows approved entries', () => {
-    setDrivers({ data: [{ id: 'd1', fullName: 'Approved One', displayHandle: 'A1B2C3D', canReportBugs: false, kycStatus: 'approved' }] });
+  it('clicking the "Approved" filter sends kycStatus="approved" to the server', () => {
+    setDrivers({ rows: [] });
     renderKyc();
-    expect(screen.queryByText('Approved One')).toBeNull(); // hidden under "needs review"
     fireEvent.click(screen.getByRole('button', { name: /^approved$/i }));
-    expect(screen.getByText('Approved One')).toBeInTheDocument();
+    const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
+    expect(lastCall[0]).toMatchObject({ kycStatus: 'approved' });
+  });
+
+  it('debounces the search input and forwards it as `search` after 300ms', () => {
+    setDrivers({ rows: [] });
+    renderKyc();
+    fireEvent.change(screen.getByLabelText(/search kyc queue/i), { target: { value: 'ravi' } });
+    act(() => { vi.advanceTimersByTime(300); });
+    const afterCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
+    expect((afterCall[0] as { search?: string }).search).toBe('ravi');
+  });
+
+  it('search applies to the agents queue too', () => {
+    setAgents({ rows: [] });
+    renderKyc();
+    fireEvent.click(screen.getByRole('button', { name: /^agents$/i }));
+    fireEvent.change(screen.getByLabelText(/search kyc queue/i), { target: { value: 'y@ex' } });
+    act(() => { vi.advanceTimersByTime(300); });
+    const lastCall = vi.mocked(useInfiniteAgents).mock.calls[vi.mocked(useInfiniteAgents).mock.calls.length-1];
+    expect(lastCall[0]).toMatchObject({ search: 'y@ex' });
   });
 
   it('shows an empty state when no entries match', () => {
-    setDrivers({ data: [] });
+    setDrivers({ rows: [] });
     renderKyc();
     expect(screen.getByText(/nothing here/i)).toBeInTheDocument();
+  });
+
+  it('shows a search-specific empty message when the server returns nothing for a query', () => {
+    setDrivers({ rows: [] });
+    renderKyc();
+    fireEvent.change(screen.getByLabelText(/search kyc queue/i), { target: { value: 'zzzzz' } });
+    act(() => { vi.advanceTimersByTime(300); });
+    expect(screen.getByText(/no drivers match that search/i)).toBeInTheDocument();
   });
 });

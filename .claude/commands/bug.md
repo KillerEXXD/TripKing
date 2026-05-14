@@ -7,7 +7,7 @@ argument-description: Bug number (e.g. /bug 12 or /bug BUG-012)
 # Investigate bug $ARGUMENTS
 
 You're triaging a bug submitted through the in-app reporter (the `bug_reports`
-table; see `supabase/migrations/024_bug_reports.sql`). Follow the 6-step flow
+table; see `supabase/migrations/027_bug_reports.sql`). Follow the 6-step flow
 TripKing uses for triage. Don't fix anything without explicit approval.
 
 ## Step 1 — Pull the data

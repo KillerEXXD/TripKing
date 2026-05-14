@@ -45,6 +45,20 @@ No file appears in both lanes (`package.json`/lockfile is in *neither* — addin
 
 ---
 
+## 🚧 In flight on `feat/trip-types` — trip types + multi-day trips (5 of 6 phases done)
+
+Branch `feat/trip-types` adds **one-way / round-trip / multi-way** support with multi-day
+durations and a 3-tab `PostTripPage`. Migration 024 is **applied to prod** (legacy rows
+backfilled as `one_way` with `expected_end_at = pickup_at + 1 day` — no payout drift).
+Edge function deployed. Phases 1–5 committed + pushed; see `docs/TRIP_TYPES_PLAN.md`.
+
+Share text leads with a 🧭 line:
+  - `One-way drop` · `Round-trip return back` · `Multi-way drop` (last ≠ first) ·
+    `Multi-way return back` (last == first)
+
+Phase 6 remaining: Playwright `e2e/trip-types.spec.ts`, the SQL alert-matcher span check,
+the `<TripShareCard>` PNG snapshot update for multi-stop, then PR review/merge.
+
 ## NEXT STEP → **Phase-6 backend — remaining items only** (✅ all 11 edge functions + Phase-4 admin-ops + Phase-5 analytics + the `/admin` `role=admin` Bearer migration + `docs/SECURITY_REVIEW.md` + the "⬆ Frontend ask" endpoints + trip-manager live tracking + the `/auth` OTP placeholder all shipped)
 
 Backend lane: ✅ rate limiting (infra + `verify-otp`) + `api_metrics` persistence done (migration 005). ✅ **anti-disintermediation / PII gating done (steps 1–5 of `docs/PII_GATING_HANDOVER.md`)** — `users.display_handle` (migration 022) + `pii_access_log` + the `can_reveal_driver` / `can_reveal_agent` SQL predicates + the `_shared/pii.ts` server helpers; `/drivers`, `/agents`, `/vacancies`, `/trips`, `/reviews` now redact name/phone/email/photo until the viewer crosses the reveal gate (acceptance row, applied trip, assigned/admin/self); a new `/vacancy-invitations` edge function lets agents invite a driver (notification → driver accepts/declines → acceptance row INSERTed = the reveal gate); free-text fields (`driver_instructions`, `luggage_notes`, `special_requests`, `applicant_message`, `decision_note`, vacancy `notes`, review `comment`) are scrubbed on read (`stripPhones`) and rejected on write (`assertNoPhones` → 400 `VALIDATION`). Client: `DriverPublic` / `AgentPublic` types + transforms (strict-throws on missing `display_handle`); `DriverIdentity` / `AgentIdentity` components are the single render path; VacanciesPage has an Invite-to-trip dialog; NotificationsPage has Accept/Decline buttons for `trip_invitation`. Smokes: `scripts/test-pii-redaction.cjs` 22/22, `scripts/test-vacancy-invitations.cjs` 24/24. **Remaining Phase-6:** real SMS provider + an `auth_otps` table for `/auth` (the implementation behind the `request-otp` placeholder; also gates `role:'admin'` for prod) — **needs a provider decision (Twilio / MSG91 / …)**; extend the rate limiter beyond `verify-otp` (to `request-otp` once real SMS lands, + the write endpoints) + a periodic `rate_limits` cleanup; an optional `tests/load/` k6 suite — see `docs/SECURITY_REVIEW.md`. Frontend lane: the Phase-3 **screens** (see `docs/CONTINUE_HERE_FRONTEND.md`; driver/agent home + profile + passenger portal are unblocked by `GET /drivers/me`/`GET /agents/me`/`GET /trips/by-otp/:otp`; the trip-manager "live trips on a map" UI is unblocked by `GET /trips?status=in_progress&posted_by_user_id=` + per-trip `assigned_driver.current_lat/lng` + `distance_to_destination_km`) → then **Phase 4–6** UIs (Phase-4 admin-ops + Phase-5 analytics dashboards — backends are live; the `/administration/config` UI's writes work now). *(Running in parallel? See the lane split above.)*

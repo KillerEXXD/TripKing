@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
-import { useAgentKycDocs, useAgents, useDriverKycDocs, useDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
+import { useAgentKycDocs, useDriverKycDocs, useInfiniteAgents, useInfiniteDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { KycDocs, KycStatus } from '@/types';
@@ -82,15 +82,15 @@ const FILTERS: { value: Filter; label: string }[] = [
   { value: 'rejected', label: KYC_LABEL.rejected },
 ];
 
+function filterToKycStatus(f: Filter): KycStatus | KycStatus[] {
+  return f === 'needs_review' ? NEEDS_REVIEW : f;
+}
+
 interface KycEntry {
   id: string;
   name: string;
   subtitle?: string;
   kycStatus: KycStatus;
-}
-
-function matchesFilter(status: KycStatus, f: Filter): boolean {
-  return f === 'needs_review' ? NEEDS_REVIEW.includes(status) : status === f;
 }
 
 function EntryCard({ entry, kind, onTransition, pending }: { entry: KycEntry; kind: 'driver' | 'agent'; onTransition: (status: KycStatus) => void; pending: boolean }) {
@@ -129,16 +129,27 @@ function EntryCard({ entry, kind, onTransition, pending }: { entry: KycEntry; ki
   );
 }
 
-function DriversQueue({ filter, q }: { filter: Filter; q: string }) {
-  const driversQuery = useDrivers();
+const PAGE_SIZE = 50;
+
+function InfiniteSentinel({ onIntersect, enabled }: { onIntersect: () => void; enabled: boolean }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const io = new IntersectionObserver((entries) => { if (entries[0]?.isIntersecting) onIntersect(); }, { rootMargin: '200px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [enabled, onIntersect]);
+  return <div ref={ref} aria-hidden className="h-1" />;
+}
+
+function DriversQueue({ filter, search }: { filter: Filter; search: string }) {
+  const query = useInfiniteDrivers({ kycStatus: filterToKycStatus(filter), ...(search ? { search } : {}) }, PAGE_SIZE);
   const updateKyc = useUpdateDriverKyc();
-  if (driversQuery.isPending) return <LoadingSkeleton rows={4} />;
-  if (driversQuery.isError) return <ErrorState title="Couldn't load drivers" message="Check your connection and try again." onRetry={() => void driversQuery.refetch()} />;
-  const term = q.trim().toLowerCase();
-  const rows = (driversQuery.data ?? [])
-    .filter((d) => matchesFilter(d.kycStatus, filter))
-    .filter((d) => !term || d.fullName.toLowerCase().includes(term) || (d.phone ?? '').toLowerCase().includes(term) || (d.email ?? '').toLowerCase().includes(term));
-  if (rows.length === 0) return <EmptyState title="Nothing here" message={term ? 'No drivers match that search.' : 'No drivers match this filter.'} />;
+  const rows = useMemo(() => query.data?.pages.flatMap((p) => p.data) ?? [], [query.data]);
+  if (query.isPending) return <LoadingSkeleton rows={4} />;
+  if (query.isError) return <ErrorState title="Couldn't load drivers" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
+  if (rows.length === 0) return <EmptyState title="Nothing here" message={search.trim() ? 'No drivers match that search.' : 'No drivers match this filter.'} />;
   return (
     <div className="space-y-3">
       {rows.map((d) => (
@@ -150,20 +161,19 @@ function DriversQueue({ filter, q }: { filter: Filter; q: string }) {
           onTransition={(kycStatus) => updateKyc.mutate({ id: d.id, kycStatus })}
         />
       ))}
+      <InfiniteSentinel enabled={!!query.hasNextPage && !query.isFetchingNextPage} onIntersect={() => void query.fetchNextPage()} />
+      {query.isFetchingNextPage ? <LoadingSkeleton rows={2} /> : null}
     </div>
   );
 }
 
-function AgentsQueue({ filter, q }: { filter: Filter; q: string }) {
-  const agentsQuery = useAgents();
+function AgentsQueue({ filter, search }: { filter: Filter; search: string }) {
+  const query = useInfiniteAgents({ kycStatus: filterToKycStatus(filter), ...(search ? { search } : {}) }, PAGE_SIZE);
   const updateKyc = useUpdateAgentKyc();
-  if (agentsQuery.isPending) return <LoadingSkeleton rows={4} />;
-  if (agentsQuery.isError) return <ErrorState title="Couldn't load agents" message="Check your connection and try again." onRetry={() => void agentsQuery.refetch()} />;
-  const term = q.trim().toLowerCase();
-  const rows = (agentsQuery.data ?? [])
-    .filter((a) => matchesFilter(a.kycStatus, filter))
-    .filter((a) => !term || a.fullName.toLowerCase().includes(term) || (a.phone ?? '').toLowerCase().includes(term) || (a.email ?? '').toLowerCase().includes(term));
-  if (rows.length === 0) return <EmptyState title="Nothing here" message={term ? 'No agents match that search.' : 'No agents match this filter.'} />;
+  const rows = useMemo(() => query.data?.pages.flatMap((p) => p.data) ?? [], [query.data]);
+  if (query.isPending) return <LoadingSkeleton rows={4} />;
+  if (query.isError) return <ErrorState title="Couldn't load agents" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
+  if (rows.length === 0) return <EmptyState title="Nothing here" message={search.trim() ? 'No agents match that search.' : 'No agents match this filter.'} />;
   return (
     <div className="space-y-3">
       {rows.map((a) => (
@@ -175,6 +185,8 @@ function AgentsQueue({ filter, q }: { filter: Filter; q: string }) {
           onTransition={(kycStatus) => updateKyc.mutate({ id: a.id, kycStatus })}
         />
       ))}
+      <InfiniteSentinel enabled={!!query.hasNextPage && !query.isFetchingNextPage} onIntersect={() => void query.fetchNextPage()} />
+      {query.isFetchingNextPage ? <LoadingSkeleton rows={2} /> : null}
     </div>
   );
 }
@@ -183,12 +195,19 @@ function AgentsQueue({ filter, q }: { filter: Filter; q: string }) {
  * `/administration/kyc` — the KYC review queue (admin-only). Move drivers and
  * agents through `pending → docs_submitted → video_pending → approved | rejected
  * | resubmit_required` (each transition fires a `kyc_status_change` notification).
- * Video verification calls happen out-of-band — mark "Video call" to flag one.
+ * Status filter + name/phone/email search both run server-side; results paginate
+ * via infinite scroll.
  */
 export function KycReviewPage() {
   const [subject, setSubject] = useState<'drivers' | 'agents'>('drivers');
   const [filter, setFilter] = useState<Filter>('needs_review');
   const [q, setQ] = useState('');
+  const [debouncedQ, setDebouncedQ] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
@@ -213,7 +232,7 @@ export function KycReviewPage() {
 
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone or email" aria-label="Search KYC queue" />
 
-      {subject === 'drivers' ? <DriversQueue filter={filter} q={q} /> : <AgentsQueue filter={filter} q={q} />}
+      {subject === 'drivers' ? <DriversQueue filter={filter} search={debouncedQ} /> : <AgentsQueue filter={filter} search={debouncedQ} />}
     </main>
   );
 }

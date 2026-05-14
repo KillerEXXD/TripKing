@@ -241,6 +241,18 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const activeParam = url.searchParams.get('active');
     if (activeParam === 'false') q = q.eq('is_active', false);
     else if (url.searchParams.get('include_inactive') !== 'true') q = q.eq('is_active', true);
+    // ?search= — admin-only ILIKE match across full_name | phone | email (trigram-indexed).
+    // Sanitised to keep PostgREST's .or() comma/paren syntax intact.
+    const searchRaw = (url.searchParams.get('search') ?? '').trim();
+    if (searchRaw) {
+      const u0 = await authUser(db, req);
+      if (!isAdmin(u0)) return fail('FORBIDDEN', 'search is admin-only', 403);
+      const term = searchRaw.replace(/[,()*]/g, ' ').trim();
+      if (term) {
+        const esc = term.replace(/%/g, '\\%').replace(/_/g, '\\_');
+        q = q.or(`full_name.ilike.%${esc}%,phone.ilike.%${esc}%,email.ilike.%${esc}%`);
+      }
+    }
     // Phase D radius filter: drivers whose (fresh) current position is within radius_km of (near_lat, near_lng).
     const near = parseNearRadius(url);
     let distById: Map<string, number> | null = null;
