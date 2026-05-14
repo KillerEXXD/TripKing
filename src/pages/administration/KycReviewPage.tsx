@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAgentKycDocs, useAgents, useDriverKycDocs, useDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
-import { Badge, Button, Card } from '@/components/ui';
+import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { KycDocs, KycStatus } from '@/types';
 
@@ -129,13 +129,16 @@ function EntryCard({ entry, kind, onTransition, pending }: { entry: KycEntry; ki
   );
 }
 
-function DriversQueue({ filter }: { filter: Filter }) {
+function DriversQueue({ filter, q }: { filter: Filter; q: string }) {
   const driversQuery = useDrivers();
   const updateKyc = useUpdateDriverKyc();
   if (driversQuery.isPending) return <LoadingSkeleton rows={4} />;
   if (driversQuery.isError) return <ErrorState title="Couldn't load drivers" message="Check your connection and try again." onRetry={() => void driversQuery.refetch()} />;
-  const rows = (driversQuery.data ?? []).filter((d) => matchesFilter(d.kycStatus, filter));
-  if (rows.length === 0) return <EmptyState title="Nothing here" message="No drivers match this filter." />;
+  const term = q.trim().toLowerCase();
+  const rows = (driversQuery.data ?? [])
+    .filter((d) => matchesFilter(d.kycStatus, filter))
+    .filter((d) => !term || d.fullName.toLowerCase().includes(term) || (d.phone ?? '').toLowerCase().includes(term) || (d.email ?? '').toLowerCase().includes(term));
+  if (rows.length === 0) return <EmptyState title="Nothing here" message={term ? 'No drivers match that search.' : 'No drivers match this filter.'} />;
   return (
     <div className="space-y-3">
       {rows.map((d) => (
@@ -151,13 +154,16 @@ function DriversQueue({ filter }: { filter: Filter }) {
   );
 }
 
-function AgentsQueue({ filter }: { filter: Filter }) {
+function AgentsQueue({ filter, q }: { filter: Filter; q: string }) {
   const agentsQuery = useAgents();
   const updateKyc = useUpdateAgentKyc();
   if (agentsQuery.isPending) return <LoadingSkeleton rows={4} />;
   if (agentsQuery.isError) return <ErrorState title="Couldn't load agents" message="Check your connection and try again." onRetry={() => void agentsQuery.refetch()} />;
-  const rows = (agentsQuery.data ?? []).filter((a) => matchesFilter(a.kycStatus, filter));
-  if (rows.length === 0) return <EmptyState title="Nothing here" message="No agents match this filter." />;
+  const term = q.trim().toLowerCase();
+  const rows = (agentsQuery.data ?? [])
+    .filter((a) => matchesFilter(a.kycStatus, filter))
+    .filter((a) => !term || a.fullName.toLowerCase().includes(term) || (a.phone ?? '').toLowerCase().includes(term) || (a.email ?? '').toLowerCase().includes(term));
+  if (rows.length === 0) return <EmptyState title="Nothing here" message={term ? 'No agents match that search.' : 'No agents match this filter.'} />;
   return (
     <div className="space-y-3">
       {rows.map((a) => (
@@ -182,6 +188,7 @@ function AgentsQueue({ filter }: { filter: Filter }) {
 export function KycReviewPage() {
   const [subject, setSubject] = useState<'drivers' | 'agents'>('drivers');
   const [filter, setFilter] = useState<Filter>('needs_review');
+  const [q, setQ] = useState('');
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
@@ -204,7 +211,9 @@ export function KycReviewPage() {
         ))}
       </div>
 
-      {subject === 'drivers' ? <DriversQueue filter={filter} /> : <AgentsQueue filter={filter} />}
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone or email" aria-label="Search KYC queue" />
+
+      {subject === 'drivers' ? <DriversQueue filter={filter} q={q} /> : <AgentsQueue filter={filter} q={q} />}
     </main>
   );
 }
