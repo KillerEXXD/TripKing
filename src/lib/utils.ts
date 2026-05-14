@@ -98,3 +98,19 @@ export function haversineKm(
       Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+
+/** Rough average road speed (km/h) used by `etaLabel` when turning km-remaining into an ETA. */
+export const ASSUMED_DRIVING_KMH = 40;
+
+/**
+ * "~12 min" / "~1 hr" / "~2 hr 15 min" — a coarse ETA from a straight-line km figure.
+ * Used on the trip-tracking card + the agent's in-progress trip cards. The 40 km/h
+ * assumption is intentionally pessimistic for mixed-traffic Indian highway driving.
+ */
+export function etaLabel(km: number): string {
+  const mins = Math.max(1, Math.round((km / ASSUMED_DRIVING_KMH) * 60));
+  if (mins < 60) return `~${mins} min`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return m === 0 ? `~${h} hr` : `~${h} hr ${m} min`;
+}

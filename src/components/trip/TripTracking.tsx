@@ -1,18 +1,7 @@
 import { Car, Clock, ExternalLink, MapPin, Navigation } from 'lucide-react';
 import { Card } from '@/components/ui';
-import { cn, formatKm } from '@/lib/utils';
+import { cn, etaLabel, formatKm } from '@/lib/utils';
 import type { Trip } from '@/types';
-
-/** Rough average speed (km/h) used to turn "km remaining" into an ETA. */
-const ASSUMED_KMH = 40;
-
-function etaLabel(km: number): string {
-  const mins = Math.max(1, Math.round((km / ASSUMED_KMH) * 60));
-  if (mins < 60) return `~${mins} min`;
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  return m === 0 ? `~${h} hr` : `~${h} hr ${m} min`;
-}
 function freshness(iso?: string): string | null {
   if (!iso) return null;
   const t = new Date(iso).getTime();
