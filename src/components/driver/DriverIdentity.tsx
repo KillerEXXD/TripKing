@@ -1,4 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { cn } from '@/lib/utils';
 import type { Driver, DriverPublic, DriverSummary, AssignedDriver } from '@/types';
 
@@ -31,9 +32,15 @@ export function DriverIdentity({ driver, size = 'md', sub, className }: DriverId
   const handle = (driver && 'displayHandle' in driver ? driver.displayHandle : '') || '';
   const fullName = (driver && 'fullName' in driver ? driver.fullName : undefined) || undefined;
   const profilePhotoUrl = (driver && 'profilePhotoUrl' in driver ? driver.profilePhotoUrl : undefined) || undefined;
+  // KYC-approved drivers earn the inline Verified badge. Pre-reveal shapes
+  // (DriverSummary / AssignedDriver) don't carry kycStatus — those rows simply
+  // don't show the badge (the server still gates `apply` / `start` on KYC).
+  const kycStatus = (driver && 'kycStatus' in driver ? driver.kycStatus : undefined) || undefined;
+  const isVerified = kycStatus === 'approved';
   const primary = fullName ?? (handle ? `Driver ${handle}` : 'Driver');
   const avatarSize = size === 'lg' ? 'size-16' : size === 'sm' ? 'size-8' : 'size-10';
   const nameSize = size === 'lg' ? 'text-xl font-bold' : 'text-sm font-semibold';
+  const badgeSize = size === 'lg' ? 'sm' : 'xs';
   return (
     <div className={cn('flex min-w-0 items-center gap-3', className)}>
       <Avatar className={avatarSize}>
@@ -41,7 +48,10 @@ export function DriverIdentity({ driver, size = 'md', sub, className }: DriverId
         <AvatarFallback>{initials(fullName ?? handle)}</AvatarFallback>
       </Avatar>
       <div className="min-w-0">
-        <div className={cn('truncate', nameSize)}>{primary}</div>
+        <div className={cn('flex min-w-0 items-center gap-1.5')}>
+          <span className={cn('truncate', nameSize)}>{primary}</span>
+          {isVerified ? <VerifiedBadge size={badgeSize} tone="emerald" /> : null}
+        </div>
         {fullName && handle ? (
           <div className="font-mono text-[11px] uppercase tracking-wide text-secondary">{handle}</div>
         ) : null}

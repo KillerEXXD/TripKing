@@ -311,6 +311,7 @@ function PostedBy({ trip }: { trip: Trip }) {
       <AgentIdentity
         handle={trip.postedByHandle}
         name={trip.postedByName}
+        kycStatus={trip.postedByKycStatus}
         size="lg"
         sub={
           <div className="flex items-center gap-1.5">

@@ -106,6 +106,10 @@ export function transformTrip(api: Api): Trip {
     postedByHandle: reqStr(api.posted_by_handle, 'MISSING_FIELD', { ...ctx, field: 'posted_by_handle' }),
     postedByName: str(api.posted_by_name),
     postedByPhone: str(api.posted_by_phone),
+    // Optional — server includes it when known so cards can render the inline Verified badge.
+    postedByKycStatus: typeof api.posted_by_kyc_status === 'string'
+      ? (api.posted_by_kyc_status as Trip['postedByKycStatus'])
+      : undefined,
     fromCity: joinedCity(api.from_city, 'MISSING_FROM_CITY', ctx),
     toCity: joinedCity(api.to_city, 'MISSING_TO_CITY', ctx),
     fromPlace: maybePlace(api.from_place),

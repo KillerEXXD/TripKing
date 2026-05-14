@@ -25,35 +25,35 @@ describe('useTrip — live polling', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it('refetches every ~15s while the trip is in_progress, then stops once it completes', async () => {
+  it('refetches every ~5s while the trip is in_progress, then stops once it completes', async () => {
     vi.mocked(getTrip).mockResolvedValue(trip({ status: 'in_progress' }));
     const { result } = renderHook(() => useTrip('t1'), { wrapper: wrapper() });
     await tick(0);
     expect(getTrip).toHaveBeenCalledTimes(1);
     expect(result.current.data?.status).toBe('in_progress');
 
-    await tick(15_000);
+    await tick(5_000);
     expect(getTrip).toHaveBeenCalledTimes(2);
-    await tick(15_000);
+    await tick(5_000);
     expect(getTrip).toHaveBeenCalledTimes(3);
 
     // the trip finishes — the next poll returns `completed`; the interval (which keys off
     // the last result's status) then clears, so no further polls happen.
     vi.mocked(getTrip).mockResolvedValue(trip({ status: 'completed' }));
-    await tick(15_000);
+    await tick(5_000);
     expect(getTrip).toHaveBeenCalledTimes(4);
 
     await tick(60_000);
     expect(getTrip).toHaveBeenCalledTimes(4);
   });
 
-  it('does not poll for a trip that is merely assigned (not started)', async () => {
+  it('polls every ~15s for an assigned trip (driver awaiting OTP)', async () => {
     vi.mocked(getTrip).mockResolvedValue(trip({ status: 'assigned' }));
     renderHook(() => useTrip('t1'), { wrapper: wrapper() });
     await tick(0);
     expect(getTrip).toHaveBeenCalledTimes(1);
-    await tick(60_000);
-    expect(getTrip).toHaveBeenCalledTimes(1);
+    await tick(15_000);
+    expect(getTrip).toHaveBeenCalledTimes(2);
   });
 
   it('is disabled when no id is given', () => {

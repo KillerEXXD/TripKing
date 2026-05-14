@@ -50,6 +50,8 @@ export interface Trip {
   /** The poster's name. Absent on a browse view to a viewer who hasn't applied; revealed once `can_reveal_agent` fires. */
   postedByName?: string;
   postedByPhone?: string;
+  /** The poster's KYC status — feeds the inline "Verified" badge on cards. Server sends this even pre-reveal. */
+  postedByKycStatus?: KycStatus;
   fromCity: CityRow;
   toCity: CityRow;
   /** Precise pickup / drop points, when the poster pinned them (alongside `fromCity` / `toCity`). */
@@ -156,6 +158,8 @@ export interface DriverSummary {
   totalTripsCompleted: number;
   topTags: string[];
   currentCity?: CityRow;
+  /** Optional — present on summaries the server enriches with trust signals (vacancy.driver). */
+  kycStatus?: KycStatus;
 }
 export interface VehicleSummary {
   id: string;
