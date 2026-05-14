@@ -93,7 +93,7 @@ function ApplicantCard({
       {acceptance.decisionNote ? <p className="text-xs text-secondary">Note: {acceptance.decisionNote}</p> : null}
       {canAct && acceptance.status === 'applied' ? (
         <div className="flex gap-2">
-          <Button variant="full" size="sm" onClick={onAssign} disabled={assigning || rejecting}>
+          <Button className="flex-1 bg-black text-white hover:bg-black/90" size="sm" onClick={onAssign} disabled={assigning || rejecting}>
             {assigning ? 'Selecting…' : 'Select this driver'}
           </Button>
           <Button variant="outline" size="sm" onClick={onReject} disabled={assigning || rejecting}>
