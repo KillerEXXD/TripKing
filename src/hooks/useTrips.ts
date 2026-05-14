@@ -30,8 +30,51 @@ function staleForStatus(status?: TripStatus | TripStatus[]): number {
   return arr.length > 0 && arr.every((s) => s === 'completed' || s === 'cancelled') ? STALE.immutable : STALE.live;
 }
 
+/**
+ * Per-status poll cadence. Tight during the two-step handshake so an agent
+ * picking a driver sees the driver's Accept (or decline / cron-expiry) within
+ * a few seconds; same in reverse for the driver waiting on the agent. Slower
+ * for idle states; off entirely for terminal states. Returned as ms or false.
+ */
+function pollIntervalFor(status: TripStatus | undefined): number | false {
+  switch (status) {
+    case 'selected':       // critical window — handshake is live, both sides watching
+      return 5_000;
+    case 'in_progress':    // live tracking — driver position + ETA
+      return 5_000;
+    case 'has_applicants': // agent is hovering on the applicants page
+    case 'assigned':       // assigned but not yet driving; passenger waiting for OTP
+      return 15_000;
+    case 'open':           // fresh post, agent watching for first applicant
+      return 30_000;
+    case 'completed':
+    case 'cancelled':
+    default:
+      return false;
+  }
+}
+/** True iff the data shape says "this query is actively polling" — drives the <LiveDot> indicator. */
+export function isTripLive(status: TripStatus | undefined): boolean {
+  return pollIntervalFor(status) !== false;
+}
+
 export function useTrips(params?: TripsQueryParams) {
-  return useQuery({ queryKey: ['trips', params ?? {}], queryFn: () => getTrips(params), staleTime: staleForStatus(params?.status) });
+  return useQuery({
+    queryKey: ['trips', params ?? {}],
+    queryFn: () => getTrips(params),
+    staleTime: staleForStatus(params?.status),
+    // Lists: poll while any row could still change. We pick the tightest interval that
+    // matches the filter — selected/in_progress lists tick at 5s, others at 15s. If the
+    // caller filtered to terminal states only (completed/cancelled), polling is off.
+    refetchInterval: () => {
+      const arr = Array.isArray(params?.status) ? params!.status : params?.status ? [params.status] : [];
+      if (arr.length === 0) return 15_000; // mixed / no filter — agent's posted-trips list
+      const intervals = arr.map((s) => pollIntervalFor(s as TripStatus)).filter((n): n is number => typeof n === 'number');
+      if (intervals.length === 0) return false;
+      return Math.min(...intervals);
+    },
+    refetchOnWindowFocus: true,
+  });
 }
 export function useTrip(id: string | undefined) {
   return useQuery({
@@ -39,8 +82,8 @@ export function useTrip(id: string | undefined) {
     queryFn: () => getTrip(id as string),
     enabled: !!id,
     staleTime: STALE.live,
-    // While the trip is running, poll so the live-tracking panel (driver position + ETA) stays current.
-    refetchInterval: (query) => (query.state.data?.status === 'in_progress' ? 15_000 : false),
+    refetchInterval: (query) => pollIntervalFor(query.state.data?.status as TripStatus | undefined),
+    refetchOnWindowFocus: true,
   });
 }
 /**
@@ -62,11 +105,27 @@ export function useTripByOtp(otp: string | undefined) {
   });
 }
 export function useTripApplicants(tripId: string | undefined) {
-  return useQuery({ queryKey: ['trip', tripId, 'applicants'], queryFn: () => getTripApplicants(tripId as string), enabled: !!tripId, staleTime: STALE.live });
+  return useQuery({
+    queryKey: ['trip', tripId, 'applicants'],
+    queryFn: () => getTripApplicants(tripId as string),
+    enabled: !!tripId,
+    staleTime: STALE.live,
+    // Applicants list is the screen the agent picks from — poll so a new applicant
+    // shows up within ~15s and a withdrawn one disappears just as fast.
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
 }
 /** The caller's own trip applications (`GET /trips/applied`) — "my applications"; `[]` if they have no driver profile. */
 export function useMyApplications() {
-  return useQuery({ queryKey: ['trips', 'applied'], queryFn: getMyApplications, staleTime: STALE.live });
+  return useQuery({
+    queryKey: ['trips', 'applied'],
+    queryFn: getMyApplications,
+    staleTime: STALE.live,
+    // Driver's "Applied" tab — needs to flip into 'selected' fast when the agent picks them.
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 const useInvalidateTrips = createInvalidator('trips', 'trip');
