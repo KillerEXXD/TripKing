@@ -1,8 +1,9 @@
 import type { ComponentType, SVGProps } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ClipboardList, Home, Plus, Search } from 'lucide-react';
+import { Bell, ClipboardList, Home, Plus } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { FindDriverIcon } from '@/components/icons/FindDriverIcon';
+import { BrowseTripsIcon } from '@/components/icons/BrowseTripsIcon';
 import { cn } from '@/lib/utils';
 
 type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -14,6 +15,11 @@ interface NavItem {
   to: string;
   /** Emphasised centre action (the ⊕ Post pill). */
   primary?: boolean;
+  /** Render the icon at the larger 28 px size — used when the icon carries the
+   *  full meaning so we drop the text label. */
+  bigIcon?: boolean;
+  /** Hide the text label below the icon. The bigger icon stands in for it. */
+  hideLabel?: boolean;
   match: (path: string) => boolean;
 }
 
@@ -21,7 +27,7 @@ interface NavItem {
 // Profile lives in the top-right avatar (not the bottom nav), consistent across all 3 roles.
 const DRIVER_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
-  { id: 'browse', label: 'Browse', Icon: Search, to: '/trips', match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
+  { id: 'browse', label: 'Find trips', Icon: BrowseTripsIcon, to: '/trips', bigIcon: true, hideLabel: true, match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
   { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, match: (p) => p === '/trips/new' },
   { id: 'mine', label: 'My trips', Icon: ClipboardList, to: '/my-trips', match: (p) => p === '/my-trips' || p === '/posted-trips' },
 ];
@@ -29,13 +35,13 @@ const AGENT_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
   { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, match: (p) => p === '/trips/new' },
   { id: 'mine', label: 'My posts', Icon: ClipboardList, to: '/posted-trips', match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
-  { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
+  { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', bigIcon: true, hideLabel: true, match: (p) => p.startsWith('/vacancies') },
 ];
 // Admins oversee the marketplace — they don't post or run trips, so no Post / My trips tabs.
 const ADMIN_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
-  { id: 'browse', label: 'Browse', Icon: Search, to: '/trips', match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
-  { id: 'find', label: 'Drivers', Icon: FindDriverIcon, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
+  { id: 'browse', label: 'Find trips', Icon: BrowseTripsIcon, to: '/trips', bigIcon: true, hideLabel: true, match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
+  { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', bigIcon: true, hideLabel: true, match: (p) => p.startsWith('/vacancies') },
   { id: 'alerts', label: 'Notifications', Icon: Bell, to: '/notifications', match: (p) => p.startsWith('/notifications') },
 ];
 
@@ -80,8 +86,8 @@ export function BottomNav() {
             aria-current={isActive ? 'page' : undefined}
             className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors', isActive ? 'text-primary' : 'text-secondary hover:text-foreground')}
           >
-            <it.Icon className="size-5" aria-hidden />
-            <span className="text-[10px] font-medium">{it.label}</span>
+            <it.Icon className={it.bigIcon ? 'size-7' : 'size-5'} aria-hidden />
+            {it.hideLabel ? null : <span className="text-[10px] font-medium">{it.label}</span>}
           </button>
         );
       })}
