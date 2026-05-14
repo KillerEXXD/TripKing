@@ -85,6 +85,23 @@ export function assignDriver(tripId: string, acceptanceId: string): Promise<Trip
   return apiClient.post<Api>(`/trips/${tripId}/assign`, { acceptance_id: acceptanceId }).then((r) => transformTrip(unwrap(r.data)));
 }
 
+// Phase 2 of the two-step handshake (docs/TRIP_ASSIGNMENT_WORKFLOW.md §8).
+// The selected driver Accepts → OTP is generated, trip flips to 'assigned'.
+export function acceptTrip(tripId: string): Promise<Trip> {
+  return apiClient.post<Api>(`/trips/${tripId}/accept`, {}).then((r) => transformTrip(unwrap(r.data)));
+}
+
+// Selected driver Declines → trip falls back to has_applicants (this driver is out of the pool).
+export function declineTrip(tripId: string, reason?: string): Promise<Trip> {
+  return apiClient.post<Api>(`/trips/${tripId}/decline`, reason ? { reason } : {}).then((r) => transformTrip(unwrap(r.data)));
+}
+
+// Trip creator withdraws the selection / assignment → trip falls back to has_applicants
+// (the driver's acceptance row goes back to 'applied' — they're still in the pool).
+export function cancelAssignment(tripId: string, reason?: string): Promise<Trip> {
+  return apiClient.post<Api>(`/trips/${tripId}/cancel-assignment`, reason ? { reason } : {}).then((r) => transformTrip(unwrap(r.data)));
+}
+
 export function startTrip(tripId: string, input: { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number }): Promise<Trip> {
   return apiClient
     .post<Api>(`/trips/${tripId}/start`, {

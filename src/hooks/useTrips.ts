@@ -2,10 +2,13 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
+  acceptTrip,
   applyToTrip,
   assignDriver,
+  cancelAssignment,
   cancelTrip,
   completeTrip,
+  declineTrip,
   getMyApplications,
   getTrip,
   getTripApplicants,
@@ -90,6 +93,30 @@ export function useAssignDriver() {
   const invalidate = useInvalidateTrips();
   return useMutation({
     mutationFn: ({ tripId, acceptanceId }: { tripId: string; acceptanceId: string }) => assignDriver(tripId, acceptanceId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+/** Phase 2 of the two-step handshake — the selected driver Accepts (OTP is generated, trip → assigned). */
+export function useAcceptTrip() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId }: { tripId: string }) => acceptTrip(tripId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+/** Selected driver Declines — trip falls back to has_applicants; this driver is out of the pool. */
+export function useDeclineTrip() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: string; reason?: string }) => declineTrip(tripId, reason),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+/** Trip creator withdraws the selection/assignment — the driver's row goes back to 'applied'. */
+export function useCancelAssignment() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: string; reason?: string }) => cancelAssignment(tripId, reason),
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
 }

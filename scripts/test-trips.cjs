@@ -122,9 +122,22 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const mineApp = (applied.json?.data || []).find((a) => a.trip_id === tid);
   check('GET /trips/applied (driver) → contains my application + its browse-safe joined trip', applied.status === 200 && !!mineApp && mineApp.id === aid && !!mineApp.trip?.from_city?.name && !has(mineApp.trip, 'passenger_phone'), `${JSON.stringify(applied.json?.data || applied.json?.error || '').slice(0, 200)}`);
 
+  // Phase 2 of the two-step handshake: assign now produces `selected` (NOT `assigned`) and does
+  // not generate the OTP — the driver must POST /accept first.
   const assign = await j('POST', `/trips/${tid}/assign`, { token, body: { acceptance_id: aid } });
-  const otp = assign.json?.data?.passenger_otp;
-  check('POST /trips/:id/assign → 200 + status assigned + passenger_otp', assign.status === 200 && assign.json?.data?.status === 'assigned' && !!otp, `status=${assign.status} ${JSON.stringify(assign.json?.error || '')}`);
+  check('POST /trips/:id/assign → 200 + status selected + deadline + no OTP yet (handshake Phase 2)',
+    assign.status === 200
+      && assign.json?.data?.status === 'selected'
+      && typeof assign.json?.data?.acceptance_deadline_at === 'string'
+      && assign.json?.data?.driver_acceptance_status === 'pending'
+      && !assign.json?.data?.passenger_otp,
+    `status=${assign.status} ${JSON.stringify(assign.json?.data || assign.json?.error || '')}`);
+  // The driver Accepts → trip flips to `assigned` + the passenger OTP is generated.
+  const accept = await j('POST', `/trips/${tid}/accept`, { token: dToken });
+  const otp = accept.json?.data?.passenger_otp;
+  check('POST /trips/:id/accept (selected driver) → 200 + status assigned + passenger_otp',
+    accept.status === 200 && accept.json?.data?.status === 'assigned' && !!otp,
+    `status=${accept.status} ${JSON.stringify(accept.json?.data || accept.json?.error || '')}`);
 
   // ── PII redaction on GET /trips/:id (trip now assigned) ────────────────
   const pPoster = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
@@ -198,7 +211,8 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
     const hidden = await j('POST', '/trips', { token, body: { ...baseTrip, passenger_phone: '+919999999999', hide_passenger_phone: true, pickup_at: futureIso(2) } });
     const hTid = hidden.json?.data?.id;
     const hAid = (await j('POST', `/trips/${hTid}/applicants`, { token: dToken, body: {} })).json?.data?.id;
-    const hOtp = (await j('POST', `/trips/${hTid}/assign`, { token, body: { acceptance_id: hAid } })).json?.data?.passenger_otp;
+    await j('POST', `/trips/${hTid}/assign`, { token, body: { acceptance_id: hAid } });
+    const hOtp = (await j('POST', `/trips/${hTid}/accept`, { token: dToken })).json?.data?.passenger_otp;
     await j('POST', `/trips/${hTid}/start`, { token: dToken, body: { passenger_otp: hOtp } });
     const hDriverView = (await j('GET', `/trips/${hTid}`, { token: dToken })).json?.data || {};
     check('hide_passenger_phone=true: assigned driver sees passenger_name but NOT passenger_phone', hDriverView.passenger_name === 'Smoke Pax' && !has(hDriverView, 'passenger_phone'), `${JSON.stringify({ n: hDriverView.passenger_name, ph: hDriverView.passenger_phone })}`);
