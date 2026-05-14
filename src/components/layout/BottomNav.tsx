@@ -67,14 +67,14 @@ export function BottomNav() {
   const activeId = items.find((it) => it.match(pathname))?.id;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t bg-white pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch justify-around border-t bg-white pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
       {items.map((it) => {
         const isActive = it.id === activeId;
         if (it.primary) {
           return (
             <button key={it.id} type="button" onClick={() => navigate(it.to)} aria-label={it.label} aria-current={isActive ? 'page' : undefined} className="-mt-3 flex flex-col items-center justify-center gap-0.5 px-3 py-1.5">
               <span className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
-                <it.Icon className="size-6" aria-hidden />
+                <it.Icon className="size-7" aria-hidden />
               </span>
               {it.hideLabel ? null : <span className="text-[10px] font-semibold text-primary">{it.label}</span>}
             </button>
@@ -89,7 +89,7 @@ export function BottomNav() {
             aria-current={isActive ? 'page' : undefined}
             className={cn('flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors', isActive ? 'text-primary' : 'text-secondary hover:text-foreground')}
           >
-            <it.Icon className={it.bigIcon ? 'size-7' : 'size-5'} aria-hidden />
+            <it.Icon className={it.bigIcon ? 'size-8' : 'size-7'} aria-hidden />
             {it.hideLabel ? null : <span className="text-[10px] font-medium">{it.label}</span>}
           </button>
         );
