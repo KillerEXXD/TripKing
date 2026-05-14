@@ -225,7 +225,7 @@ function AvailabilitySummaryCard({ count, max }: { count: number; max: number })
           <Hand className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">You're showing as available ({count}/{max})</div>
+          <div className="text-sm font-semibold">You&apos;re showing as vacant ({count}/{max})</div>
           <div className="truncate text-xs text-secondary">Agents can find you in the driver feed. Tap to manage.</div>
         </div>
         <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />

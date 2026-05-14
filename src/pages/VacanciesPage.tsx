@@ -51,7 +51,7 @@ function VacancyCard({ vacancy, canInvite }: { vacancy: Vacancy; canInvite: bool
         {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
       </div>
       <div className="text-xs text-secondary">
-        <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Available in {vacancy.currentPlace?.name ?? vacancy.currentCity.name} · {availableLabel(vacancy)}
+        <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Vacant in {vacancy.currentPlace?.name ?? vacancy.currentCity.name} · {availableLabel(vacancy)}
         {vacancy.distanceKm != null ? ` · ${vacancy.distanceKm} km away` : ''}
       </div>
       {vacancy.destinationCities.length > 0 ? (
@@ -254,7 +254,7 @@ export function VacanciesPage() {
         {vacanciesQuery.isPending ? (
           <LoadingSkeleton rows={5} />
         ) : vacanciesQuery.isError ? (
-          <ErrorState title="Couldn't load available drivers" message="Check your connection and try again." onRetry={() => void vacanciesQuery.refetch()} />
+          <ErrorState title="Couldn't load vacant drivers" message="Check your connection and try again." onRetry={() => void vacanciesQuery.refetch()} />
         ) : vacancies.length === 0 ? (
           <EmptyState
             icon={<Star className="size-7" />}
