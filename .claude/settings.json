@@ -5,5 +5,15 @@
       "c:/Apps/hudr-workspace/hudr-pwa",
       "c:/Apps/DriverMahal"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/scripts/mcp-health-check.js" }
+        ]
+      }
+    ]
   }
 }
