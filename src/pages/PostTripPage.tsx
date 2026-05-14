@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
@@ -14,6 +14,7 @@ import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
 import { Button, Card, Input } from '@/components/ui';
+import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
 import type { Place, PostTripInput, Trip, TripType, WaypointInput } from '@/types';
@@ -111,7 +112,7 @@ export function PostTripPage() {
   const [passengerSectionOpen, setPassengerSectionOpen] = useState(false);
   const passengerSectionRef = useRef<HTMLDivElement>(null);
 
-  const { register, handleSubmit, watch, setValue, getValues, trigger, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
+  const { register, handleSubmit, watch, setValue, getValues, trigger, formState, control } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
 
   useEffect(() => {
@@ -411,15 +412,23 @@ export function PostTripPage() {
                 </div>
               )}
               <Field label={tripType === 'one_way' ? 'Pickup date & time' : 'Trip starts (date & time)'} error={errors.pickupAt?.message}>
-                <Input type="datetime-local" {...register('pickupAt', { required: 'Set the start time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Start time must be in the future' })} />
+                <Controller
+                  control={control}
+                  name="pickupAt"
+                  rules={{ required: 'Set the start time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Start time must be in the future' }}
+                  render={({ field, fieldState }) => (
+                    <DateTimeField
+                      id="pickupAt"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  )}
+                />
               </Field>
               {tripType !== 'one_way' ? (
                 <Field label="Trip ends (date & time)" hint={tripType === 'round_trip' ? 'When the driver is back at the start city.' : 'Auto-fills from the last destination — you can override.'}>
-                  <Input
-                    type="datetime-local"
-                    value={expectedEndAt}
-                    onChange={(e) => setExpectedEndAt(e.target.value)}
-                  />
+                  <DateTimeField value={expectedEndAt} onChange={setExpectedEndAt} />
                 </Field>
               ) : null}
               <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message} hint="Worked out from the route — you don't need to enter it">
