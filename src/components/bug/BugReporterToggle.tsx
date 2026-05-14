@@ -6,9 +6,9 @@ import { useSetCanReportBugs } from '@/hooks/useBugReports';
 /**
  * Admin per-user toggle for `users.can_report_bugs`. Optimistic — flips
  * locally on click so the affordance stays responsive, then reverts on
- * mutation failure. Since GET /drivers / /agents don't return the flag in
- * the current contract, callers pass the initial value via `initial`
- * (default `false`); admin can flip either way.
+ * mutation failure. The initial state comes from `initial` (the driver /
+ * agent admin GETs surface `canReportBugs` so the toggle is truthful);
+ * defaults to `false` for callsites that don't yet have it.
  */
 export interface BugReporterToggleProps {
   userId: string;

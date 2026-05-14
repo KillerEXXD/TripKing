@@ -2264,7 +2264,7 @@
         "tags": [
           "drivers"
         ],
-        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries; kyc_status accepts a CSV (the admin KYC queue). Deactivated drivers are excluded by default (pass active=false for only-deactivated, or include_inactive=true for all). When near_lat+near_lng+radius_km are all given, the list is restricted to drivers whose (non-stale, ≤30 min old) current position is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
+        "summary": "List driver profiles (public) — joins home/current city + vehicle summaries; rows carry `can_report_bugs` (from users) so admin UIs render the BugReporterToggle truthfully; kyc_status accepts a CSV (the admin KYC queue). Deactivated drivers are excluded by default (pass active=false for only-deactivated, or include_inactive=true for all). When near_lat+near_lng+radius_km are all given, the list is restricted to drivers whose (non-stale, ≤30 min old) current position is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
         "parameters": [
           {
             "name": "current_city_id",
@@ -2808,7 +2808,7 @@
         "tags": [
           "agents"
         ],
-        "summary": "List agent (trip-manager) profiles (public) — deactivated agents are excluded by default (pass active=false for only-deactivated, or include_inactive=true for all)",
+        "summary": "List agent (trip-manager) profiles (public) — rows carry `can_report_bugs` (from users) so admin UIs render the BugReporterToggle truthfully; deactivated agents are excluded by default (pass active=false for only-deactivated, or include_inactive=true for all)",
         "parameters": [
           {
             "name": "business_city_id",

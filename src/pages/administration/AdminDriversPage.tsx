@@ -77,7 +77,7 @@ function DriverCard({ d }: { d: Driver }) {
       </div>
       {d.userId ? (
         <div className="flex justify-end">
-          <BugReporterToggle userId={d.userId} />
+          <BugReporterToggle userId={d.userId} initial={d.canReportBugs} />
         </div>
       ) : null}
     </Card>

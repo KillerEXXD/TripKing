@@ -57,7 +57,7 @@ function purgeVacanciesFor(driverId: string): void {
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
 const DRIVER_SELECT =
-  '*, user:users!user_id(display_handle), home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
+  '*, user:users!user_id(display_handle, can_report_bugs), home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
   'vehicles(id, year, seats, ac, is_primary, is_active, registration_number, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const AGENT_SELECT = '*, business_city:cities!business_city_id(*)';
 
@@ -120,12 +120,13 @@ const stripPrivateKyc = (drv: Row): Row => {
   for (const f of PRIVATE_KYC_FIELDS) delete out[f];
   return out;
 };
-/** Flatten the joined `user:{display_handle}` onto the row as `display_handle`. Non-mutating. */
+/** Flatten the joined `user:{display_handle, can_report_bugs}` onto the row. Non-mutating. */
 function flattenHandle(row: Row | null | undefined): Row | null {
   if (!row) return (row ?? null) as null;
   const out = { ...row };
   const u = out.user as Record<string, unknown> | null | undefined;
   out.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
+  out.can_report_bugs = u && typeof u.can_report_bugs === 'boolean' ? u.can_report_bugs : false;
   delete out.user;
   return out;
 }

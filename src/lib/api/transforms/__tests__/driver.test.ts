@@ -19,7 +19,7 @@ describe('transformDriver', () => {
     const d = transformDriver({
       id: 'd1',
       user_id: 'u1',
-      display_handle: 'A1B2C3D',
+      display_handle: 'A1B2C3D', can_report_bugs: false,
       full_name: 'Ravi Kumar',
       phone: '+919999999999',
       home_city: city('c1', 'Vellore'),
@@ -46,19 +46,19 @@ describe('transformDriver', () => {
     expect(d.vehicles[0]?.carTypeLabel).toBe('Innova');
   });
   it('defaults missing optionals and throws on missing id / user_id', () => {
-    const d = transformDriver({ id: 'd2', user_id: 'u2', display_handle: 'A1B2C3D', });
+    const d = transformDriver({ id: 'd2', user_id: 'u2', display_handle: 'A1B2C3D', can_report_bugs: false, });
     expect(d.homeCity).toBeUndefined();
     expect(d.homePlace).toBeUndefined();
     expect(d.currentPlace).toBeUndefined();
     expect(d.distanceKm).toBeUndefined();
     expect(d.vehicles).toEqual([]);
     expect(d.ratingDistribution).toEqual({ '1': 0, '2': 0, '3': 0, '4': 0, '5': 0 });
-    expect(() => transformDriver({ user_id: 'u2', display_handle: 'A1B2C3D', })).toThrow(DriverTransformError);
+    expect(() => transformDriver({ user_id: 'u2', display_handle: 'A1B2C3D', can_report_bugs: false, })).toThrow(DriverTransformError);
     expect(() => transformDriver({ id: 'd2' })).toThrow(/MISSING_USER_ID/);
   });
   it('maps the joined current_place / home_place and a radius-list distance_km', () => {
     const place = (id: string, name: string, lat: number, lng: number) => ({ id, provider: 'nominatim', provider_place_id: `N${id}`, name, formatted_address: `${name}, India`, state: 'Tamil Nadu', country: 'IN', lat, lng, is_active: true, created_at: '2026-05-26T00:00:00Z' });
-    const d = transformDriver({ id: 'd3', user_id: 'u3', display_handle: 'A1B2C3D', home_place: place('p1', 'Katpadi', 12.97, 79.13), current_place: place('p2', 'Guindy, Chennai', 13.01, 80.21), current_lat: 13.01, current_lng: 80.21, distance_km: 2.4 });
+    const d = transformDriver({ id: 'd3', user_id: 'u3', display_handle: 'A1B2C3D', can_report_bugs: false, home_place: place('p1', 'Katpadi', 12.97, 79.13), current_place: place('p2', 'Guindy, Chennai', 13.01, 80.21), current_lat: 13.01, current_lng: 80.21, distance_km: 2.4 });
     expect(d.homePlace?.name).toBe('Katpadi');
     expect(d.currentPlace?.name).toBe('Guindy, Chennai');
     expect(d.distanceKm).toBe(2.4);
@@ -68,7 +68,7 @@ describe('transformDriver', () => {
 describe('transformDriverPublic', () => {
   it('maps a redacted driver row (no identity fields) and keeps the handle', async () => {
     const { transformDriverPublic } = await import('@/lib/api/transforms/driver');
-    const d = transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001', rating_avg: 4.5, rating_count: 7, total_trips_completed: 12, top_tags: ['Polite'] });
+    const d = transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001', can_report_bugs: false, rating_avg: 4.5, rating_count: 7, total_trips_completed: 12, top_tags: ['Polite'] });
     expect(d.displayHandle).toBe('AFFE001');
     // identity fields are not on the public shape
     expect((d as unknown as Record<string, unknown>).fullName).toBeUndefined();
@@ -80,12 +80,23 @@ describe('transformDriverPublic', () => {
     expect(() => transformDriverPublic({ id: 'd9', user_id: 'u9' })).toThrow(DriverTransformError);
     expect(() => transformDriverPublic({ id: 'd9', user_id: 'u9' })).toThrow(/MISSING_DISPLAY_HANDLE/);
   });
+  it('throws MISSING_CAN_REPORT_BUGS when the API omits the bug-reporter flag', async () => {
+    const { transformDriverPublic } = await import('@/lib/api/transforms/driver');
+    expect(() => transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001' })).toThrow(/MISSING_CAN_REPORT_BUGS/);
+  });
+  it('carries can_report_bugs through to canReportBugs', async () => {
+    const { transformDriverPublic } = await import('@/lib/api/transforms/driver');
+    const on = transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001', can_report_bugs: true });
+    expect(on.canReportBugs).toBe(true);
+    const off = transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001', can_report_bugs: false });
+    expect(off.canReportBugs).toBe(false);
+  });
 });
 
 describe('transformAgentPublic', () => {
   it('maps a redacted agent row (no identity fields) and keeps the handle', async () => {
     const { transformAgentPublic } = await import('@/lib/api/transforms/driver');
-    const a = transformAgentPublic({ id: 'a9', user_id: 'u9', display_handle: 'AFFE002', business_name: 'A Travels', top_tags: [], total_trips_posted: 5 });
+    const a = transformAgentPublic({ id: 'a9', user_id: 'u9', display_handle: 'AFFE002', can_report_bugs: false, business_name: 'A Travels', top_tags: [], total_trips_posted: 5 });
     expect(a.displayHandle).toBe('AFFE002');
     expect((a as unknown as Record<string, unknown>).fullName).toBeUndefined();
     expect((a as unknown as Record<string, unknown>).phone).toBeUndefined();
@@ -94,7 +105,7 @@ describe('transformAgentPublic', () => {
 
 describe('transformAgent', () => {
   it('maps an agent with a joined business city', () => {
-    const a = transformAgent({ id: 'a1', user_id: 'u3', display_handle: 'A1B2C3D', full_name: 'Agent A', phone: '+91', business_name: 'A Travels', business_city: city('c1', 'Vellore'), kyc_status: 'approved', top_tags: ['Pays on time'], total_trips_posted: 120 });
+    const a = transformAgent({ id: 'a1', user_id: 'u3', display_handle: 'A1B2C3D', can_report_bugs: false, full_name: 'Agent A', phone: '+91', business_name: 'A Travels', business_city: city('c1', 'Vellore'), kyc_status: 'approved', top_tags: ['Pays on time'], total_trips_posted: 120 });
     expect(a.businessName).toBe('A Travels');
     expect(a.businessCity?.name).toBe('Vellore');
     expect(a.totalTripsPosted).toBe(120);
@@ -124,7 +135,7 @@ describe('transformDriver — verification block + KYC fields', () => {
   it('parses the server-computed verification block on GET /drivers/me', () => {
     const d = transformDriver({
       id: 'd1', user_id: 'u1', kyc_status: 'docs_submitted', aadhaar_number_masked: '••••1234', driver_license_number: 'TN09-2020-1', driver_license_expiry: '2031-01-01',
-      display_handle: 'A1B2C3D',
+      display_handle: 'A1B2C3D', can_report_bugs: false,
       verification: {
         kyc_status: 'docs_submitted',
         steps: { details: 'done', documents: 'done', vehicle: 'todo', vehicle_photos: 'todo', video_call: 'todo' },
@@ -144,10 +155,10 @@ describe('transformDriver — verification block + KYC fields', () => {
     expect(d.drivingLicenseNumber).toBe('TN09-2020-1');
   });
   it('leaves verification undefined when the API did not send it (public GET /drivers/:id)', () => {
-    expect(transformDriver({ id: 'd2', user_id: 'u2', display_handle: 'A1B2C3D', }).verification).toBeUndefined();
+    expect(transformDriver({ id: 'd2', user_id: 'u2', display_handle: 'A1B2C3D', can_report_bugs: false, }).verification).toBeUndefined();
   });
   it('coerces an unknown step status to "todo"', () => {
-    const d = transformDriver({ id: 'd3', user_id: 'u3', display_handle: 'A1B2C3D', verification: { kyc_status: 'pending', steps: { documents: 'weird' }, steps_done: 0, steps_total: 5 } });
+    const d = transformDriver({ id: 'd3', user_id: 'u3', display_handle: 'A1B2C3D', can_report_bugs: false, verification: { kyc_status: 'pending', steps: { documents: 'weird' }, steps_done: 0, steps_total: 5 } });
     expect(d.verification?.steps.documents).toBe('todo');
   });
 });

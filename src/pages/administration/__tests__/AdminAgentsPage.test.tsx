@@ -14,7 +14,7 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
     id: 'a1',
     userId: 'u1',
     fullName: 'Priya Ramesh',
-    displayHandle: 'A1B2C3D',
+    displayHandle: 'A1B2C3D', canReportBugs: false,
     phone: '+919876500000',
     email: 'priya@example.com',
     businessName: 'Priya Travels',
@@ -57,7 +57,7 @@ describe('AdminAgentsPage', () => {
     setAgents({
       rows: [
         makeAgent(),
-        makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A2B2C3D', kycStatus: 'pending', businessName: 'SP Tours', totalTripsPosted: 0 }),
+        makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A2B2C3D', canReportBugs: false, kycStatus: 'pending', businessName: 'SP Tours', totalTripsPosted: 0 }),
       ],
     });
     renderPage();
@@ -82,7 +82,7 @@ describe('AdminAgentsPage', () => {
     setAgents({
       rows: [
         makeAgent(),
-        makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A2B2C3D', phone: '+918000000000', email: 'suresh@example.com', businessName: 'SP Tours' }),
+        makeAgent({ id: 'a2', userId: 'u2', fullName: 'Suresh P', displayHandle: 'A2B2C3D', canReportBugs: false, phone: '+918000000000', email: 'suresh@example.com', businessName: 'SP Tours' }),
       ],
     });
     renderPage();

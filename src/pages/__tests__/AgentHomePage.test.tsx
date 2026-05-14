@@ -18,7 +18,7 @@ vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <di
 
 const agentUser: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
-const agent: Agent = { id: 'a1', userId: 'u1', fullName: 'Agent A', displayHandle: 'A1B2C3D', phone: '+91', businessName: 'A Travels', businessCity: city('c1', 'Vellore'), profilePhotoUrl: '', kycStatus: 'approved', topTags: [], totalTripsPosted: 12 };
+const agent: Agent = { id: 'a1', userId: 'u1', fullName: 'Agent A', displayHandle: 'A1B2C3D', canReportBugs: false, phone: '+91', businessName: 'A Travels', businessCity: city('c1', 'Vellore'), profilePhotoUrl: '', kycStatus: 'approved', topTags: [], totalTripsPosted: 12 };
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return { id: 't1', postedByUserId: 'u1', postedByRole: 'trip_manager', postedByName: 'Agent A', postedByHandle: 'A1B2C3D', fromCity: city('c1', 'Vellore'), toCity: city('c2', 'Chennai'), pickupAt: '2099-06-01T09:00:00Z', expectedDistanceKm: 140, carTypeId: 'ct1', seatsRequired: 4, acRequired: true, ratePerKm: 14, totalFare: 1960, commissionPct: 10, gstAmount: 98, driverBata: 300, extrasPaidByPassenger: true, driverPayout: 2200, passengerName: 'P', passengerPhone: '+91', passengerCount: 2, status: 'open', showFareToPassenger: true, hidePassengerPhone: false, applicantCount: 0, createdAt: '2099-05-30T00:00:00Z', ...over };
 }

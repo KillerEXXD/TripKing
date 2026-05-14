@@ -10,7 +10,7 @@ import type {
   VehicleSummary, VerificationStepStatus, VerificationSummary, VideoOutcome, VideoVerificationStatus,
 } from '@/types';
 
-export type DriverTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID' | 'MISSING_DISPLAY_HANDLE';
+export type DriverTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID' | 'MISSING_DISPLAY_HANDLE' | 'MISSING_CAN_REPORT_BUGS';
 export class DriverTransformError extends Error {
   constructor(message: string, public code: DriverTransformErrorCode, public context: Record<string, unknown> = {}) {
     super(message);
@@ -26,6 +26,10 @@ function reqStr(v: unknown, code: DriverTransformErrorCode, ctx: Api): string {
   const s = str(v);
   if (!s) throw new DriverTransformError(`missing ${code}`, code, ctx);
   return s;
+}
+function reqBool(v: unknown, code: DriverTransformErrorCode, ctx: Api): boolean {
+  if (typeof v !== 'boolean') throw new DriverTransformError(`missing ${code}`, code, ctx);
+  return v;
 }
 function num(v: unknown, fallback = 0): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v)) ? Number(v) : fallback;
@@ -161,6 +165,7 @@ export function transformDriverPublic(api: Api): DriverPublic {
     managerTopTags: strArray(api.manager_top_tags),
     totalTripsCompleted: num(api.total_trips_completed, 0),
     vehicles: Array.isArray(api.vehicles) ? (api.vehicles as Api[]).map(vehicleSummary) : [],
+    canReportBugs: reqBool(api.can_report_bugs, 'MISSING_CAN_REPORT_BUGS', { id }),
   };
 }
 
@@ -190,6 +195,7 @@ export function transformAgentPublic(api: Api): AgentPublic {
     kycStatus: (str(api.kyc_status) ?? 'pending') as KycStatus,
     topTags: strArray(api.top_tags),
     totalTripsPosted: num(api.total_trips_posted, 0),
+    canReportBugs: reqBool(api.can_report_bugs, 'MISSING_CAN_REPORT_BUGS', { id }),
   };
 }
 

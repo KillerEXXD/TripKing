@@ -16,7 +16,7 @@ function makeAgent(over: Partial<Agent> = {}): Agent {
     id: 'a1',
     userId: 'u1',
     fullName: 'Priya Ramesh',
-    displayHandle: 'AAGENT1',
+    displayHandle: 'AAGENT1', canReportBugs: false,
     phone: '+919876500001',
     businessName: 'PR Travels',
     businessCity: city('c1', 'Vellore'),

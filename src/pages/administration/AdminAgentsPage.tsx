@@ -64,7 +64,7 @@ function AgentCard({ a }: { a: Agent }) {
       </div>
       {a.userId ? (
         <div className="flex justify-end">
-          <BugReporterToggle userId={a.userId} />
+          <BugReporterToggle userId={a.userId} initial={a.canReportBugs} />
         </div>
       ) : null}
     </Card>
