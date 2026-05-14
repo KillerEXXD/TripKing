@@ -78,7 +78,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
  */
 export function PostedTripsPage() {
   const { user } = useAuth();
-  const [filter, setFilter] = useState<'all' | TripStatus>('all');
+  const [filter, setFilter] = useState<'all' | TripStatus>('open');
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
   const tripsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
 

@@ -95,6 +95,8 @@ describe('PostedTripsPage', () => {
   it('lists the caller\'s trips and filters by status', () => {
     setTrips({ data: [makeTrip({ id: 't1', status: 'open', fromCity: city('c1', 'Vellore') }), makeTrip({ id: 't2', status: 'completed', fromCity: city('c3', 'Bangalore') })] });
     renderPosted();
+    // Default filter is "Open" — switch to "All" to see both statuses
+    fireEvent.click(screen.getByRole('button', { name: /^all/i }));
     expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
     expect(screen.getByText(/bangalore → chennai/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^completed/i }));
@@ -114,6 +116,8 @@ describe('PostedTripsPage', () => {
   it('opens the share sheet from a card and links a needs-review trip to its applicants', () => {
     setTrips({ data: [makeTrip({ status: 'has_applicants', applicantCount: 2 })] });
     renderPosted();
+    // Default filter is "Open"; the has_applicants trip lives under "Needs review"
+    fireEvent.click(screen.getByRole('button', { name: /^needs review/i }));
     expect(screen.getByRole('link', { name: /review applicants/i })).toHaveAttribute('href', '/trips/t1/applicants');
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
     expect(screen.getByText('share modal')).toBeInTheDocument();
