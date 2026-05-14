@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Badge, Card } from '@/components/ui';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
+import { initials } from '@/lib/utils';
 
 interface AdminTile {
   to: string;
@@ -45,6 +46,14 @@ function Bellish({ count }: { count: number }) {
   );
 }
 
+function ProfileAvatar({ name }: { name: string }) {
+  return (
+    <Link to="/profile" aria-label="Your profile" className="flex size-9 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-sm font-bold text-primary hover:ring-2 hover:ring-primary/40">
+      <span>{name ? initials(name) : '?'}</span>
+    </Link>
+  );
+}
+
 function AdminTileCard({ tile }: { tile: AdminTile }) {
   return (
     <Link to={tile.to} className="flex flex-col gap-2 rounded-2xl border bg-white p-3.5 transition-colors hover:border-primary/40">
@@ -77,7 +86,10 @@ export function HomePage() {
             <Badge variant="info">Admin</Badge>
           </div>
         </div>
-        <Bellish count={unread} />
+        <div className="flex items-center gap-1">
+          <Bellish count={unread} />
+          <ProfileAvatar name={user?.displayName || user?.phone || 'Admin'} />
+        </div>
       </header>
 
       <div className="space-y-4 px-4 pb-4 pt-3">
