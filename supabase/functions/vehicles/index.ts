@@ -20,6 +20,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail as pgFailShared } from '../_shared/http.ts';
+import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 
 const pgFail = (e: { code?: string; message: string }) => pgFailShared(e, { fkAs: 'IN_USE' });
 
@@ -110,6 +111,7 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     delete b.eligibility_status; // derived, never stored
     const { data: created, error } = await db.from('vehicles').insert({ ...b, driver_id: did }).select('id').single();
     if (error) return pgFail(error);
+    await maybePromoteToReadyForApproval(db, 'driver', did);
     return returnVehicle(created.id as string);
   }
 
@@ -152,6 +154,7 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     if (Object.keys(b).length === 0) return fail('VALIDATION', 'Nothing to update', 422);
     const { error } = await db.from('vehicles').update(b).eq('id', id);
     if (error) return pgFail(error);
+    await maybePromoteToReadyForApproval(db, 'driver', owner.driverId);
     return returnVehicle(id);
   }
 

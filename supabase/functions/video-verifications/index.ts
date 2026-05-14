@@ -21,6 +21,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail as pgFailShared } from '../_shared/http.ts';
+import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 
 const pgFail = (e: { code?: string; message: string }) =>
   pgFailShared(e, { dupMessage: 'You already have a video call scheduled' });
@@ -188,18 +189,78 @@ const handler = withTiming('video-verifications', async (req: Request): Promise<
       face_match_confirmed: face, documents_confirmed: docs, liveness_check_passed: live, outcome, notes,
     }).eq('id', id);
     if (error) return pgFail(error);
-    const newKyc = outcome === 'approved' ? 'approved' : outcome === 'rejected' ? 'rejected' : 'resubmit_required';
-    await setSubjectKyc(db, kind, subjectId, { kyc_status: newKyc, kyc_reviewed_by: u.id, kyc_reviewed_at: now, kyc_rejection_reason: outcome === 'approved' ? null : notes });
+    // Positive outcome no longer auto-approves: it puts the subject in `ready_for_approval`
+    // (admin confirms with one click in the KYC detail page). Negative outcomes still terminate.
+    if (outcome === 'approved') {
+      await setSubjectKyc(db, kind, subjectId, { kyc_status: 'video_pending', kyc_reviewed_by: u.id, kyc_reviewed_at: now, kyc_rejection_reason: null });
+      await maybePromoteToReadyForApproval(db, kind, subjectId);
+    } else {
+      const newKyc = outcome === 'rejected' ? 'rejected' : 'resubmit_required';
+      await setSubjectKyc(db, kind, subjectId, { kyc_status: newKyc, kyc_reviewed_by: u.id, kyc_reviewed_at: now, kyc_rejection_reason: notes });
+    }
+    const { data: after } = await db.from(kind === 'driver' ? 'drivers' : 'trip_managers').select('kyc_status').eq('id', subjectId).maybeSingle();
+    const finalKyc = str((after as Row | null)?.kyc_status);
     if (subjectUserId) {
       await db.from('notifications').insert({
         user_id: subjectUserId,
         type: 'kyc_status_change',
         title: 'Video verification complete',
-        body: outcome === 'approved' ? 'Your video verification passed — your KYC is approved.'
+        body: outcome === 'approved'
+          ? finalKyc === 'ready_for_approval'
+            ? 'Your video call passed — an admin will approve your KYC shortly.'
+            : 'Your video call passed — finish the remaining checklist steps to complete KYC.'
           : outcome === 'rejected' ? `Your video verification was not successful.${notes ? ' ' + notes : ''}`
           : `Please re-submit your documents.${notes ? ' ' + notes : ''}`,
-        payload_json: { kyc_status: newKyc, kind: kind === 'driver' ? 'driver' : 'agent', video_verification_id: id, ...(notes ? { note: notes } : {}) },
+        payload_json: { kyc_status: finalKyc, kind: kind === 'driver' ? 'driver' : 'agent', video_verification_id: id, ...(notes ? { note: notes } : {}) },
       });
+    }
+    return returnRow(id);
+  }
+
+  // ── PATCH /video-verifications/:id/status (admin — manually flip status/outcome) ─
+  // For off-platform calls or to re-open / re-finalize a row. Audit-trail handled by
+  // standard timing logs; this does NOT loop through finalize gates.
+  if (sub === 'status' && (req.method === 'PATCH' || req.method === 'PUT' || req.method === 'POST')) {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    if (!isAdmin(u)) return fail('FORBIDDEN', 'Admin only', 403);
+    const b = await readBody(req);
+    const VV_STATUSES = ['scheduled', 'completed', 'cancelled', 'no_show'] as const;
+    const nextStatus = str(b.status);
+    const nextOutcome = b.outcome === null ? null : str(b.outcome);
+    const adminNotes = typeof b.notes === 'string' ? (b.notes as string) : null;
+    if (nextStatus && !(VV_STATUSES as readonly string[]).includes(nextStatus)) {
+      return fail('VALIDATION', `status must be one of ${VV_STATUSES.join(', ')}`, 422);
+    }
+    if (nextOutcome && !(OUTCOMES as readonly string[]).includes(nextOutcome)) {
+      return fail('VALIDATION', `outcome must be one of ${OUTCOMES.join(', ')} or null`, 422);
+    }
+    const patch: Row = {};
+    if (nextStatus) patch.status = nextStatus;
+    if (b.outcome !== undefined) patch.outcome = nextOutcome;
+    if (adminNotes !== null) patch.notes = adminNotes;
+    if (nextStatus === 'completed' && !row.conducted_at) {
+      patch.conducted_by = u.id;
+      patch.conducted_at = new Date().toISOString();
+    }
+    if (Object.keys(patch).length === 0) return fail('VALIDATION', 'send status, outcome or notes', 422);
+    const { error } = await db.from('video_verifications').update(patch).eq('id', id);
+    if (error) return pgFail(error);
+    // Mirror subject kyc_status as needed
+    const effStatus = nextStatus || str(row.status);
+    const effOutcome = b.outcome !== undefined ? nextOutcome : (row.outcome ? str(row.outcome) : null);
+    if (effStatus === 'completed' && effOutcome === 'approved') {
+      await setSubjectKyc(db, kind, subjectId, { kyc_status: 'video_pending', kyc_reviewed_by: u.id, kyc_reviewed_at: new Date().toISOString(), kyc_rejection_reason: null });
+      await maybePromoteToReadyForApproval(db, kind, subjectId);
+    } else if (effStatus === 'completed' && effOutcome === 'rejected') {
+      await setSubjectKyc(db, kind, subjectId, { kyc_status: 'rejected', kyc_reviewed_by: u.id, kyc_reviewed_at: new Date().toISOString(), kyc_rejection_reason: adminNotes });
+    } else if (effStatus === 'completed' && effOutcome === 'resubmit_required') {
+      await setSubjectKyc(db, kind, subjectId, { kyc_status: 'resubmit_required', kyc_reviewed_by: u.id, kyc_reviewed_at: new Date().toISOString(), kyc_rejection_reason: adminNotes });
+    } else if ((effStatus === 'cancelled' || effStatus === 'no_show') && str(row.status) !== effStatus) {
+      const subjKyc = str((subjRow as Row | null)?.kyc_status);
+      if (subjKyc === 'video_pending' || subjKyc === 'ready_for_approval') {
+        await setSubjectKyc(db, kind, subjectId, { kyc_status: 'docs_submitted' });
+      }
     }
     return returnRow(id);
   }
@@ -216,13 +277,13 @@ const handler = withTiming('video-verifications', async (req: Request): Promise<
     if (b.cancel === true) {
       const { error } = await db.from('video_verifications').update({ status: 'cancelled' }).eq('id', id);
       if (error) return pgFail(error);
-      if ((subjRow as Row | null)?.kyc_status === 'video_pending') await setSubjectKyc(db, kind, subjectId, { kyc_status: 'docs_submitted' });
+      { const k = (subjRow as Row | null)?.kyc_status; if (k === 'video_pending' || k === 'ready_for_approval') await setSubjectKyc(db, kind, subjectId, { kyc_status: 'docs_submitted' }); }
       return returnRow(id);
     }
     if (isAdmin(u) && b.no_show === true) {
       const { error } = await db.from('video_verifications').update({ status: 'no_show' }).eq('id', id);
       if (error) return pgFail(error);
-      if ((subjRow as Row | null)?.kyc_status === 'video_pending') await setSubjectKyc(db, kind, subjectId, { kyc_status: 'docs_submitted' });
+      { const k = (subjRow as Row | null)?.kyc_status; if (k === 'video_pending' || k === 'ready_for_approval') await setSubjectKyc(db, kind, subjectId, { kyc_status: 'docs_submitted' }); }
       return returnRow(id);
     }
     if (typeof b.reschedule_to === 'string') {

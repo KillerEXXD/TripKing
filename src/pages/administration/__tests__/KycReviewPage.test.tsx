@@ -6,12 +6,8 @@ import { KycReviewPage } from '@/pages/administration/KycReviewPage';
 vi.mock('@/hooks/useDrivers', () => ({
   useInfiniteDrivers: vi.fn(),
   useInfiniteAgents: vi.fn(),
-  useUpdateDriverKyc: vi.fn(),
-  useUpdateAgentKyc: vi.fn(),
-  useDriverKycDocs: vi.fn(),
-  useAgentKycDocs: vi.fn(),
 }));
-import { useInfiniteAgents, useInfiniteDrivers, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
+import { useInfiniteAgents, useInfiniteDrivers } from '@/hooks/useDrivers';
 
 type InfState = { isPending?: boolean; isError?: boolean; rows?: unknown[]; hasNextPage?: boolean; refetch?: () => void };
 function infState(s: InfState = {}) {
@@ -27,13 +23,6 @@ function infState(s: InfState = {}) {
 }
 function setDrivers(s: InfState = {}) { vi.mocked(useInfiniteDrivers).mockReturnValue(infState(s)); }
 function setAgents(s: InfState = {}) { vi.mocked(useInfiniteAgents).mockReturnValue(infState(s)); }
-function setMutations() {
-  const dm = { mutate: vi.fn(), isPending: false };
-  const am = { mutate: vi.fn(), isPending: false };
-  vi.mocked(useUpdateDriverKyc).mockReturnValue(dm as never);
-  vi.mocked(useUpdateAgentKyc).mockReturnValue(am as never);
-  return { dm, am };
-}
 
 function renderKyc() {
   return render(
@@ -48,11 +37,8 @@ describe('KycReviewPage', () => {
     vi.useFakeTimers();
     vi.mocked(useInfiniteDrivers).mockReset();
     vi.mocked(useInfiniteAgents).mockReset();
-    vi.mocked(useUpdateDriverKyc).mockReset();
-    vi.mocked(useUpdateAgentKyc).mockReset();
     setDrivers();
     setAgents();
-    setMutations();
   });
 
   it('shows a skeleton while drivers load', () => {
@@ -70,39 +56,43 @@ describe('KycReviewPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('passes the "needs review" kycStatus CSV to the server by default', () => {
+  it('passes the "needs review" kycStatus CSV (incl. ready_for_approval) to the server by default', () => {
     setDrivers({ rows: [{ id: 'd1', fullName: 'X', kycStatus: 'docs_submitted' }] });
     renderKyc();
     const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
-    expect(lastCall[0]).toMatchObject({ kycStatus: ['pending', 'docs_submitted', 'video_pending', 'resubmit_required'] });
+    expect(lastCall[0]).toMatchObject({ kycStatus: ['pending', 'docs_submitted', 'video_pending', 'ready_for_approval', 'resubmit_required'] });
     expect(lastCall[0]).not.toHaveProperty('search');
   });
 
-  it('approving a driver calls useUpdateDriverKyc; the current-status button is disabled', () => {
-    const { dm } = setMutations();
+  it('cards are links to the per-applicant detail page (driver)', () => {
     setDrivers({ rows: [{ id: 'd1', fullName: 'Ravi', kycStatus: 'docs_submitted' }] });
     renderKyc();
-    expect(screen.getByRole('button', { name: /docs in/i })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: /^approve$/i }));
-    expect(dm.mutate).toHaveBeenCalledWith({ id: 'd1', kycStatus: 'approved' });
+    const link = screen.getByRole('link', { name: /ravi/i });
+    expect(link).toHaveAttribute('href', '/administration/kyc/driver/d1');
   });
 
-  it('switching to "Agents" shows the agent queue, and approving an agent calls useUpdateAgentKyc', () => {
-    const { am } = setMutations();
+  it('switching to the Agents tab shows agent cards linking to the agent detail page', () => {
     setAgents({ rows: [{ id: 'a1', fullName: 'Agent X', businessName: 'X Travels', kycStatus: 'pending' }] });
     renderKyc();
-    fireEvent.click(screen.getByRole('button', { name: /^agents$/i }));
-    expect(screen.getByText('Agent X')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^approve$/i }));
-    expect(am.mutate).toHaveBeenCalledWith({ id: 'a1', kycStatus: 'approved' });
+    fireEvent.click(screen.getByRole('tab', { name: /^agents$/i }));
+    const link = screen.getByRole('link', { name: /agent x/i });
+    expect(link).toHaveAttribute('href', '/administration/kyc/agent/a1');
   });
 
   it('clicking the "Approved" filter sends kycStatus="approved" to the server', () => {
     setDrivers({ rows: [] });
     renderKyc();
-    fireEvent.click(screen.getByRole('button', { name: /^approved$/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^approved$/i }));
     const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
     expect(lastCall[0]).toMatchObject({ kycStatus: 'approved' });
+  });
+
+  it('clicking the "Ready for approval" filter sends kycStatus="ready_for_approval"', () => {
+    setDrivers({ rows: [] });
+    renderKyc();
+    fireEvent.click(screen.getByRole('tab', { name: /ready for approval/i }));
+    const lastCall = vi.mocked(useInfiniteDrivers).mock.calls[vi.mocked(useInfiniteDrivers).mock.calls.length-1];
+    expect(lastCall[0]).toMatchObject({ kycStatus: 'ready_for_approval' });
   });
 
   it('debounces the search input and forwards it as `search` after 300ms', () => {
@@ -117,7 +107,7 @@ describe('KycReviewPage', () => {
   it('search applies to the agents queue too', () => {
     setAgents({ rows: [] });
     renderKyc();
-    fireEvent.click(screen.getByRole('button', { name: /^agents$/i }));
+    fireEvent.click(screen.getByRole('tab', { name: /^agents$/i }));
     fireEvent.change(screen.getByLabelText(/search kyc queue/i), { target: { value: 'y@ex' } });
     act(() => { vi.advanceTimersByTime(300); });
     const lastCall = vi.mocked(useInfiniteAgents).mock.calls[vi.mocked(useInfiniteAgents).mock.calls.length-1];

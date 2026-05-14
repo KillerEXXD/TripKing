@@ -32,6 +32,7 @@ import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.t
 import { revealCache, redactDriver, logPiiReveal } from '../_shared/pii.ts';
 import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail } from '../_shared/http.ts';
+import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
 const CACHE_EPOCH = 'v1';
@@ -80,7 +81,7 @@ const DOC_TYPE_TO_PATH_COL: Record<DocType, string> = {
 const REQUIRED_VEHICLE_PHOTO_COLS = [
   'photo_front_url', 'photo_back_url', 'photo_left_url', 'photo_right_url', 'photo_plate_url', 'rc_book_url', 'insurance_url',
 ] as const;
-const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'approved', 'rejected', 'resubmit_required'] as const;
+const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'ready_for_approval', 'approved', 'rejected', 'resubmit_required'] as const;
 
 function pick(src: Row, keys: string[]): Row {
   const out: Row = {};
@@ -122,7 +123,7 @@ async function buildVerification(db: Db, drv: Row): Promise<Row> {
     .select('id, status, scheduled_at, meeting_url, outcome')
     .eq('driver_id', driverId).order('created_at', { ascending: false }).limit(1);
   const vv = (vvRows && vvRows[0]) ? (vvRows[0] as Row) : null;
-  const videoCall = kycStatus === 'approved' ? 'done'
+  const videoCall = kycStatus === 'approved' || kycStatus === 'ready_for_approval' ? 'done'
     : vv && vv.status === 'scheduled' ? 'scheduled'
     : vv && vv.status === 'completed' && vv.outcome === 'approved' ? 'done'
     : 'todo';
@@ -456,6 +457,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     };
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    await maybePromoteToReadyForApproval(db, 'driver', id);
     invalidateDriverMe(ownerId);
     return respondDriver(id, true);
   }

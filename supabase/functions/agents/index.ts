@@ -27,6 +27,7 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 import { revealCache, redactAgent, logPiiReveal } from '../_shared/pii.ts';
 import { authUser as authUserShared, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail } from '../_shared/http.ts';
+import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 
 const authUser = (db: Db, req: Request) => authUserShared(db, req, { defaultRole: 'trip_manager' });
 
@@ -49,7 +50,7 @@ const DOC_TYPE_TO_PATH_COL: Record<DocType, string> = {
   aadhaar_back: 'aadhaar_back_path',
   selfie: 'selfie_path',
 };
-const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'approved', 'rejected', 'resubmit_required'] as const;
+const KYC_STATES = ['pending', 'docs_submitted', 'video_pending', 'ready_for_approval', 'approved', 'rejected', 'resubmit_required'] as const;
 
 function pick(src: Row, keys: string[]): Row {
   const out: Row = {};
@@ -83,7 +84,7 @@ async function buildVerification(db: Db, tm: Row): Promise<Row> {
     .select('id, status, scheduled_at, meeting_url, outcome')
     .eq('manager_id', managerId).order('created_at', { ascending: false }).limit(1);
   const vv = (vvRows && vvRows[0]) ? (vvRows[0] as Row) : null;
-  const videoCall = kycStatus === 'approved' ? 'done'
+  const videoCall = kycStatus === 'approved' || kycStatus === 'ready_for_approval' ? 'done'
     : vv && vv.status === 'scheduled' ? 'scheduled'
     : vv && vv.status === 'completed' && vv.outcome === 'approved' ? 'done'
     : 'todo';
@@ -322,6 +323,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
       kyc_rejection_reason: null,
     }).eq('id', id);
     if (error) return pgFail(error);
+    await maybePromoteToReadyForApproval(db, 'manager', id);
     invalidateAgentMe(ownerId);
     return respondAgent(id, true);
   }

@@ -9,6 +9,8 @@ import {
   getVideoVerification,
   markVideoCallNoShow,
   rescheduleVideoCall,
+  setVideoCallStatus,
+  type SetVideoCallStatusInput,
 } from '@/lib/api/services/videoVerifications';
 import type { FinalizeVideoCallInput, ScheduledVideoCallsQueryParams } from '@/types';
 
@@ -51,6 +53,21 @@ export function useFinalizeVideoCall() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: FinalizeVideoCallInput }) => finalizeVideoCall(id, input),
+    onSuccess: (vv) => {
+      void qc.invalidateQueries({ queryKey: ['video-verifications'] });
+      void qc.invalidateQueries({ queryKey: ['video-verification', vv.id] });
+      if (vv.driverId) void qc.invalidateQueries({ queryKey: ['driver', vv.driverId] });
+      if (vv.managerId) void qc.invalidateQueries({ queryKey: ['agent', vv.managerId] });
+      void qc.invalidateQueries({ queryKey: ['drivers'] });
+      void qc.invalidateQueries({ queryKey: ['agents'] });
+    },
+  });
+}
+/** Admin manual status override — mirrors `useFinalizeVideoCall` invalidations. */
+export function useSetVideoCallStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: SetVideoCallStatusInput }) => setVideoCallStatus(id, input),
     onSuccess: (vv) => {
       void qc.invalidateQueries({ queryKey: ['video-verifications'] });
       void qc.invalidateQueries({ queryKey: ['video-verification', vv.id] });

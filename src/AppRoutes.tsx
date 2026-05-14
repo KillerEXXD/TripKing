@@ -35,6 +35,7 @@ const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazyWithRetry(() => import('@/pages/administration/AdministrationPage'));
 const AdminConfigPage = lazyWithRetry(() => import('@/pages/administration/AdminConfigPage'));
 const KycReviewPage = lazyWithRetry(() => import('@/pages/administration/KycReviewPage'));
+const KycDetailPage = lazyWithRetry(() => import('@/pages/administration/KycDetailPage'));
 const VideoCallConsolePage = lazyWithRetry(() => import('@/pages/administration/VideoCallConsolePage'));
 const VehicleEligibilityPage = lazyWithRetry(() => import('@/pages/administration/VehicleEligibilityPage'));
 const ReviewModerationPage = lazyWithRetry(() => import('@/pages/administration/ReviewModerationPage'));
@@ -103,6 +104,7 @@ export function AppRoutes() {
             <Route path="/administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
             <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
             <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
+            <Route path="/administration/kyc/:kind/:id" element={<AdminRoute><KycDetailPage /></AdminRoute>} />
             <Route path="/administration/drivers" element={<AdminRoute><AdminDriversPage /></AdminRoute>} />
             <Route path="/administration/agents" element={<AdminRoute><AdminAgentsPage /></AdminRoute>} />
             <Route path="/administration/passengers" element={<AdminRoute><PassengersPage /></AdminRoute>} />

@@ -12,6 +12,7 @@ const KYC_BADGE: Record<KycStatus, { label: string; variant: 'success' | 'warnin
   pending: { label: 'Pending', variant: 'muted' },
   docs_submitted: { label: 'Docs in', variant: 'info' },
   video_pending: { label: 'Video pending', variant: 'info' },
+  ready_for_approval: { label: 'Ready for approval', variant: 'success' },
   approved: { label: 'Verified', variant: 'success' },
   rejected: { label: 'Rejected', variant: 'destructive' },
   resubmit_required: { label: 'Resubmit', variant: 'warning' },
