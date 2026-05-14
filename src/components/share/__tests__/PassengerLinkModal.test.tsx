@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import type { Trip } from '@/types';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/share/tripShareImage', () => ({
+  renderTripShareImage: vi.fn(async () => new File([new Uint8Array([1, 2, 3])], 'tripking-trip.png', { type: 'image/png' })),
+}));
+import { renderTripShareImage } from '@/lib/share/tripShareImage';
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 const trip: Trip = {
@@ -54,8 +58,37 @@ describe('PassengerLinkModal', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('navigator', { ...navigator, share: undefined, clipboard: { writeText } });
     render(<PassengerLinkModal trip={trip} otp="999000" onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /copy the link/i }));
+    fireEvent.click(screen.getByRole('button', { name: /copy the caption/i }));
     expect(writeText).toHaveBeenCalledWith(expect.stringContaining('/passenger/999000'));
+    expect(writeText).toHaveBeenCalledWith(expect.stringContaining('Passenger OTP: 999000'));
+  });
+
+  it('share with files when the platform supports it — attaches the trip image PNG', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    const canShare = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('navigator', { ...navigator, share, canShare });
+    render(<PassengerLinkModal trip={trip} otp="654321" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /share with passenger/i }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    expect(renderTripShareImage).toHaveBeenCalledWith(expect.objectContaining({ otp: '654321', url: expect.stringContaining('/passenger/654321') }));
+    const arg = share.mock.calls[0][0];
+    expect(arg.text).toContain('Passenger OTP: 654321');
+    expect(arg.text).toContain('/passenger/654321');
+    expect(arg.files).toHaveLength(1);
+    expect(arg.files[0]).toBeInstanceOf(File);
+    expect(arg.files[0].type).toBe('image/png');
+  });
+
+  it('text-only share when canShare({files}) is false (desktop fallback)', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    const canShare = vi.fn().mockReturnValue(false);
+    vi.stubGlobal('navigator', { ...navigator, share, canShare });
+    render(<PassengerLinkModal trip={trip} otp="111222" onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /share with passenger/i }));
+    await waitFor(() => expect(share).toHaveBeenCalled());
+    const arg = share.mock.calls[0][0];
+    expect(arg.files).toBeUndefined();
+    expect(arg.text).toContain('Passenger OTP: 111222');
   });
 
   it('calls onClose when dismissed', () => {
