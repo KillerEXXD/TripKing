@@ -67,10 +67,10 @@ describe('<WaypointEditor>', () => {
     render(<WaypointEditor value={[row({ waitMinutes: 30 })]} onChange={onChange} cities={cities} />);
     const wait = screen.getByRole('spinbutton', { name: /wait \(minutes\)/i });
     fireEvent.change(wait, { target: { value: '60' } });
-    expect((onChange.mock.calls.at(-1)?.[0] as WaypointDraft[])[0]?.waitMinutes).toBe(60);
+    expect((onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] as WaypointDraft[])[0]?.waitMinutes).toBe(60);
     // negative is clamped to 0
     fireEvent.change(wait, { target: { value: '-5' } });
-    expect((onChange.mock.calls.at(-1)?.[0] as WaypointDraft[])[0]?.waitMinutes).toBe(0);
+    expect((onChange.mock.calls[onChange.mock.calls.length - 1]?.[0] as WaypointDraft[])[0]?.waitMinutes).toBe(0);
   });
 
   it('removes a row via the trash button', () => {
