@@ -402,10 +402,10 @@ function AvailableList({ query }: { query: ReturnType<typeof useMyActiveVacancie
     return (
       <EmptyState
         title="You're not listed anywhere yet"
-        message="Post your availability so agents can find you for trips going from your city."
+        message="Tap I'm vacant so agents can find you for trips going from your city."
         action={
           <Button asChild size="sm">
-            <Link to="/vacancies/new">Post availability</Link>
+            <Link to="/vacancies/new">Post vacant</Link>
           </Button>
         }
       />

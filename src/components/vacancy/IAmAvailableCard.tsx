@@ -119,13 +119,13 @@ export function IAmAvailableCard({ driverId }: Props) {
                 variant="outline"
                 disabled
                 title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — remove one before posting another.`}
-                aria-label={`Post availability (disabled — at the ${max}-active limit)`}
+                aria-label={`Post vacant (disabled — at the ${max}-active limit)`}
               >
                 <Plus className="size-4" aria-hidden /> Post
               </Button>
             ) : (
               <Button asChild size="sm" variant="default">
-                <Link to="/vacancies/new" aria-label="Post availability">
+                <Link to="/vacancies/new" aria-label="Post vacant">
                   <Plus className="size-4" aria-hidden /> Post
                 </Link>
               </Button>

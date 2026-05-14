@@ -26,7 +26,7 @@ function FlowHeader({ onBack }: { onBack: () => void }) {
       <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
         <ArrowLeft className="size-5" aria-hidden />
       </button>
-      <h1 className="text-base font-semibold">Post your availability</h1>
+      <h1 className="text-base font-semibold">Post vacant</h1>
     </header>
   );
 }
@@ -283,12 +283,12 @@ export function PostVacancyPage() {
       </Card>
 
       {postVacancy.isError ? <p className="text-sm text-red-700">Couldn&apos;t post your availability — please try again.</p> : null}
-      <div className="flex gap-3">
-        <Button type="button" variant="outline" onClick={() => navigate('/vacancies')} disabled={postVacancy.isPending}>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" className="shrink-0" onClick={() => navigate('/vacancies')} disabled={postVacancy.isPending}>
           Cancel
         </Button>
-        <Button type="button" variant="full" onClick={() => void onSubmit()} disabled={!canSubmit}>
-          {postVacancy.isPending ? 'Posting…' : 'Post availability'}
+        <Button type="button" variant="full" className="min-w-0 flex-1" onClick={() => void onSubmit()} disabled={!canSubmit}>
+          {postVacancy.isPending ? 'Posting…' : 'Post vacant'}
         </Button>
       </div>
       </div>
