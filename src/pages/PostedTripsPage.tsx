@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card } from '@/components/ui';
+import { LiveDot } from '@/components/ui/LiveDot';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
@@ -91,7 +92,10 @@ export function PostedTripsPage() {
     <div className="mx-auto max-w-md">
       <header className="flex items-center gap-2 border-b bg-white px-4 py-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold">My posts</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-base font-semibold">My posts</h1>
+            <LiveDot />
+          </div>
           <p className="text-xs text-secondary">{tripsQuery.isSuccess ? `${trips.length} trip${trips.length === 1 ? '' : 's'}` : 'Trips you have posted'}</p>
         </div>
         <Button asChild size="sm" className="gap-1.5">

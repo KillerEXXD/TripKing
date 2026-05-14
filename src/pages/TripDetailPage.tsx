@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
-import { useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
@@ -19,6 +19,7 @@ import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
 import { Badge, Button, Card } from '@/components/ui';
+import { LiveDot } from '@/components/ui/LiveDot';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { toast } from 'sonner';
@@ -595,9 +596,10 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
           <div className="text-2xl font-bold leading-tight">
             {routeChainText(trip)}
           </div>
-          <Badge variant={badge.variant} className="mt-1 shrink-0">
-            {badge.label}
-          </Badge>
+          <div className="mt-1 flex shrink-0 items-center gap-2">
+            {isTripLive(trip.status) ? <LiveDot tone={trip.status === 'selected' ? 'amber' : 'emerald'} /> : null}
+            <Badge variant={badge.variant}>{badge.label}</Badge>
+          </div>
         </div>
         {(trip.waypoints?.length ?? 0) >= 3 ? (
           <ol className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
