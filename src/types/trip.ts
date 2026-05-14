@@ -244,6 +244,18 @@ export interface ApplyToTripInput {
   quotedRatePerKm?: number;
   message?: string;
 }
+export type TripInvitationStatus = 'pending' | 'applied' | 'declined' | 'withdrawn' | 'expired';
+/** Phase 4 of the two-step handshake — agent invites a specific driver to view a trip. */
+export interface TripInvitation {
+  id: string;
+  tripId?: string;
+  driverId: string;
+  status: TripInvitationStatus;
+  declinedReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  driver?: DriverSummary;
+}
 export interface TripsQueryParams {
   status?: TripStatus | TripStatus[];
   fromCityId?: string;
@@ -251,6 +263,8 @@ export interface TripsQueryParams {
   postedByUserId?: string;
   /** A driver uuid, or the literal `'me'` — the trips assigned to (being driven by) that driver. */
   assignedDriverId?: string;
+  /** Phase 4: `'me'` → only trips the caller has been invited to. */
+  invited?: 'me';
   /** Restrict to trips whose pickup point is within the radius (nearest first). */
   near?: NearRadius;
   page?: number;

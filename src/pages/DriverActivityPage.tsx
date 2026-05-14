@@ -10,9 +10,10 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { AcceptanceStatus, MyApplication, Trip } from '@/types';
 
-type Tab = 'driving' | 'applied' | 'posted';
+type Tab = 'driving' | 'invited' | 'applied' | 'posted';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'driving', label: 'Driving' },
+  { id: 'invited', label: 'Invited' },
   { id: 'applied', label: 'Applied' },
   { id: 'posted', label: 'Posted by me' },
 ];
@@ -102,9 +103,11 @@ export function DriverActivityPage() {
   const drivingQuery = useTrips({ assignedDriverId: 'me' });
   const postedQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
   const appliedQuery = useMyApplications();
+  const invitedQuery = useTrips({ invited: 'me' });
 
   const counts = {
     driving: drivingQuery.data?.length,
+    invited: invitedQuery.data?.length,
     applied: appliedQuery.data?.length,
     posted: postedQuery.data?.length,
   };
@@ -136,6 +139,15 @@ export function DriverActivityPage() {
             errorTitle="Couldn't load your trips"
             emptyTitle="No trips assigned to you yet"
             emptyMessage="When a trip manager picks you for a trip, it shows up here — upcoming, in progress, and done."
+            onShare={setShareTrip}
+          />
+        )}
+        {tab === 'invited' && (
+          <TripList
+            query={invitedQuery}
+            errorTitle="Couldn't load your invites"
+            emptyTitle="No invitations yet"
+            emptyMessage="When a trip manager invites you to a trip directly, it shows up here. You'll see their name and phone so you can call before you apply."
             onShare={setShareTrip}
           />
         )}
