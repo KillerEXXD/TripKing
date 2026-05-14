@@ -5,7 +5,7 @@ import { useTripByOtp } from '@/hooks/useTrips';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatINR, formatKm, initials } from '@/lib/utils';
+import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
 const STATUS_LABEL: Partial<Record<TripStatus, { label: string; variant: 'success' | 'info' | 'muted' | 'destructive' }>> = {
@@ -14,10 +14,6 @@ const STATUS_LABEL: Partial<Record<TripStatus, { label: string; variant: 'succes
   completed: { label: 'Completed', variant: 'muted' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
-function pickupLabel(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
 const telHref = (phone?: string) => (phone ? `tel:${phone.replace(/[^\d+]/g, '')}` : undefined);
 const smsHref = (phone?: string) => (phone ? `sms:${phone.replace(/[^\d+]/g, '')}` : undefined);
 
@@ -86,7 +82,7 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
           <Stat icon={<MapPin />} label="Distance" value={formatKm(trip.expectedDistanceKm)} />
-          <Stat icon={<Calendar />} label="Pickup" value={pickupLabel(trip.pickupAt)} />
+          <Stat icon={<Calendar />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
           <Stat icon={<Car />} label="Vehicle" value={`${trip.carTypeLabel ?? 'Any car'}${trip.acRequired ? ' · AC' : ''}`} />
           <Stat icon={<KeyRound />} label="Your OTP" value={otp} />
         </div>

@@ -10,18 +10,10 @@ import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, initials } from '@/lib/utils';
+import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
 import type { Agent, Trip, Vacancy } from '@/types';
 
 const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
-function pickupLabel(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
-function firstName(full: string | undefined): string {
-  if (!full) return '';
-  return full.trim().split(/\s+/)[0] ?? '';
-}
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
@@ -55,7 +47,7 @@ function PostedTripRow({ trip }: { trip: Trip }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
-            <div className="text-xs text-secondary">{pickupLabel(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout</div>
+            <div className="text-xs text-secondary">{formatPickupTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout</div>
           </div>
           <Badge variant={trip.status === 'has_applicants' ? 'warning' : trip.status === 'assigned' || trip.status === 'in_progress' ? 'info' : trip.status === 'completed' ? 'muted' : trip.status === 'cancelled' ? 'destructive' : 'success'}>{STATUS_LABEL[trip.status]}</Badge>
         </div>
@@ -102,7 +94,7 @@ function AgentHome({ agent }: { agent: Agent }) {
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{firstName(agent.fullName) || user?.displayName || 'Agent'}</span>
+            <span className="truncate font-semibold">{getFirstName(agent.fullName) || user?.displayName || 'Agent'}</span>
             <Badge variant="secondary">Agent</Badge>
           </div>
         </div>

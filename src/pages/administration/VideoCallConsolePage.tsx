@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { useFinalizeVideoCall, useMarkVideoCallNoShow, useScheduledVideoCalls } from '@/hooks/useVideoVerification';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
+import { formatPickupTime } from '@/lib/utils';
 import type { VideoOutcome, VideoVerification, VideoVerificationStatus } from '@/types';
 
 const STATUS_TABS: { value: VideoVerificationStatus[]; label: string }[] = [
@@ -19,10 +20,6 @@ const STATUS_TABS: { value: VideoVerificationStatus[]; label: string }[] = [
   { value: ['cancelled', 'no_show', 'failed'], label: 'Cancelled / no-show' },
 ];
 
-function fmt(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
 function subjectOf(vv: VideoVerification) {
   const s = vv.driver ?? vv.manager;
   return { kind: vv.driver ? 'Driver' : 'Trip manager', name: s?.fullName ?? '—', phone: s?.phone, city: s?.cityName, kyc: s?.kycStatus };
@@ -62,7 +59,7 @@ function CallCard({ vv }: { vv: VideoVerification }) {
         <div className="min-w-0">
           <div className="font-bold">{s.name}</div>
           <div className="text-xs text-secondary">{s.kind}{s.city ? ` · ${s.city}` : ''}{s.phone ? ` · ${s.phone}` : ''}</div>
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary"><CalendarClock className="size-3.5" aria-hidden /> {fmt(vv.scheduledAt)}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary"><CalendarClock className="size-3.5" aria-hidden /> {formatPickupTime(vv.scheduledAt)}</div>
         </div>
         <div className="shrink-0 text-right">
           <Badge variant={vv.status === 'scheduled' ? 'info' : vv.outcome === 'approved' ? 'success' : vv.status === 'completed' ? 'warning' : 'muted'}>

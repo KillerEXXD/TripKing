@@ -3,6 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Copy, ExternalLink, Share2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui';
+import { formatPickupTime } from '@/lib/utils';
 import type { Trip } from '@/types';
 
 export interface PassengerLinkModalProps {
@@ -16,10 +17,6 @@ function passengerLink(otp: string): string {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://trip-king.vercel.app';
   return `${origin}/passenger/${encodeURIComponent(otp)}`;
 }
-function pickup(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
 
 /**
  * "Share with the passenger" sheet — shown after a driver is assigned. Hands the
@@ -30,7 +27,7 @@ function pickup(iso: string): string {
  */
 export function PassengerLinkModal({ trip, otp, onClose }: PassengerLinkModalProps) {
   const url = passengerLink(otp);
-  const caption = `Your TripKing trip is confirmed — ${trip.fromCity.name} → ${trip.toCity.name}, pickup ${pickup(trip.pickupAt)}. Track your driver and see the details here: ${url}`;
+  const caption = `Your TripKing trip is confirmed — ${trip.fromCity.name} → ${trip.toCity.name}, pickup ${formatPickupTime(trip.pickupAt)}. Track your driver and see the details here: ${url}`;
   const [copied, setCopied] = useState(false);
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
@@ -61,7 +58,7 @@ export function PassengerLinkModal({ trip, otp, onClose }: PassengerLinkModalPro
             <div>
               <Dialog.Title className="text-base font-semibold">Share with the passenger</Dialog.Title>
               <Dialog.Description className="text-xs text-secondary">
-                {trip.fromCity.name} → {trip.toCity.name} · pickup {pickup(trip.pickupAt)}
+                {trip.fromCity.name} → {trip.toCity.name} · pickup {formatPickupTime(trip.pickupAt)}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>

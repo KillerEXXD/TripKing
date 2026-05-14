@@ -12,17 +12,8 @@ import { GetVerifiedBanner } from '@/components/driver';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, initials } from '@/lib/utils';
+import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
 import type { Driver, Trip } from '@/types';
-
-function pickupLabel(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
-function firstName(full: string | undefined): string {
-  if (!full) return '';
-  return full.trim().split(/\s+/)[0] ?? '';
-}
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
@@ -100,7 +91,7 @@ function NearbyTripCard({ trip }: { trip: Trip }) {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
-            <div className="text-xs text-secondary">{Math.round(trip.expectedDistanceKm)} km · {pickupLabel(trip.pickupAt)}</div>
+            <div className="text-xs text-secondary">{Math.round(trip.expectedDistanceKm)} km · {formatPickupTime(trip.pickupAt)}</div>
           </div>
           <div className="shrink-0 text-right">
             <div className="font-bold">{formatINR(trip.driverPayout)}</div>
@@ -139,7 +130,7 @@ function DriverHome({ driver }: { driver: Driver }) {
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{firstName(driver.fullName) || user?.displayName || 'Driver'}</span>
+            <span className="truncate font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
             <Badge variant="success">Driver</Badge>
           </div>
         </div>

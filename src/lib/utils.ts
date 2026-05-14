@@ -51,6 +51,25 @@ export function isValidUUID(value: string | null | undefined): value is string {
 }
 
 /**
+ * Pickup-time line used across trip cards / detail / book screens:
+ * "2026-05-14T08:30:00Z" → "Wed, 14 May, 2:00 pm". Falls back to the raw string when unparseable.
+ */
+export function formatPickupTime(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * First-name from a full name: "Ravi Kumar" → "Ravi". Empty string for nullish input.
+ */
+export function getFirstName(full: string | undefined | null): string {
+  if (!full) return '';
+  return full.trim().split(/\s+/)[0] ?? '';
+}
+
+/**
  * Initials from a full name: "Ravi Kumar" → "RK"
  */
 export function initials(fullName: string): string {

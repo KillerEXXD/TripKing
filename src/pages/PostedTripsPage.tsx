@@ -6,7 +6,7 @@ import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR, formatKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
 export const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
@@ -19,10 +19,6 @@ export const STATUS_META: Record<TripStatus, { label: string; variant: 'success'
 };
 const FILTERS: ('all' | TripStatus)[] = ['all', 'open', 'has_applicants', 'assigned', 'in_progress', 'completed', 'cancelled'];
 
-export function pickupLabel(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
-}
 const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
 
 export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => void }) {
@@ -48,7 +44,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
           </Badge>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-secondary">Pickup: {pickupLabel(trip.pickupAt)}</span>
+          <span className="text-secondary">Pickup: {formatPickupTime(trip.pickupAt)}</span>
           {hasApplicants ? (
             <Badge variant="warning">
               <Users className="size-3" aria-hidden /> {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'}

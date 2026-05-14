@@ -13,6 +13,7 @@ import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useAvailableVideoSlots, useBookVideoCall, useCancelVideoCall, useRescheduleVideoCall, useVideoVerification } from '@/hooks/useVideoVerification';
 import { Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
+import { formatPickupTime } from '@/lib/utils';
 
 function Header({ onBack }: { onBack: () => void }) {
   return (
@@ -23,11 +24,6 @@ function Header({ onBack }: { onBack: () => void }) {
       <h1 className="text-base font-semibold">Video verification</h1>
     </header>
   );
-}
-
-function fmt(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 }
 
 function SlotPicker({ onPick, disabled }: { onPick: (iso: string) => void; disabled: boolean }) {
@@ -120,7 +116,7 @@ export function BookVideoCallPage() {
 
         {kyc === 'video_pending' && vv && vv.status === 'scheduled' && !rescheduling && (
           <Card className="gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="size-4 text-blue-600" aria-hidden /> Scheduled for {fmt(vv.scheduledAt)}</div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="size-4 text-blue-600" aria-hidden /> Scheduled for {formatPickupTime(vv.scheduledAt)}</div>
             <p className="text-sm text-secondary">On the call, an admin will ask you to show your original documents to the camera and do a quick liveness check (turn your head / blink).</p>
             {vv.meetingUrl && (
               <Button variant="full" asChild>
