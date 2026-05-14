@@ -8,6 +8,10 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn() }));
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
+import { useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useVacancies', () => ({ useMyActiveVacancies: vi.fn(), useCancelVacancy: vi.fn() }));
+import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
 vi.mock('@/components/share/ShareTripModal', () => ({ ShareTripModal: () => <div>share modal</div> }));
 
 const user: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -59,6 +63,9 @@ function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsS
   vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() } as never);
   vi.mocked(useTrips).mockImplementation((params?: TripsQueryParams) => (params?.assignedDriverId ? driving : params?.invited ? invited : posted) as never);
   vi.mocked(useMyApplications).mockReturnValue(applied as never);
+  vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, data: { id: 'd1' }, refetch: vi.fn() } as never);
+  vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn() } as never);
+  vi.mocked(useCancelVacancy).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
 }
 const renderPage = () => render(<MemoryRouter><DriverActivityPage /></MemoryRouter>);
 
@@ -67,6 +74,9 @@ describe('DriverActivityPage', () => {
     vi.mocked(useAuth).mockReset();
     vi.mocked(useTrips).mockReset();
     vi.mocked(useMyApplications).mockReset();
+    vi.mocked(useMyDriver).mockReset();
+    vi.mocked(useMyActiveVacancies).mockReset();
+    vi.mocked(useCancelVacancy).mockReset();
   });
 
   it('shows the three tabs and lists the trips assigned to you by default', () => {
@@ -114,5 +124,75 @@ describe('DriverActivityPage', () => {
     setUp({ driving: tripsState({ isError: true }) });
     renderPage();
     expect(screen.getByText(/couldn't load your trips/i)).toBeInTheDocument();
+  });
+
+  it('Driving chip shows only in_progress + accepted (not selected / completed / cancelled)', () => {
+    setUp({ driving: tripsState({ data: [
+      makeTrip({ id: 'd-acc', status: 'accepted', toCity: city('cA', 'Accepted-to') }),
+      makeTrip({ id: 'd-prog', status: 'in_progress', toCity: city('cB', 'Inprog-to') }),
+      makeTrip({ id: 'd-sel', status: 'selected', toCity: city('cC', 'Selected-to') }),
+      makeTrip({ id: 'd-done', status: 'completed', toCity: city('cD', 'Done-to') }),
+      makeTrip({ id: 'd-cxl', status: 'cancelled', toCity: city('cE', 'Cancelled-to') }),
+    ] }) });
+    renderPage();
+    // Default tab is Driving
+    expect(screen.getByText(/vellore → accepted-to/i)).toBeInTheDocument();
+    expect(screen.getByText(/vellore → inprog-to/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore → selected-to/i)).toBeNull();
+    expect(screen.queryByText(/vellore → done-to/i)).toBeNull();
+    expect(screen.queryByText(/vellore → cancelled-to/i)).toBeNull();
+  });
+
+  it('Selected / Completed / Cancelled chips each filter the assigned list to their bucket', () => {
+    setUp({ driving: tripsState({ data: [
+      makeTrip({ id: 'd-prog', status: 'in_progress', toCity: city('cB', 'Inprog-to') }),
+      makeTrip({ id: 'd-sel', status: 'selected', toCity: city('cC', 'Selected-to') }),
+      makeTrip({ id: 'd-done', status: 'completed', toCity: city('cD', 'Done-to') }),
+      makeTrip({ id: 'd-cxl', status: 'cancelled', toCity: city('cE', 'Cancelled-to') }),
+    ] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^selected/i }));
+    expect(screen.getByText(/vellore → selected-to/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore → inprog-to/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^completed/i }));
+    expect(screen.getByText(/vellore → done-to/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore → selected-to/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^cancelled/i }));
+    expect(screen.getByText(/vellore → cancelled-to/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore → done-to/i)).toBeNull();
+  });
+
+  it('All chip unions assigned + invited + applied and sorts by lifecycle priority', () => {
+    setUp({
+      driving: tripsState({ data: [
+        makeTrip({ id: 'd-prog', status: 'in_progress', toCity: city('cB', 'Driving-to') }),
+        makeTrip({ id: 'd-cxl', status: 'cancelled', toCity: city('cE', 'Cancelled-to') }),
+      ] }),
+      invited: tripsState({ data: [makeTrip({ id: 'inv-1', toCity: city('cI', 'Invited-to') })] }),
+      applied: appsState({ data: [makeApp({ acceptanceId: 'app-1', status: 'applied', trip: makeTrip({ id: 'app-trip', toCity: city('cP', 'Applied-to') }) })] }),
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^all/i }));
+    const cards = screen.getAllByText(/vellore → \w+-to/i);
+    expect(cards[0]).toHaveTextContent(/driving-to/i);
+    expect(cards[1]).toHaveTextContent(/invited-to/i);
+    expect(cards[2]).toHaveTextContent(/applied-to/i);
+    expect(cards[3]).toHaveTextContent(/cancelled-to/i);
+  });
+
+  it('All chip dedupes — a trip that\'s both assigned and applied appears once, bucketed under Driving', () => {
+    const trip = makeTrip({ id: 'shared', status: 'in_progress', toCity: city('cS', 'Shared-to') });
+    setUp({
+      driving: tripsState({ data: [trip] }),
+      applied: appsState({ data: [makeApp({ acceptanceId: 'app-shared', status: 'selected', trip })] }),
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^all/i }));
+    const matches = screen.getAllByText(/vellore → shared-to/i);
+    expect(matches.length).toBe(1);
+    // The driving-bucket card uses PostedTripCard (status badge 'In progress'), not the ApplicationRow
+    // (which would show 'Selected — you got it!'). Verify it took the higher-priority bucket.
+    expect(screen.queryByText(/selected — you got it/i)).toBeNull();
+    expect(screen.getByText(/in progress/i)).toBeInTheDocument();
   });
 });

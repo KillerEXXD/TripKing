@@ -13,11 +13,15 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatClockTime, formatINR, formatKm, formatPickupTime, formatShortDate } from '@/lib/utils';
 import type { AcceptanceStatus, MyApplication, Trip, Vacancy } from '@/types';
 
-type Tab = 'driving' | 'invited' | 'applied' | 'available' | 'posted';
+type Tab = 'all' | 'driving' | 'invited' | 'applied' | 'selected' | 'completed' | 'cancelled' | 'available' | 'posted';
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'all', label: 'All' },
   { id: 'driving', label: 'Driving' },
   { id: 'invited', label: 'Invited' },
   { id: 'applied', label: 'Applied' },
+  { id: 'selected', label: 'Selected' },
+  { id: 'completed', label: 'Completed' },
+  { id: 'cancelled', label: 'Cancelled' },
   { id: 'available', label: "I'm available" },
   { id: 'posted', label: 'Posted by me' },
 ];
@@ -71,28 +75,75 @@ function ApplicationRow({ app }: { app: MyApplication }) {
   );
 }
 
+/**
+ * Renders a trip list. Two modes:
+ *  - `query`-mode: drives loading / error / empty UI from a `useTrips` query (used by invited / posted tabs).
+ *  - `trips`-mode: a pre-filtered array (used by the driving / selected / completed / cancelled sub-buckets
+ *    that derive from a single `drivingQuery` result, filtered client-side by trip status).
+ */
 function TripList({
   query,
+  trips: preFiltered,
   emptyTitle,
   emptyMessage,
   onShare,
   errorTitle,
 }: {
-  query: ReturnType<typeof useTrips>;
+  /** Drives the loading + error UI. Either pass `query` alone (data flows from query.data), or pass
+   *  `query` + `trips` for a client-side-filtered sub-view of that query (loading/error still flow
+   *  from the shared query). */
+  query?: ReturnType<typeof useTrips>;
+  trips?: Trip[];
   emptyTitle: string;
   emptyMessage: string;
   errorTitle: string;
   onShare: (t: Trip) => void;
 }) {
-  if (query.isPending) return <LoadingSkeleton rows={4} />;
-  if (query.isError) return <ErrorState title={errorTitle} message="Check your connection and try again." onRetry={() => void query.refetch()} />;
-  const trips = query.data ?? [];
+  if (query) {
+    if (query.isPending) return <LoadingSkeleton rows={4} />;
+    if (query.isError) return <ErrorState title={errorTitle} message="Check your connection and try again." onRetry={() => void query.refetch()} />;
+  }
+  const trips = preFiltered ?? query?.data ?? [];
   if (trips.length === 0) return <EmptyState title={emptyTitle} message={emptyMessage} />;
   return (
     <div className="space-y-3">
       {trips.map((t) => (
         <PostedTripCard key={t.id} trip={t} onShare={() => onShare(t)} />
       ))}
+    </div>
+  );
+}
+
+const ALL_PRIORITY = { driving: 0, selected: 1, invited: 2, applied: 3, completed: 4, cancelled: 5 } as const;
+type AllBucket = keyof typeof ALL_PRIORITY;
+interface AllEntry { tripId: string; trip: Trip; bucket: AllBucket; application?: MyApplication }
+
+/** Renders the union "All" view — each trip appears once, bucketed by the most-progressed lifecycle role
+ *  the driver has on it (assigned wins over invited wins over applied). Applied bucket uses `ApplicationRow`
+ *  to preserve acceptance-status badges; everything else uses `PostedTripCard`. */
+function AllList({ entries, onShare }: { entries: AllEntry[]; onShare: (t: Trip) => void }) {
+  if (entries.length === 0) {
+    return (
+      <EmptyState
+        title="No trips yet"
+        message="Apply to an open trip, get invited, or post your own — they'll all show up here."
+        action={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/trips">Browse trips</Link>
+          </Button>
+        }
+      />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {entries.map((e) =>
+        e.bucket === 'applied' && e.application ? (
+          <ApplicationRow key={e.tripId} app={e.application} />
+        ) : (
+          <PostedTripCard key={e.tripId} trip={e.trip} onShare={() => onShare(e.trip)} />
+        ),
+      )}
     </div>
   );
 }
@@ -126,8 +177,45 @@ export function DriverActivityPage() {
   const myDriverId = myDriverQuery.data?.id ?? '';
   const availableQuery = useMyActiveVacancies(myDriverId);
 
-  const counts = {
-    driving: drivingQuery.data?.length,
+  // Sub-buckets carved out of `drivingQuery` (which returns every assigned trip regardless of status).
+  // Driving = accepted + in_progress per product-owner decision: both are "trips I'm driving" — pre-start
+  // with OTP ready, and live.
+  const assigned = drivingQuery.data ?? [];
+  const drivingTrips   = assigned.filter((t) => t.status === 'in_progress' || t.status === 'accepted');
+  const selectedTrips  = assigned.filter((t) => t.status === 'selected');
+  const completedTrips = assigned.filter((t) => t.status === 'completed');
+  const cancelledTrips = assigned.filter((t) => t.status === 'cancelled');
+
+  // "All" — union of every trip the driver has a role on, deduped by trip.id, bucketed by the
+  // most-progressed role (assigned > invited > applied), sorted by lifecycle priority then pickupAt.
+  const allEntries: AllEntry[] = (() => {
+    const seen = new Map<string, AllEntry>();
+    for (const t of assigned) {
+      let bucket: AllBucket | undefined;
+      if (t.status === 'in_progress' || t.status === 'accepted') bucket = 'driving';
+      else if (t.status === 'selected') bucket = 'selected';
+      else if (t.status === 'completed') bucket = 'completed';
+      else if (t.status === 'cancelled') bucket = 'cancelled';
+      if (bucket) seen.set(t.id, { tripId: t.id, trip: t, bucket });
+    }
+    for (const t of invitedQuery.data ?? []) {
+      if (!seen.has(t.id)) seen.set(t.id, { tripId: t.id, trip: t, bucket: 'invited' });
+    }
+    for (const app of appliedQuery.data ?? []) {
+      if (!seen.has(app.trip.id)) seen.set(app.trip.id, { tripId: app.trip.id, trip: app.trip, bucket: 'applied', application: app });
+    }
+    return [...seen.values()].sort((a, b) => {
+      if (ALL_PRIORITY[a.bucket] !== ALL_PRIORITY[b.bucket]) return ALL_PRIORITY[a.bucket] - ALL_PRIORITY[b.bucket];
+      return a.trip.pickupAt.localeCompare(b.trip.pickupAt);
+    });
+  })();
+
+  const counts: Record<Tab, number | undefined> = {
+    all: drivingQuery.data && invitedQuery.data && appliedQuery.data ? allEntries.length : undefined,
+    driving: drivingQuery.data ? drivingTrips.length : undefined,
+    selected: drivingQuery.data ? selectedTrips.length : undefined,
+    completed: drivingQuery.data ? completedTrips.length : undefined,
+    cancelled: drivingQuery.data ? cancelledTrips.length : undefined,
     invited: invitedQuery.data?.length,
     applied: appliedQuery.data?.length,
     available: availableQuery.data?.length,
@@ -145,7 +233,7 @@ export function DriverActivityPage() {
         </Button>
       </header>
 
-      <div className="flex gap-1 overflow-x-auto whitespace-nowrap border-b bg-white px-3 py-2">
+      <div className="flex flex-wrap gap-1.5 border-b bg-white px-3 py-2">
         {TABS.map((t) => (
           <button key={t.id} type="button" onClick={() => setTab(t.id)} aria-pressed={tab === t.id} className={tabBtn(tab === t.id)}>
             {t.label}
@@ -155,12 +243,44 @@ export function DriverActivityPage() {
       </div>
 
       <div className="space-y-3 p-4">
+        {tab === 'all' && <AllList entries={allEntries} onShare={setShareTrip} />}
         {tab === 'driving' && (
           <TripList
             query={drivingQuery}
+            trips={drivingTrips}
             errorTitle="Couldn't load your trips"
             emptyTitle="No trips assigned to you yet"
-            emptyMessage="When a trip manager picks you for a trip, it shows up here — upcoming, in progress, and done."
+            emptyMessage="When a trip manager picks you for a trip, it shows up here — once you accept (or one's in progress)."
+            onShare={setShareTrip}
+          />
+        )}
+        {tab === 'selected' && (
+          <TripList
+            query={drivingQuery}
+            trips={selectedTrips}
+            errorTitle="Couldn't load your trips"
+            emptyTitle="No trips waiting on your accept"
+            emptyMessage="When a trip manager picks you, this is where you confirm — accept within the 15-min window."
+            onShare={setShareTrip}
+          />
+        )}
+        {tab === 'completed' && (
+          <TripList
+            query={drivingQuery}
+            trips={completedTrips}
+            errorTitle="Couldn't load your trips"
+            emptyTitle="No completed trips yet"
+            emptyMessage="Your completed trips will show up here with the route, fare and your earnings."
+            onShare={setShareTrip}
+          />
+        )}
+        {tab === 'cancelled' && (
+          <TripList
+            query={drivingQuery}
+            trips={cancelledTrips}
+            errorTitle="Couldn't load your trips"
+            emptyTitle="No cancelled trips"
+            emptyMessage="If a trip you were assigned to gets cancelled, you'll see it here for your records."
             onShare={setShareTrip}
           />
         )}
