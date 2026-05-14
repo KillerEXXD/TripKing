@@ -52,7 +52,8 @@ import { readBody, pgFail } from '../_shared/http.ts';
 
 // v3 (2026-05-14): added `posted_by_kyc_status` to every trip row (drives <VerifiedBadge>).
 // v4 (2026-05-15): added `pending_invitation_count` to every trip row (drives the "Invited" chip on /posted-trips).
-const CACHE_EPOCH = 'v4';
+// v5 (2026-05-15): bumped after the QA-data reset wipe (scripts/reset-trips-qa.sql) to drop every cached trip row cluster-wide.
+const CACHE_EPOCH = 'v5';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the

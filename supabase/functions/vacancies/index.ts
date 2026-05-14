@@ -34,7 +34,8 @@ const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 // LIVE tier — short TTLs, memory-only (per-isolate). The cluster has few isolates and a 30s
 // staleness window is acceptable; the DB round-trip for a shared-cache lookup would erase the
 // benefit. Bump the epoch when the response shape of GET /vacancies changes.
-const CACHE_EPOCH = 'v2';
+// v3 (2026-05-15): bumped after the QA-data reset wipe (scripts/reset-trips-qa.sql) to drop every cached vacancy row.
+const CACHE_EPOCH = 'v3';
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
   for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
