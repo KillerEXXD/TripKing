@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, MapPin, Plus } from 'lucide-react';
+import { ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
-import { useMyActiveVacancies } from '@/hooks/useVacancies';
+import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
 import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card } from '@/components/ui';
@@ -214,18 +215,39 @@ function vacancyWindow(v: Vacancy): string {
 }
 
 function VacancyRow({ vacancy }: { vacancy: Vacancy }) {
+  const cancel = useCancelVacancy();
   const where = vacancy.currentPlace?.name ?? vacancy.currentCity.name;
   const destinations = vacancy.destinationCities.map((c) => c.name).join(', ');
+
+  function onRemove() {
+    if (!window.confirm(`Remove your availability from ${where}?`)) return;
+    cancel.mutate(vacancy.id, {
+      onSuccess: () => toast.success('Removed — agents won’t see this any more.'),
+      onError: () => toast.error('Couldn’t remove that — please try again.'),
+    });
+  }
+
   return (
     <Card className="gap-1.5">
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 truncate font-bold">
             <MapPin className="size-4 text-secondary" aria-hidden /> {where}
           </div>
           <div className="mt-0.5 text-xs text-secondary">{vacancyWindow(vacancy)}</div>
         </div>
-        {vacancy.minRatePerKm ? <Badge variant="muted" className="shrink-0">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+        <div className="flex shrink-0 items-center gap-1">
+          {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={cancel.isPending}
+            aria-label={`Remove availability from ${where}`}
+            className="rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-40"
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </button>
+        </div>
       </div>
       {destinations ? (
         <div className="text-xs text-secondary">

@@ -1,9 +1,10 @@
 import { Link } from 'react-router-dom';
-import { MapPinned, Plus } from 'lucide-react';
-import { Button } from '@/components/ui';
-import { useMyActiveVacancies } from '@/hooks/useVacancies';
+import { MapPinned, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Badge, Button } from '@/components/ui';
+import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
 import { useAppSettings } from '@/hooks/useAdminConfig';
-import { formatClockTime, formatShortDate } from '@/lib/utils';
+import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
 // Hard fallback if app_settings hasn't loaded yet — matches the DB DEFAULT 2 from
@@ -25,11 +26,63 @@ function windowLabel(v: Vacancy): string {
     : `${formatShortDate(from)} ${formatClockTime(from)} – ${formatShortDate(to)} ${formatClockTime(to)}`;
 }
 
+function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
+  const cancel = useCancelVacancy();
+  const where = vacancy.currentPlace?.name ?? vacancy.currentCity.name;
+  const destinations = vacancy.destinationCities.map((c) => c.name).join(', ');
+
+  function onRemove() {
+    if (!window.confirm(`Remove your availability from ${where}?`)) return;
+    cancel.mutate(vacancy.id, {
+      onSuccess: () => toast.success('Removed — agents won’t see this any more.'),
+      onError: () => toast.error('Couldn’t remove that — please try again.'),
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 space-y-1.5 text-sm">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">From</div>
+            <div className="font-bold text-foreground">{where}</div>
+          </div>
+          {destinations ? (
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">To</div>
+              <div className="text-foreground">{destinations}</div>
+            </div>
+          ) : null}
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">When</div>
+            <div className="text-foreground">{windowLabel(vacancy)}</div>
+          </div>
+          {vacancy.minRatePerKm || vacancy.notes ? (
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+              {vacancy.notes ? <span className="text-xs text-secondary">“{vacancy.notes}”</span> : null}
+            </div>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          disabled={cancel.isPending}
+          aria-label={`Remove availability from ${where}`}
+          className="shrink-0 rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-40"
+        >
+          <Trash2 className="size-4" aria-hidden />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * "I'm available" hero for drivers on `/vacancies`. Shows `X / max active` where `max`
  * is admin-configurable via `app_settings.max_active_vacancies_per_driver` (migration
- * 022, default 2). Each active vacancy is listed with its current city, time window,
- * and destinations so the driver can see at a glance what they've posted. The matching
+ * 022, default 2). Each active vacancy renders as its own card below the hero with
+ * a Remove button so the driver can drop one without losing the others. The matching
  * backend constraint lives in `supabase/functions/vacancies/index.ts` (POST returns
  * 409 CONFLICT past the limit).
  */
@@ -43,11 +96,8 @@ export function IAmAvailableCard({ driverId }: Props) {
   const loading = query.isPending;
 
   return (
-    <div
-      className="mx-4 mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
-      data-testid="i-am-available-card"
-    >
-      <div className="flex items-start gap-3">
+    <div className="mx-4 mt-3 space-y-2" data-testid="i-am-available-card">
+      <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-hidden>
           <MapPinned className="size-5" />
         </span>
@@ -56,7 +106,7 @@ export function IAmAvailableCard({ driverId }: Props) {
           <p className="mt-0.5 text-xs text-emerald-800">
             {count === 0
               ? 'Let agents find you for trips going from your city.'
-              : `You're listed in ${count === 1 ? 'one city' : `${count} cities`}.`}
+              : 'Each posting below is live. Remove the ones you no longer want.'}
           </p>
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-emerald-900">
@@ -68,7 +118,7 @@ export function IAmAvailableCard({ driverId }: Props) {
                 size="sm"
                 variant="outline"
                 disabled
-                title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — cancel one before posting another.`}
+                title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — remove one before posting another.`}
                 aria-label={`Post availability (disabled — at the ${max}-active limit)`}
               >
                 <Plus className="size-4" aria-hidden /> Post
@@ -84,21 +134,9 @@ export function IAmAvailableCard({ driverId }: Props) {
         </div>
       </div>
 
-      {vacancies.length > 0 ? (
-        <ul className="mt-3 space-y-2 border-t border-emerald-200 pt-3 text-xs text-emerald-900">
-          {vacancies.map((v) => {
-            const where = v.currentPlace?.name ?? v.currentCity.name;
-            const destinations = v.destinationCities.map((c) => c.name).join(', ');
-            return (
-              <li key={v.id} className="space-y-0.5">
-                <div className="font-semibold">{where}</div>
-                <div className="text-emerald-800">{windowLabel(v)}</div>
-                {destinations ? <div className="text-emerald-800">→ {destinations}</div> : null}
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {vacancies.map((v) => (
+        <MyVacancyCard key={v.id} vacancy={v} />
+      ))}
     </div>
   );
 }
