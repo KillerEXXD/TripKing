@@ -47,7 +47,7 @@ function stepStatus(v: unknown): VerificationStepStatus {
 }
 const VV_STATUSES: VideoVerificationStatus[] = ['scheduled', 'completed', 'failed', 'cancelled', 'no_show'];
 const VV_OUTCOMES: VideoOutcome[] = ['approved', 'rejected', 'resubmit_required'];
-function transformVerification(v: unknown): VerificationSummary | undefined {
+export function transformVerification(v: unknown): VerificationSummary | undefined {
   if (!v || typeof v !== 'object') return undefined;
   const o = v as Api;
   const stepsRaw = (o.steps && typeof o.steps === 'object' ? o.steps : {}) as Api;

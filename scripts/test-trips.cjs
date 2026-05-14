@@ -127,6 +127,14 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('GET /trips/:id as the assigned driver → passenger name + posted_by_phone + passenger phone (hide=false); NOT passenger_otp', pDriver.passenger_name === 'Smoke Pax' && pDriver.posted_by_phone !== undefined && pDriver.passenger_phone === '+918888888888' && !has(pDriver, 'passenger_otp'), `${JSON.stringify({ n: pDriver.passenger_name, ph: pDriver.passenger_phone, otp: pDriver.passenger_otp })}`);
   const pRando = (await j('GET', `/trips/${tid}`, { token: randoToken })).json?.data || {};
   check('GET /trips/:id as a non-party → no passenger_name/phone, no posted_by_phone, no passenger_otp', !has(pRando, 'passenger_name') && !has(pRando, 'passenger_phone') && !has(pRando, 'posted_by_phone') && !has(pRando, 'passenger_otp'), `keys=${Object.keys(pRando).join(',')}`);
+
+  // Counterparty verification checklist (after assignment):
+  //  - poster sees the assigned driver's verification block (server-computed steps; no doc URLs)
+  //  - assigned driver sees posted_by_verification (the poster's checklist)
+  //  - rando sees neither
+  check('GET /trips/:id as the poster → assigned_driver.verification present (kyc_status + steps)', !!pPoster.assigned_driver?.verification && typeof pPoster.assigned_driver.verification.kyc_status === 'string' && pPoster.assigned_driver.verification.steps && typeof pPoster.assigned_driver.verification.steps_total === 'number', `verif=${JSON.stringify(pPoster.assigned_driver?.verification)}`);
+  check('GET /trips/:id as the assigned driver → posted_by_verification present', !!pDriver.posted_by_verification && typeof pDriver.posted_by_verification.kyc_status === 'string' && pDriver.posted_by_verification.steps, `verif=${JSON.stringify(pDriver.posted_by_verification)}`);
+  check('GET /trips/:id as a non-party → no assigned_driver.verification + no posted_by_verification', !pRando.assigned_driver?.verification && !has(pRando, 'posted_by_verification'), `drv=${JSON.stringify(pRando.assigned_driver?.verification)} pbv=${JSON.stringify(pRando.posted_by_verification)}`);
   check('GET /trips/:id unauthenticated → 401', (await j('GET', `/trips/${tid}`)).status === 401);
 
   // by-otp (passenger portal) — still public

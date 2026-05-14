@@ -1,5 +1,6 @@
 import type { CityRow } from './adminConfig';
 import type { NearRadius, Place } from './place';
+import type { KycStatus, VerificationSummary } from './driver';
 
 export type TripStatus = 'open' | 'has_applicants' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
 export type PosterRole = 'driver' | 'trip_manager';
@@ -84,6 +85,12 @@ export interface Trip {
   assignedDriverHandle?: string;
   /** The assigned driver, joined server-side (with live position). Present once a driver is assigned. */
   assignedDriver?: AssignedDriver;
+  /**
+   * Server-computed KYC checklist for the POSTER — attached on GET /trips/:id when the viewer is
+   * the assigned driver. Lets the assigned driver see how thoroughly the agent who hired them is
+   * verified (doc/video steps marked done, no document URLs). Absent for other viewers.
+   */
+  postedByVerification?: VerificationSummary;
   /** Server-computed straight-line km from the assigned driver's last position to the drop-off city (in-progress trips only). */
   distanceToDestinationKm?: number;
   showFareToPassenger: boolean;
@@ -110,12 +117,20 @@ export interface AssignedDriver {
   fullName?: string;
   phone?: string;
   profilePhotoUrl?: string;
+  /** The driver's KYC state; present whenever the joined `drivers` row is revealed (poster/admin/self views). */
+  kycStatus?: KycStatus;
   ratingAvg: number;
   ratingCount: number;
   totalTripsCompleted: number;
   currentLat?: number;
   currentLng?: number;
   currentLocationAt?: string;
+  /**
+   * Server-computed KYC checklist; attached on GET /trips/:id only, and only to the poster/admin
+   * (so they can see the verification state of their assigned driver). Lists which steps the
+   * driver has completed — no document URLs.
+   */
+  verification?: VerificationSummary;
 }
 
 /**

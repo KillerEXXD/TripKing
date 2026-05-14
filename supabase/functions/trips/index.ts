@@ -75,7 +75,7 @@ type Db = ReturnType<typeof serviceClient>;
 const WAYPOINTS_JOIN = 'waypoints:trip_waypoints!trip_id(id, seq, city:cities!city_id(*), place:places!place_id(*), arrive_at, wait_minutes, is_destination, notes)';
 const TRIP_SELECT =
   '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' +
-  'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle))';
+  'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, phone, profile_photo_url, kyc_status, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle))';
 // for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
 const BY_OTP_SELECT =
   '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' +
@@ -237,6 +237,69 @@ function distanceToDest(raw: Record<string, unknown>): number | null {
   const dLat = num(d?.current_lat), dLng = num(d?.current_lng), tLat = num(dest?.lat), tLng = num(dest?.lng);
   if (dLat == null || dLng == null || tLat == null || tLng == null) return null;
   return Math.round(haversineKm(dLat, dLng, tLat, tLng) * 10) / 10;
+}
+
+// ── Counterparty verification checklist (GET /trips/:id only) ────────────────
+// After assignment, the poster wants confidence in their driver, and the assigned driver
+// wants confidence in the poster. We mirror the per-step "Get verified" checklist (the
+// same shape /drivers/me and /agents/me return) so the trip-detail UI can show a tick
+// list — without exposing the actual document URLs (just done/todo/action_needed).
+const REQUIRED_VEHICLE_PHOTO_COLS = [
+  'photo_front_url', 'photo_back_url', 'photo_left_url', 'photo_right_url', 'photo_plate_url', 'rc_book_url', 'insurance_url',
+] as const;
+type VerificationBlock = {
+  kyc_status: string;
+  steps: Record<string, string>;
+  steps_done: number;
+  steps_total: number;
+};
+async function buildDriverVerificationLite(db: Db, driverId: string): Promise<VerificationBlock | null> {
+  const { data } = await db.from('drivers')
+    .select('id, kyc_status, full_name, home_city_id, aadhaar_front_path, aadhaar_back_path, driver_license_path, selfie_path')
+    .eq('id', driverId).maybeSingle();
+  if (!data) return null;
+  const drv = data as Record<string, unknown>;
+  const kycStatus = (drv.kyc_status as string) || 'pending';
+  const hasAllDocs = !!(drv.aadhaar_front_path && drv.aadhaar_back_path && drv.driver_license_path && drv.selfie_path);
+  const documents = kycStatus === 'resubmit_required' ? 'action_needed' : hasAllDocs ? 'done' : 'todo';
+  const { data: vehs } = await db.from('vehicles').select('*').eq('driver_id', driverId).eq('is_active', true);
+  const vehicles = (vehs ?? []) as Record<string, unknown>[];
+  const chosen = vehicles.find((v) => v.is_primary) ?? vehicles[0] ?? null;
+  const vehiclePhotosDone = !!chosen && REQUIRED_VEHICLE_PHOTO_COLS.every((c) => typeof chosen[c] === 'string' && (chosen[c] as string).length > 0);
+  const { data: vvRows } = await db.from('video_verifications')
+    .select('status, outcome').eq('driver_id', driverId).order('created_at', { ascending: false }).limit(1);
+  const vv = (vvRows && vvRows[0]) ? (vvRows[0] as Record<string, unknown>) : null;
+  const videoCall = kycStatus === 'approved' || kycStatus === 'ready_for_approval' ? 'done'
+    : vv && vv.status === 'scheduled' ? 'scheduled'
+    : vv && vv.status === 'completed' && vv.outcome === 'approved' ? 'done'
+    : 'todo';
+  const details = drv.full_name && drv.home_city_id ? 'done' : 'todo';
+  const steps = { details, documents, vehicle: vehicles.length > 0 ? 'done' : 'todo', vehicle_photos: vehiclePhotosDone ? 'done' : 'todo', video_call: videoCall } as Record<string, string>;
+  return { kyc_status: kycStatus, steps, steps_done: Object.values(steps).filter((s) => s === 'done').length, steps_total: 5 };
+}
+async function buildAgentVerificationLite(db: Db, managerId: string): Promise<VerificationBlock | null> {
+  const { data } = await db.from('trip_managers')
+    .select('id, kyc_status, full_name, business_city_id, aadhaar_front_path, aadhaar_back_path, selfie_path')
+    .eq('id', managerId).maybeSingle();
+  if (!data) return null;
+  const tm = data as Record<string, unknown>;
+  const kycStatus = (tm.kyc_status as string) || 'pending';
+  const hasAllDocs = !!(tm.aadhaar_front_path && tm.aadhaar_back_path && tm.selfie_path);
+  const documents = kycStatus === 'resubmit_required' ? 'action_needed' : hasAllDocs ? 'done' : 'todo';
+  const { data: vvRows } = await db.from('video_verifications')
+    .select('status, outcome').eq('manager_id', managerId).order('created_at', { ascending: false }).limit(1);
+  const vv = (vvRows && vvRows[0]) ? (vvRows[0] as Record<string, unknown>) : null;
+  const videoCall = kycStatus === 'approved' || kycStatus === 'ready_for_approval' ? 'done'
+    : vv && vv.status === 'scheduled' ? 'scheduled'
+    : vv && vv.status === 'completed' && vv.outcome === 'approved' ? 'done'
+    : 'todo';
+  const details = tm.full_name && tm.business_city_id ? 'done' : 'todo';
+  const steps = { details, documents, video_call: videoCall } as Record<string, string>;
+  return { kyc_status: kycStatus, steps, steps_done: Object.values(steps).filter((s) => s === 'done').length, steps_total: 3 };
+}
+async function agentIdForUser(db: Db, userId: string): Promise<string | null> {
+  const { data } = await db.from('trip_managers').select('id').eq('user_id', userId).maybeSingle();
+  return ((data as Record<string, unknown> | null)?.id as string | undefined) ?? null;
 }
 
 // ── PII redaction ────────────────────────────────────────────────────────────
@@ -745,7 +808,29 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips/:id', trip_id: raw.id as string });
       }
     }
-    return ok(redactTrip(raw, rel, posterReveal));
+    const redacted = redactTrip(raw, rel, posterReveal);
+    // After-assignment counterparty verification: poster/admin gets the driver's checklist;
+    // the assigned driver gets the poster's. We only attach on GET /trips/:id (detail) — the
+    // builder makes 2-3 extra queries, which is fine for one trip but expensive for a list.
+    if (raw.assigned_driver_id && (rel === 'owner' || rel === 'admin')) {
+      const v = await buildDriverVerificationLite(db, raw.assigned_driver_id as string);
+      const drv = redacted.assigned_driver as Record<string, unknown> | null | undefined;
+      if (drv && v) (drv as Record<string, unknown>).verification = v;
+    }
+    if (rel === 'assigned') {
+      const posterUserId = raw.posted_by_user_id as string | undefined;
+      const posterRole = raw.posted_by_role as string | undefined;
+      if (posterUserId) {
+        const subjectId = posterRole === 'driver' ? await driverIdFor(posterUserId) : await agentIdForUser(db, posterUserId);
+        if (subjectId) {
+          const v = posterRole === 'driver'
+            ? await buildDriverVerificationLite(db, subjectId)
+            : await buildAgentVerificationLite(db, subjectId);
+          if (v) redacted.posted_by_verification = v;
+        }
+      }
+    }
+    return ok(redacted);
   }
 
   // ── /trips/:id/applicants ────────────────────────────────────────────────
