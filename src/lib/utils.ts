@@ -99,6 +99,24 @@ export function haversineKm(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/**
+ * Pick the curated city closest to a (lat, lng) point by straight-line distance.
+ * Returns `undefined` if the city list is empty or if no city has lat/lng on file.
+ * Used by `<NearCityPicker>` to seed the near-city pill from the browser's geolocation.
+ */
+export function nearestCity<C extends { id: string; lat: number; lng: number }>(
+  point: { lat: number; lng: number },
+  cities: readonly C[],
+): C | undefined {
+  let best: { city: C; km: number } | undefined;
+  for (const c of cities) {
+    if (typeof c.lat !== 'number' || typeof c.lng !== 'number') continue;
+    const km = haversineKm(point.lat, point.lng, c.lat, c.lng);
+    if (!best || km < best.km) best = { city: c, km };
+  }
+  return best?.city;
+}
+
 /** Rough average road speed (km/h) used by `etaLabel` when turning km-remaining into an ETA. */
 export const ASSUMED_DRIVING_KMH = 40;
 
