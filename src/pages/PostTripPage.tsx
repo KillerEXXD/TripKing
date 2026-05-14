@@ -28,6 +28,7 @@ interface PostTripForm {
   acRequired: boolean;
   ratePerKm: number;
   driverBata: number;
+  gstAmount: number;
   extrasPaidByPassenger: boolean;
   passengerName: string;
   passengerPhone: string;
@@ -49,6 +50,7 @@ const DEFAULTS: PostTripForm = {
   acRequired: true,
   ratePerKm: 0,
   driverBata: 0,
+  gstAmount: 0,
   extrasPaidByPassenger: true,
   passengerName: '',
   passengerPhone: '',
@@ -119,6 +121,7 @@ export function PostTripPage() {
     if (!s) return;
     const cur = getValues();
     if (!cur.driverBata) setValue('driverBata', s.defaultDriverBata);
+    if (!cur.gstAmount) setValue('gstAmount', s.defaultGstAmount);
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
@@ -279,7 +282,7 @@ export function PostTripPage() {
       ratePerKm: Number(values.ratePerKm),
       totalFare,
       commissionPct: appSettings.data?.defaultCommissionPct ?? 0,
-      gstAmount: 0,
+      gstAmount: Math.max(0, Math.round(Number(values.gstAmount) || 0)),
       driverBata: Math.max(0, Math.round(Number(values.driverBata) || 0)),
       extrasPaidByPassenger: values.extrasPaidByPassenger,
       driverInstructions: values.driverInstructions.trim() || undefined,
@@ -490,6 +493,13 @@ export function PostTripPage() {
                   <Input type="number" min={0} step={1} inputMode="numeric" {...register('driverBata', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
                 </Field>
               </div>
+              <Field
+                label="GST (₹)"
+                error={errors.gstAmount?.message}
+                hint="Flat amount per trip — pre-filled from platform settings, edit if this trip's GST is different."
+              >
+                <Input type="number" min={0} step={1} inputMode="numeric" {...register('gstAmount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
+              </Field>
               <div className="rounded-lg bg-muted px-3 py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">Total fare ({distance > 0 ? distance : '—'} km × {formatINR(rate)}/km)</span>

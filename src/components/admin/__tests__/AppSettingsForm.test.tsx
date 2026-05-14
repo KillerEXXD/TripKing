@@ -17,7 +17,7 @@ function fixture(over: Partial<AppSettings> = {}): AppSettings {
     vehicleExpiryWarningDays: 90,
     defaultAlertRadiusKm: 25,
     defaultCommissionPct: 10,
-    defaultGstPct: 5,
+    defaultGstAmount: 100,
     defaultDriverBata: 300,
     defaultExtrasPaidByPassenger: true,
     defaultDriverInstructions: '1. Call before arrival',

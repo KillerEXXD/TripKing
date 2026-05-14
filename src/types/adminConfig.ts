@@ -72,9 +72,9 @@ export interface AppSettings {
   defaultAlertRadiusKm: number;
   /** Percentage. */
   defaultCommissionPct: number;
-  /** Percentage. */
-  defaultGstPct: number;
-  /** ₹ flat amount. */
+  /** ₹ flat amount per trip (NOT a percentage — renamed from `defaultGstPct` in migration 029). */
+  defaultGstAmount: number;
+  /** ₹ per day. Multi-day trips multiply this by the day count automatically. */
   defaultDriverBata: number;
   defaultExtrasPaidByPassenger: boolean;
   defaultDriverInstructions: string;
