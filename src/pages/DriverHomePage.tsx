@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Hand, MapPin, Plus, Search, Sparkles, Star, TrendingUp } from 'lucide-react';
+import { Bell, CheckCircle2, ChevronRight, Hand, MapPin, Navigation, Plus, Search, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
-import { useTrips } from '@/hooks/useTrips';
+import { useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useVacancies } from '@/hooks/useVacancies';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
@@ -13,7 +13,7 @@ import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
-import type { Driver, Trip } from '@/types';
+import type { Driver, MyApplication, Trip } from '@/types';
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
@@ -109,6 +109,110 @@ function NearbyTripCard({ trip }: { trip: Trip }) {
   );
 }
 
+/**
+ * Top-of-home card for a trip the driver is actively running (`status='in_progress'`).
+ * Always the highest priority — supersedes every other home card while live.
+ */
+function CurrentTripCard({ trip }: { trip: Trip }) {
+  return (
+    <Link
+      to={`/trips/${trip.id}`}
+      className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
+    >
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+        <Navigation className="size-3.5" aria-hidden /> Driving now
+      </div>
+      <div className="mt-1 text-lg font-bold text-emerald-950">
+        {trip.fromCity.name} → {trip.toCity.name}
+      </div>
+      <div className="mt-0.5 text-xs text-emerald-800">
+        {Math.round(trip.expectedDistanceKm)} km · {formatINR(trip.driverPayout)} payout
+      </div>
+      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-1.5 text-sm font-semibold text-white">
+        Continue trip <ChevronRight className="size-4" aria-hidden />
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Driver has accepted but hasn't yet entered the OTP + odometer to start (`status='assigned'`).
+ * Amber to nudge action but distinct from the live-in-progress emerald.
+ */
+function AssignedTripCard({ trip }: { trip: Trip }) {
+  return (
+    <Link
+      to={`/trips/${trip.id}`}
+      className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
+    >
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+        <CheckCircle2 className="size-3.5" aria-hidden /> Ready to start
+      </div>
+      <div className="mt-1 text-lg font-bold text-amber-950">
+        {trip.fromCity.name} → {trip.toCity.name}
+      </div>
+      <div className="mt-0.5 text-xs text-amber-800">
+        Pickup: {formatPickupTime(trip.pickupAt)} · {Math.round(trip.expectedDistanceKm)} km
+      </div>
+      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
+        Start the trip <ChevronRight className="size-4" aria-hidden />
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Trips an agent has selected the driver for, awaiting accept/decline. These live in
+ * `trip_acceptances` with `status='selected'` — sourced from `useMyApplications` and
+ * filtered client-side. (We could add `?status=selected` to the API later if list size
+ * becomes a concern.)
+ */
+function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
+  if (apps.length === 0) return null;
+  const first = apps[0]!;
+  const more = apps.length - 1;
+  return (
+    <Link
+      to="/my-trips?tab=applied"
+      className="block rounded-2xl border-2 border-blue-300 bg-blue-50 p-4 transition-colors hover:bg-blue-100"
+    >
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+        <Sparkles className="size-3.5" aria-hidden /> {apps.length} trip{apps.length === 1 ? '' : 's'} waiting for your decision
+      </div>
+      <div className="mt-1 text-base font-bold text-blue-950">
+        {first.trip.fromCity.name} → {first.trip.toCity.name}
+      </div>
+      <div className="mt-0.5 text-xs text-blue-800">
+        Pickup: {formatPickupTime(first.trip.pickupAt)}{more > 0 ? ` · +${more} more` : ''}
+      </div>
+      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-700 px-4 py-1.5 text-sm font-semibold text-white">
+        Review <ChevronRight className="size-4" aria-hidden />
+      </div>
+    </Link>
+  );
+}
+
+function AvailabilitySummaryCard({ count, max }: { count: number; max: number }) {
+  if (count === 0) return null;
+  return (
+    <Link
+      to="/my-trips?tab=available"
+      className="block rounded-2xl border border-violet-200 bg-violet-50/60 p-4 transition-colors hover:bg-violet-100/60"
+    >
+      <div className="flex items-center gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700">
+          <Hand className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold">You're showing as available ({count}/{max})</div>
+          <div className="truncate text-xs text-secondary">Agents can find you in the driver feed. Tap to manage.</div>
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
+      </div>
+    </Link>
+  );
+}
+
 function DriverHome({ driver }: { driver: Driver }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
@@ -118,18 +222,25 @@ function DriverHome({ driver }: { driver: Driver }) {
 
   const nearbyQuery = useTrips({ status: ['open', 'has_applicants'], fromCityId: nearCityId || undefined });
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
+  const myApplicationsQuery = useMyApplications();
   const myVacanciesQuery = useVacancies({ driverId: driver.id, status: 'active' });
 
   const nearby = nearbyQuery.data ?? [];
   const postedWithApplicants = (myPostsQuery.data ?? []).filter((t) => t.status === 'has_applicants').length;
   const activeVacancies = (myVacanciesQuery.data ?? []).length;
 
-  // Max-active-vacancies is admin-configurable (migration 022, default 2). When the driver has
-  // already hit the cap, the "I'm available" tile should take them to the list to manage what
-  // they've posted instead of into a form that the backend will 409 on submit.
+  // Priority cards: a driver has at most one trip in each of these states at a time.
+  const myDriving = myDrivingQuery.data ?? [];
+  const inProgressTrip = myDriving.find((t) => t.status === 'in_progress');
+  const assignedTrip = myDriving.find((t) => t.status === 'assigned');
+  // Selected = agent picked you, you haven't accepted/declined yet (handshake spec).
+  const awaitingDecision = (myApplicationsQuery.data ?? []).filter((a) => a.status === 'selected');
+
+  // Max-active-vacancies is admin-configurable (migration 022, default 2). When at the cap the
+  // tiles below offer no path forward; the AvailabilitySummaryCard handles the manage flow.
   const settings = useAppSettings();
   const maxActiveVacancies = settings.data?.maxActiveVacanciesPerDriver ?? 2;
-  const availableTileTarget = activeVacancies >= maxActiveVacancies ? '/my-trips?tab=available' : '/vacancies/new';
 
   return (
     <div>
@@ -149,6 +260,15 @@ function DriverHome({ driver }: { driver: Driver }) {
 
       <div className="space-y-3 px-4 pb-4 pt-3">
         {driver.verification && <GetVerifiedBanner verification={driver.verification} />}
+
+        {/* Priority stack — surfaces an active driving job, an accepted-but-not-started trip,
+            invitations awaiting accept/decline, and the driver's own availability listings.
+            Each card no-ops when it has nothing to show. */}
+        {inProgressTrip ? <CurrentTripCard trip={inProgressTrip} /> : null}
+        {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
+        <AwaitingMyDecisionCard apps={awaitingDecision} />
+        <AvailabilitySummaryCard count={activeVacancies} max={maxActiveVacancies} />
+
         {nearCity ? (
           <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 py-1.5 pl-3 pr-2 text-sm text-emerald-700">
             <MapPin className="size-3.5" aria-hidden />
@@ -166,10 +286,9 @@ function DriverHome({ driver }: { driver: Driver }) {
           </div>
         ) : null}
 
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-2 gap-2.5">
           <HubTile icon={<Search className="size-5" aria-hidden />} label="Find a trip" tone="blue" to="/trips" />
           <HubTile icon={<Plus className="size-5" aria-hidden />} label="Post a trip" tone="violet" to="/trips/new" />
-          <HubTile icon={<Hand className="size-5" aria-hidden />} label="I'm available" tone="emerald" to={availableTileTarget} />
         </div>
 
         <ReputationCard driver={driver} />
@@ -193,9 +312,6 @@ function DriverHome({ driver }: { driver: Driver }) {
       <div className="space-y-3 px-4">
         {postedWithApplicants > 0 ? (
           <ActionCard tone="amber" icon={<Sparkles className="size-5" aria-hidden />} title={`${postedWithApplicants} trip you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`} hint="Review applicants and pick a driver." to="/posted-trips" />
-        ) : null}
-        {activeVacancies > 0 ? (
-          <ActionCard tone="violet" icon={<Hand className="size-5" aria-hidden />} title={`You're showing as available (${activeVacancies})`} hint="Agents can find you in the driver feed." to="/vacancies" />
         ) : null}
       </div>
 
