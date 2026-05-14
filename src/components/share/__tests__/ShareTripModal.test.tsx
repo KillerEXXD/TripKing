@@ -47,6 +47,7 @@ const trip = {
   showFareToPassenger: true,
   hidePassengerPhone: false,
   applicantCount: 0,
+  pendingInvitationCount: 0,
   createdAt: '2099-05-30T00:00:00.000Z',
 } as Trip;
 

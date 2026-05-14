@@ -77,6 +77,10 @@ describe('transformTrip', () => {
     expect(t.toPlace).toBeUndefined();
     expect(t.distanceKm).toBeUndefined();
   });
+  it('reads pending_invitation_count, defaulting to 0 when absent', () => {
+    expect(transformTrip(fullTrip).pendingInvitationCount).toBe(0);
+    expect(transformTrip({ ...fullTrip, pending_invitation_count: 3 }).pendingInvitationCount).toBe(3);
+  });
   it('maps the joined from_place / to_place and a radius-list distance_km', () => {
     const t = transformTrip({
       ...fullTrip,

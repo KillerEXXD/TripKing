@@ -40,6 +40,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     showFareToPassenger: true,
     hidePassengerPhone: false,
     applicantCount: 0,
+    pendingInvitationCount: 0,
     createdAt: '2099-05-30T00:00:00.000Z',
     acceptanceWindowMinutes: 15,
     ...over,
@@ -114,13 +115,42 @@ describe('PostedTripsPage', () => {
     expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
   });
 
-  it('opens the share sheet from a card and links a needs-review trip to its applicants', () => {
+  it('opens the share sheet from a card and links a has-applicants trip to its applicants', () => {
     setTrips({ data: [makeTrip({ status: 'has_applicants', applicantCount: 2 })] });
     renderPosted();
-    // Default filter is "Open"; the has_applicants trip lives under "Needs review"
-    fireEvent.click(screen.getByRole('button', { name: /^needs review/i }));
+    // Default filter is "Open"; the has_applicants trip lives under "Has applicants"
+    fireEvent.click(screen.getByRole('button', { name: /^has applicants/i }));
     expect(screen.getByRole('link', { name: /review applicants/i })).toHaveAttribute('href', '/trips/t1/applicants');
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
     expect(screen.getByText('share modal')).toBeInTheDocument();
+  });
+
+  it('Invited chip surfaces open trips with pending invitations (and hides them from Open)', () => {
+    setTrips({ data: [
+      makeTrip({ id: 't1', status: 'open', pendingInvitationCount: 0, fromCity: city('c1', 'Vellore') }),
+      makeTrip({ id: 't2', status: 'open', pendingInvitationCount: 2, fromCity: city('c3', 'Bangalore') }),
+    ] });
+    renderPosted();
+    // Default filter is "Open" — only the no-invitations trip
+    expect(screen.getByText(/vellore → chennai/i)).toBeInTheDocument();
+    expect(screen.queryByText(/bangalore → chennai/i)).toBeNull();
+    // Invited chip — only the trip with pending invitations
+    fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
+    expect(screen.getByText(/bangalore → chennai/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore → chennai/i)).toBeNull();
+  });
+
+  it('All sorts trips by lifecycle priority (open → invited → has_applicants → … → cancelled)', () => {
+    setTrips({ data: [
+      makeTrip({ id: 't1', status: 'cancelled', fromCity: city('c1', 'Cancelled-from') }),
+      makeTrip({ id: 't2', status: 'open', pendingInvitationCount: 1, fromCity: city('c2', 'Invited-from') }),
+      makeTrip({ id: 't3', status: 'open', fromCity: city('c3', 'Open-from') }),
+    ] });
+    renderPosted();
+    fireEvent.click(screen.getByRole('button', { name: /^all/i }));
+    const cards = screen.getAllByText(/-from → chennai/i);
+    expect(cards[0]).toHaveTextContent(/^open-from/i);
+    expect(cards[1]).toHaveTextContent(/^invited-from/i);
+    expect(cards[2]).toHaveTextContent(/^cancelled-from/i);
   });
 });

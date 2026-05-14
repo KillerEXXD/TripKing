@@ -33,6 +33,7 @@ const trip: Trip = {
   showFareToPassenger: true,
   hidePassengerPhone: false,
   applicantCount: 1,
+  pendingInvitationCount: 0,
   createdAt: '2099-05-30T00:00:00.000Z',
   acceptanceWindowMinutes: 15,
 };

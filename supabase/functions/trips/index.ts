@@ -51,7 +51,8 @@ import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail } from '../_shared/http.ts';
 
 // v3 (2026-05-14): added `posted_by_kyc_status` to every trip row (drives <VerifiedBadge>).
-const CACHE_EPOCH = 'v3';
+// v4 (2026-05-15): added `pending_invitation_count` to every trip row (drives the "Invited" chip on /posted-trips).
+const CACHE_EPOCH = 'v4';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the
@@ -519,12 +520,31 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (uid && kyc.has(uid)) r.posted_by_kyc_status = kyc.get(uid);
     }
   }
+  /**
+   * Adds `pending_invitation_count` to each row — the number of `trip_invitations`
+   * rows in status='pending' for that trip. Drives the "Invited" chip on
+   * `/posted-trips` (agent's My posts). One indexed query per call, regardless
+   * of row count; defaults to 0 when no invitations exist.
+   */
+  async function enrichPendingInvitationCount(rows: Record<string, unknown>[]): Promise<void> {
+    if (rows.length === 0) return;
+    const tripIds = rows.map((r) => (typeof r.id === 'string' ? r.id : '')).filter(Boolean);
+    if (tripIds.length === 0) return;
+    const { data } = await db.from('trip_invitations').select('trip_id').in('trip_id', tripIds).eq('status', 'pending');
+    const counts = new Map<string, number>();
+    for (const r of (data ?? []) as { trip_id: string }[]) counts.set(r.trip_id, (counts.get(r.trip_id) ?? 0) + 1);
+    for (const r of rows) {
+      const id = typeof r.id === 'string' ? r.id : '';
+      r.pending_invitation_count = id ? counts.get(id) ?? 0 : 0;
+    }
+  }
   /** Re-fetch a trip joined + redacted for the viewer `u` (used by POST/assign/start/complete/cancel). */
   async function fullTrip(id: string, u: { id: string; role: string }): Promise<Record<string, unknown>> {
     const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', id).single();
     if (error) throw new Error(error.message);
     const raw = data as Record<string, unknown>;
     await enrichPostedByKyc([raw]);
+    await enrichPendingInvitationCount([raw]);
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     return redactTrip(raw, relationshipFor(raw, u, myDriverId), false);
   }
@@ -614,6 +634,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (error) throw new Error(error.message);
       const rows = (data ?? []) as Record<string, unknown>[];
       await enrichPostedByKyc(rows); // adds posted_by_kyc_status for the <VerifiedBadge>
+      await enrichPendingInvitationCount(rows); // adds pending_invitation_count for the "Invited" chip on /posted-trips
       return { rows, distEntries };
     };
 
@@ -855,6 +876,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
     const raw = data as Record<string, unknown>;
     await enrichPostedByKyc([raw]);
+    await enrichPendingInvitationCount([raw]);
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     const rel = relationshipFor(raw, u, myDriverId);
     let posterReveal = false;

@@ -147,6 +147,7 @@ export function transformTrip(api: Api): Trip {
     cancelledAt: str(api.cancelled_at),
     cancelReasonId: str(api.cancel_reason_id),
     applicantCount: num(api.applicant_count, 0),
+    pendingInvitationCount: num(api.pending_invitation_count, 0),
     createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
     passengerOtp: str(api.passenger_otp),
     distanceKm: numOpt(api.distance_km),

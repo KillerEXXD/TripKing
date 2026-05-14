@@ -106,6 +106,8 @@ export interface Trip {
   cancelledAt?: string;
   cancelReasonId?: string;
   applicantCount: number;
+  /** Number of `trip_invitations` rows in status='pending' for this trip — drives the "Invited" chip on `/posted-trips`. Always present (server defaults to 0). */
+  pendingInvitationCount: number;
   createdAt: string;
   /** The passenger OTP — echoed only to the trip poster / admin (or returned by `POST /trips/:id/assign`). Used to build the passenger-portal link. */
   passengerOtp?: string;
