@@ -2,7 +2,9 @@ import type { CityRow } from './adminConfig';
 import type { NearRadius, Place } from './place';
 import type { KycStatus, VerificationSummary } from './driver';
 
-export type TripStatus = 'open' | 'has_applicants' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+export type TripStatus = 'open' | 'has_applicants' | 'selected' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+/** Phase 2 of the two-step handshake — drives the driver's Accept/Decline card. Null on trips that pre-date the handshake. */
+export type DriverAcceptanceStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 export type PosterRole = 'driver' | 'trip_manager';
 export type AcceptanceStatus = 'applied' | 'selected' | 'rejected' | 'withdrawn' | 'expired';
 /** Migration 024: the *shape* of the route. */
@@ -77,6 +79,10 @@ export interface Trip {
   luggageNotes?: string;
   specialRequests?: string;
   status: TripStatus;
+  /** Two-step-handshake fields (migration 030). All NULL until Phase 2 wires the flow. */
+  acceptanceWindowMinutes: number;
+  acceptanceDeadlineAt?: string;
+  driverAcceptanceStatus?: DriverAcceptanceStatus;
   assignedDriverId?: string;
   assignedVehicleId?: string;
   assignedAcceptanceId?: string;
@@ -213,6 +219,8 @@ export interface PostTripInput {
   commissionPct: number;
   gstAmount: number;
   driverBata: number;
+  /** Phase 1 of the two-step handshake — how long the selected driver has to Accept. 5–30, default 15. */
+  acceptanceWindowMinutes?: number;
   extrasPaidByPassenger: boolean;
   driverInstructions?: string;
   passengerName: string;

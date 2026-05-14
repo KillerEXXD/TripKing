@@ -12,12 +12,13 @@ import type { Trip, TripStatus } from '@/types';
 export const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   open: { label: 'Open', variant: 'success' },
   has_applicants: { label: 'Needs review', variant: 'warning' },
+  selected: { label: 'Awaiting acceptance', variant: 'warning' },
   assigned: { label: 'Assigned', variant: 'info' },
   in_progress: { label: 'In progress', variant: 'info' },
   completed: { label: 'Completed', variant: 'muted' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
-const FILTERS: ('all' | TripStatus)[] = ['all', 'open', 'has_applicants', 'assigned', 'in_progress', 'completed', 'cancelled'];
+const FILTERS: ('all' | TripStatus)[] = ['all', 'open', 'has_applicants', 'selected', 'assigned', 'in_progress', 'completed', 'cancelled'];
 
 const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
 

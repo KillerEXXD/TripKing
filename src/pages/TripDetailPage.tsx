@@ -28,6 +28,7 @@ import type { Trip, TripStatus, Vehicle } from '@/types';
 const STATUS_BADGE = {
   open: { label: 'Open', variant: 'success' },
   has_applicants: { label: 'Has applicants', variant: 'warning' },
+  selected: { label: 'Awaiting acceptance', variant: 'warning' },
   assigned: { label: 'Assigned', variant: 'info' },
   in_progress: { label: 'In progress', variant: 'info' },
   completed: { label: 'Completed', variant: 'muted' },

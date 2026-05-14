@@ -677,6 +677,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       commission_pct: b.commission_pct ?? 10,
       gst_amount: b.gst_amount ?? 0,
       driver_bata: b.driver_bata ?? 300,
+      // Phase 1 of the two-step handshake — accept the trip-creator's window choice.
+      // CHECK [5,30] is enforced at the DB; if omitted, falls back to the column default (15).
+      ...(typeof b.acceptance_window_minutes === 'number' && Number.isFinite(b.acceptance_window_minutes)
+        ? { acceptance_window_minutes: Math.min(30, Math.max(5, Math.round(b.acceptance_window_minutes))) }
+        : {}),
       extras_paid_by_passenger: b.extras_paid_by_passenger ?? true,
       driver_instructions: (b.driver_instructions as string | null) ?? null,
       passenger_name: (typeof b.passenger_name === 'string' && b.passenger_name.trim()) ? b.passenger_name.trim() : '',

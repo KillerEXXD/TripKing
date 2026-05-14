@@ -99,6 +99,12 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const getAsPoster0 = await j('GET', `/trips/${tid}`, { token });
   check('GET /trips/:id (poster) → 200, no passenger_otp_hash', getAsPoster0.status === 200 && getAsPoster0.json?.data?.id === tid && !has(getAsPoster0.json?.data, 'passenger_otp_hash'), `status=${getAsPoster0.status}`);
   check('GET /trips/:id → posted_by_kyc_status is a string (drives <VerifiedBadge>)', typeof getAsPoster0.json?.data?.posted_by_kyc_status === 'string', `posted_by_kyc_status=${JSON.stringify(getAsPoster0.json?.data?.posted_by_kyc_status)}`);
+  // Phase 1 of the two-step handshake (migration 030): every trip carries an acceptance window int 5–30.
+  check('GET /trips/:id → acceptance_window_minutes is an int 5–30 (handshake Phase 1)',
+    typeof getAsPoster0.json?.data?.acceptance_window_minutes === 'number'
+      && getAsPoster0.json.data.acceptance_window_minutes >= 5
+      && getAsPoster0.json.data.acceptance_window_minutes <= 30,
+    `acceptance_window_minutes=${JSON.stringify(getAsPoster0.json?.data?.acceptance_window_minutes)}`);
   // a non-party authed user → browse-safe (no passenger PII)
   const getAsRando0 = await j('GET', `/trips/${tid}`, { token: randoToken });
   check('GET /trips/:id (non-party) → 200, browse-safe (no passenger_name/phone, no posted_by_phone)', getAsRando0.status === 200 && getAsRando0.json?.data?.id === tid && !has(getAsRando0.json?.data, 'passenger_name') && !has(getAsRando0.json?.data, 'passenger_phone') && !has(getAsRando0.json?.data, 'posted_by_phone'), `keys=${Object.keys(getAsRando0.json?.data || {}).join(',')}`);

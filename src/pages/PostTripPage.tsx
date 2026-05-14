@@ -30,6 +30,8 @@ interface PostTripForm {
   ratePerKm: number;
   driverBata: number;
   gstAmount: number;
+  /** Phase 1 of the two-step handshake — 5–30 min. */
+  acceptanceWindowMinutes: number;
   extrasPaidByPassenger: boolean;
   passengerName: string;
   passengerPhone: string;
@@ -52,6 +54,7 @@ const DEFAULTS: PostTripForm = {
   ratePerKm: 0,
   driverBata: 0,
   gstAmount: 0,
+  acceptanceWindowMinutes: 15,
   extrasPaidByPassenger: true,
   passengerName: '',
   passengerPhone: '',
@@ -285,6 +288,7 @@ export function PostTripPage() {
       commissionPct: appSettings.data?.defaultCommissionPct ?? 0,
       gstAmount: Math.max(0, Math.round(Number(values.gstAmount) || 0)),
       driverBata: Math.max(0, Math.round(Number(values.driverBata) || 0)),
+      acceptanceWindowMinutes: Math.min(30, Math.max(5, Math.round(Number(values.acceptanceWindowMinutes) || 15))),
       extrasPaidByPassenger: values.extrasPaidByPassenger,
       driverInstructions: values.driverInstructions.trim() || undefined,
       passengerName: passengerSectionOpen ? values.passengerName.trim() : '',
@@ -508,6 +512,27 @@ export function PostTripPage() {
                 hint="Flat amount per trip — pre-filled from platform settings, edit if this trip's GST is different."
               >
                 <Input type="number" min={0} step={1} inputMode="numeric" {...register('gstAmount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
+              </Field>
+              <Field
+                label={`Acceptance window: ${watch('acceptanceWindowMinutes') ?? 15} min`}
+                error={errors.acceptanceWindowMinutes?.message}
+                hint="After you pick a driver, they have this long to Accept. If they don't, the trip goes back to applicants. (Two-step handshake — see docs/TRIP_ASSIGNMENT_WORKFLOW.md.)"
+              >
+                <input
+                  type="range"
+                  min={5}
+                  max={30}
+                  step={1}
+                  className="w-full accent-emerald-600"
+                  {...register('acceptanceWindowMinutes', {
+                    valueAsNumber: true,
+                    validate: (v) => (Number.isFinite(v) && v >= 5 && v <= 30) || 'Pick a value between 5 and 30 minutes',
+                  })}
+                />
+                <div className="flex justify-between text-[10px] uppercase tracking-wide text-secondary">
+                  <span>5 min</span>
+                  <span>30 min</span>
+                </div>
               </Field>
               <div className="rounded-lg bg-muted px-3 py-2 text-sm">
                 <div className="flex items-center justify-between">
