@@ -143,22 +143,50 @@ export function PostTripPage() {
   // The expected distance is computed from the picked route (the curated city's centre, or the
   // pinned exact spot when one is set) — the poster never types it. A short delay debounces rapid
   // changes and lets the "calculating…" indicator paint.
+  // For multi-way the chain is summed leg-by-leg (origin → stop 1 → … → final, + optionally
+  // origin again when "Return to start" is ticked). One-way / round-trip stay at the legacy
+  // 2-point haversine — round-trip drivers actually cover the route twice but the fare math
+  // hasn't changed semantics, so we leave that decision for a separate commit.
   const citiesData = citiesQuery.data;
   useEffect(() => {
     const coordsOf = (id: string) => citiesData?.find((c) => c.id === id);
-    const a = fromPlace ?? coordsOf(fromCityId);
-    const b = toPlace ?? coordsOf(toCityId);
-    if (!a || !b || !Number.isFinite(a.lat) || !Number.isFinite(a.lng) || !Number.isFinite(b.lat) || !Number.isFinite(b.lng) || (a.lat === b.lat && a.lng === b.lng)) {
+    type Pt = { lat: number; lng: number };
+    const valid = (p: { lat?: number; lng?: number } | undefined | null): p is Pt =>
+      !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
+
+    // Build the ordered chain of coordinate pairs to sum.
+    let chain: Pt[] = [];
+    if (tripType === 'multi_way') {
+      const origin = fromPlace ?? coordsOf(fromCityId);
+      if (valid(origin)) chain.push({ lat: origin.lat, lng: origin.lng });
+      for (const w of waypoints) {
+        const c = coordsOf(w.cityId);
+        if (valid(c)) chain.push({ lat: c.lat, lng: c.lng });
+      }
+      if (returnToStart && valid(origin)) chain.push({ lat: origin.lat, lng: origin.lng });
+    } else {
+      const a = fromPlace ?? coordsOf(fromCityId);
+      const b = toPlace ?? coordsOf(toCityId);
+      if (valid(a) && valid(b) && !(a.lat === b.lat && a.lng === b.lng)) {
+        chain = [{ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }];
+      }
+    }
+
+    if (chain.length < 2) {
       setDistanceCalculating(false);
       return;
     }
     setDistanceCalculating(true);
     const t = setTimeout(() => {
-      setValue('expectedDistanceKm', Math.max(1, Math.round(haversineKm(a.lat, a.lng, b.lat, b.lng) * ROAD_DISTANCE_FACTOR)), { shouldValidate: true });
+      let totalKm = 0;
+      for (let i = 1; i < chain.length; i++) {
+        totalKm += haversineKm(chain[i - 1]!.lat, chain[i - 1]!.lng, chain[i]!.lat, chain[i]!.lng);
+      }
+      setValue('expectedDistanceKm', Math.max(1, Math.round(totalKm * ROAD_DISTANCE_FACTOR)), { shouldValidate: true });
       setDistanceCalculating(false);
     }, 450);
     return () => clearTimeout(t);
-  }, [fromCityId, toCityId, fromPlace, toPlace, citiesData, setValue]);
+  }, [tripType, fromCityId, toCityId, fromPlace, toPlace, waypoints, returnToStart, citiesData, setValue]);
 
   // Look the passenger up by phone (debounced) once it's "complete" — prefill the name from the
   // directory when we have a hit and the name field is still empty (never clobber a typed name).
