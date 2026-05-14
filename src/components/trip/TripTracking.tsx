@@ -43,6 +43,17 @@ export function TripTracking({ trip }: { trip: Trip }) {
   const inProgress = trip.status === 'in_progress';
   const kmRemaining = typeof trip.distanceToDestinationKm === 'number' ? trip.distanceToDestinationKm : undefined;
   const fraction = inProgress && kmRemaining != null && trip.expectedDistanceKm > 0 ? Math.min(0.98, Math.max(0.02, 1 - kmRemaining / trip.expectedDistanceKm)) : 0.02;
+  // Multi-day "Day N of M" — only renders when the trip span is ≥2 days and it's already in_progress.
+  // `dayN` clamps to the trip span so "Day 4 of 3" is impossible if the driver overran.
+  const totalDays = (() => {
+    if (!trip.expectedEndAt) return 1;
+    const start = new Date(trip.pickupAt).getTime();
+    const end = new Date(trip.expectedEndAt).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 1;
+    return Math.max(1, Math.ceil((end - start) / 86_400_000));
+  })();
+  const dayN = inProgress && totalDays > 1 ? Math.min(totalDays, Math.max(1, Math.ceil((Date.now() - new Date(trip.pickupAt).getTime()) / 86_400_000))) : 1;
+  const showMultiDay = inProgress && totalDays > 1;
 
   return (
     <Card className="gap-3">
@@ -50,7 +61,14 @@ export function TripTracking({ trip }: { trip: Trip }) {
         <div className="flex items-center gap-1.5 font-semibold">
           <Navigation className="size-4 text-emerald-600" aria-hidden /> Live tracking
         </div>
-        <span className="text-xs text-secondary">{inProgress ? 'On the way' : 'Driver confirmed'}</span>
+        <div className="flex items-center gap-2">
+          {showMultiDay ? (
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+              Day {dayN} of {totalDays}
+            </span>
+          ) : null}
+          <span className="text-xs text-secondary">{inProgress ? 'On the way' : 'Driver confirmed'}</span>
+        </div>
       </div>
 
       <div>

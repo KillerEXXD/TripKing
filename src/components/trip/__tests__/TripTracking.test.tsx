@@ -58,6 +58,28 @@ describe('<TripTracking>', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('shows "Day N of M" chip on a multi-day in-progress trip', () => {
+    const d = driver({ currentLat: 13, currentLng: 80 });
+    // Trip span = 3 days; pickup was ~1 day ago so we expect Day 2 of 3.
+    const pickupAt = new Date(Date.now() - 25 * 3_600_000).toISOString();
+    const expectedEndAt = new Date(new Date(pickupAt).getTime() + 3 * 86_400_000).toISOString();
+    renderWithProviders(<TripTracking trip={makeTrip({ status: 'in_progress', distanceToDestinationKm: 100, assignedDriver: d, pickupAt, expectedEndAt })} />);
+    expect(screen.getByText(/Day 2 of 3/i)).toBeInTheDocument();
+  });
+
+  it('does NOT show the multi-day chip on a single-day trip', () => {
+    const d = driver({ currentLat: 13, currentLng: 80 });
+    renderWithProviders(<TripTracking trip={makeTrip({ status: 'in_progress', distanceToDestinationKm: 40, assignedDriver: d })} />);
+    expect(screen.queryByText(/Day \d+ of \d+/i)).toBeNull();
+  });
+
+  it('does NOT show the multi-day chip on an "assigned" multi-day trip (not yet started)', () => {
+    const pickupAt = new Date(Date.now() + 3_600_000).toISOString();
+    const expectedEndAt = new Date(new Date(pickupAt).getTime() + 3 * 86_400_000).toISOString();
+    renderWithProviders(<TripTracking trip={makeTrip({ status: 'assigned', assignedDriver: driver(), pickupAt, expectedEndAt })} />);
+    expect(screen.queryByText(/Day \d+ of \d+/i)).toBeNull();
+  });
+
   it('for an assigned (not-yet-started) trip shows the "driver confirmed" panel, no ETA card', () => {
     renderWithProviders(<TripTracking trip={makeTrip({ status: 'assigned', assignedDriver: driver() })} />);
     expect(screen.getByText('Live tracking')).toBeInTheDocument();
