@@ -91,7 +91,7 @@ describe('transformTrip', () => {
   it('keeps the assigned driver but leaves the position fields undefined when the API sends them as null', () => {
     const t = transformTrip({
       ...fullTrip,
-      status: 'assigned',
+      status: 'accepted',
       assigned_driver_id: 'd1',
       assigned_driver: { id: 'd1', display_handle: 'A1B2C3D', full_name: 'Ravi', profile_photo_url: '', rating_avg: 4.7, rating_count: 12, total_trips_completed: 30, current_lat: null, current_lng: null, current_location_at: null },
     });

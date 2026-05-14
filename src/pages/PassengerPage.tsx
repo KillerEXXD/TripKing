@@ -9,7 +9,7 @@ import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
 const STATUS_LABEL: Partial<Record<TripStatus, { label: string; variant: 'success' | 'info' | 'muted' | 'destructive' }>> = {
-  assigned: { label: 'Confirmed', variant: 'success' },
+  accepted: { label: 'Confirmed', variant: 'success' },
   in_progress: { label: 'In progress', variant: 'info' },
   completed: { label: 'Completed', variant: 'muted' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },

@@ -18,7 +18,7 @@ The Phase W prototype shipped to https://driver-mahal.vercel.app uncovered concr
 
 1. **Map-driven location search everywhere** — single reusable `LocationSearchPanel` component (OpenStreetMap Nominatim for prototype, Google Places-ready for prod). Used by Driver Home current-location, Post Vacancy from + multi-add destinations, Post Trip from/to, alert criteria, Vacancies/Find Driver filter, Trip Feed filter. Every selection carries lat/lng for radius matching.
 2. **Default-to-near-me for browse views** — drivers land on Trips and Vacancies pre-filtered to their currentCity with a contextual "Trips from {city}" / "Drivers vacant in {city}" heading.
-3. **Trip lifecycle: applied → assigned → started → completed** with persisted state across the prototype:
+3. **Trip lifecycle: applied → accepted → started → completed** with persisted state across the prototype:
    - **`myApplicationsStore`** — driver applications survive reload; "✓ You applied" badges appear on every trip card; Apply CTA → "Applied" pill with Withdraw.
    - **`tripStateStore`** — manager assignments + cancellations + OTP + visibility toggles, overlaid on the seed trips so feeds reflect user actions.
    - **`tripExecutionStore`** — per-trip start/complete timestamps, odometer photos (start + end), driver notes.
@@ -237,7 +237,7 @@ DriverMahal is a 3-role progressive web app that connects independent cab driver
 | `passenger_count` | int | |
 | `luggage_notes`, `special_requests` | text | |
 | `status` | enum | `open \| has_applicants \| assigned \| in_progress \| completed \| closed \| cancelled \| expired \| disputed` — see **Trip Status Lifecycle** below |
-| `confirmed_substate` | enum | Only meaningful when `status='assigned'`: `awaiting_start \| driver_en_route \| arrived_at_pickup`. Drives the "Driver on the way / arrived" passenger notification and starts live tracking. |
+| `confirmed_substate` | enum | Only meaningful when `status='accepted'`: `awaiting_start \| driver_en_route \| arrived_at_pickup`. Drives the "Driver on the way / arrived" passenger notification and starts live tracking. |
 | `cancellation_reason` | enum | Only set when `status='cancelled'`: `manager \| driver \| mid_trip \| no_show \| passenger_no_show`. (Kept as a separate field rather than expanding the status enum so analytics still know who cancelled and why.) |
 | `closure_state` | enum | Only meaningful when `status='completed'`: `pending_reviews \| closed`. After the review window (48h) or once both parties review, `status` flips to `closed`. |
 | `applicant_count` | int | Cached count of `trip_acceptances` rows with `status='applied'` |
@@ -268,10 +268,10 @@ A trip moves through these states. `status` is the primary field; `confirmed_sub
 | `has_applicants` | ≥1 driver applied, none selected yet | System on first `trip_acceptances` row | `assigned`, `open` (all withdrew), `cancelled`, `expired` |
 | `expired` | `pickup_datetime` passed with no driver assigned (nightly job) | System | *(terminal)* |
 
-**Confirmed** (`status='assigned'`, qualified by `confirmed_substate`)
+**Confirmed** (`status='accepted'`, qualified by `confirmed_substate`)
 | `confirmed_substate` | Meaning | Set by | Can move to |
 |----------------------|---------|--------|-------------|
-| `awaiting_start` | Driver selected; trip not yet underway | Poster picks a driver → `status='assigned'`, `assigned_driver_id` set, other acceptances → `rejected` | `driver_en_route`, or `cancelled` (`manager`/`driver`/`no_show`) |
+| `awaiting_start` | Driver selected; trip not yet underway | Poster picks a driver → `status='accepted'`, `assigned_driver_id` set, other acceptances → `rejected` | `driver_en_route`, or `cancelled` (`manager`/`driver`/`no_show`) |
 | `driver_en_route` | Driver heading to the pickup point — **live tracking starts here** | Driver taps "On my way" | `arrived_at_pickup`, or `cancelled` (`driver`/`no_show`) |
 | `arrived_at_pickup` | Driver at pickup, waiting for passenger | Driver taps "Arrived" | `in_progress`, or `cancelled` (`passenger_no_show`) |
 
@@ -302,7 +302,7 @@ A trip moves through these states. `status` is the primary field; `confirmed_sub
 
 ```
                 ┌─ cancelled (manager/driver) ─┐
-open → has_applicants → assigned ───────────────┤
+open → has_applicants → accepted ───────────────┤
   │        │             │ awaiting_start       │
   │        │             ▼                       ▼
   └─ expired              driver_en_route → arrived_at_pickup → in_progress → completed → closed
@@ -331,7 +331,7 @@ open → has_applicants → assigned ──────────────�
 | `decision_note` | text | Optional reason from poster |
 | `created_at` | timestamp | |
 
-> **Multi-driver acceptance:** When a trip is posted, any approved driver matching `car_type_required` can apply. Multiple drivers may apply per trip. The poster (driver or trip manager) sees the applicant list, reviews each driver's profile (rating, completed trips, vehicle, photo), and selects exactly one — at which point that row's `status='selected'`, all others auto-flip to `rejected`, and the trip's `status='assigned'` with `assigned_driver_id` set. Selected and rejected drivers all receive push notifications.
+> **Multi-driver acceptance:** When a trip is posted, any approved driver matching `car_type_required` can apply. Multiple drivers may apply per trip. The poster (driver or trip manager) sees the applicant list, reviews each driver's profile (rating, completed trips, vehicle, photo), and selects exactly one — at which point that row's `status='selected'`, all others auto-flip to `rejected`, and the trip's `status='accepted'` with `assigned_driver_id` set. Selected and rejected drivers all receive push notifications.
 
 ### `alerts` — match criteria a user subscribes to
 | Field | Type | Description |

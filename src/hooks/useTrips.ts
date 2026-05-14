@@ -3,6 +3,7 @@ import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
   acceptTrip,
+  getOverlappingApplications,
   applyToTrip,
   assignDriver,
   cancelAssignment,
@@ -47,7 +48,7 @@ function pollIntervalFor(status: TripStatus | undefined): number | false {
     case 'in_progress':    // live tracking — driver position + ETA
       return 5_000;
     case 'has_applicants': // agent is hovering on the applicants page
-    case 'assigned':       // assigned but not yet driving; passenger waiting for OTP
+    case 'accepted':       // assigned but not yet driving; passenger waiting for OTP
       return 15_000;
     case 'open':           // fresh post, agent watching for first applicant
       return 30_000;
@@ -104,7 +105,7 @@ export function useTripByOtp(otp: string | undefined) {
     staleTime: STALE.live,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === 'assigned' || status === 'in_progress' ? 12_000 : false;
+      return status === 'accepted' || status === 'in_progress' ? 12_000 : false;
     },
   });
 }
@@ -159,12 +160,24 @@ export function useAssignDriver() {
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
 }
-/** Phase 2 of the two-step handshake — the selected driver Accepts (OTP is generated, trip → assigned). */
+/** Phase 2 of the two-step handshake — the selected driver Accepts (OTP is generated, trip → accepted). */
 export function useAcceptTrip() {
   const invalidate = useInvalidateTrips();
   return useMutation({
-    mutationFn: ({ tripId }: { tripId: string }) => acceptTrip(tripId),
+    mutationFn: ({ tripId, withdrawAcceptanceIds }: { tripId: string; withdrawAcceptanceIds?: string[] }) =>
+      acceptTrip(tripId, { withdrawAcceptanceIds }),
     onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+
+/** Driver-only — overlapping applications this driver should consider withdrawing
+ *  when accepting `tripId`. Empty list means no conflict. Fetched on dialog open. */
+export function useOverlappingApplications(tripId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['trip', tripId, 'overlapping-applications'],
+    queryFn: () => getOverlappingApplications(tripId as string),
+    enabled: !!tripId && enabled,
+    staleTime: STALE.live,
   });
 }
 /** Selected driver Declines — trip falls back to has_applicants; this driver is out of the pool. */

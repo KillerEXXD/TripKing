@@ -87,9 +87,18 @@ export function assignDriver(tripId: string, acceptanceId: string): Promise<Trip
 }
 
 // Phase 2 of the two-step handshake (docs/TRIP_ASSIGNMENT_WORKFLOW.md §8).
-// The selected driver Accepts → OTP is generated, trip flips to 'assigned'.
-export function acceptTrip(tripId: string): Promise<Trip> {
-  return apiClient.post<Api>(`/trips/${tripId}/accept`, {}).then((r) => transformTrip(unwrap(r.data)));
+// The selected driver Accepts → OTP is generated, trip flips to 'accepted'.
+// Optional `withdrawAcceptanceIds` — applications on overlapping trips that
+// should be withdrawn at the same time (driver's choice from AcceptTripDialog).
+export function acceptTrip(tripId: string, input?: { withdrawAcceptanceIds?: string[] }): Promise<Trip> {
+  const body = input?.withdrawAcceptanceIds?.length ? { withdraw_acceptance_ids: input.withdrawAcceptanceIds } : {};
+  return apiClient.post<Api>(`/trips/${tripId}/accept`, body).then((r) => transformTrip(unwrap(r.data)));
+}
+
+/** Driver-only — fetches other trips the caller has applied to that overlap this one's
+ *  [pickup_at, expected_end_at]. Used by the AcceptTripDialog. */
+export function getOverlappingApplications(tripId: string): Promise<MyApplication[]> {
+  return apiClient.get<Api[]>(`/trips/${tripId}/overlapping-applications`).then((r) => (r.data ?? []).map(transformMyApplication));
 }
 
 // Selected driver Declines → trip falls back to has_applicants (this driver is out of the pool).

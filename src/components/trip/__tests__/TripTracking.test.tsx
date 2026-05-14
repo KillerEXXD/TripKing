@@ -77,12 +77,12 @@ describe('<TripTracking>', () => {
   it('does NOT show the multi-day chip on an "assigned" multi-day trip (not yet started)', () => {
     const pickupAt = new Date(Date.now() + 3_600_000).toISOString();
     const expectedEndAt = new Date(new Date(pickupAt).getTime() + 3 * 86_400_000).toISOString();
-    renderWithProviders(<TripTracking trip={makeTrip({ status: 'assigned', assignedDriver: driver(), pickupAt, expectedEndAt })} />);
+    renderWithProviders(<TripTracking trip={makeTrip({ status: 'accepted', assignedDriver: driver(), pickupAt, expectedEndAt })} />);
     expect(screen.queryByText(/Day \d+ of \d+/i)).toBeNull();
   });
 
   it('for an assigned (not-yet-started) trip shows the "driver confirmed" panel, no ETA card', () => {
-    renderWithProviders(<TripTracking trip={makeTrip({ status: 'assigned', assignedDriver: driver() })} />);
+    renderWithProviders(<TripTracking trip={makeTrip({ status: 'accepted', assignedDriver: driver() })} />);
     expect(screen.getByText('Live tracking')).toBeInTheDocument();
     expect(screen.getByText('Driver confirmed')).toBeInTheDocument();
     expect(screen.getByText(/you'll see them move here once the trip starts/i)).toBeInTheDocument();

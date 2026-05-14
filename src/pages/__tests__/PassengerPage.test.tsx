@@ -35,7 +35,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     passengerName: 'Priya Sharma',
     passengerPhone: '+919999999999',
     passengerCount: 2,
-    status: 'assigned',
+    status: 'accepted',
     assignedDriverId: 'd1',
     assignedDriver: driver,
     showFareToPassenger: true,

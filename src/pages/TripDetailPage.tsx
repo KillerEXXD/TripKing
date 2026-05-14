@@ -14,6 +14,7 @@ import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
+import { AcceptTripDialog } from '@/components/trip/AcceptTripDialog';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
@@ -32,7 +33,7 @@ const STATUS_BADGE = {
   open: { label: 'Open', variant: 'success' },
   has_applicants: { label: 'Has applicants', variant: 'warning' },
   selected: { label: 'Awaiting acceptance', variant: 'warning' },
-  assigned: { label: 'Assigned', variant: 'info' },
+  accepted: { label: 'Accepted', variant: 'info' },
   in_progress: { label: 'In progress', variant: 'info' },
   completed: { label: 'Completed', variant: 'muted' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
@@ -177,7 +178,7 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
 }
 
 /** Assigned-driver bottom CTA: start the trip with the passenger's OTP, then complete it. */
-function AssignedDriverBar({ trip }: { trip: Trip }) {
+function AcceptedDriverBar({ trip }: { trip: Trip }) {
   const startMutation = useStartTrip();
   const completeMutation = useCompleteTrip();
   const [showStartForm, setShowStartForm] = useState(false);
@@ -217,7 +218,7 @@ function AssignedDriverBar({ trip }: { trip: Trip }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md space-y-2 border-t bg-white px-4 py-3">
       <div className="text-center text-xs font-semibold text-primary">You&apos;re driving this trip</div>
-      {trip.status === 'assigned' ? (
+      {trip.status === 'accepted' ? (
         <>
           {showStartForm ? (
             <>
@@ -483,11 +484,17 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
   const acceptMutation = useAcceptTrip();
   const declineMutation = useDeclineTrip();
   const callHref = trip.postedByPhone ? `tel:${trip.postedByPhone}` : undefined;
+  const [confirming, setConfirming] = useState(false);
 
-  async function onAccept() {
+  async function runAccept(withdrawAcceptanceIds: string[]) {
+    setConfirming(false);
     try {
-      await acceptMutation.mutateAsync({ tripId: trip.id });
-      toast.success("You're confirmed — the passenger will get an OTP shortly.");
+      await acceptMutation.mutateAsync({ tripId: trip.id, withdrawAcceptanceIds });
+      toast.success(
+        withdrawAcceptanceIds.length > 0
+          ? `Accepted — ${withdrawAcceptanceIds.length} overlapping application${withdrawAcceptanceIds.length === 1 ? '' : 's'} withdrawn. The passenger will get an OTP shortly.`
+          : "You're confirmed — the passenger will get an OTP shortly.",
+      );
     } catch (e) {
       // 409 = race condition (agent withdrew or selection expired between render and tap).
       const status = e instanceof ApiError ? e.status : 0;
@@ -534,13 +541,20 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
         ) : null}
       </div>
       <div className="mt-3 flex gap-2">
-        <Button variant="full" size="lg" className="flex-1" onClick={() => void onAccept()} disabled={busy}>
+        <Button variant="full" size="lg" className="flex-1" onClick={() => setConfirming(true)} disabled={busy}>
           {acceptMutation.isPending ? 'Accepting…' : 'Accept'}
         </Button>
         <Button variant="outline" size="lg" className="text-destructive" onClick={() => void onDecline()} disabled={busy}>
           {declineMutation.isPending ? 'Declining…' : 'Decline'}
         </Button>
       </div>
+      <AcceptTripDialog
+        trip={trip}
+        open={confirming}
+        onClose={() => setConfirming(false)}
+        onConfirm={(ids) => void runAccept(ids)}
+        pending={acceptMutation.isPending}
+      />
     </Card>
   );
 }
@@ -599,10 +613,10 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
   const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
   const applyable = trip.status === 'open' || trip.status === 'has_applicants';
   const showApplyBar = viewer.isDriver && !viewer.isPoster && applyable;
-  const showAssignedBar = viewer.isAssignedDriver && (trip.status === 'assigned' || trip.status === 'in_progress');
+  const showAcceptedBar = viewer.isAssignedDriver && (trip.status === 'accepted' || trip.status === 'in_progress');
   const showTracking = viewer.isPoster || viewer.isAssignedDriver;
-  const canCancel = viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants' || trip.status === 'assigned');
-  const passengerEditable = viewer.isPoster && ['open', 'has_applicants', 'assigned'].includes(trip.status);
+  const canCancel = viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants' || trip.status === 'accepted');
+  const passengerEditable = viewer.isPoster && ['open', 'has_applicants', 'accepted'].includes(trip.status);
   const passengerMissing = !trip.passengerName;
   // Auto-open the passenger edit form when redirected here from the assign flow.
   const [editingPassenger, setEditingPassenger] = useState(fillPassenger && passengerEditable);
@@ -620,7 +634,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
   }, []);
 
   return (
-    <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
+    <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAcceptedBar) && 'pb-40')}>
       {viewer.isAssignedDriver && trip.status === 'selected' ? <SelectedDriverCard trip={trip} /> : null}
       {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
       {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
@@ -686,7 +700,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
       {showTracking ? <TripTracking trip={trip} /> : null}
 
-      {viewer.isPoster && trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress') ? (
+      {viewer.isPoster && trip.passengerOtp && (trip.status === 'accepted' || trip.status === 'in_progress') ? (
         <Card className="gap-2 border-emerald-300 bg-emerald-50">
           <div className="text-sm font-semibold text-emerald-900">Passenger OTP</div>
           <div className="text-center font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900">{trip.passengerOtp}</div>
@@ -806,7 +820,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
       {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
-      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} /> : showAssignedBar ? <AssignedDriverBar trip={trip} /> : null}
+      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} /> : showAcceptedBar ? <AcceptedDriverBar trip={trip} /> : null}
       {showShareLink && trip.passengerOtp ? <PassengerLinkModal trip={trip} otp={trip.passengerOtp} onClose={() => setShowShareLink(false)} /> : null}
     </div>
   );

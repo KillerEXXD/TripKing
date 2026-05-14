@@ -29,7 +29,7 @@ const trip: Trip = {
   passengerName: 'Priya',
   passengerPhone: '+91',
   passengerCount: 2,
-  status: 'assigned',
+  status: 'accepted',
   showFareToPassenger: true,
   hidePassengerPhone: false,
   applicantCount: 1,
