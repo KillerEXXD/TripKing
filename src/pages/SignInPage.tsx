@@ -82,9 +82,13 @@ export function SignInPage() {
     if (otp.length < OTP_LENGTH) return;
     setBusy(true);
     try {
-      await verifyOtp(phoneE164, otp);
+      const me = await verifyOtp(phoneE164, otp);
       const from = fromOf(location.state);
-      navigate(from === '/' ? '/onboarding' : from, { replace: true });
+      // Admins never need driver/agent onboarding — skip straight to the role-aware home
+      // so the RoleSwitcher + bottom nav render. Drivers/agents still pass through
+      // /onboarding, which itself bails to / when a profile already exists (3a3e6db).
+      const target = from !== '/' ? from : me.role === 'admin' ? '/' : '/onboarding';
+      navigate(target, { replace: true });
     } catch {
       toast.error("That code didn't work — try again");
     } finally {
