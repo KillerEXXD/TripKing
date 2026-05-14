@@ -1,4 +1,5 @@
 /** Bug-tracker transforms — strict, throw on missing required fields. */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import {
   BUG_CATEGORIES,
   BUG_PRIORITIES,
@@ -23,16 +24,7 @@ export type BugReportTransformErrorCode =
   | 'BAD_ATTACHMENT'
   | 'BAD_COMMENT';
 
-export class BugReportTransformError extends Error {
-  constructor(
-    message: string,
-    public code: BugReportTransformErrorCode,
-    public context: Record<string, unknown> = {},
-  ) {
-    super(message);
-    this.name = 'BugReportTransformError';
-  }
-}
+export class BugReportTransformError extends ApiTransformError<BugReportTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);

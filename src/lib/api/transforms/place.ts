@@ -4,20 +4,12 @@
  * `transformPlaceSearchResult` is mostly validation; the stored `places` row from
  * `POST /places` is `snake_case`, so `transformPlace` is the `snake_case` → `camelCase` bridge.
  */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type { Place, PlaceSearchResult, ResolvePlaceInput } from '@/types';
 
 export type PlaceTransformErrorCode = 'MISSING_ID' | 'MISSING_NAME' | 'MISSING_PROVIDER' | 'BAD_COORDS';
 
-export class PlaceTransformError extends Error {
-  constructor(
-    message: string,
-    public code: PlaceTransformErrorCode,
-    public context: Record<string, unknown> = {},
-  ) {
-    super(message);
-    this.name = 'PlaceTransformError';
-  }
-}
+export class PlaceTransformError extends ApiTransformError<PlaceTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 

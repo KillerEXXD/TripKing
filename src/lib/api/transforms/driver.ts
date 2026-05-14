@@ -2,6 +2,7 @@
  * Driver / agent transforms — strict (throw on missing id / user_id; cities and
  * vehicles are joined server-side). Never compute reputation/eligibility here.
  */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
 import type {
@@ -11,12 +12,7 @@ import type {
 } from '@/types';
 
 export type DriverTransformErrorCode = 'MISSING_ID' | 'MISSING_USER_ID' | 'MISSING_DISPLAY_HANDLE' | 'MISSING_CAN_REPORT_BUGS';
-export class DriverTransformError extends Error {
-  constructor(message: string, public code: DriverTransformErrorCode, public context: Record<string, unknown> = {}) {
-    super(message);
-    this.name = 'DriverTransformError';
-  }
-}
+export class DriverTransformError extends ApiTransformError<DriverTransformErrorCode> {}
 
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {

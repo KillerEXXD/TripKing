@@ -2,6 +2,7 @@
  * Transforms for the admin master-data resources — strict (throw on missing
  * required fields) one-way `snake_case` → `camelCase`, plus `toApi*` writers.
  */
+import { ApiTransformError } from '@/lib/api/transforms/base';
 import type {
   AppSettings,
   AppSettingsInput,
@@ -25,16 +26,7 @@ import type {
 
 export type AdminConfigTransformErrorCode = 'MISSING_ID' | 'MISSING_LABEL' | 'MISSING_FIELD' | 'BAD_VALUE';
 
-export class AdminConfigTransformError extends Error {
-  constructor(
-    message: string,
-    public code: AdminConfigTransformErrorCode,
-    public context: Record<string, unknown> = {},
-  ) {
-    super(message);
-    this.name = 'AdminConfigTransformError';
-  }
-}
+export class AdminConfigTransformError extends ApiTransformError<AdminConfigTransformErrorCode> {}
 
 function reqId(api: { id?: unknown }): string {
   if (typeof api?.id !== 'string' || !api.id) throw new AdminConfigTransformError('row has no id', 'MISSING_ID', { api });
