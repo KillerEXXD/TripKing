@@ -53,58 +53,6 @@ export interface PostVacancyInput {
   minRatePerKm?: number;
   notes?: string;
 }
-// ── vacancy-invitations ──────────────────────────────────────────────────────
-export type VacancyInvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired';
-
-/**
- * An agent's invitation for the driver behind a vacancy to one of their open trips.
- * Driver-side PII on the `driver` field is `DriverSummary` (handle + trust signals only)
- * until the invitation is accepted; once accepted the server returns the full identity.
- */
-export interface VacancyInvitation {
-  id: string;
-  vacancyId: string;
-  tripId: string;
-  invitedByUserId: string;
-  /** Inviter's display handle (always present). */
-  inviterHandle: string;
-  /** Inviter's display name — surfaced to admin and to the inviting agent only. */
-  inviterName?: string;
-  driverId: string;
-  driver?: DriverSummary;
-  status: VacancyInvitationStatus;
-  message?: string;
-  expiresAt: string;
-  decidedAt?: string;
-  createdAt: string;
-  trip?: {
-    id: string;
-    status: string;
-    pickupAt: string;
-    expectedDistanceKm: number;
-    totalFare: number;
-    driverPayout: number;
-    fromCity?: CityRow;
-    toCity?: CityRow;
-  };
-  vacancy?: {
-    id: string;
-    status: VacancyStatus;
-    currentCity?: CityRow;
-  };
-}
-
-export interface CreateVacancyInvitationInput {
-  vacancyId: string;
-  tripId: string;
-  message?: string;
-}
-
-export interface VacancyInvitationsQueryParams {
-  /** `'driver'` → mine-received; `'agent'` → mine-sent; omit for both (or admin: all). */
-  role?: 'driver' | 'agent';
-}
-
 export interface VacanciesQueryParams {
   currentCityId?: string;
   destinationCityId?: string;

@@ -22,6 +22,7 @@ function fixture(over: Partial<AppSettings> = {}): AppSettings {
     defaultExtrasPaidByPassenger: true,
     defaultDriverInstructions: '1. Call before arrival',
     maxActiveVacanciesPerDriver: 2,
+    inviteMaxRadiusKm: 15,
     ...over,
   };
 }

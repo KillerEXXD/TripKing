@@ -1,8 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { AlarmClock, ArrowLeft, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
-import { toast } from 'sonner';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
-import { useDecideVacancyInvitation } from '@/hooks/useVacancyInvitations';
 import { Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { Notification, NotificationType } from '@/types';
@@ -44,30 +42,9 @@ function tripIdOf(n: Notification): string | undefined {
   const v = n.payloadJson?.trip_id ?? n.payloadJson?.tripId;
   return typeof v === 'string' && v ? v : undefined;
 }
-/** An invitation-id payload, if this is a trip_invitation. */
-function invitationIdOf(n: Notification): string | undefined {
-  const v = n.payloadJson?.invitation_id ?? n.payloadJson?.invitationId;
-  return typeof v === 'string' && v ? v : undefined;
-}
-
 function NotificationRow({ n, onRead }: { n: Notification; onRead: (id: string) => void }) {
   const Icon = ICON[n.type] ?? Bell;
   const tripId = tripIdOf(n);
-  const invitationId = n.type === 'trip_invitation' ? invitationIdOf(n) : undefined;
-  const decide = useDecideVacancyInvitation();
-  const handleDecide = (status: 'accepted' | 'declined') => {
-    if (!invitationId) return;
-    decide.mutate(
-      { id: invitationId, status },
-      {
-        onSuccess: () => {
-          toast.success(status === 'accepted' ? 'Invitation accepted — you can now see the trip details.' : 'Invitation declined.');
-          if (!n.isRead) onRead(n.id);
-        },
-        onError: (e: unknown) => toast.error(e instanceof Error ? e.message : 'Could not update the invitation'),
-      },
-    );
-  };
   return (
     <Card className={`gap-2 ${n.isRead ? '' : 'border-primary/40 bg-primary/5'}`}>
       <div className="flex items-start gap-3">
@@ -80,16 +57,6 @@ function NotificationRow({ n, onRead }: { n: Notification; onRead: (id: string) 
             {n.isRead ? null : <span role="img" aria-label="Unread" className="size-2 shrink-0 rounded-full bg-primary" />}
           </div>
           {n.body ? <p className="mt-0.5 text-sm text-secondary">{n.body}</p> : null}
-          {invitationId ? (
-            <div className="mt-2 flex gap-2">
-              <Button type="button" size="sm" disabled={decide.isPending} onClick={() => handleDecide('accepted')}>
-                <ThumbsUp className="size-3.5" aria-hidden /> Accept
-              </Button>
-              <Button type="button" size="sm" variant="outline" disabled={decide.isPending} onClick={() => handleDecide('declined')}>
-                <ThumbsDown className="size-3.5" aria-hidden /> Decline
-              </Button>
-            </div>
-          ) : null}
           <div className="mt-1.5 flex items-center gap-3 text-xs">
             <span className="text-secondary">{relTime(n.createdAt)}</span>
             {tripId ? (

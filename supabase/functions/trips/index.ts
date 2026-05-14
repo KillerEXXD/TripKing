@@ -455,7 +455,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   async function loadTrip(id: string) {
     const { data } = await db
       .from('trips')
-      .select('id, posted_by_user_id, assigned_driver_id, assigned_acceptance_id, status, passenger_otp_hash, acceptance_window_minutes, acceptance_deadline_at, driver_acceptance_status')
+      .select('id, posted_by_user_id, assigned_driver_id, assigned_acceptance_id, status, passenger_otp_hash, acceptance_window_minutes, acceptance_deadline_at, driver_acceptance_status, from_city_id')
       .eq('id', id)
       .maybeSingle();
     return data as {
@@ -468,7 +468,17 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       acceptance_window_minutes: number | null;
       acceptance_deadline_at: string | null;
       driver_acceptance_status: 'pending' | 'accepted' | 'declined' | 'expired' | null;
+      from_city_id: string | null;
     } | null;
+  }
+  /** Haversine distance in km — keeping it inline to avoid a PostGIS round-trip per driver. */
+  function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const R = 6371;
+    const dLat = toRad(bLat - aLat);
+    const dLng = toRad(bLng - aLng);
+    const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(s)));
   }
   async function driverIdFor(userId: string): Promise<string | null> {
     const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
@@ -1217,8 +1227,40 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (ids.length === 0) return fail('VALIDATION', 'driver_ids must be a non-empty array of driver UUIDs', 422);
       // Filter to active, KYC-approved drivers (otherwise the invite leads nowhere).
       const { data: eligible } = await db.from('drivers').select('id, user_id').in('id', ids).eq('is_active', true).eq('kyc_status', 'approved');
-      const eligibleRows = (eligible ?? []) as { id: string; user_id: string }[];
+      let eligibleRows = (eligible ?? []) as { id: string; user_id: string }[];
       const skipped = ids.filter((id) => !eligibleRows.some((r) => r.id === id));
+
+      // Radius gate — when a candidate driver has an active vacancy, the trip's pickup must
+      // be within `app_settings.invite_max_radius_km` of that vacancy's announced city.
+      // Drivers without an active vacancy are not radius-checked (preserves the trip-side
+      // "agent picks from the pickup-city directory" flow on InviteDriversCard).
+      if (eligibleRows.length > 0 && trip.from_city_id) {
+        const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
+        const maxKm = typeof settings?.invite_max_radius_km === 'number' ? settings.invite_max_radius_km : 15;
+        const { data: pickupCity } = await db.from('cities').select('lat, lng').eq('id', trip.from_city_id).maybeSingle();
+        if (pickupCity?.lat != null && pickupCity?.lng != null) {
+          const { data: vacRows } = await db
+            .from('vacancies')
+            .select('driver_id, current_city:cities!current_city_id(lat, lng)')
+            .in('driver_id', eligibleRows.map((r) => r.id))
+            .eq('status', 'open');
+          type VacRow = { driver_id: string; current_city: { lat: number | null; lng: number | null } | null };
+          const outOfRadius: string[] = [];
+          for (const r of eligibleRows) {
+            const v = (vacRows as VacRow[] | null)?.find((x) => x.driver_id === r.id);
+            const lat = v?.current_city?.lat;
+            const lng = v?.current_city?.lng;
+            if (typeof lat === 'number' && typeof lng === 'number') {
+              const km = distanceKm(pickupCity.lat, pickupCity.lng, lat, lng);
+              if (km > maxKm) outOfRadius.push(r.id);
+            }
+          }
+          if (outOfRadius.length > 0) {
+            eligibleRows = eligibleRows.filter((r) => !outOfRadius.includes(r.id));
+            skipped.push(...outOfRadius);
+          }
+        }
+      }
       // Upsert — re-inviting a previously-declined/withdrawn driver bumps status back to 'pending'.
       const now = new Date().toISOString();
       const rows = eligibleRows.map((r) => ({

@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useVacancies } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
-import { useCreateVacancyInvitation } from '@/hooks/useVacancyInvitations';
+import { useInviteDrivers } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { cityHooks } from '@/hooks/useAdminConfig';
@@ -91,9 +91,10 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
   const myUserId = user?.id ?? '';
   // Only trips the caller owns + still accepting applicants are eligible.
   const trips = useTrips({ status: ['open', 'has_applicants'], postedByUserId: myUserId });
-  const createInvite = useCreateVacancyInvitation();
+  const inviteDrivers = useInviteDrivers();
   const eligible = (trips.data ?? []).filter((t) => t.status === 'open' || t.status === 'has_applicants');
   const handle = vacancy.driver?.displayHandle ?? '';
+  const driverId = vacancy.driver?.id ?? '';
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
       <Dialog.Portal>
@@ -118,14 +119,22 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
                 <TripPickRow
                   key={t.id}
                   trip={t}
-                  disabled={createInvite.isPending}
+                  disabled={inviteDrivers.isPending || !driverId}
                   onPick={() => {
-                    createInvite.mutate(
-                      { vacancyId: vacancy.id, tripId: t.id, message: undefined },
+                    if (!driverId) return;
+                    inviteDrivers.mutate(
+                      { tripId: t.id, driverIds: [driverId] },
                       {
-                        onSuccess: () => {
-                          toast.success('Invitation sent');
-                          onClose();
+                        onSuccess: (r) => {
+                          if (r.created.length > 0) {
+                            toast.success('Invitation sent');
+                            onClose();
+                          } else if (r.skipped.length > 0) {
+                            // The radius gate (or KYC / inactive) skipped the driver.
+                            toast.error('Driver is outside the invite radius from this trip\'s pickup, or no longer eligible.');
+                          } else {
+                            toast.error('Could not send the invitation');
+                          }
                         },
                         onError: (e: unknown) => {
                           const msg = e instanceof Error ? e.message : 'Could not send the invitation';

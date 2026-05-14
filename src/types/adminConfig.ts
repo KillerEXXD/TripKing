@@ -80,6 +80,10 @@ export interface AppSettings {
   defaultDriverInstructions: string;
   /** How many ACTIVE vacancies a driver may have at once. CHECK [1,10] in the DB. */
   maxActiveVacanciesPerDriver: number;
+  /** When an agent invites a driver from that driver's "I'm available" vacancy, the trip's
+   *  pickup must be within this many km of the vacancy's announced city. Drivers without an
+   *  active vacancy are not radius-checked. CHECK [1,200] in the DB. */
+  inviteMaxRadiusKm: number;
 }
 
 // ── write-side input shapes ─────────────────────────────────────────────────
