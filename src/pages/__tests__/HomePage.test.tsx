@@ -25,17 +25,20 @@ describe('HomePage (admin home)', () => {
     expect(screen.getByText(/^admin$/i)).toBeInTheDocument();
   });
 
-  it('shows a tile for every /administration area, linking to it', () => {
+  it('shows a tile for every /administration area, linking to it (parity with AdministrationPage)', () => {
     renderHome();
     const expected: [RegExp, string][] = [
+      [/platform dashboard/i, '/administration/dashboard'],
       [/reference data/i, '/administration/config'],
       [/kyc review queue/i, '/administration/kyc'],
-      [/reviews moderation/i, '/administration/reviews'],
-      [/translation manager/i, '/administration/translations'],
       [/search by name, phone, city/i, '/administration/drivers'],
       [/search by name, phone, business/i, '/administration/agents'],
       [/search by name, phone, alias/i, '/administration/passengers'],
+      [/video call console/i, '/administration/video-calls'],
       [/filter by eligibility and expiry/i, '/administration/vehicles'],
+      [/reviews moderation/i, '/administration/reviews'],
+      [/translation manager/i, '/administration/translations'],
+      [/bug tracker/i, '/administration/bugs'],
     ];
     for (const [name, href] of expected) {
       const link = screen.getByRole('link', { name });
