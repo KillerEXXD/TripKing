@@ -59,7 +59,7 @@ type Row = Record<string, unknown>;
 const DRIVER_SELECT =
   '*, user:users!user_id(display_handle, can_report_bugs), home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
   'vehicles(id, year, seats, ac, is_primary, is_active, registration_number, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
-const AGENT_SELECT = '*, business_city:cities!business_city_id(*)';
+const AGENT_SELECT = '*, user:users!user_id(display_handle), business_city:cities!business_city_id(*)';
 
 // fields that must not be exposed to anyone other than the owning driver or an admin
 const PRIVATE_KYC_FIELDS = [
@@ -214,7 +214,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const { data, error } = await db.from('trip_managers').select(AGENT_SELECT).eq('id', agentId).maybeSingle();
     if (error) return fail('DB_ERROR', error.message, 500);
     if (!data) return fail('NOT_FOUND', 'Agent not found', 404);
-    return ok(data);
+    return ok(flattenHandle(data as Row));
   }
   async function syncRole(userId: string, role: 'driver' | 'trip_manager'): Promise<void> {
     const { data: u } = await db.from('users').select('role').eq('id', userId).maybeSingle();

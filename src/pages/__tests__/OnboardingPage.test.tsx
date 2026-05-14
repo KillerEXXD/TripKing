@@ -10,7 +10,12 @@ import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
 
-vi.mock('@/hooks/useDrivers', () => ({ useCreateMyDriverProfile: vi.fn(), useCreateMyAgentProfile: vi.fn() }));
+vi.mock('@/hooks/useDrivers', () => ({
+  useCreateMyDriverProfile: vi.fn(),
+  useCreateMyAgentProfile: vi.fn(),
+  useMyDriver: vi.fn(() => ({ data: undefined, isPending: false, isError: false })),
+  useMyAgent: vi.fn(() => ({ data: undefined, isPending: false, isError: false })),
+}));
 import { useCreateMyAgentProfile, useCreateMyDriverProfile } from '@/hooks/useDrivers';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

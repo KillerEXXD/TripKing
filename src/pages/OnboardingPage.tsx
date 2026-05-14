@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Briefcase, Car } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cityHooks } from '@/hooks/useAdminConfig';
-import { useCreateMyAgentProfile, useCreateMyDriverProfile } from '@/hooks/useDrivers';
+import { useCreateMyAgentProfile, useCreateMyDriverProfile, useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn } from '@/lib/utils';
@@ -65,6 +65,13 @@ export function OnboardingPage() {
   const citiesQuery = cityHooks.useList();
   const createDriver = useCreateMyDriverProfile();
   const createAgent = useCreateMyAgentProfile();
+  // Returning user with a profile already? Bail to home — SignInPage routes everyone
+  // here after OTP, so a fresh login on an existing account would otherwise land here.
+  const myDriver = useMyDriver();
+  const myAgent = useMyAgent();
+  useEffect(() => {
+    if (myDriver.data || myAgent.data) navigate('/', { replace: true });
+  }, [myDriver.data, myAgent.data, navigate]);
   const submitting = createDriver.isPending || createAgent.isPending;
   const submitFailed = createDriver.isError || createAgent.isError;
 
