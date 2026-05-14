@@ -250,9 +250,25 @@ function DriverHome({ driver }: { driver: Driver }) {
       <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
             <Badge variant="success">Driver</Badge>
+            {nearCity ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                <MapPin className="size-3" aria-hidden />
+                <span className="font-semibold">Near {nearCity.name}</span>
+                {cities.length > 0 ? (
+                  <select aria-label="Change the area to browse near" value={nearCityId} onChange={(e) => setNearCityId(e.target.value)} className="bg-transparent text-[11px] text-emerald-700 outline-none">
+                    <option value="">— anywhere —</option>
+                    {cities.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+              </span>
+            ) : null}
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -271,23 +287,6 @@ function DriverHome({ driver }: { driver: Driver }) {
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
         <AwaitingMyDecisionCard apps={awaitingDecision} />
         <AvailabilitySummaryCard count={activeVacancies} max={maxActiveVacancies} />
-
-        {nearCity ? (
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 py-1.5 pl-3 pr-2 text-sm text-emerald-700">
-            <MapPin className="size-3.5" aria-hidden />
-            <span className="font-semibold">Near {nearCity.name}</span>
-            {cities.length > 0 ? (
-              <select aria-label="Change the area to browse near" value={nearCityId} onChange={(e) => setNearCityId(e.target.value)} className="bg-transparent text-xs text-emerald-700 outline-none">
-                <option value="">— anywhere —</option>
-                {cities.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-        ) : null}
 
         <div className="grid grid-cols-2 gap-2.5">
           <HubTile icon={<Search className="size-5" aria-hidden />} label="Find a trip" tone="blue" to="/trips" />
