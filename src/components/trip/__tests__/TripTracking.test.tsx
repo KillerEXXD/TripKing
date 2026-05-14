@@ -43,6 +43,7 @@ const baseTrip: Trip = {
   hidePassengerPhone: false,
   applicantCount: 0,
   createdAt: '2026-05-20T10:00:00Z',
+  acceptanceWindowMinutes: 15,
 };
 
 function makeTrip(over: Partial<Trip> = {}): Trip {

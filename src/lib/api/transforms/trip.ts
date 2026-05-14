@@ -146,6 +146,13 @@ export function transformTrip(api: Api): Trip {
     createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
     passengerOtp: str(api.passenger_otp),
     distanceKm: numOpt(api.distance_km),
+    // Phase 1 of the two-step handshake (migration 030). Default 15 so trips
+    // that pre-date the column still satisfy the type — DB default is 15 too.
+    acceptanceWindowMinutes: num(api.acceptance_window_minutes, 15),
+    acceptanceDeadlineAt: str(api.acceptance_deadline_at),
+    driverAcceptanceStatus: typeof api.driver_acceptance_status === 'string'
+      ? (api.driver_acceptance_status as Trip['driverAcceptanceStatus'])
+      : undefined,
   };
 }
 
@@ -262,6 +269,7 @@ export function toApiPostTrip(input: PostTripInput): Record<string, unknown> {
     gst_amount: input.gstAmount,
     driver_bata: input.driverBata,
     extras_paid_by_passenger: input.extrasPaidByPassenger,
+    ...(input.acceptanceWindowMinutes !== undefined ? { acceptance_window_minutes: input.acceptanceWindowMinutes } : {}),
     driver_instructions: input.driverInstructions ?? null,
     passenger_name: input.passengerName,
     passenger_phone: input.passengerPhone,
