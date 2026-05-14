@@ -4,9 +4,42 @@ import type { NearRadius, Place } from './place';
 export type TripStatus = 'open' | 'has_applicants' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
 export type PosterRole = 'driver' | 'trip_manager';
 export type AcceptanceStatus = 'applied' | 'selected' | 'rejected' | 'withdrawn' | 'expired';
+/** Migration 024: the *shape* of the route. */
+export type TripType = 'one_way' | 'round_trip' | 'multi_way';
+
+/** One stop in a trip's itinerary. seq=0 is the origin; the highest seq is the final destination. */
+export interface Waypoint {
+  id: string;
+  seq: number;
+  city?: CityRow;
+  place?: Place;
+  /** Expected arrival; null on seq=0 (the origin time is `Trip.pickupAt`). */
+  arriveAt?: string;
+  /** How long the driver waits here (paid via `app_settings.wait_rate_per_min`). */
+  waitMinutes: number;
+  /** Agent's marker — a paying stop (vs a transit-only waypoint). */
+  isDestination: boolean;
+  notes?: string;
+}
+
+/** Body shape on POST /trips for a single waypoint (camelCase). */
+export interface WaypointInput {
+  cityId?: string;
+  placeId?: string;
+  arriveAt?: string;
+  waitMinutes?: number;
+  isDestination?: boolean;
+  notes?: string;
+}
 
 export interface Trip {
   id: string;
+  /** Route shape (migration 024). Optional for back-compat; transforms default to `one_way`. */
+  tripType?: TripType;
+  /** Trip end timestamp — the driver is committed until then. Multi-day trips have a real span. */
+  expectedEndAt?: string;
+  /** Ordered list of waypoints (origin → 0+ stops → final). Optional; transforms default to `[]`. */
+  waypoints?: Waypoint[];
   postedByUserId: string;
   postedByRole: PosterRole;
   /** Stable opaque poster identifier (e.g. "A3E5A6E") — always present, even on a browse-safe view. */
@@ -140,6 +173,16 @@ export interface TripAcceptance {
 
 // ── write-side inputs ───────────────────────────────────────────────────────
 export interface PostTripInput {
+  /** Route shape (migration 024). When omitted the server defaults to `one_way`. */
+  tripType?: TripType;
+  /** Ordered waypoints — preferred over `fromCityId`/`toCityId` for round_trip / multi_way / any
+   *  trip with intermediate stops. Required when `tripType` is round_trip or multi_way. */
+  waypoints?: WaypointInput[];
+  /** Trip end timestamp. Server defaults to last-waypoint `arriveAt + waitMinutes`, or
+   *  `pickupAt + 1 day` for legacy single-leg shapes. */
+  expectedEndAt?: string;
+  /** Legacy single-leg shape — when both are supplied without `waypoints`, the server synthesises
+   *  a 2-waypoint `one_way` plan. Today's clients keep working unchanged. */
   fromCityId: string;
   toCityId: string;
   /** Optional precise pickup / drop points (`places.id`s). */
