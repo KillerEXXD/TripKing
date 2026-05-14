@@ -13,6 +13,7 @@ import {
   useSetVehicleActive,
   useUpdateVehicle,
   useVehicle,
+  useVehiclePhotoUrls,
 } from '@/hooks/useVehicles';
 
 function setup() {
@@ -33,6 +34,17 @@ describe('useVehicles hooks', () => {
     const { result } = renderHook(() => useDriverVehicles('d1'), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(svc.getDriverVehicles).toHaveBeenCalledWith('d1');
+  });
+
+  it('useVehiclePhotoUrls is disabled without an id, fetches when supplied', async () => {
+    const { wrapper } = setup();
+    renderHook(() => useVehiclePhotoUrls(undefined), { wrapper });
+    expect(svc.getVehiclePhotoUrls).not.toHaveBeenCalled();
+    vi.mocked(svc.getVehiclePhotoUrls).mockResolvedValue({ front: 'https://signed/front', back: null } as never);
+    const { result } = renderHook(() => useVehiclePhotoUrls('v1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(svc.getVehiclePhotoUrls).toHaveBeenCalledWith('v1');
+    expect(result.current.data).toMatchObject({ front: 'https://signed/front', back: null });
   });
 
   it('useVehicle is disabled without an id', () => {

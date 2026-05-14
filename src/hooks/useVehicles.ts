@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
-import { addVehicle, deleteVehicle, getAdminVehicles, getAdminVehiclesPage, getDriverVehicles, getVehicle, setVehicleActive, updateVehicle, type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
+import { addVehicle, deleteVehicle, getAdminVehicles, getAdminVehiclesPage, getDriverVehicles, getVehicle, getVehiclePhotoUrls, setVehicleActive, updateVehicle, type AdminVehiclesQueryParams } from '@/lib/api/services/vehicles';
 import type { VehicleInput } from '@/types';
 
 export function useDriverVehicles(driverId: string | undefined) {
@@ -9,6 +9,10 @@ export function useDriverVehicles(driverId: string | undefined) {
 }
 export function useVehicle(id: string | undefined) {
   return useQuery({ queryKey: ['vehicle', id], queryFn: () => getVehicle(id as string), enabled: !!id, staleTime: STALE.profile });
+}
+/** Signed download URLs (5-min) for a vehicle's photos; owner or admin. */
+export function useVehiclePhotoUrls(id: string | undefined, enabled = true) {
+  return useQuery({ queryKey: ['vehicle', id, 'photos'], queryFn: () => getVehiclePhotoUrls(id as string), enabled: enabled && !!id, staleTime: STALE.live });
 }
 /** Admin eligibility dashboard — vehicles across all drivers. */
 export function useAdminVehicles(params?: AdminVehiclesQueryParams) {

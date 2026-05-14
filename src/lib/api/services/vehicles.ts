@@ -75,3 +75,9 @@ export function deleteVehicle(id: string): Promise<void> {
 export function getVehiclePhotoUploadUrl(vehicleId: string, slot: VehiclePhotoSlot): Promise<UploadUrlResponse> {
   return apiClient.post<Api>(`/vehicles/${vehicleId}/photo-upload-url`, { slot }).then((r) => transformUploadUrl(unwrap(r.data)));
 }
+
+/** Short-lived signed download URLs for the vehicle's photos (`GET /vehicles/:id/photos`; owner/admin). */
+export type VehiclePhotoSignedUrls = Partial<Record<VehiclePhotoSlot, string | null>>;
+export function getVehiclePhotoUrls(vehicleId: string): Promise<VehiclePhotoSignedUrls> {
+  return apiClient.get<VehiclePhotoSignedUrls>(`/vehicles/${vehicleId}/photos`).then((r) => (r.data ?? {}) as VehiclePhotoSignedUrls);
+}

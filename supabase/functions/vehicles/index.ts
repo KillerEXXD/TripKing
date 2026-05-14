@@ -12,6 +12,7 @@
  *   DELETE /vehicles/:id         (owning driver/admin) — 409 IN_USE if referenced
  *   POST   /vehicles/:id/photo-upload-url (owning driver/admin) — { slot } → short-lived signed UPLOAD url into the private 'vehicle-photos' bucket at <vehicleId>/<slot>
  *                                slot ∈ front|back|left|right|plate|interior|rc|insurance|permit ; response includes the column to store the public path into
+ *   GET    /vehicles/:id/photos          (owning driver/admin) — short-lived signed DOWNLOAD urls for every populated photo slot (keyed by slot name); the vehicle-photos bucket is private, so this is the only way to render previews server-side
  */
 // @ts-expect-error — Deno std, resolved at runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
@@ -119,6 +120,26 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
 
   // GET /vehicles/:id
   if (!sub && req.method === 'GET') return returnVehicle(id);
+
+  // GET /vehicles/:id/photos (owning driver/admin) — signed DOWNLOAD urls for every photo slot
+  if (sub === 'photos' && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    const owner = await vehicleOwnerDriverId(id);
+    if (!owner) return fail('NOT_FOUND', 'Vehicle not found', 404);
+    const did = await driverIdFor(u.id);
+    if (owner.driverId !== did && !isAdmin(u)) return fail('FORBIDDEN', 'Not your vehicle', 403);
+    const { data: veh } = await db.from('vehicles').select(Object.values(SLOT_TO_COL).join(',')).eq('id', id).maybeSingle();
+    const row = (veh ?? {}) as Row;
+    const out: Record<string, string | null> = {};
+    for (const slot of PHOTO_SLOTS) {
+      const path = str(row[SLOT_TO_COL[slot]]);
+      if (!path) { out[slot] = null; continue; }
+      const { data, error } = await db.storage.from('vehicle-photos').createSignedUrl(path, 300);
+      out[slot] = error || !data ? null : data.signedUrl;
+    }
+    return ok(out);
+  }
 
   // POST /vehicles/:id/photo-upload-url (owning driver/admin) — signed UPLOAD url
   if (sub === 'photo-upload-url' && req.method === 'POST') {

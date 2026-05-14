@@ -16,7 +16,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, ChevronDown, ChevronRight, Circle, Clock3, ShieldCheck, Sparkles, TriangleAlert, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAgent, useAgentKycDocs, useDriver, useDriverKycDocs, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
-import { useDriverVehicles } from '@/hooks/useVehicles';
+import { useDriverVehicles, useVehiclePhotoUrls } from '@/hooks/useVehicles';
 import { useSetVideoCallStatus } from '@/hooks/useVideoVerification';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -139,19 +139,29 @@ function VehiclePanel({ driverId, mode }: { driverId: string; mode: 'vehicle' | 
       </div>
     );
   }
-  // photos
-  const slots: { label: string; url?: string }[] = [
-    { label: 'Front', url: v.photoFrontUrl },
-    { label: 'Back', url: v.photoBackUrl },
-    { label: 'Left', url: v.photoLeftUrl },
-    { label: 'Right', url: v.photoRightUrl },
-    { label: 'Plate close-up', url: v.photoPlateUrl },
-    { label: 'RC book', url: v.rcBookUrl },
-    { label: 'Insurance', url: v.insuranceUrl },
+  return <VehiclePhotosGrid vehicleId={v.id} />;
+}
+
+function VehiclePhotosGrid({ vehicleId }: { vehicleId: string }) {
+  const q = useVehiclePhotoUrls(vehicleId);
+  if (q.isPending) return <LoadingSkeleton rows={2} />;
+  if (q.isError) return <ErrorState title="Couldn't load photos" onRetry={() => void q.refetch()} />;
+  const urls = q.data ?? {};
+  const slots: { label: string; url?: string | null }[] = [
+    { label: 'Front', url: urls.front },
+    { label: 'Back', url: urls.back },
+    { label: 'Left', url: urls.left },
+    { label: 'Right', url: urls.right },
+    { label: 'Plate close-up', url: urls.plate },
+    { label: 'RC book', url: urls.rc },
+    { label: 'Insurance', url: urls.insurance },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {slots.map((s) => <DocTile key={s.label} label={s.label} url={s.url} />)}
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        {slots.map((s) => <DocTile key={s.label} label={s.label} url={s.url ?? undefined} />)}
+      </div>
+      <Button size="sm" variant="ghost" onClick={() => void q.refetch()}>Re-fetch signed URLs</Button>
     </div>
   );
 }
