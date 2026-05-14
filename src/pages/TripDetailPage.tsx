@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/myApplicationsStore';
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
+import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
@@ -467,11 +468,33 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       <Card className="gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="text-2xl font-bold leading-tight">
-            {trip.fromCity.name} → {trip.toCity.name}
+            {routeChainText(trip)}
           </div>
           <Badge variant={badge.variant} className="mt-1 shrink-0">
             {badge.label}
           </Badge>
+        </div>
+        {(trip.waypoints?.length ?? 0) >= 3 ? (
+          <ol className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
+            {(trip.waypoints ?? []).map((w, i) => {
+              const name = w.place?.name ?? w.city?.name ?? '—';
+              const time = w.arriveAt ? new Date(w.arriveAt).toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : null;
+              const wait = w.waitMinutes > 0 ? (w.waitMinutes >= 60 ? `${Math.round(w.waitMinutes / 60)}h` : `${w.waitMinutes}m`) + ' wait' : null;
+              const sub = [time, wait].filter(Boolean).join(' · ');
+              return (
+                <li key={w.id} className="flex items-start gap-2">
+                  <span className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[10px] font-bold text-primary">{i + 1}</span>
+                  <div className="min-w-0">
+                    <div className="font-medium">{name}</div>
+                    {sub ? <div className="text-xs text-secondary">{sub}</div> : null}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <TripTypeBadge trip={trip} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Stat icon={<MapPin />} label="Distance" value={formatKm(trip.expectedDistanceKm)} />

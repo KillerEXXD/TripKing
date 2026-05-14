@@ -16,7 +16,9 @@ import type {
   Trip,
   TripAcceptance,
   TripStatus,
+  TripType,
   VehicleSummary,
+  Waypoint,
 } from '@/types';
 
 export type TripTransformErrorCode =
@@ -65,12 +67,37 @@ function joinedCity(v: unknown, code: 'MISSING_FROM_CITY' | 'MISSING_TO_CITY', c
   return transformCity(v as Api);
 }
 
+const TRIP_TYPES: TripType[] = ['one_way', 'round_trip', 'multi_way'];
+function tripTypeOf(v: unknown): TripType {
+  return typeof v === 'string' && (TRIP_TYPES as string[]).includes(v) ? (v as TripType) : 'one_way';
+}
+
+/** Migration-024 waypoint join → camelCase `Waypoint`. Tolerant of missing fields (server invariants
+ *  guarantee id + seq; everything else is optional per business rules). */
+export function transformWaypoint(api: Api): Waypoint {
+  const city = api.city && typeof api.city === 'object' ? transformCity(api.city as Api) : undefined;
+  const place = maybePlace(api.place);
+  return {
+    id: str(api.id) ?? '',
+    seq: num(api.seq, 0),
+    city,
+    place,
+    arriveAt: str(api.arrive_at),
+    waitMinutes: num(api.wait_minutes, 0),
+    isDestination: bool(api.is_destination, false),
+    notes: str(api.notes),
+  };
+}
+
 export function transformTrip(api: Api): Trip {
   const id = reqStr(api.id, 'MISSING_ID', { api });
   const ctx = { trip_id: id };
   const carType = api.car_type as Api | undefined;
   return {
     id,
+    tripType: tripTypeOf(api.trip_type),
+    expectedEndAt: str(api.expected_end_at),
+    waypoints: Array.isArray(api.waypoints) ? (api.waypoints as Api[]).map(transformWaypoint).sort((a, b) => a.seq - b.seq) : [],
     postedByUserId: reqStr(api.posted_by_user_id, 'MISSING_FIELD', ctx),
     postedByRole: ((api.posted_by_role as string) ?? 'trip_manager') as PosterRole,
     postedByHandle: reqStr(api.posted_by_handle, 'MISSING_FIELD', { ...ctx, field: 'posted_by_handle' }),
@@ -213,7 +240,7 @@ export function transformMyApplication(api: Api): MyApplication {
 
 // ── write-side ──────────────────────────────────────────────────────────────
 export function toApiPostTrip(input: PostTripInput): Record<string, unknown> {
-  return {
+  const body: Record<string, unknown> = {
     from_city_id: input.fromCityId,
     to_city_id: input.toCityId,
     from_place_id: input.fromPlaceId ?? null,
@@ -238,4 +265,18 @@ export function toApiPostTrip(input: PostTripInput): Record<string, unknown> {
     show_fare_to_passenger: input.showFareToPassenger,
     hide_passenger_phone: input.hidePassengerPhone,
   };
+  // Migration-024 fields — omit when unset so legacy callers continue to POST the same shape.
+  if (input.tripType !== undefined) body.trip_type = input.tripType;
+  if (input.expectedEndAt !== undefined) body.expected_end_at = input.expectedEndAt;
+  if (Array.isArray(input.waypoints) && input.waypoints.length > 0) {
+    body.waypoints = input.waypoints.map((w) => ({
+      city_id: w.cityId ?? null,
+      place_id: w.placeId ?? null,
+      arrive_at: w.arriveAt ?? null,
+      wait_minutes: w.waitMinutes ?? 0,
+      is_destination: w.isDestination ?? false,
+      notes: w.notes ?? null,
+    }));
+  }
+  return body;
 }

@@ -1058,7 +1058,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Post a trip (Bearer; the poster must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver/agent profile is deactivated, 403 KYC_REQUIRED if not yet approved) — hide_passenger_phone (true|false) and passenger_count (≥1) are REQUIRED. from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422). total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a trip (Bearer; the poster must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver/agent profile is deactivated, 403 KYC_REQUIRED if not yet approved) — hide_passenger_phone + trip_type + waypoints (or legacy from/to) and passenger_count (≥1) are REQUIRED. from_place_id / to_place_id accepted alongside from_city_id / to_city_id (both coexist; *_place_id is the new primary path; a bad place id → 422). total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {
@@ -1066,8 +1066,6 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "from_city_id",
-                  "to_city_id",
                   "pickup_at",
                   "car_type_id",
                   "expected_distance_km",
@@ -1089,6 +1087,55 @@
                   },
                   "to_place_id": {
                     "type": "string"
+                  },
+                  "trip_type": {
+                    "type": "string",
+                    "enum": [
+                      "one_way",
+                      "round_trip",
+                      "multi_way"
+                    ],
+                    "description": "route shape; defaults to one_way"
+                  },
+                  "expected_end_at": {
+                    "type": "string",
+                    "description": "ISO; > pickup_at and ≤ app_settings.max_trip_duration_days"
+                  },
+                  "waypoints": {
+                    "type": "array",
+                    "description": "ordered list of waypoints (origin → 0+ stops → final). Required for round_trip / multi_way.",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "city_id": {
+                          "type": "string"
+                        },
+                        "place_id": {
+                          "type": "string"
+                        },
+                        "arrive_at": {
+                          "type": "string"
+                        },
+                        "wait_minutes": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "is_destination": {
+                          "type": "boolean"
+                        },
+                        "notes": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "from_city_id": {
+                    "type": "string",
+                    "description": "required when waypoints[] is omitted"
+                  },
+                  "to_city_id": {
+                    "type": "string",
+                    "description": "required when waypoints[] is omitted"
                   }
                 }
               }

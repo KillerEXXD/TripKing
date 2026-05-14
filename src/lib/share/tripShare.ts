@@ -6,7 +6,33 @@
  */
 import { toBlob } from 'html-to-image';
 import { formatINR, formatKm } from '@/lib/utils';
-import type { Trip } from '@/types';
+import type { Trip, Waypoint } from '@/types';
+
+// ── Trip-type share variants (migration 024) ─────────────────────────────────
+/**
+ * Four shareable variants. `Trip.tripType` is the route *shape*; the variant collapses
+ * `multi_way` into "drop" vs "return back" based on whether the last waypoint loops back
+ * to the first. Drives the 🧭 line in the WhatsApp/Telegram caption.
+ */
+export type ShareVariant = 'one_way_drop' | 'round_trip_return' | 'multi_way_drop' | 'multi_way_return';
+
+export function shareVariant(trip: Trip): ShareVariant {
+  if (!trip.tripType || trip.tripType === 'one_way') return 'one_way_drop';
+  if (trip.tripType === 'round_trip') return 'round_trip_return';
+  // multi_way: derive drop-vs-return from the waypoints chain.
+  const wp = trip.waypoints ?? [];
+  if (wp.length < 2) return 'multi_way_drop';
+  const firstId = wp[0]?.place?.id ?? wp[0]?.city?.id;
+  const lastId = wp[wp.length - 1]?.place?.id ?? wp[wp.length - 1]?.city?.id;
+  return firstId && lastId && firstId === lastId ? 'multi_way_return' : 'multi_way_drop';
+}
+
+export const VARIANT_LABEL: Record<ShareVariant, string> = {
+  one_way_drop: 'One-way drop',
+  round_trip_return: 'Round-trip return back',
+  multi_way_drop: 'Multi-way drop',
+  multi_way_return: 'Multi-way return back',
+};
 
 /** Public deep link to the trip's detail page. */
 export function buildShareUrl(trip: Trip): string {
@@ -37,6 +63,26 @@ function placeLabel(c: { name: string; state?: string }): string {
   return c.state ? `${c.name}, ${c.state}` : c.name;
 }
 
+function waypointLabel(w: Waypoint): string {
+  return w.place?.name ?? (w.city ? placeLabel(w.city) : '—');
+}
+function waypointTail(w: Waypoint): string {
+  const time = w.arriveAt ? `${pickupDateLong(w.arriveAt)}, ${pickupTime(w.arriveAt)}` : null;
+  const wait = w.waitMinutes > 0 ? `${w.waitMinutes >= 60 ? `${Math.round(w.waitMinutes / 60)}h` : `${w.waitMinutes}m`} wait` : null;
+  const parts = [time, wait].filter(Boolean);
+  return parts.length > 0 ? ` (${parts.join(' · ')})` : '';
+}
+/** Render a multi-stop route as `📍 origin → stop → … → final`, one line per waypoint after the origin. */
+function routeChainBlock(trip: Trip): string[] {
+  const wp = trip.waypoints ?? [];
+  if (wp.length < 2) return [];
+  const lines = [`📍 ${waypointLabel(wp[0]!)}`];
+  for (let i = 1; i < wp.length; i++) {
+    lines.push(`   → ${waypointLabel(wp[i]!)}${waypointTail(wp[i]!)}`);
+  }
+  return lines;
+}
+
 /**
  * Plain-text caption for WhatsApp / Telegram (also the clipboard fallback).
  * Three icon-led blocks — trip / money / poster — then the deep link.
@@ -45,14 +91,31 @@ export function buildShareCaption(trip: Trip, opts: { withUrl?: boolean } = { wi
   const acTag = trip.acRequired ? ' · AC' : '';
   const carType = trip.carTypeLabel ?? 'Any';
   const contact = resolvePosterPhone(trip);
+  const variant = shareVariant(trip);
+  const hasChain = (trip.waypoints ?? []).length >= 3;
+
+  // Route block — a chain when there are intermediate waypoints, otherwise the existing
+  // 2-row "Pickup / Drop" pair. Either way, the 🧭 line names the variant up front.
+  const routeBlock = hasChain
+    ? [`🧭 ${VARIANT_LABEL[variant]}`, ...routeChainBlock(trip)]
+    : [
+        `🧭 ${VARIANT_LABEL[variant]}`,
+        `📍 Pickup: ${placeLabel(trip.fromCity)}`,
+        `🏁 Drop: ${placeLabel(trip.toCity)}`,
+      ];
+
+  const scheduleBlock = [
+    `🛣️ Distance: ${formatKm(trip.expectedDistanceKm)}`,
+    `📅 Trip starts: ${pickupDateLong(trip.pickupAt)}, ${pickupTime(trip.pickupAt)}`,
+    ...(trip.expectedEndAt && trip.expectedEndAt !== trip.pickupAt
+      ? [`🕒 Trip ends: ${pickupDateLong(trip.expectedEndAt)}, ${pickupTime(trip.expectedEndAt)}`]
+      : []),
+  ];
 
   const tripBlock = [
     `🚗 Car type required: ${carType}${acTag}`,
-    `📍 Pickup: ${placeLabel(trip.fromCity)}`,
-    `🏁 Drop: ${placeLabel(trip.toCity)}`,
-    `🛣️ Distance: ${formatKm(trip.expectedDistanceKm)}`,
-    `📅 Pickup date: ${pickupDateLong(trip.pickupAt)}`,
-    `🕒 Time: ${pickupTime(trip.pickupAt)}`,
+    ...routeBlock,
+    ...scheduleBlock,
   ];
   const moneyBlock = [
     `💵 Per km: ${formatINR(trip.ratePerKm)}`,
