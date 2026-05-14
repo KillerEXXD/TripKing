@@ -6,7 +6,7 @@ export type TripStatus = 'open' | 'has_applicants' | 'selected' | 'accepted' | '
 /** Phase 2 of the two-step handshake — drives the driver's Accept/Decline card. Null on trips that pre-date the handshake. */
 export type DriverAcceptanceStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 export type PosterRole = 'driver' | 'trip_manager';
-export type AcceptanceStatus = 'applied' | 'selected' | 'rejected' | 'withdrawn' | 'expired';
+export type AcceptanceStatus = 'applied' | 'selected' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
 /** Migration 024: the *shape* of the route. */
 export type TripType = 'one_way' | 'round_trip' | 'multi_way';
 
