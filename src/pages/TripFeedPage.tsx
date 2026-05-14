@@ -4,6 +4,7 @@ import { MapPin, Snowflake, Sparkles } from 'lucide-react';
 import { useTrips } from '@/hooks/useTrips';
 import { carTypeHooks, cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
+import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR } from '@/lib/utils';
@@ -23,9 +24,7 @@ function TripCard({ trip }: { trip: Trip }) {
       <Card className="gap-2 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="font-bold">
-              {trip.fromCity.name} → {trip.toCity.name}
-            </div>
+            <div className="truncate font-bold">{routeChainText(trip)}</div>
             <div className="text-xs text-secondary">
               {Math.round(trip.expectedDistanceKm)} km · {pickupLabel(trip.pickupAt)}
             </div>
@@ -36,6 +35,7 @@ function TripCard({ trip }: { trip: Trip }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <TripTypeBadge trip={trip} />
           {trip.distanceKm != null ? (
             <Badge variant="muted">
               <MapPin className="size-3" aria-hidden /> {trip.distanceKm} km away
