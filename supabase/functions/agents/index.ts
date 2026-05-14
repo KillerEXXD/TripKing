@@ -30,7 +30,10 @@ import { readBody, pgFail } from '../_shared/http.ts';
 
 const authUser = (db: Db, req: Request) => authUserShared(db, req, { defaultRole: 'trip_manager' });
 
-const CACHE_EPOCH = 'v1';
+// Bump when the response shape changes so the memory cache (60s TTL) doesn't keep
+// returning the old shape — e.g. v2 nukes pre-`can_report_bugs` cached `/agents/me`
+// payloads that were tripping `MISSING_CAN_REPORT_BUGS` on the client transform.
+const CACHE_EPOCH = 'v2';
 function invalidateAgentMe(userId: string): void {
   cacheDelete(`agents:me:user-${userId}:${CACHE_EPOCH}`);
 }

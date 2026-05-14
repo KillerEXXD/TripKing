@@ -34,7 +34,9 @@ import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail } from '../_shared/http.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
-const CACHE_EPOCH = 'v1';
+// v2 (2026-05-14): added `can_report_bugs` to the flattened shape; stale v1
+// cache entries were tripping `MISSING_CAN_REPORT_BUGS` on the client transform.
+const CACHE_EPOCH = 'v2';
 function invalidateDriverMe(userId: string): void {
   cacheDelete(`drivers:me:user-${userId}:${CACHE_EPOCH}`);
 }

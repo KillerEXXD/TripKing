@@ -144,10 +144,12 @@ async function tokenFor(role) {
   check('GET /drivers/me for a user with no driver profile → 404', meNoProfile.status === 404, `status=${meNoProfile.status}`);
   const me = await j('GET', '/drivers/me', { token });
   check('GET /drivers/me → 200 + the caller’s driver profile', me.status === 200 && me.json?.data?.id === driverId && !!me.json?.data?.user_id, `status=${me.status} ${JSON.stringify(me.json?.error || me.json?.data || '')}`);
+  check('GET /drivers/me → can_report_bugs is a boolean (regression: was tripping MISSING_CAN_REPORT_BUGS in Sentry)', typeof me.json?.data?.can_report_bugs === 'boolean', `can_report_bugs=${JSON.stringify(me.json?.data?.can_report_bugs)}`);
   const agentMeNoProfile = await j('GET', '/agents/me', { token: adminToken });
   check('GET /agents/me for a user with no agent profile → 404', agentMeNoProfile.status === 404, `status=${agentMeNoProfile.status}`);
   const agentMe = await j('GET', '/agents/me', { token: token2 });
   check('GET /agents/me → 200 + the caller’s agent profile', agentMe.status === 200 && agentMe.json?.data?.id === agentId, `status=${agentMe.status} ${JSON.stringify(agentMe.json?.error || '')}`);
+  check('GET /agents/me → can_report_bugs is a boolean (regression)', typeof agentMe.json?.data?.can_report_bugs === 'boolean', `can_report_bugs=${JSON.stringify(agentMe.json?.data?.can_report_bugs)}`);
 
   // ── admin (de)activation kill switch — PATCH /drivers/:id/active + /agents/:id/active ──────────
   const actNoAuth = await j('PATCH', `/drivers/${driverId}/active`, { body: { is_active: false } });
