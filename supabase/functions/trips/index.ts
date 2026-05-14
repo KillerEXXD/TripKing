@@ -67,13 +67,15 @@ function invalidateTripsList(): void {
 
 type Db = ReturnType<typeof serviceClient>;
 
-// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map; from/to place joined alongside the curated cities.
+// includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map; from/to place joined alongside the curated cities;
+// waypoints (migration 024) joined as an ordered list so the client can render the route chain (one_way / round_trip / multi_way).
+const WAYPOINTS_JOIN = 'waypoints:trip_waypoints!trip_id(id, seq, city:cities!city_id(*), place:places!place_id(*), arrive_at, wait_minutes, is_destination, notes)';
 const TRIP_SELECT =
-  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
+  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' +
   'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle))';
 // for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
 const BY_OTP_SELECT =
-  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' +
+  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' +
   'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle)), ' +
   'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
@@ -104,6 +106,134 @@ async function readBody(req: Request): Promise<Record<string, unknown>> {
 async function sha256hex(s: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── waypoint plan (migration 024) ────────────────────────────────────────────
+type TripType = 'one_way' | 'round_trip' | 'multi_way';
+type WaypointInsert = {
+  trip_id?: string;       // set after the parent trips row is inserted
+  seq: number;
+  city_id: string | null;
+  place_id: string | null;
+  arrive_at: string | null;
+  wait_minutes: number;
+  is_destination: boolean;
+  notes: string | null;
+};
+type WaypointPlan = {
+  trip_type: TripType;
+  expected_end_at: string;          // ISO; > pickup_at and ≤ pickup_at + max_trip_duration_days
+  waypoints: WaypointInsert[];      // ≥ 2, with seq=0..N
+  from_city_id: string;             // denormalised first waypoint
+  from_place_id: string | null;
+  to_city_id: string;               // denormalised last waypoint
+  to_place_id: string | null;
+};
+
+/** Parse + validate the waypoint shape from a POST body. Returns a Response on failure. */
+async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAtIso: string): Promise<WaypointPlan | Response> {
+  const tripType = (typeof body.trip_type === 'string' && ['one_way', 'round_trip', 'multi_way'].includes(body.trip_type) ? body.trip_type : 'one_way') as TripType;
+
+  // Either accept `waypoints[]` directly, or synthesise from legacy from_*/to_* (one_way only).
+  let raw: Record<string, unknown>[];
+  if (Array.isArray(body.waypoints) && body.waypoints.length > 0) {
+    raw = (body.waypoints as unknown[]).map((w) => (w && typeof w === 'object' ? (w as Record<string, unknown>) : {}));
+  } else {
+    const fromCity = typeof body.from_city_id === 'string' ? body.from_city_id : '';
+    const toCity = typeof body.to_city_id === 'string' ? body.to_city_id : '';
+    if (!fromCity || !toCity) return fail('VALIDATION', 'either waypoints[] or both from_city_id and to_city_id are required', 422);
+    raw = [
+      { city_id: fromCity, place_id: typeof body.from_place_id === 'string' ? body.from_place_id : null, wait_minutes: 0, is_destination: false },
+      { city_id: toCity, place_id: typeof body.to_place_id === 'string' ? body.to_place_id : null, arrive_at: null, wait_minutes: 0, is_destination: true },
+    ];
+  }
+
+  if (raw.length < 2) return fail('VALIDATION', 'a trip needs at least 2 waypoints (origin + destination)', 422);
+
+  // shape per trip_type
+  const firstCity = (raw[0]?.city_id as string | null | undefined) ?? null;
+  const firstPlace = (raw[0]?.place_id as string | null | undefined) ?? null;
+  const lastCity = (raw[raw.length - 1]?.city_id as string | null | undefined) ?? null;
+  const lastPlace = (raw[raw.length - 1]?.place_id as string | null | undefined) ?? null;
+  if (!firstCity && !firstPlace) return fail('VALIDATION', 'first waypoint needs city_id or place_id', 422);
+  if (!lastCity && !lastPlace) return fail('VALIDATION', 'last waypoint needs city_id or place_id', 422);
+
+  const sameEndpoints = (firstCity && lastCity && firstCity === lastCity) || (firstPlace && lastPlace && firstPlace === lastPlace);
+  if (tripType === 'round_trip' && !sameEndpoints) return fail('VALIDATION', 'round_trip requires the last waypoint to match the first city/place', 422);
+  if (tripType === 'multi_way' && raw.length < 3) return fail('VALIDATION', 'multi_way requires ≥3 waypoints', 422);
+  if (tripType === 'multi_way' && sameEndpoints) return fail('VALIDATION', 'multi_way last waypoint must differ from the first (use round_trip for a loop)', 422);
+  if (tripType === 'one_way' && sameEndpoints) return fail('VALIDATION', 'one_way last waypoint must differ from the first (use round_trip for a loop)', 422);
+
+  // monotonic arrive_at; phones scrubbed; defaults applied
+  const pickupMs = new Date(pickupAtIso).getTime();
+  if (!Number.isFinite(pickupMs)) return fail('VALIDATION', 'pickup_at is not a valid ISO timestamp', 422);
+  let prevMs = pickupMs;
+  const waypoints: WaypointInsert[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const w = raw[i];
+    const city = typeof w.city_id === 'string' && w.city_id ? w.city_id : null;
+    const place = typeof w.place_id === 'string' && w.place_id ? w.place_id : null;
+    if (!city && !place) return fail('VALIDATION', `waypoint ${i}: city_id or place_id required`, 422);
+    let arriveAt: string | null = null;
+    if (i > 0) {
+      // intermediate + final must carry a monotonic arrive_at
+      const a = typeof w.arrive_at === 'string' ? w.arrive_at : null;
+      if (a) {
+        const ms = new Date(a).getTime();
+        if (!Number.isFinite(ms)) return fail('VALIDATION', `waypoint ${i}: arrive_at must be ISO`, 422);
+        if (ms <= prevMs) return fail('VALIDATION', `waypoint ${i}: arrive_at must be after the previous waypoint's time`, 422);
+        prevMs = ms;
+        arriveAt = a;
+      }
+      // arrive_at is optional for intermediate AND final waypoints — when the final's is null,
+      // expected_end_at falls back to pickup_at + 1 day (or the body-supplied expected_end_at).
+    }
+    const notes = typeof w.notes === 'string' ? w.notes : null;
+    try { assertNoPhones(notes, `waypoints[${i}].notes`); } catch (e) {
+      if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+      throw e;
+    }
+    const wait = Number.isFinite(Number(w.wait_minutes)) ? Math.max(0, Math.floor(Number(w.wait_minutes))) : 0;
+    waypoints.push({
+      seq: i,
+      city_id: city,
+      place_id: place,
+      arrive_at: arriveAt,
+      wait_minutes: wait,
+      is_destination: typeof w.is_destination === 'boolean' ? w.is_destination : i === raw.length - 1,
+      notes,
+    });
+  }
+
+  // expected_end_at: body value > computed-from-last-waypoint > pickup_at + 1d
+  const lastWp = waypoints[waypoints.length - 1];
+  const computedEndMs = lastWp.arrive_at ? new Date(lastWp.arrive_at).getTime() + lastWp.wait_minutes * 60_000 : pickupMs + 86_400_000;
+  const bodyEnd = typeof body.expected_end_at === 'string' ? body.expected_end_at : null;
+  const endIso = bodyEnd ?? new Date(computedEndMs).toISOString();
+  const endMs = new Date(endIso).getTime();
+  if (!Number.isFinite(endMs) || endMs <= pickupMs) return fail('VALIDATION', 'expected_end_at must be after pickup_at', 422);
+
+  // span ≤ max_trip_duration_days
+  const { data: settings } = await db.from('app_settings').select('max_trip_duration_days').eq('id', 1).maybeSingle();
+  const maxDays = Number((settings as Record<string, unknown> | null)?.max_trip_duration_days ?? 14);
+  if ((endMs - pickupMs) > maxDays * 86_400_000) return fail('VALIDATION', `trip span exceeds the ${maxDays}-day cap`, 422);
+
+  return {
+    trip_type: tripType,
+    expected_end_at: endIso,
+    waypoints,
+    from_city_id: firstCity ?? '',
+    from_place_id: firstPlace,
+    to_city_id: lastCity ?? '',
+    to_place_id: lastPlace,
+  };
+}
+
+/** Sort the joined waypoints by seq (PostgREST embed doesn't guarantee order). */
+function sortWaypoints(row: Record<string, unknown> | null | undefined): void {
+  if (!row) return;
+  const wp = row.waypoints as Record<string, unknown>[] | undefined;
+  if (Array.isArray(wp)) wp.sort((a, b) => Number(a.seq) - Number(b.seq));
 }
 const genOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 function pgFail(error: { code?: string; message: string }, fallbackStatus = 400): Response {
@@ -205,6 +335,7 @@ function scrubTripText(out: Record<string, unknown>): void {
  * Computed by the caller before invoking this (an async predicate call).
  */
 function redactTrip(raw: Record<string, unknown>, rel: ViewerRel, posterReveal = false): Record<string, unknown> {
+  sortWaypoints(raw);
   const out = { ...raw };
   delete out.passenger_otp_hash;            // never anyone
   for (const k of TRIP_PII_COLS) delete out[k];
@@ -408,14 +539,15 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
       throw e;
     }
-    const fromCityId = String(b.from_city_id ?? '');
-    const toCityId = String(b.to_city_id ?? '');
-    if (!fromCityId || !toCityId) return fail('VALIDATION', 'from_city_id and to_city_id are required', 422);
     const distance = Number(b.expected_distance_km);
     const rate = Number(b.rate_per_km);
     if (!Number.isFinite(distance) || !Number.isFinite(rate) || !b.pickup_at || !b.car_type_id) {
       return fail('VALIDATION', 'pickup_at, car_type_id, expected_distance_km, rate_per_km are required', 422);
     }
+    const pickupAtIso = String(b.pickup_at);
+    // Resolve trip shape: a `waypoints[]` array (new style) OR legacy from_city_id/to_city_id (synthesised as a 2-waypoint one_way).
+    const plan = await buildWaypointPlan(db, b, pickupAtIso);
+    if (plan instanceof Response) return plan;
     const hidePassengerPhone = typeof b.hide_passenger_phone === 'boolean' ? b.hide_passenger_phone : true;
     const passengerCount = Number(b.passenger_count);
     if (!Number.isInteger(passengerCount) || passengerCount < 1) {
@@ -434,11 +566,13 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       posted_by_role: posterRole,
       posted_by_name: (usr?.display_name as string) ?? '',
       posted_by_phone: (b.posted_by_phone as string | null) ?? null,
-      from_city_id: fromCityId,
-      to_city_id: toCityId,
-      from_place_id: (typeof b.from_place_id === 'string' && b.from_place_id) ? b.from_place_id : null,
-      to_place_id: (typeof b.to_place_id === 'string' && b.to_place_id) ? b.to_place_id : null,
+      trip_type: plan.trip_type,
+      from_city_id: plan.from_city_id,
+      to_city_id: plan.to_city_id,
+      from_place_id: plan.from_place_id,
+      to_place_id: plan.to_place_id,
       pickup_at: b.pickup_at,
+      expected_end_at: plan.expected_end_at,
       expected_distance_km: distance,
       car_type_id: b.car_type_id,
       seats_required: b.seats_required ?? 4,
@@ -461,6 +595,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     };
     const { data: created, error } = await db.from('trips').insert(insert).select('id').single();
     if (error) return pgFail(error); // 23503 (bad from_place_id/to_place_id/from_city_id/…) → 422
+    // Insert the waypoints (the mirror trigger reaffirms trips.from_*/to_*/expected_end_at).
+    const wpRows = plan.waypoints.map((w) => ({ ...w, trip_id: created.id as string }));
+    const { error: wpErr } = await db.from('trip_waypoints').insert(wpRows);
+    if (wpErr) {
+      // Roll back the orphan trip so the agent can fix + retry.
+      await db.from('trips').delete().eq('id', created.id as string);
+      return pgFail(wpErr);
+    }
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_trip', { p_trip_id: created.id }); } catch { /* ignore */ }
     // upsert into the passengers directory — first poster wins (name + referrer never overwritten);
@@ -510,6 +652,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       row.assigned_driver = drvOut;
     }
     scrubTripText(row);
+    sortWaypoints(row);
     const dist = distanceToDest(row);
     if (dist != null) row.distance_to_destination_km = dist;
     if (!row.show_fare_to_passenger) {
@@ -526,7 +669,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (!did) return ok([]); // no driver profile ⇒ no applications
     const { data, error } = await db
       .from('trip_acceptances')
-      .select('*, trip:trips!trip_id(*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label))')
+      .select('*, trip:trips!trip_id(*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ')')
       .eq('driver_id', did)
       .order('applied_at', { ascending: false });
     if (error) return fail('DB_ERROR', error.message, 500);
@@ -543,6 +686,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         t.posted_by_handle = posterUser && typeof posterUser.display_handle === 'string' ? posterUser.display_handle : null;
         delete t.posted_by_user;
         scrubTripText(t);
+        sortWaypoints(t);
       }
       return shapeAcceptance(rec);
     });
