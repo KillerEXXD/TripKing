@@ -1,6 +1,7 @@
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { queryClient } from '@/lib/queryClient';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ErrorBoundary } from '@/components/feedback';
@@ -17,6 +18,7 @@ export function App() {
             <PostHogPageviewTracker />
             <AppRoutes />
             <Toaster richColors position="top-center" />
+            <SpeedInsights />
           </BrowserRouter>
         </AuthProvider>
       </QueryClientProvider>
