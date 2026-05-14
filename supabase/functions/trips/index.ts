@@ -702,18 +702,24 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       return fail('VALIDATION', 'passenger_count (a positive integer) is required', 422);
     }
     const totalFare = b.total_fare !== undefined && b.total_fare !== null ? Number(b.total_fare) : Math.round(distance * rate);
-    const { data: usr } = await db.from('users').select('display_name, role').eq('id', u.id).maybeSingle();
+    const { data: usr } = await db.from('users').select('display_name, phone, role').eq('id', u.id).maybeSingle();
     const posterRole = usr?.role === 'driver' ? 'driver' : 'trip_manager';
     const { data: posterProf } = await (posterRole === 'driver'
-      ? db.from('drivers').select('kyc_status, is_active').eq('user_id', u.id).maybeSingle()
-      : db.from('trip_managers').select('kyc_status, is_active').eq('user_id', u.id).maybeSingle());
+      ? db.from('drivers').select('kyc_status, is_active, full_name, phone').eq('user_id', u.id).maybeSingle()
+      : db.from('trip_managers').select('kyc_status, is_active, full_name, phone').eq('user_id', u.id).maybeSingle());
     if (posterProf?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your account has been deactivated — contact support.', 403);
     if ((posterProf?.kyc_status as string) !== 'approved') return fail('KYC_REQUIRED', 'Complete your verification (KYC) before posting a trip', 403);
+    // Snapshot the poster's real name + phone onto the trip row so redactTrip() can reveal them
+    // once the driver acceptance handshake reaches a state where the rule allows it. Source of
+    // truth is the poster's profile row (drivers/trip_managers); fall back through users.* then
+    // empty string / null so we never block trip creation on missing optional fields.
+    const posterFullName = ((posterProf?.full_name as string | null | undefined) || (usr?.display_name as string | null | undefined) || '').toString();
+    const posterPhone = ((posterProf?.phone as string | null | undefined) || (usr?.phone as string | null | undefined) || '').toString();
     const insert = {
       posted_by_user_id: u.id,
       posted_by_role: posterRole,
-      posted_by_name: (usr?.display_name as string) ?? '',
-      posted_by_phone: (b.posted_by_phone as string | null) ?? null,
+      posted_by_name: posterFullName,
+      posted_by_phone: posterPhone || null,
       trip_type: plan.trip_type,
       from_city_id: plan.from_city_id,
       to_city_id: plan.to_city_id,
@@ -1388,14 +1394,24 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         .eq('trip_id', tripId)
         .order('created_at', { ascending: false });
       if (error) return pgFail(error);
+      // Privacy rule: the actor (agent) reveals themselves on invite, but the recipient
+      // (driver) stays anonymous to the agent until they reciprocate by applying. So we
+      // strip full_name / phone / profile_photo_url from each invitee unless their
+      // trip_invitations.status === 'applied' (i.e. they've moved from pending → applied
+      // by opening / applying via the invite). Trust signals (rating, KYC, trip count,
+      // handle) stay visible the whole time so the agent has something to act on.
       const flat = (data ?? []).map((row) => {
         const r = row as Record<string, unknown>;
+        const reciprocated = r.status === 'applied';
         const drv = r.driver as Record<string, unknown> | null | undefined;
         if (drv) {
           const flatDrv = { ...drv };
           const uu = flatDrv.user as Record<string, unknown> | null | undefined;
           flatDrv.display_handle = uu && typeof uu.display_handle === 'string' ? uu.display_handle : null;
           delete flatDrv.user;
+          if (!reciprocated) {
+            for (const k of ['full_name', 'phone', 'profile_photo_url']) delete flatDrv[k];
+          }
           r.driver = flatDrv;
         }
         return r;

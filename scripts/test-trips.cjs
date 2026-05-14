@@ -284,6 +284,15 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('POST /trips/:id/invites (poster) → 200 + created row + invitee_count', invited.status === 200 && !!inviteId, `status=${invited.status} ${JSON.stringify(invited.json?.data || invited.json?.error || '')}`);
   const inviteList = await j('GET', `/trips/${inviteTripId}/invites`, { token });
   check('GET /trips/:id/invites (poster) → 200 + array with the driver attached', inviteList.status === 200 && Array.isArray(inviteList.json?.data) && inviteList.json.data.length >= 1 && !!inviteList.json.data[0]?.driver?.display_handle, `${JSON.stringify(inviteList.json?.data || '').slice(0, 200)}`);
+  // Privacy rule: agent invites driver → driver still anonymous to agent until driver applies.
+  // The pending invitee row must NOT contain full_name / phone / profile_photo_url.
+  const pendingInvitee = (inviteList.json?.data || []).find((r) => r.driver?.id === drvId);
+  check('GET /trips/:id/invites (poster) → driver name/phone HIDDEN while pending (actor-reveals rule)',
+    !!pendingInvitee && pendingInvitee.status === 'pending'
+      && pendingInvitee.driver?.full_name === undefined
+      && pendingInvitee.driver?.phone === undefined
+      && pendingInvitee.driver?.profile_photo_url === undefined,
+    `status=${pendingInvitee?.status} full_name=${JSON.stringify(pendingInvitee?.driver?.full_name)} phone=${JSON.stringify(pendingInvitee?.driver?.phone)}`);
   // The invited driver can see the trip via ?invited=me + sees the agent's name pre-revealed.
   const invitedTab = await j('GET', '/trips?invited=me', { token: dToken });
   const invitedTrip = (invitedTab.json?.data || []).find((t) => t.id === inviteTripId);
