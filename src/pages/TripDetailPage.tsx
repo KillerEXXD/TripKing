@@ -2,7 +2,7 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
-import { useApplyToTrip, useCancelTrip, useCompleteTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
@@ -13,10 +13,15 @@ import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/my
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
+import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
+import { DriverIdentity } from '@/components/driver/DriverIdentity';
+import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
 import { Badge, Button, Card } from '@/components/ui';
+import { LiveDot } from '@/components/ui/LiveDot';
+import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { toast } from 'sonner';
@@ -26,6 +31,7 @@ import type { Trip, TripStatus, Vehicle } from '@/types';
 const STATUS_BADGE = {
   open: { label: 'Open', variant: 'success' },
   has_applicants: { label: 'Has applicants', variant: 'warning' },
+  selected: { label: 'Awaiting acceptance', variant: 'warning' },
   assigned: { label: 'Assigned', variant: 'info' },
   in_progress: { label: 'In progress', variant: 'info' },
   completed: { label: 'Completed', variant: 'muted' },
@@ -331,6 +337,14 @@ function PostedBy({ trip }: { trip: Trip }) {
           </Button>
         </div>
       ) : null}
+      {/* Server attaches this only when the viewer is the assigned driver — they get to see how
+          thoroughly the poster who hired them is verified. No document URLs. */}
+      {trip.postedByVerification ? (
+        <CounterpartyChecklist
+          verification={trip.postedByVerification}
+          steps={isAgentPost ? AGENT_VERIFICATION_STEPS : DRIVER_VERIFICATION_STEPS}
+        />
+      ) : null}
     </Card>
   );
 }
@@ -434,6 +448,125 @@ function PassengerEditForm({ trip, onSaved }: { trip: Trip; onSaved?: () => void
   );
 }
 
+/**
+ * Phase 2 of the two-step handshake — shown to the driver while the trip sits in `selected`.
+ * Accept generates the passenger OTP and flips the trip to `assigned`. Decline (or letting the
+ * server-side cron expire) bumps the trip back to `has_applicants`.
+ */
+function SelectedDriverCard({ trip }: { trip: Trip }) {
+  const acceptMutation = useAcceptTrip();
+  const declineMutation = useDeclineTrip();
+  const callHref = trip.postedByPhone ? `tel:${trip.postedByPhone}` : undefined;
+
+  async function onAccept() {
+    try {
+      await acceptMutation.mutateAsync({ tripId: trip.id });
+      toast.success("You're confirmed — the passenger will get an OTP shortly.");
+    } catch (e) {
+      // 409 = race condition (agent withdrew or selection expired between render and tap).
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('Too late — this trip is no longer available to you. The page has been refreshed.');
+      else if (status === 403) toast.error('You need an active KYC-approved profile to accept.');
+      else toast.error("Couldn't accept — please try again.");
+    }
+  }
+  async function onDecline() {
+    if (!window.confirm("Decline this trip? You won't be re-offered it.")) return;
+    try {
+      await declineMutation.mutateAsync({ tripId: trip.id });
+      toast.success('Trip declined.');
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('This trip is no longer available — nothing to decline.');
+      else toast.error("Couldn't decline — please try again.");
+    }
+  }
+  const busy = acceptMutation.isPending || declineMutation.isPending;
+  return (
+    <Card className="border-emerald-300 bg-emerald-50">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
+          {trip.acceptanceDeadlineAt ? (
+            <CountdownTimer
+              deadline={trip.acceptanceDeadlineAt}
+              prefix="Accept within"
+              expiredLabel="Expired — being reassigned…"
+              className="text-xs text-emerald-800"
+            />
+          ) : null}
+        </div>
+        <div className="text-base font-bold text-emerald-900">Accept this trip to start.</div>
+        <p className="text-xs text-emerald-800">
+          If you don&apos;t respond before the timer hits zero, it&apos;ll go back to other applicants.
+        </p>
+        {trip.postedByName ? (
+          <p className="text-xs text-emerald-800">
+            Picked by <b>{trip.postedByName}</b>
+            {callHref ? <> · <a href={callHref} className="underline">Call to confirm</a></> : null}
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-3 flex gap-2">
+        <Button variant="full" size="lg" className="flex-1" onClick={() => void onAccept()} disabled={busy}>
+          {acceptMutation.isPending ? 'Accepting…' : 'Accept'}
+        </Button>
+        <Button variant="outline" size="lg" className="text-destructive" onClick={() => void onDecline()} disabled={busy}>
+          {declineMutation.isPending ? 'Declining…' : 'Decline'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+/** Trip creator's view while waiting for the driver to Accept. */
+function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
+  const cancelMutation = useCancelAssignment();
+  const driverName = trip.assignedDriver?.fullName ?? (trip.assignedDriverHandle ? `Driver ${trip.assignedDriverHandle}` : 'the driver');
+  const driverPhone = trip.assignedDriver?.phone;
+  async function onCancel() {
+    if (!window.confirm(`Withdraw the selection of ${driverName}? Other applicants stay available.`)) return;
+    try {
+      await cancelMutation.mutateAsync({ tripId: trip.id });
+      toast.success('Selection withdrawn. Pick another applicant.');
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('Trip already moved on — page refreshed.');
+      else toast.error("Couldn't withdraw — please try again.");
+    }
+  }
+  return (
+    <Card className="border-amber-300 bg-amber-50">
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Awaiting acceptance</div>
+          {trip.acceptanceDeadlineAt ? (
+            <CountdownTimer
+              deadline={trip.acceptanceDeadlineAt}
+              prefix="Decides within"
+              expiredLabel="Expired — finding another driver…"
+              className="text-xs text-amber-800"
+            />
+          ) : null}
+        </div>
+        <div className="text-sm font-semibold text-amber-900">
+          Waiting for <b>{driverName}</b> to accept.
+        </div>
+        {driverPhone ? (
+          <p className="text-xs text-amber-800">
+            <a href={`tel:${driverPhone}`} className="underline">Call them</a> to confirm.
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-2 flex justify-end">
+        <Button variant="outline" size="sm" className="text-destructive" onClick={() => void onCancel()} disabled={cancelMutation.isPending}>
+          {cancelMutation.isPending ? 'Withdrawing…' : 'Withdraw selection'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
 function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
   const badge = STATUS_BADGE[trip.status];
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
@@ -463,14 +596,34 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
   return (
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAssignedBar) && 'pb-40')}>
+      {viewer.isAssignedDriver && trip.status === 'selected' ? <SelectedDriverCard trip={trip} /> : null}
+      {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
+      {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
+      {showApplyBar && myApplication ? (
+        <Card className="border-emerald-200 bg-emerald-50">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-emerald-900">
+                You&apos;ve applied — waiting for the trip manager
+                {trip.applicantCount > 0 ? (
+                  <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
+                ) : null}
+              </div>
+              <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
       <Card className="gap-3">
         <div className="flex items-start justify-between gap-3">
           <div className="text-2xl font-bold leading-tight">
             {routeChainText(trip)}
           </div>
-          <Badge variant={badge.variant} className="mt-1 shrink-0">
-            {badge.label}
-          </Badge>
+          <div className="mt-1 flex shrink-0 items-center gap-2">
+            {isTripLive(trip.status) ? <LiveDot tone={trip.status === 'selected' ? 'amber' : 'emerald'} /> : null}
+            <Badge variant={badge.variant}>{badge.label}</Badge>
+          </div>
         </div>
         {(trip.waypoints?.length ?? 0) >= 3 ? (
           <ol className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
@@ -582,10 +735,24 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
         </Card>
       ) : null}
 
-      {trip.assignedDriverId ? (
-        <Card>
-          <Link to={`/drivers/${trip.assignedDriverId}`} className="flex items-center gap-2 text-sm font-medium text-primary">
-            <User className="size-4" aria-hidden /> View the assigned driver&apos;s profile →
+      {trip.assignedDriverId && trip.assignedDriver ? (
+        <Card className="gap-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Assigned driver</div>
+          <DriverIdentity
+            driver={trip.assignedDriver}
+            size="lg"
+            sub={
+              trip.assignedDriver.ratingCount > 0
+                ? <span>★ {trip.assignedDriver.ratingAvg.toFixed(1)} · {trip.assignedDriver.totalTripsCompleted} trips</span>
+                : <span>{trip.assignedDriver.totalTripsCompleted} trips</span>
+            }
+          />
+          {/* The checklist is server-attached only for poster / admin views — no document URLs, just step status. */}
+          {trip.assignedDriver.verification ? (
+            <CounterpartyChecklist verification={trip.assignedDriver.verification} steps={DRIVER_VERIFICATION_STEPS} />
+          ) : null}
+          <Link to={`/drivers/${trip.assignedDriverId}`} className="flex items-center gap-1 text-sm font-medium text-primary">
+            View full profile <User className="size-4" aria-hidden />
           </Link>
         </Card>
       ) : null}
@@ -598,17 +765,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
         </Card>
       ) : null}
 
-      {showApplyBar && myApplication ? (
-        <Card className="border-emerald-200 bg-emerald-50">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-emerald-900">You&apos;ve applied — waiting for the trip manager</div>
-              <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
-            </div>
-          </div>
-        </Card>
-      ) : viewer.isDriver && !viewer.isPoster && trip.applicantCount > 0 && applyable ? (
+      {!showApplyBar && viewer.isDriver && !viewer.isPoster && trip.applicantCount > 0 && applyable ? (
         <Card>
           <p className="text-sm text-secondary">🤝 {trip.applicantCount} driver{trip.applicantCount === 1 ? '' : 's'} applied — a sharp rate helps you stand out.</p>
         </Card>
@@ -640,9 +797,9 @@ export function TripDetailPage() {
   const location = useLocation();
   const fillPassenger = new URLSearchParams(location.search).get('fillPassenger') === '1';
   const { user } = useAuth();
+  // Effective role honours the admin role-switcher — an admin viewing-as-driver gets the
+  // driver flow (Apply bar), not the poster/admin flow.
   const effectiveRole = useEffectiveRole();
-  // Admins can switch their view to act as a driver or agent. Treat the effective role
-  // as authoritative so an admin viewing-as-driver sees the apply flow, not poster/admin UI.
   const isDriver = effectiveRole === 'driver';
   const isAdminView = user?.role === 'admin' && effectiveRole === 'admin';
   const tripQuery = useTrip(id);
@@ -679,8 +836,8 @@ export function TripDetailPage() {
           fillPassenger={fillPassenger}
           viewer={{
             isDriver,
-            // An admin viewing-as-driver is not the poster for this purpose, even if
-            // they posted the trip under their agent identity (postedByUserId === user.id).
+            // An admin viewing-as-driver isn't a poster for this purpose, even if they posted
+            // the trip under their agent identity (postedByUserId === user.id).
             isPoster: !isDriver && !!user && tripQuery.data.postedByUserId === user.id,
             isAdmin: isAdminView,
             isAssignedDriver: !!myDriverQuery.data?.id && tripQuery.data.assignedDriverId === myDriverQuery.data.id,

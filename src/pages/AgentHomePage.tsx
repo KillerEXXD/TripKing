@@ -13,7 +13,7 @@ import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
 import type { Agent, Trip, Vacancy } from '@/types';
 
-const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
+const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', selected: 'Awaiting acceptance', assigned: 'Assigned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (

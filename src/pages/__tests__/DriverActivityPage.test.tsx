@@ -41,6 +41,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     hidePassengerPhone: false,
     applicantCount: 0,
     createdAt: '2099-05-30T00:00:00.000Z',
+    acceptanceWindowMinutes: 15,
     ...over,
   } as Trip;
 }
@@ -53,9 +54,9 @@ type AppsQ = { isPending?: boolean; isError?: boolean; data?: MyApplication[]; r
 const tripsState = (s: TripsQ = {}) => ({ isPending: false, isError: false, data: [] as Trip[], refetch: vi.fn(), ...s });
 const appsState = (s: AppsQ = {}) => ({ isPending: false, isError: false, data: [] as MyApplication[], refetch: vi.fn(), ...s });
 
-function setUp({ driving = tripsState(), posted = tripsState(), applied = appsState() } = {}) {
+function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsState(), applied = appsState() } = {}) {
   vi.mocked(useAuth).mockReturnValue({ user, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() } as never);
-  vi.mocked(useTrips).mockImplementation((params?: TripsQueryParams) => (params?.assignedDriverId ? driving : posted) as never);
+  vi.mocked(useTrips).mockImplementation((params?: TripsQueryParams) => (params?.assignedDriverId ? driving : params?.invited ? invited : posted) as never);
   vi.mocked(useMyApplications).mockReturnValue(applied as never);
 }
 const renderPage = () => render(<MemoryRouter><DriverActivityPage /></MemoryRouter>);
@@ -99,6 +100,13 @@ describe('DriverActivityPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
     expect(screen.getByText(/haven't applied to any trips/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/trips');
+  });
+
+  it('the Invited tab lists trips the driver was invited to', () => {
+    setUp({ invited: tripsState({ data: [makeTrip({ id: 'i-1', toCity: city('c8', 'Bangalore') })] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
+    expect(screen.getByText('Vellore → Bangalore')).toBeInTheDocument();
   });
 
   it('surfaces an error on the Driving tab', () => {

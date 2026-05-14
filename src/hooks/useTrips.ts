@@ -2,22 +2,29 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
+  acceptTrip,
   applyToTrip,
   assignDriver,
+  cancelAssignment,
   cancelTrip,
   completeTrip,
+  declineTrip,
+  declineTripInvite,
   getMyApplications,
   getTrip,
   getTripApplicants,
   getTripByOtp,
+  getTripInvites,
   getTrips,
+  inviteDrivers,
   postTrip,
   rejectApplicant,
   startTrip,
   updateTripPassenger,
   withdrawApplication,
+  withdrawTripInvite,
 } from '@/lib/api/services/trips';
-import type { ApplyToTripInput, PostTripInput, TripsQueryParams, TripStatus, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, PostTripInput, TripInvitation, TripsQueryParams, TripStatus, UpdateTripPassengerInput } from '@/types';
 
 type StartInput = { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number };
 type CompleteInput = { endOdoUrl?: string; endOdoReading?: number; driverNotes?: string };
@@ -27,8 +34,51 @@ function staleForStatus(status?: TripStatus | TripStatus[]): number {
   return arr.length > 0 && arr.every((s) => s === 'completed' || s === 'cancelled') ? STALE.immutable : STALE.live;
 }
 
+/**
+ * Per-status poll cadence. Tight during the two-step handshake so an agent
+ * picking a driver sees the driver's Accept (or decline / cron-expiry) within
+ * a few seconds; same in reverse for the driver waiting on the agent. Slower
+ * for idle states; off entirely for terminal states. Returned as ms or false.
+ */
+function pollIntervalFor(status: TripStatus | undefined): number | false {
+  switch (status) {
+    case 'selected':       // critical window — handshake is live, both sides watching
+      return 5_000;
+    case 'in_progress':    // live tracking — driver position + ETA
+      return 5_000;
+    case 'has_applicants': // agent is hovering on the applicants page
+    case 'assigned':       // assigned but not yet driving; passenger waiting for OTP
+      return 15_000;
+    case 'open':           // fresh post, agent watching for first applicant
+      return 30_000;
+    case 'completed':
+    case 'cancelled':
+    default:
+      return false;
+  }
+}
+/** True iff the data shape says "this query is actively polling" — drives the <LiveDot> indicator. */
+export function isTripLive(status: TripStatus | undefined): boolean {
+  return pollIntervalFor(status) !== false;
+}
+
 export function useTrips(params?: TripsQueryParams) {
-  return useQuery({ queryKey: ['trips', params ?? {}], queryFn: () => getTrips(params), staleTime: staleForStatus(params?.status) });
+  return useQuery({
+    queryKey: ['trips', params ?? {}],
+    queryFn: () => getTrips(params),
+    staleTime: staleForStatus(params?.status),
+    // Lists: poll while any row could still change. We pick the tightest interval that
+    // matches the filter — selected/in_progress lists tick at 5s, others at 15s. If the
+    // caller filtered to terminal states only (completed/cancelled), polling is off.
+    refetchInterval: () => {
+      const arr = Array.isArray(params?.status) ? params!.status : params?.status ? [params.status] : [];
+      if (arr.length === 0) return 15_000; // mixed / no filter — agent's posted-trips list
+      const intervals = arr.map((s) => pollIntervalFor(s as TripStatus)).filter((n): n is number => typeof n === 'number');
+      if (intervals.length === 0) return false;
+      return Math.min(...intervals);
+    },
+    refetchOnWindowFocus: true,
+  });
 }
 export function useTrip(id: string | undefined) {
   return useQuery({
@@ -36,8 +86,8 @@ export function useTrip(id: string | undefined) {
     queryFn: () => getTrip(id as string),
     enabled: !!id,
     staleTime: STALE.live,
-    // While the trip is running, poll so the live-tracking panel (driver position + ETA) stays current.
-    refetchInterval: (query) => (query.state.data?.status === 'in_progress' ? 15_000 : false),
+    refetchInterval: (query) => pollIntervalFor(query.state.data?.status as TripStatus | undefined),
+    refetchOnWindowFocus: true,
   });
 }
 /**
@@ -59,11 +109,27 @@ export function useTripByOtp(otp: string | undefined) {
   });
 }
 export function useTripApplicants(tripId: string | undefined) {
-  return useQuery({ queryKey: ['trip', tripId, 'applicants'], queryFn: () => getTripApplicants(tripId as string), enabled: !!tripId, staleTime: STALE.live });
+  return useQuery({
+    queryKey: ['trip', tripId, 'applicants'],
+    queryFn: () => getTripApplicants(tripId as string),
+    enabled: !!tripId,
+    staleTime: STALE.live,
+    // Applicants list is the screen the agent picks from — poll so a new applicant
+    // shows up within ~15s and a withdrawn one disappears just as fast.
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
 }
 /** The caller's own trip applications (`GET /trips/applied`) — "my applications"; `[]` if they have no driver profile. */
 export function useMyApplications() {
-  return useQuery({ queryKey: ['trips', 'applied'], queryFn: getMyApplications, staleTime: STALE.live });
+  return useQuery({
+    queryKey: ['trips', 'applied'],
+    queryFn: getMyApplications,
+    staleTime: STALE.live,
+    // Driver's "Applied" tab — needs to flip into 'selected' fast when the agent picks them.
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
+  });
 }
 
 const useInvalidateTrips = createInvalidator('trips', 'trip');
@@ -90,6 +156,30 @@ export function useAssignDriver() {
   const invalidate = useInvalidateTrips();
   return useMutation({
     mutationFn: ({ tripId, acceptanceId }: { tripId: string; acceptanceId: string }) => assignDriver(tripId, acceptanceId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+/** Phase 2 of the two-step handshake — the selected driver Accepts (OTP is generated, trip → assigned). */
+export function useAcceptTrip() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId }: { tripId: string }) => acceptTrip(tripId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+/** Selected driver Declines — trip falls back to has_applicants; this driver is out of the pool. */
+export function useDeclineTrip() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: string; reason?: string }) => declineTrip(tripId, reason),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+/** Trip creator withdraws the selection/assignment — the driver's row goes back to 'applied'. */
+export function useCancelAssignment() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, reason }: { tripId: string; reason?: string }) => cancelAssignment(tripId, reason),
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
 }
@@ -128,3 +218,47 @@ export function useUpdateTripPassenger() {
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
 }
+
+// ─── Phase 4 trip_invitations hooks ─────────────────────────────────────────
+
+export function useTripInvites(tripId: string | undefined) {
+  return useQuery({
+    queryKey: ['trip', tripId, 'invites'],
+    queryFn: () => getTripInvites(tripId as string),
+    enabled: !!tripId,
+    staleTime: STALE.live,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+/** Driver's "Invited" tab — trips the caller has been invited to (pre-reveal exception applies). */
+export function useInvitedTrips() {
+  return useTrips({ invited: 'me' });
+}
+
+export function useInviteDrivers() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, driverIds }: { tripId: string; driverIds: string[] }) => inviteDrivers(tripId, driverIds),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+
+export function useWithdrawTripInvite() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, inviteId }: { tripId: string; inviteId: string }) => withdrawTripInvite(tripId, inviteId),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+
+export function useDeclineTripInvite() {
+  const invalidate = useInvalidateTrips();
+  return useMutation({
+    mutationFn: ({ tripId, inviteId, reason }: { tripId: string; inviteId: string; reason?: string }) => declineTripInvite(tripId, inviteId, reason),
+    onSuccess: (_d, v) => invalidate(v.tripId),
+  });
+}
+// Re-export the invitation type so consumers can import from one place.
+export type { TripInvitation };

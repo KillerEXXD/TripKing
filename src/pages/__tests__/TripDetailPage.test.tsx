@@ -5,7 +5,8 @@ import { TripDetailPage } from '@/pages/TripDetailPage';
 import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
 
-vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn() }));
+vi.mock('@/components/trip/InviteDriversCard', () => ({ InviteDriversCard: () => null }));
+vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useAcceptTrip: vi.fn(() => ({ mutate: vi.fn(), isPending: false })), useDeclineTrip: vi.fn(() => ({ mutate: vi.fn(), isPending: false })), useCancelAssignment: vi.fn(() => ({ mutate: vi.fn(), isPending: false })), isTripLive: vi.fn(() => false) }));
 import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger } from '@/hooks/useTrips';
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(() => ({ data: null, isFetching: false, isSuccess: false })), isLookupablePhone: vi.fn(() => false) }));
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
@@ -57,6 +58,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     hidePassengerPhone: false,
     applicantCount: 0,
     createdAt: '2099-05-30T00:00:00.000Z',
+    acceptanceWindowMinutes: 15,
     ...over,
   };
 }

@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
+import { DateTimeField } from '@/components/form';
 import { cn } from '@/lib/utils';
 import type { CityRow } from '@/types';
 
@@ -132,10 +133,9 @@ export function WaypointEditor({
               <div className="grid grid-cols-2 gap-2">
                 <label className="block">
                   <span className="text-[11px] font-medium text-secondary">Arrive at</span>
-                  <Input
-                    type="datetime-local"
+                  <DateTimeField
                     value={w.arriveAt}
-                    onChange={(e) => update(i, { arriveAt: e.target.value })}
+                    onChange={(value) => update(i, { arriveAt: value })}
                   />
                 </label>
                 <label className="block">

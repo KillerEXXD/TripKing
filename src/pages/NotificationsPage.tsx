@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import { BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Mail, MessageSquare, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, Wrench, XCircle, type LucideIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AlarmClock, ArrowLeft, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
 import { useDecideVacancyInvitation } from '@/hooks/useVacancyInvitations';
@@ -21,6 +21,11 @@ const ICON: Record<NotificationType, LucideIcon> = {
   bug_reported: Bug,
   bug_resolved: Wrench,
   bug_commented: MessageSquare,
+  // Phase 3 of the two-step handshake:
+  trip_selected: AlarmClock,
+  trip_assignment_cancelled: RotateCcw,
+  selection_expired: Hourglass,
+  driver_declined: UserX,
 };
 
 function relTime(iso: string): string {
@@ -114,12 +119,22 @@ export function NotificationsPage() {
   const notifsQuery = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
+  const navigate = useNavigate();
 
   const notifs = notifsQuery.data ?? [];
   const unread = notifs.filter((n) => !n.isRead).length;
 
+  // Returns to the previous page; falls back to / if history is empty (e.g. user opened the link directly).
+  function goBack() {
+    if (window.history.length > 1) navigate(-1);
+    else navigate('/');
+  }
+
   return (
     <main className="mx-auto max-w-md space-y-4 p-4">
+      <button type="button" onClick={goBack} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Back
+      </button>
       <header className="flex items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">Notifications</h1>

@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
 import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip } from '@/hooks/useTrips';
@@ -14,6 +14,7 @@ import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
 import { Button, Card, Input } from '@/components/ui';
+import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
 import type { Place, PostTripInput, Trip, TripType, WaypointInput } from '@/types';
@@ -28,6 +29,9 @@ interface PostTripForm {
   acRequired: boolean;
   ratePerKm: number;
   driverBata: number;
+  gstAmount: number;
+  /** Phase 1 of the two-step handshake — 5–30 min. */
+  acceptanceWindowMinutes: number;
   extrasPaidByPassenger: boolean;
   passengerName: string;
   passengerPhone: string;
@@ -49,6 +53,8 @@ const DEFAULTS: PostTripForm = {
   acRequired: true,
   ratePerKm: 0,
   driverBata: 0,
+  gstAmount: 0,
+  acceptanceWindowMinutes: 15,
   extrasPaidByPassenger: true,
   passengerName: '',
   passengerPhone: '',
@@ -111,7 +117,7 @@ export function PostTripPage() {
   const [passengerSectionOpen, setPassengerSectionOpen] = useState(false);
   const passengerSectionRef = useRef<HTMLDivElement>(null);
 
-  const { register, handleSubmit, watch, setValue, getValues, trigger, formState } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
+  const { register, handleSubmit, watch, setValue, getValues, trigger, formState, control } = useForm<PostTripForm>({ defaultValues: DEFAULTS });
   const { errors, isSubmitting } = formState;
 
   useEffect(() => {
@@ -119,6 +125,7 @@ export function PostTripPage() {
     if (!s) return;
     const cur = getValues();
     if (!cur.driverBata) setValue('driverBata', s.defaultDriverBata);
+    if (!cur.gstAmount) setValue('gstAmount', s.defaultGstAmount);
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
@@ -279,8 +286,9 @@ export function PostTripPage() {
       ratePerKm: Number(values.ratePerKm),
       totalFare,
       commissionPct: appSettings.data?.defaultCommissionPct ?? 0,
-      gstAmount: 0,
+      gstAmount: Math.max(0, Math.round(Number(values.gstAmount) || 0)),
       driverBata: Math.max(0, Math.round(Number(values.driverBata) || 0)),
+      acceptanceWindowMinutes: Math.min(30, Math.max(5, Math.round(Number(values.acceptanceWindowMinutes) || 15))),
       extrasPaidByPassenger: values.extrasPaidByPassenger,
       driverInstructions: values.driverInstructions.trim() || undefined,
       passengerName: passengerSectionOpen ? values.passengerName.trim() : '',
@@ -411,15 +419,23 @@ export function PostTripPage() {
                 </div>
               )}
               <Field label={tripType === 'one_way' ? 'Pickup date & time' : 'Trip starts (date & time)'} error={errors.pickupAt?.message}>
-                <Input type="datetime-local" {...register('pickupAt', { required: 'Set the start time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Start time must be in the future' })} />
+                <Controller
+                  control={control}
+                  name="pickupAt"
+                  rules={{ required: 'Set the start time', validate: (v) => (!!v && new Date(v).getTime() > Date.now()) || 'Start time must be in the future' }}
+                  render={({ field, fieldState }) => (
+                    <DateTimeField
+                      id="pickupAt"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      aria-invalid={!!fieldState.error}
+                    />
+                  )}
+                />
               </Field>
               {tripType !== 'one_way' ? (
                 <Field label="Trip ends (date & time)" hint={tripType === 'round_trip' ? 'When the driver is back at the start city.' : 'Auto-fills from the last destination — you can override.'}>
-                  <Input
-                    type="datetime-local"
-                    value={expectedEndAt}
-                    onChange={(e) => setExpectedEndAt(e.target.value)}
-                  />
+                  <DateTimeField value={expectedEndAt} onChange={setExpectedEndAt} />
                 </Field>
               ) : null}
               <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message} hint="Worked out from the route — you don't need to enter it">
@@ -490,6 +506,34 @@ export function PostTripPage() {
                   <Input type="number" min={0} step={1} inputMode="numeric" {...register('driverBata', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
                 </Field>
               </div>
+              <Field
+                label="GST (₹)"
+                error={errors.gstAmount?.message}
+                hint="Flat amount per trip — pre-filled from platform settings, edit if this trip's GST is different."
+              >
+                <Input type="number" min={0} step={1} inputMode="numeric" {...register('gstAmount', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 0) || 'Cannot be negative' })} />
+              </Field>
+              <Field
+                label={`Acceptance window: ${watch('acceptanceWindowMinutes') ?? 15} min`}
+                error={errors.acceptanceWindowMinutes?.message}
+                hint="After you pick a driver, they have this long to Accept. If they don't, the trip goes back to applicants. (Two-step handshake — see docs/TRIP_ASSIGNMENT_WORKFLOW.md.)"
+              >
+                <input
+                  type="range"
+                  min={5}
+                  max={30}
+                  step={1}
+                  className="w-full accent-emerald-600"
+                  {...register('acceptanceWindowMinutes', {
+                    valueAsNumber: true,
+                    validate: (v) => (Number.isFinite(v) && v >= 5 && v <= 30) || 'Pick a value between 5 and 30 minutes',
+                  })}
+                />
+                <div className="flex justify-between text-[10px] uppercase tracking-wide text-secondary">
+                  <span>5 min</span>
+                  <span>30 min</span>
+                </div>
+              </Field>
               <div className="rounded-lg bg-muted px-3 py-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="text-secondary">Total fare ({distance > 0 ? distance : '—'} km × {formatINR(rate)}/km)</span>

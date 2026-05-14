@@ -106,8 +106,8 @@ export function VideoCallConsolePage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Home
+      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Video call console</h1>
 

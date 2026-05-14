@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui';
 import { LookupListEditor } from '@/components/admin/LookupListEditor';
 import { AppSettingsForm } from '@/components/admin/AppSettingsForm';
@@ -49,6 +51,9 @@ export function AdminConfigPage() {
   const [section, setSection] = useState<SectionId>('general');
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-6">
+      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Administration
+      </Link>
       <h1 className="text-2xl font-bold">Reference data</h1>
       <nav className="flex flex-wrap gap-2" aria-label="Reference-data sections">
         {SECTIONS.map((s) => (

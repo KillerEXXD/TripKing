@@ -15,6 +15,19 @@ import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carTypeHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// Stub the custom Popover-based DateTimeField with a native datetime-local input so the
+// existing `fireEvent.change(getByLabelText(/pickup/i), { value: '…' })` assertions drive it.
+vi.mock('@/components/form', async () => {
+  const actual = await vi.importActual<typeof import('@/components/form')>('@/components/form');
+  return {
+    ...actual,
+    DateTimeField: ({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) => (
+      // The mock mirrors the previous native datetime-local: also sets `name` so the
+      // existing `querySelector('[name="pickupAt"]')` helpers in this file still resolve.
+      <input type="datetime-local" id={id} name={id} value={value} onChange={(e) => onChange(e.target.value)} title="datetime field (mock)" />
+    ),
+  };
+});
 import { toast } from 'sonner';
 vi.mock('@/components/share/ShareTripModal', () => ({
   ShareTripModal: ({ onClose }: { onClose: () => void }) => (

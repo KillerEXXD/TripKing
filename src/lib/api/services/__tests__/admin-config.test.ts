@@ -61,7 +61,7 @@ describe('admin-config service', () => {
       vehicle_expiry_warning_days: 90,
       default_alert_radius_km: 25,
       default_commission_pct: 10,
-      default_gst_pct: 5,
+      default_gst_amount: 100,
       default_driver_bata: 300,
       default_extras_paid_by_passenger: true,
       default_driver_instructions: 'x',

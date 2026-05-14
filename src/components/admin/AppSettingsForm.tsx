@@ -10,7 +10,7 @@ type NumericKey =
   | 'vehicleExpiryWarningDays'
   | 'defaultAlertRadiusKm'
   | 'defaultCommissionPct'
-  | 'defaultGstPct'
+  | 'defaultGstAmount'
   | 'defaultDriverBata'
   | 'maxActiveVacanciesPerDriver';
 
@@ -19,8 +19,8 @@ const NUMERIC_FIELDS: { key: NumericKey; label: string; min?: number; max?: numb
   { key: 'vehicleExpiryWarningDays', label: 'Expiry warning window (days)', min: 1, hint: 'When to start warning drivers (90 / 30 / 7-day reminders).' },
   { key: 'defaultAlertRadiusKm', label: 'Default alert radius (km)', min: 1 },
   { key: 'defaultCommissionPct', label: 'Default commission %', min: 0, max: 30, hint: 'Pre-fills the Post-a-trip form.' },
-  { key: 'defaultGstPct', label: 'Default GST %', min: 0, max: 100 },
-  { key: 'defaultDriverBata', label: 'Default driver bata (₹)', min: 0 },
+  { key: 'defaultGstAmount', label: 'Default GST (₹)', min: 0, hint: 'Flat rupee amount per trip (NOT a percentage). Pre-fills the Post-a-trip form.' },
+  { key: 'defaultDriverBata', label: 'Default driver bata (₹ / day)', min: 0, hint: 'Per-day amount. Multi-day trips multiply this by the day count automatically.' },
   { key: 'maxActiveVacanciesPerDriver', label: 'Max active "I\'m available" posts per driver', min: 1, max: 10, hint: 'Soft enforcement — lowering this doesn\'t cancel existing posts; only new posts see the new ceiling.' },
 ];
 

@@ -200,7 +200,7 @@ export function transformAppSettings(api: Record<string, unknown>): AppSettings 
     vehicleExpiryWarningDays: reqNum(api.vehicle_expiry_warning_days, 'vehicle_expiry_warning_days', { api }),
     defaultAlertRadiusKm: reqNum(api.default_alert_radius_km, 'default_alert_radius_km', { api }),
     defaultCommissionPct: reqNum(api.default_commission_pct, 'default_commission_pct', { api }),
-    defaultGstPct: reqNum(api.default_gst_pct, 'default_gst_pct', { api }),
+    defaultGstAmount: reqNum(api.default_gst_amount, 'default_gst_amount', { api }),
     defaultDriverBata: reqNum(api.default_driver_bata, 'default_driver_bata', { api }),
     defaultExtrasPaidByPassenger: api.default_extras_paid_by_passenger !== false,
     defaultDriverInstructions: typeof api.default_driver_instructions === 'string' ? api.default_driver_instructions : '',
@@ -213,7 +213,7 @@ export function toApiAppSettings(input: AppSettingsInput): Record<string, unknow
   if (input.vehicleExpiryWarningDays !== undefined) out.vehicle_expiry_warning_days = input.vehicleExpiryWarningDays;
   if (input.defaultAlertRadiusKm !== undefined) out.default_alert_radius_km = input.defaultAlertRadiusKm;
   if (input.defaultCommissionPct !== undefined) out.default_commission_pct = input.defaultCommissionPct;
-  if (input.defaultGstPct !== undefined) out.default_gst_pct = input.defaultGstPct;
+  if (input.defaultGstAmount !== undefined) out.default_gst_amount = input.defaultGstAmount;
   if (input.defaultDriverBata !== undefined) out.default_driver_bata = input.defaultDriverBata;
   if (input.defaultExtrasPaidByPassenger !== undefined) out.default_extras_paid_by_passenger = input.defaultExtrasPaidByPassenger;
   if (input.defaultDriverInstructions !== undefined) out.default_driver_instructions = input.defaultDriverInstructions;

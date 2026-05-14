@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ClipboardList, Home, Plus, Search, Users, type LucideIcon } from 'lucide-react';
+import { Bell, ClipboardList, Home, Plus, Search, Users, type LucideIcon } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +27,13 @@ const AGENT_NAV: NavItem[] = [
   { id: 'mine', label: 'My posts', Icon: ClipboardList, to: '/posted-trips', match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
   { id: 'find', label: 'Find driver', Icon: Users, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
 ];
+// Admins oversee the marketplace — they don't post or run trips, so no Post / My trips tabs.
+const ADMIN_NAV: NavItem[] = [
+  { id: 'home', label: 'Home', Icon: Home, to: '/', match: (p) => p === '/' },
+  { id: 'browse', label: 'Browse', Icon: Search, to: '/trips', match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
+  { id: 'find', label: 'Drivers', Icon: Users, to: '/vacancies', match: (p) => p.startsWith('/vacancies') },
+  { id: 'alerts', label: 'Notifications', Icon: Bell, to: '/notifications', match: (p) => p.startsWith('/notifications') },
+];
 
 /** Flow / detail screens are full-screen with their own back-bar + (sometimes) sticky CTA — no bottom nav. */
 const HIDE_NAV = /^\/(trips\/(new|[^/]+)|drivers\/[^/]+|alerts\/(new|[^/]+)|vacancies\/new)$|^\/trips\/[^/]+\/applicants$/;
@@ -43,7 +50,7 @@ export function BottomNav() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   if (HIDE_NAV.test(pathname)) return null;
-  const items = role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
+  const items = role === 'admin' ? ADMIN_NAV : role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
   const activeId = items.find((it) => it.match(pathname))?.id;
 
   return (

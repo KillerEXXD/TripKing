@@ -98,6 +98,13 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   // poster reads their own trip → full
   const getAsPoster0 = await j('GET', `/trips/${tid}`, { token });
   check('GET /trips/:id (poster) → 200, no passenger_otp_hash', getAsPoster0.status === 200 && getAsPoster0.json?.data?.id === tid && !has(getAsPoster0.json?.data, 'passenger_otp_hash'), `status=${getAsPoster0.status}`);
+  check('GET /trips/:id → posted_by_kyc_status is a string (drives <VerifiedBadge>)', typeof getAsPoster0.json?.data?.posted_by_kyc_status === 'string', `posted_by_kyc_status=${JSON.stringify(getAsPoster0.json?.data?.posted_by_kyc_status)}`);
+  // Phase 1 of the two-step handshake (migration 030): every trip carries an acceptance window int 5–30.
+  check('GET /trips/:id → acceptance_window_minutes is an int 5–30 (handshake Phase 1)',
+    typeof getAsPoster0.json?.data?.acceptance_window_minutes === 'number'
+      && getAsPoster0.json.data.acceptance_window_minutes >= 5
+      && getAsPoster0.json.data.acceptance_window_minutes <= 30,
+    `acceptance_window_minutes=${JSON.stringify(getAsPoster0.json?.data?.acceptance_window_minutes)}`);
   // a non-party authed user → browse-safe (no passenger PII)
   const getAsRando0 = await j('GET', `/trips/${tid}`, { token: randoToken });
   check('GET /trips/:id (non-party) → 200, browse-safe (no passenger_name/phone, no posted_by_phone)', getAsRando0.status === 200 && getAsRando0.json?.data?.id === tid && !has(getAsRando0.json?.data, 'passenger_name') && !has(getAsRando0.json?.data, 'passenger_phone') && !has(getAsRando0.json?.data, 'posted_by_phone'), `keys=${Object.keys(getAsRando0.json?.data || {}).join(',')}`);
@@ -115,9 +122,22 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const mineApp = (applied.json?.data || []).find((a) => a.trip_id === tid);
   check('GET /trips/applied (driver) → contains my application + its browse-safe joined trip', applied.status === 200 && !!mineApp && mineApp.id === aid && !!mineApp.trip?.from_city?.name && !has(mineApp.trip, 'passenger_phone'), `${JSON.stringify(applied.json?.data || applied.json?.error || '').slice(0, 200)}`);
 
+  // Phase 2 of the two-step handshake: assign now produces `selected` (NOT `assigned`) and does
+  // not generate the OTP — the driver must POST /accept first.
   const assign = await j('POST', `/trips/${tid}/assign`, { token, body: { acceptance_id: aid } });
-  const otp = assign.json?.data?.passenger_otp;
-  check('POST /trips/:id/assign → 200 + status assigned + passenger_otp', assign.status === 200 && assign.json?.data?.status === 'assigned' && !!otp, `status=${assign.status} ${JSON.stringify(assign.json?.error || '')}`);
+  check('POST /trips/:id/assign → 200 + status selected + deadline + no OTP yet (handshake Phase 2)',
+    assign.status === 200
+      && assign.json?.data?.status === 'selected'
+      && typeof assign.json?.data?.acceptance_deadline_at === 'string'
+      && assign.json?.data?.driver_acceptance_status === 'pending'
+      && !assign.json?.data?.passenger_otp,
+    `status=${assign.status} ${JSON.stringify(assign.json?.data || assign.json?.error || '')}`);
+  // The driver Accepts → trip flips to `assigned` + the passenger OTP is generated.
+  const accept = await j('POST', `/trips/${tid}/accept`, { token: dToken });
+  const otp = accept.json?.data?.passenger_otp;
+  check('POST /trips/:id/accept (selected driver) → 200 + status assigned + passenger_otp',
+    accept.status === 200 && accept.json?.data?.status === 'assigned' && !!otp,
+    `status=${accept.status} ${JSON.stringify(accept.json?.data || accept.json?.error || '')}`);
 
   // ── PII redaction on GET /trips/:id (trip now assigned) ────────────────
   const pPoster = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
@@ -126,6 +146,14 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('GET /trips/:id as the assigned driver → passenger name + posted_by_phone + passenger phone (hide=false); NOT passenger_otp', pDriver.passenger_name === 'Smoke Pax' && pDriver.posted_by_phone !== undefined && pDriver.passenger_phone === '+918888888888' && !has(pDriver, 'passenger_otp'), `${JSON.stringify({ n: pDriver.passenger_name, ph: pDriver.passenger_phone, otp: pDriver.passenger_otp })}`);
   const pRando = (await j('GET', `/trips/${tid}`, { token: randoToken })).json?.data || {};
   check('GET /trips/:id as a non-party → no passenger_name/phone, no posted_by_phone, no passenger_otp', !has(pRando, 'passenger_name') && !has(pRando, 'passenger_phone') && !has(pRando, 'posted_by_phone') && !has(pRando, 'passenger_otp'), `keys=${Object.keys(pRando).join(',')}`);
+
+  // Counterparty verification checklist (after assignment):
+  //  - poster sees the assigned driver's verification block (server-computed steps; no doc URLs)
+  //  - assigned driver sees posted_by_verification (the poster's checklist)
+  //  - rando sees neither
+  check('GET /trips/:id as the poster → assigned_driver.verification present (kyc_status + steps)', !!pPoster.assigned_driver?.verification && typeof pPoster.assigned_driver.verification.kyc_status === 'string' && pPoster.assigned_driver.verification.steps && typeof pPoster.assigned_driver.verification.steps_total === 'number', `verif=${JSON.stringify(pPoster.assigned_driver?.verification)}`);
+  check('GET /trips/:id as the assigned driver → posted_by_verification present', !!pDriver.posted_by_verification && typeof pDriver.posted_by_verification.kyc_status === 'string' && pDriver.posted_by_verification.steps, `verif=${JSON.stringify(pDriver.posted_by_verification)}`);
+  check('GET /trips/:id as a non-party → no assigned_driver.verification + no posted_by_verification', !pRando.assigned_driver?.verification && !has(pRando, 'posted_by_verification'), `drv=${JSON.stringify(pRando.assigned_driver?.verification)} pbv=${JSON.stringify(pRando.posted_by_verification)}`);
   check('GET /trips/:id unauthenticated → 401', (await j('GET', `/trips/${tid}`)).status === 401);
 
   // by-otp (passenger portal) — still public
@@ -183,7 +211,8 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
     const hidden = await j('POST', '/trips', { token, body: { ...baseTrip, passenger_phone: '+919999999999', hide_passenger_phone: true, pickup_at: futureIso(2) } });
     const hTid = hidden.json?.data?.id;
     const hAid = (await j('POST', `/trips/${hTid}/applicants`, { token: dToken, body: {} })).json?.data?.id;
-    const hOtp = (await j('POST', `/trips/${hTid}/assign`, { token, body: { acceptance_id: hAid } })).json?.data?.passenger_otp;
+    await j('POST', `/trips/${hTid}/assign`, { token, body: { acceptance_id: hAid } });
+    const hOtp = (await j('POST', `/trips/${hTid}/accept`, { token: dToken })).json?.data?.passenger_otp;
     await j('POST', `/trips/${hTid}/start`, { token: dToken, body: { passenger_otp: hOtp } });
     const hDriverView = (await j('GET', `/trips/${hTid}`, { token: dToken })).json?.data || {};
     check('hide_passenger_phone=true: assigned driver sees passenger_name but NOT passenger_phone', hDriverView.passenger_name === 'Smoke Pax' && !has(hDriverView, 'passenger_phone'), `${JSON.stringify({ n: hDriverView.passenger_name, ph: hDriverView.passenger_phone })}`);
@@ -240,6 +269,38 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const assignDeact = await j('POST', `/trips/${tA}/assign`, { token, body: { acceptance_id: aA } });
   check('POST /trips/:id/assign with a deactivated driver\'s acceptance → 422', assignDeact.status === 422, `status=${assignDeact.status} ${JSON.stringify(assignDeact.json?.error || '')}`);
   await j('PATCH', `/drivers/${drv2Id}/active`, { token: adminToken, body: { is_active: true } });
+
+  // ── Phase 4: trip invites ─────────────────────────────────────────────────────
+  // Need an invitable driver (active + KYC-approved). dToken / drvId from earlier already qualify.
+  const inviteTripId = await newTrip({ pickup_at: futureIso(4) });
+  const inviteNoAuth = await j('POST', `/trips/${inviteTripId}/invites`, { body: { driver_ids: [drvId] } });
+  check('POST /trips/:id/invites without auth → 401', inviteNoAuth.status === 401, `status=${inviteNoAuth.status}`);
+  const inviteByRando = await j('POST', `/trips/${inviteTripId}/invites`, { token: randoToken, body: { driver_ids: [drvId] } });
+  check('POST /trips/:id/invites by a non-poster → 403', inviteByRando.status === 403, `status=${inviteByRando.status}`);
+  const inviteBad = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: {} });
+  check('POST /trips/:id/invites without driver_ids → 422', inviteBad.status === 422, `status=${inviteBad.status}`);
+  const invited = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: { driver_ids: [drvId] } });
+  const inviteId = invited.json?.data?.created?.[0]?.id;
+  check('POST /trips/:id/invites (poster) → 200 + created row + invitee_count', invited.status === 200 && !!inviteId, `status=${invited.status} ${JSON.stringify(invited.json?.data || invited.json?.error || '')}`);
+  const inviteList = await j('GET', `/trips/${inviteTripId}/invites`, { token });
+  check('GET /trips/:id/invites (poster) → 200 + array with the driver attached', inviteList.status === 200 && Array.isArray(inviteList.json?.data) && inviteList.json.data.length >= 1 && !!inviteList.json.data[0]?.driver?.display_handle, `${JSON.stringify(inviteList.json?.data || '').slice(0, 200)}`);
+  // The invited driver can see the trip via ?invited=me + sees the agent's name pre-revealed.
+  const invitedTab = await j('GET', '/trips?invited=me', { token: dToken });
+  const invitedTrip = (invitedTab.json?.data || []).find((t) => t.id === inviteTripId);
+  check('GET /trips?invited=me (invited driver) → contains the trip + posted_by_name pre-revealed (Phase 4)',
+    invitedTab.status === 200 && !!invitedTrip && typeof invitedTrip.posted_by_name === 'string' && invitedTrip.posted_by_name.length > 0,
+    `len=${invitedTab.json?.data?.length} posted_by_name=${JSON.stringify(invitedTrip?.posted_by_name)}`);
+  // Driver declines the invite.
+  const declineByOther = await j('POST', `/trips/${inviteTripId}/invites/${inviteId}/decline`, { token: token, body: { reason: 'busy' } });
+  check('POST /trips/:id/invites/:invite_id/decline by non-invitee → 403', declineByOther.status === 403, `status=${declineByOther.status}`);
+  const declineInvite = await j('POST', `/trips/${inviteTripId}/invites/${inviteId}/decline`, { token: dToken, body: { reason: 'too far' } });
+  check('POST /trips/:id/invites/:invite_id/decline (invitee) → 200', declineInvite.status === 200, `status=${declineInvite.status} ${JSON.stringify(declineInvite.json?.error || '')}`);
+  // Re-invite + agent withdraws.
+  const reInvite = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: { driver_ids: [drvId] } });
+  const reInviteId = reInvite.json?.data?.created?.[0]?.id;
+  check('POST /trips/:id/invites again → 200 + same row id (upserts back to pending)', reInvite.status === 200 && !!reInviteId, `status=${reInvite.status} ${JSON.stringify(reInvite.json?.data || '')}`);
+  const withdrawInvite = await j('DELETE', `/trips/${inviteTripId}/invites/${reInviteId}`, { token });
+  check('DELETE /trips/:id/invites/:invite_id (poster) → 200', withdrawInvite.status === 200, `status=${withdrawInvite.status}`);
 
   if (failures) { console.error(`[test-trips] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-trips] all checks passed');

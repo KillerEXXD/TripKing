@@ -11,6 +11,18 @@ import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+// Stub the custom Popover-based DateTimeField with a native datetime-local input so the
+// existing `fireEvent.change(getByLabelText(/available from/i), { value: '…' })` assertions
+// can drive it. The production component is exercised in its own unit test.
+vi.mock('@/components/form', async () => {
+  const actual = await vi.importActual<typeof import('@/components/form')>('@/components/form');
+  return {
+    ...actual,
+    DateTimeField: ({ value, onChange, id }: { value: string; onChange: (v: string) => void; id?: string }) => (
+      <input type="datetime-local" id={id} value={value} onChange={(e) => onChange(e.target.value)} title="datetime field (mock)" />
+    ),
+  };
+});
 // Stub the place-search panel so this test doesn't pull in the React Query stack — it just
 // renders a button that "picks" a fixed place when clicked.
 const fakePlace = { id: 'p1', provider: 'nominatim', providerPlaceId: 'N1', name: 'Katpadi, Vellore', formattedAddress: null, state: 'TN', country: 'IN', lat: 12.97, lng: 79.13, cityId: null, isActive: true, createdAt: '2026-05-12T00:00:00Z' };

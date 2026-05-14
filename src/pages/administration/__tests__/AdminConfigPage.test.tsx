@@ -1,6 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { AdminConfigPage } from '@/pages/administration/AdminConfigPage';
+
+const renderPage = () => render(<MemoryRouter><AdminConfigPage /></MemoryRouter>);
 
 vi.mock('@/hooks/useAdminConfig', () => {
   const carTypeRows = [{ id: 'c1', label: 'Sedan', sortOrder: 20, isActive: true }];
@@ -27,7 +30,7 @@ vi.mock('@/hooks/useAdminConfig', () => {
       vehicleExpiryWarningDays: 90,
       defaultAlertRadiusKm: 25,
       defaultCommissionPct: 10,
-      defaultGstPct: 5,
+      defaultGstAmount: 100,
       defaultDriverBata: 300,
       defaultExtrasPaidByPassenger: true,
       defaultDriverInstructions: '1. Call the customer before arrival',
@@ -38,7 +41,7 @@ vi.mock('@/hooks/useAdminConfig', () => {
 
 describe('AdminConfigPage', () => {
   it('renders all reference-data sections and opens on General settings', () => {
-    render(<AdminConfigPage />);
+    renderPage();
     for (const label of [
       'General settings',
       'Car types',
@@ -57,14 +60,14 @@ describe('AdminConfigPage', () => {
   });
 
   it('Car types section lists rows', () => {
-    render(<AdminConfigPage />);
+    renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Car types' }));
     expect(screen.getByRole('heading', { name: 'Car types' })).toBeInTheDocument();
     expect(screen.getByText('Sedan')).toBeInTheDocument();
   });
 
   it('Vehicle makes & models section renders the master-detail (empty state)', () => {
-    render(<AdminConfigPage />);
+    renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Vehicle makes & models' }));
     expect(screen.getByRole('heading', { name: /vehicle makes & models/i })).toBeInTheDocument();
     expect(screen.getByText(/no makes yet/i)).toBeInTheDocument();
@@ -72,7 +75,7 @@ describe('AdminConfigPage', () => {
   });
 
   it('Review tags section renders the three vocabularies', () => {
-    render(<AdminConfigPage />);
+    renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Review tags' }));
     expect(screen.getByText('Passenger → driver')).toBeInTheDocument();
     expect(screen.getByText('Agent → driver')).toBeInTheDocument();
@@ -80,7 +83,7 @@ describe('AdminConfigPage', () => {
   });
 
   it('Cities / Languages / Seat options / Cancellation reasons render without crashing', () => {
-    render(<AdminConfigPage />);
+    renderPage();
     for (const tab of ['Cities', 'Languages', 'Seat options', 'Cancellation reasons']) {
       fireEvent.click(screen.getByRole('button', { name: tab }));
       expect(screen.getByRole('heading', { name: tab })).toBeInTheDocument();

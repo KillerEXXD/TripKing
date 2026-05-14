@@ -1,8 +1,10 @@
 import type { CityRow } from './adminConfig';
-import type { KycStatus } from './driver';
 import type { NearRadius, Place } from './place';
+import type { KycStatus, VerificationSummary } from './driver';
 
-export type TripStatus = 'open' | 'has_applicants' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+export type TripStatus = 'open' | 'has_applicants' | 'selected' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+/** Phase 2 of the two-step handshake — drives the driver's Accept/Decline card. Null on trips that pre-date the handshake. */
+export type DriverAcceptanceStatus = 'pending' | 'accepted' | 'declined' | 'expired';
 export type PosterRole = 'driver' | 'trip_manager';
 export type AcceptanceStatus = 'applied' | 'selected' | 'rejected' | 'withdrawn' | 'expired';
 /** Migration 024: the *shape* of the route. */
@@ -79,6 +81,10 @@ export interface Trip {
   luggageNotes?: string;
   specialRequests?: string;
   status: TripStatus;
+  /** Two-step-handshake fields (migration 030). All NULL until Phase 2 wires the flow. */
+  acceptanceWindowMinutes: number;
+  acceptanceDeadlineAt?: string;
+  driverAcceptanceStatus?: DriverAcceptanceStatus;
   assignedDriverId?: string;
   assignedVehicleId?: string;
   assignedAcceptanceId?: string;
@@ -87,6 +93,12 @@ export interface Trip {
   assignedDriverHandle?: string;
   /** The assigned driver, joined server-side (with live position). Present once a driver is assigned. */
   assignedDriver?: AssignedDriver;
+  /**
+   * Server-computed KYC checklist for the POSTER — attached on GET /trips/:id when the viewer is
+   * the assigned driver. Lets the assigned driver see how thoroughly the agent who hired them is
+   * verified (doc/video steps marked done, no document URLs). Absent for other viewers.
+   */
+  postedByVerification?: VerificationSummary;
   /** Server-computed straight-line km from the assigned driver's last position to the drop-off city (in-progress trips only). */
   distanceToDestinationKm?: number;
   showFareToPassenger: boolean;
@@ -113,12 +125,20 @@ export interface AssignedDriver {
   fullName?: string;
   phone?: string;
   profilePhotoUrl?: string;
+  /** The driver's KYC state; present whenever the joined `drivers` row is revealed (poster/admin/self views). */
+  kycStatus?: KycStatus;
   ratingAvg: number;
   ratingCount: number;
   totalTripsCompleted: number;
   currentLat?: number;
   currentLng?: number;
   currentLocationAt?: string;
+  /**
+   * Server-computed KYC checklist; attached on GET /trips/:id only, and only to the poster/admin
+   * (so they can see the verification state of their assigned driver). Lists which steps the
+   * driver has completed — no document URLs.
+   */
+  verification?: VerificationSummary;
 }
 
 /**
@@ -203,6 +223,8 @@ export interface PostTripInput {
   commissionPct: number;
   gstAmount: number;
   driverBata: number;
+  /** Phase 1 of the two-step handshake — how long the selected driver has to Accept. 5–30, default 15. */
+  acceptanceWindowMinutes?: number;
   extrasPaidByPassenger: boolean;
   driverInstructions?: string;
   passengerName: string;
@@ -226,6 +248,18 @@ export interface ApplyToTripInput {
   quotedRatePerKm?: number;
   message?: string;
 }
+export type TripInvitationStatus = 'pending' | 'applied' | 'declined' | 'withdrawn' | 'expired';
+/** Phase 4 of the two-step handshake — agent invites a specific driver to view a trip. */
+export interface TripInvitation {
+  id: string;
+  tripId?: string;
+  driverId: string;
+  status: TripInvitationStatus;
+  declinedReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  driver?: DriverSummary;
+}
 export interface TripsQueryParams {
   status?: TripStatus | TripStatus[];
   fromCityId?: string;
@@ -233,6 +267,8 @@ export interface TripsQueryParams {
   postedByUserId?: string;
   /** A driver uuid, or the literal `'me'` — the trips assigned to (being driven by) that driver. */
   assignedDriverId?: string;
+  /** Phase 4: `'me'` → only trips the caller has been invited to. */
+  invited?: 'me';
   /** Restrict to trips whose pickup point is within the radius (nearest first). */
   near?: NearRadius;
   page?: number;
