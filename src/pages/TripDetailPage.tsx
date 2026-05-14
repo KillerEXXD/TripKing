@@ -180,8 +180,9 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
 function AssignedDriverBar({ trip }: { trip: Trip }) {
   const startMutation = useStartTrip();
   const completeMutation = useCompleteTrip();
-  const [showOtp, setShowOtp] = useState(false);
+  const [showStartForm, setShowStartForm] = useState(false);
   const [otp, setOtp] = useState('');
+  const [startOdo, setStartOdo] = useState('');
 
   async function onStart() {
     const code = otp.trim();
@@ -189,11 +190,17 @@ function AssignedDriverBar({ trip }: { trip: Trip }) {
       toast.error("Enter the passenger's OTP to start the trip.");
       return;
     }
+    const odoNum = Number(startOdo);
+    if (!Number.isFinite(odoNum) || odoNum <= 0) {
+      toast.error('Enter your odometer reading before starting.');
+      return;
+    }
     try {
-      await startMutation.mutateAsync({ tripId: trip.id, input: { passengerOtp: code } });
+      await startMutation.mutateAsync({ tripId: trip.id, input: { passengerOtp: code, startOdoReading: odoNum } });
       toast.success('Trip started — drive safe.');
-      setShowOtp(false);
+      setShowStartForm(false);
       setOtp('');
+      setStartOdo('');
     } catch {
       toast.error("That OTP didn't match — double-check it with the passenger.");
     }
@@ -212,15 +219,34 @@ function AssignedDriverBar({ trip }: { trip: Trip }) {
       <div className="text-center text-xs font-semibold text-primary">You&apos;re driving this trip</div>
       {trip.status === 'assigned' ? (
         <>
-          {showOtp ? (
-            <input type="text" inputMode="numeric" maxLength={8} value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))} placeholder="Passenger OTP" aria-label="Passenger OTP" className="h-11 w-full rounded-md border border-input bg-white text-center font-mono text-lg tracking-[0.3em]" />
-          ) : null}
-          {showOtp ? (
-            <Button variant="full" size="lg" disabled={startMutation.isPending} onClick={() => void onStart()}>
-              {startMutation.isPending ? 'Starting…' : 'Start the trip'}
-            </Button>
+          {showStartForm ? (
+            <>
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={8}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="Passenger OTP"
+                aria-label="Passenger OTP"
+                className="h-11 w-full rounded-md border border-input bg-white text-center font-mono text-lg tracking-[0.3em]"
+              />
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={startOdo}
+                onChange={(e) => setStartOdo(e.target.value)}
+                placeholder="Start odometer reading (km)"
+                aria-label="Start odometer reading in kilometres"
+                className="h-11 w-full rounded-md border border-input bg-white px-3 text-base"
+              />
+              <Button variant="full" size="lg" disabled={startMutation.isPending} onClick={() => void onStart()}>
+                {startMutation.isPending ? 'Starting…' : 'Start the trip'}
+              </Button>
+            </>
           ) : (
-            <Button variant="full" size="lg" onClick={() => setShowOtp(true)}>
+            <Button variant="full" size="lg" onClick={() => setShowStartForm(true)}>
               Start the trip
             </Button>
           )}
@@ -575,7 +601,6 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
   const showApplyBar = viewer.isDriver && !viewer.isPoster && applyable;
   const showAssignedBar = viewer.isAssignedDriver && (trip.status === 'assigned' || trip.status === 'in_progress');
   const showTracking = viewer.isPoster || viewer.isAssignedDriver;
-  const canSharePassengerLink = viewer.isPoster && !!trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress') && !!trip.passengerName;
   const canCancel = viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants' || trip.status === 'assigned');
   const passengerEditable = viewer.isPoster && ['open', 'has_applicants', 'assigned'].includes(trip.status);
   const passengerMissing = !trip.passengerName;
@@ -661,13 +686,18 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
       {showTracking ? <TripTracking trip={trip} /> : null}
 
-      {canSharePassengerLink ? (
-        <Card className="gap-2 border-primary/30 bg-primary/5">
-          <div className="text-sm font-semibold">Share the trip with your passenger</div>
-          <p className="text-xs text-secondary">Send them a link (the OTP is built in) — they see the trip, the assigned driver, and the driver&apos;s live location and ETA. No login needed.</p>
-          <Button variant="full" size="sm" onClick={() => setShowShareLink(true)}>
-            Share the passenger link
-          </Button>
+      {viewer.isPoster && trip.passengerOtp && (trip.status === 'assigned' || trip.status === 'in_progress') ? (
+        <Card className="gap-2 border-emerald-300 bg-emerald-50">
+          <div className="text-sm font-semibold text-emerald-900">Passenger OTP</div>
+          <div className="text-center font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900">{trip.passengerOtp}</div>
+          <p className="text-xs text-emerald-800">
+            Share this code with your passenger. The driver enters it when they meet to start the trip.
+          </p>
+          {trip.passengerName ? (
+            <Button variant="full" size="sm" onClick={() => setShowShareLink(true)}>
+              Or send a passenger link (OTP built in)
+            </Button>
+          ) : null}
         </Card>
       ) : null}
 
