@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, ChevronRight, Hand, MapPin, Navigation, Plus, Search, Sparkles, Star, TrendingUp } from 'lucide-react';
+import { Bell, CheckCircle2, ChevronRight, Hand, MapPin, Navigation, Sparkles, Star, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useMyApplications, useTrips } from '@/hooks/useTrips';
@@ -27,16 +27,6 @@ function Bellish({ count }: { count: number }) {
     <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative -mr-1 flex size-9 items-center justify-center rounded-full text-secondary hover:bg-muted">
       <Bell className="size-5" aria-hidden />
       {count > 0 ? <span className="absolute right-1 top-1 size-2 rounded-full bg-destructive" /> : null}
-    </Link>
-  );
-}
-
-function HubTile({ icon, label, tone, to }: { icon: React.ReactNode; label: string; tone: 'violet' | 'emerald' | 'blue'; to: string }) {
-  const palette = { violet: 'bg-violet-100 text-violet-700', emerald: 'bg-emerald-100 text-emerald-700', blue: 'bg-blue-100 text-blue-700' };
-  return (
-    <Link to={to} className="flex flex-col items-center justify-center gap-1.5 rounded-xl border bg-white p-3 text-center transition-colors hover:border-primary/40">
-      <span className={`flex size-9 items-center justify-center rounded-full ${palette[tone]}`}>{icon}</span>
-      <span className="text-[11px] font-semibold leading-tight">{label}</span>
     </Link>
   );
 }
@@ -113,7 +103,22 @@ function NearbyTripCard({ trip }: { trip: Trip }) {
  * Top-of-home card for a trip the driver is actively running (`status='in_progress'`).
  * Always the highest priority — supersedes every other home card while live.
  */
-function CurrentTripCard({ trip }: { trip: Trip }) {
+/** Top-of-home card — always rendered. When the driver has no in-progress trip,
+ *  shows an empty-state explaining what will appear here. */
+function CurrentTripCard({ trip }: { trip: Trip | undefined }) {
+  if (!trip) {
+    return (
+      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <Navigation className="size-3.5" aria-hidden /> Driving now
+        </div>
+        <div className="mt-1 text-sm font-medium text-slate-700">No trip in progress</div>
+        <div className="mt-0.5 text-xs text-slate-500">
+          When you start a trip, it'll show up here so you can continue, track the route, and complete it.
+        </div>
+      </div>
+    );
+  }
   return (
     <Link
       to={`/trips/${trip.id}`}
@@ -168,7 +173,19 @@ function AssignedTripCard({ trip }: { trip: Trip }) {
  * becomes a concern.)
  */
 function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
-  if (apps.length === 0) return null;
+  if (apps.length === 0) {
+    return (
+      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <Sparkles className="size-3.5" aria-hidden /> Review
+        </div>
+        <div className="mt-1 text-sm font-medium text-slate-700">No trips waiting for your decision</div>
+        <div className="mt-0.5 text-xs text-slate-500">
+          When an agent picks you for a trip you applied to, it'll show up here so you can Accept or Decline.
+        </div>
+      </div>
+    );
+  }
   const first = apps[0]!;
   const more = apps.length - 1;
   // One trip → land directly on its detail so the driver can Accept / Decline in one tap.
@@ -283,15 +300,10 @@ function DriverHome({ driver }: { driver: Driver }) {
         {/* Priority stack — surfaces an active driving job, an accepted-but-not-started trip,
             invitations awaiting accept/decline, and the driver's own availability listings.
             Each card no-ops when it has nothing to show. */}
-        {inProgressTrip ? <CurrentTripCard trip={inProgressTrip} /> : null}
-        {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
+        <CurrentTripCard trip={inProgressTrip} />
         <AwaitingMyDecisionCard apps={awaitingDecision} />
+        {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
         <AvailabilitySummaryCard count={activeVacancies} max={maxActiveVacancies} />
-
-        <div className="grid grid-cols-2 gap-2.5">
-          <HubTile icon={<Search className="size-5" aria-hidden />} label="Find a trip" tone="blue" to="/trips" />
-          <HubTile icon={<Plus className="size-5" aria-hidden />} label="Post a trip" tone="violet" to="/trips/new" />
-        </div>
 
         <ReputationCard driver={driver} />
 

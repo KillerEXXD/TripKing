@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, ChevronRight, Navigation, Plus, Sparkles, Star, Users } from 'lucide-react';
+import { BarChart3, Bell, ChevronRight, Navigation, Sparkles, Star } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -29,20 +29,23 @@ function Bellish({ count }: { count: number }) {
     </Link>
   );
 }
-function HubTile({ icon, label, tone, to }: { icon: React.ReactNode; label: string; tone: 'violet' | 'blue' | 'emerald'; to: string }) {
-  const palette = { violet: 'bg-violet-100 text-violet-700', blue: 'bg-blue-100 text-blue-700', emerald: 'bg-emerald-100 text-emerald-700' };
-  return (
-    <Link to={to} className="flex flex-col items-center justify-center gap-1.5 rounded-xl border bg-white p-3 text-center transition-colors hover:border-primary/40">
-      <span className={`flex size-9 items-center justify-center rounded-full ${palette[tone]}`}>{icon}</span>
-      <span className="text-[11px] font-semibold leading-tight">{label}</span>
-    </Link>
-  );
-}
-
-/** Top-of-home tile-style card showing the agent how many of their posted trips are
- *  actively running. Click → /posted-trips?status=in_progress for the rich list. */
+/** Top-of-home card — shows the agent how many of their posted trips are actively
+ *  running. Always rendered: when count is 0, an empty-state card explains what
+ *  will appear here. Click (when active) → /posted-trips?status=in_progress. */
 function TripsInProgressCard({ count }: { count: number }) {
-  if (count === 0) return null;
+  if (count === 0) {
+    return (
+      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <Navigation className="size-3.5" aria-hidden /> Driving now
+        </div>
+        <div className="mt-1 text-sm font-medium text-slate-700">No trips in progress</div>
+        <div className="mt-0.5 text-xs text-slate-500">
+          When your trips are being driven, they'll show up here with the driver, passenger, and live ETA.
+        </div>
+      </div>
+    );
+  }
   return (
     <Link
       to="/posted-trips?status=in_progress"
@@ -64,11 +67,23 @@ function TripsInProgressCard({ count }: { count: number }) {
   );
 }
 
-/** Trips the agent posted that have applicants but no driver selected yet. Replaces
- *  the previous "X of your trips have applicants" amber banner with the same intent
- *  + summary stats + a consistent visual style. Click → /posted-trips?status=has_applicants. */
+/** Trips the agent posted that have applicants but no driver selected yet.
+ *  Always rendered: when tripCount is 0, an empty-state card explains what
+ *  will appear here. Click (when active) → /posted-trips?status=has_applicants. */
 function NeedsActionCard({ tripCount, totalApplicants }: { tripCount: number; totalApplicants: number }) {
-  if (tripCount === 0) return null;
+  if (tripCount === 0) {
+    return (
+      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+          <Sparkles className="size-3.5" aria-hidden /> Review
+        </div>
+        <div className="mt-1 text-sm font-medium text-slate-700">No applicants waiting</div>
+        <div className="mt-0.5 text-xs text-slate-500">
+          When drivers apply to your trips, they'll show up here so you can pick one.
+        </div>
+      </div>
+    );
+  }
   return (
     <Link
       to="/posted-trips?status=has_applicants"
@@ -143,12 +158,6 @@ function AgentHome({ agent }: { agent: Agent }) {
             Each card no-ops when its count is zero. Mirrors the Driver-home pattern (PR #66). */}
         <TripsInProgressCard count={inProgressCount} />
         <NeedsActionCard tripCount={needsActionTrips.length} totalApplicants={needsActionApplicants} />
-
-        <div className="grid grid-cols-3 gap-2.5">
-          <HubTile icon={<Plus className="size-5" aria-hidden />} label="Post a trip" tone="violet" to="/trips/new" />
-          <HubTile icon={<Sparkles className="size-5" aria-hidden />} label="My posts" tone="blue" to="/posted-trips" />
-          <HubTile icon={<Users className="size-5" aria-hidden />} label="Find a driver" tone="emerald" to="/vacancies" />
-        </div>
 
         <Link to="/profile" className="block w-full space-y-2 rounded-xl border bg-white px-3 py-2.5 transition-colors hover:border-primary/40">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-secondary">Your reputation</div>
