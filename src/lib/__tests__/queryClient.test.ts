@@ -68,9 +68,11 @@ describe('queryClient — global error funnel', () => {
     expect(captureDataError).not.toHaveBeenCalled();
   });
 
-  it('does not report expected 401 / 404 user errors', async () => {
+  it('does not report expected 401 / 404 / 409 user errors', async () => {
     await queryClient.fetchQuery({ queryKey: ['driver', 'me'], queryFn: () => Promise.reject(new ApiError('not found', 404)), retry: false }).catch(() => undefined);
     await queryClient.fetchQuery({ queryKey: ['me'], queryFn: () => Promise.reject(new ApiError('expired', 401)), retry: false }).catch(() => undefined);
+    // 409: e.g. "You already have a video call scheduled" / "vacancy limit reached" — user-correctable, not a bug.
+    await queryClient.fetchQuery({ queryKey: ['video-call'], queryFn: () => Promise.reject(new ApiError('already scheduled', 409)), retry: false }).catch(() => undefined);
     await flush();
     expect(captureDataError).not.toHaveBeenCalled();
   });

@@ -54,8 +54,8 @@ function handleCacheError(error: unknown, opts: { meta: TripKingQueryMeta; featu
     return;
   }
   addDataBreadcrumb(`${kind} error`, { feature, status });
-  // ApiErrors are already captured (with rich request context) by the API client; 401/404 are expected user errors.
-  if (!isReported(error) && status !== 401 && status !== 404) {
+  // ApiErrors are already captured (with rich request context) by the API client; 401/404/409 are expected user-correctable errors.
+  if (!isReported(error) && status !== 401 && status !== 404 && status !== 409) {
     captureDataError(meta.feature ?? feature, error, { status });
   }
   if (meta.toastOnError) toast.error(messageForError(error));
