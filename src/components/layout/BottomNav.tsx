@@ -34,11 +34,13 @@ const DRIVER_NAV: NavItem[] = [
   { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, hideLabel: true, match: (p) => p === '/trips/new' },
   { id: 'mine', label: 'My trips', Icon: ClipboardList, to: '/my-trips', hideLabel: true, match: (p) => p === '/my-trips' || p === '/posted-trips' },
 ];
+// Tab order mirrors DRIVER_NAV (Home · Search · + · My) so users switching role
+// don't have to relearn the layout.
 const AGENT_NAV: NavItem[] = [
   { id: 'home', label: 'Home', Icon: Home, to: '/', hideLabel: true, match: (p) => p === '/' },
+  { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', bigIcon: true, hideLabel: true, match: (p) => p.startsWith('/vacancies') },
   { id: 'post', label: 'Post a trip', Icon: Plus, to: '/trips/new', primary: true, hideLabel: true, match: (p) => p === '/trips/new' },
   { id: 'mine', label: 'My posts', Icon: ClipboardList, to: '/posted-trips', hideLabel: true, match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
-  { id: 'find', label: 'Find driver', Icon: FindDriverIcon, to: '/vacancies', bigIcon: true, hideLabel: true, match: (p) => p.startsWith('/vacancies') },
 ];
 // Admins oversee the marketplace — they don't post or run trips, so no Post / My trips tabs.
 const ADMIN_NAV: NavItem[] = [
