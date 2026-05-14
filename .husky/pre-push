@@ -1,6 +1,11 @@
 #!/bin/sh
 # Pre-push gate: type-check, tests, coverage, test-policy compliance, prod build.
 # Policy doc: docs/TEST_POLICY.md
+
+# Branch sanity (twin of the pre-commit guard — see its comment for why).
+branch="$(git branch --show-current 2>/dev/null)"
+echo "🌿  Pushing branch: ${branch:-(detached HEAD)}"
+
 echo "🔎  tsc --noEmit"
 npx tsc --noEmit || { echo "❌ Type errors — fix before pushing."; exit 1; }
 

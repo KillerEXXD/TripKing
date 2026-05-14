@@ -1,4 +1,12 @@
 #!/bin/sh
 # Quick gate before each commit — full test/build run is on pre-push.
+
+# Branch sanity: echo the current branch so a parallel session's `git checkout` in this
+# same worktree never silently lands work on the wrong branch. (We hit this twice in
+# one session before adding the guard.) If the message doesn't match the branch you
+# meant to commit to, abort with `git reset HEAD~` and `git checkout main` (or your branch).
+branch="$(git branch --show-current 2>/dev/null)"
+echo "🌿  Committing to: ${branch:-(detached HEAD)}"
+
 echo "🔎  tsc --noEmit"
 npx tsc --noEmit || { echo "❌ Type errors — fix before committing."; exit 1; }
