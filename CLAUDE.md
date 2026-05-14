@@ -162,6 +162,7 @@ Edge functions get `withTiming()` performance instrumentation, a k6 load-test en
 - i18n from day one — all user-facing strings via `t('key')`, never concatenate translated fragments; the `languages` lookup table drives available locales. Admin app is English-only at launch.
 - PWA: `vite-plugin-pwa`, the Workbox config above, `safe-area-inset-*` padding for notched phones, "Add to Home Screen" affordance.
 - **Commit discipline:** one logical change per commit; review `git diff --stat` before committing; never bundle an unrelated "improvement"; conventional commit messages (`feat:`, `fix:`, `refactor:`, `chore:`).
+- **Worktrees — when to use them.** Default: small fixes go straight to `main` (Husky pre-push gates each commit). **Spin up a `feat/<thing>` worktree** (`git worktree add -b feat/<thing> ../TripKing-<thing> origin/main`) when **any** of these is true: the change touches more than ~3 files; it spans more than one commit (multi-phase feature); a parallel session is likely to push to `main` while you work (we have lost commits to an automatic rebase mid-flight — recoverable via `git reflog` + `git cherry-pick`, but avoidable); the work is risky enough that an isolated branch + PR review pays for itself. After merge, delete: `git worktree remove ../TripKing-<thing> && git branch -d feat/<thing>`.
 - **OpenAPI is part of the PR:** any edge-function change updates `public/docs/openapi.yaml` + `.json` (served as Swagger UI) and adds a k6 load-test entry + a `scripts/test-*.cjs` smoke test — in the same PR.
 
 ---
