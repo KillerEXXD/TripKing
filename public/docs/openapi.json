@@ -1008,6 +1008,14 @@
             }
           },
           {
+            "name": "via_city_id",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "trips whose waypoint chain contains this city anywhere (origin / stop / destination) — migration 024"
+          },
+          {
             "name": "posted_by_user_id",
             "in": "query",
             "schema": {

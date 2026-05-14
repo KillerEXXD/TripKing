@@ -13,7 +13,7 @@
  * the credential) — it's the passenger's own view (their data + the assigned driver's position/phone to track/reach the ride).
  *
  * Routes (at the function root, i.e. /functions/v1/trips/...):
- *   GET    /trips                       (Bearer) ?status=&from_city_id=&to_city_id=&posted_by_user_id=&assigned_driver_id=&near_lat=&near_lng=&radius_km=&limit=
+ *   GET    /trips                       (Bearer) ?status=&from_city_id=&to_city_id=&via_city_id=&posted_by_user_id=&assigned_driver_id=&near_lat=&near_lng=&radius_km=&limit=
  *                                       — assigned_driver_id accepts a driver uuid OR the literal `me` (the trips you're driving);
  *                                         near_lat+near_lng+radius_km restrict to trips whose pickup point (from_place → from_city fallback) is within the radius (nearest first; each row gets distance_km)
  *   POST   /trips                       (Bearer; the poster must be is_active + KYC-approved) — from_place_id / to_place_id accepted alongside from_city_id / to_city_id; hide_passenger_phone (bool) + passenger_count (int≥1) are REQUIRED; total_fare computed if omitted; driver_payout via trigger; matching active alerts get an alert_match notification
@@ -404,6 +404,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const status = url.searchParams.get('status') ?? '';
     const fromCity = url.searchParams.get('from_city_id') ?? '';
     const toCity = url.searchParams.get('to_city_id') ?? '';
+    // Migration 024: trips whose itinerary passes through this city (anywhere in the waypoint
+    // chain — origin, intermediate stop, or final destination). Useful for drivers running an
+    // alert on cities they could intercept en route.
+    const viaCity = url.searchParams.get('via_city_id') ?? '';
     const postedBy = url.searchParams.get('posted_by_user_id') ?? '';
     const assignedDriverRaw = url.searchParams.get('assigned_driver_id') ?? '';
     let assignedDriver = assignedDriverRaw;
@@ -439,6 +443,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (toCity) q = q.eq('to_city_id', toCity);
       if (postedBy) q = q.eq('posted_by_user_id', postedBy);
       if (assignedDriver) q = q.eq('assigned_driver_id', assignedDriver);
+      // via_city_id: filter to trips whose waypoint chain contains this city (any seq).
+      if (viaCity) {
+        const { data: wpRows, error: wpErr } = await db.from('trip_waypoints').select('trip_id').eq('city_id', viaCity);
+        if (wpErr) throw new Error(wpErr.message);
+        const tripIds = [...new Set(((wpRows ?? []) as { trip_id: string }[]).map((r) => r.trip_id))];
+        if (tripIds.length === 0) return { rows: [], distEntries: null };
+        q = q.in('id', tripIds);
+      }
       let distEntries: [string, number][] | null = null;
       if (near) {
         const { data: rad, error: radErr } = await db.rpc('trips_in_radius', { p_lat: near.lat, p_lng: near.lng, p_radius_m: near.radiusM });
@@ -464,6 +476,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
             status,
             from_city_id: fromCity,
             to_city_id: toCity,
+            via_city_id: viaCity,
             posted_by_user_id: postedBy,
             assigned_driver_id: assignedDriver,
             near_lat: near ? near.lat.toFixed(3) : '',
