@@ -82,22 +82,17 @@ const PAGE_SIZE = 50;
 export function AdminAgentsPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  const agentsQuery = useInfiniteAgents(filter === 'all' ? undefined : { kycStatus: filter }, PAGE_SIZE);
+  const [debouncedQ, setDebouncedQ] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(q.trim()), 300);
+    return () => clearTimeout(t);
+  }, [q]);
+  const params = { ...(filter === 'all' ? {} : { kycStatus: filter as KycStatus }), ...(debouncedQ ? { search: debouncedQ } : {}) };
+  const agentsQuery = useInfiniteAgents(Object.keys(params).length ? params : undefined, PAGE_SIZE);
 
   const rows = useMemo(() => (agentsQuery.data?.pages.flatMap((p) => p.data) ?? []), [agentsQuery.data]);
   const total = agentsQuery.data?.pages[0]?.meta.total;
-
-  const filtered = useMemo(() => {
-    const term = q.trim().toLowerCase();
-    if (!term) return rows;
-    return rows.filter(
-      (a) =>
-        a.fullName.toLowerCase().includes(term) ||
-        (a.phone ?? '').toLowerCase().includes(term) ||
-        (a.email ?? '').toLowerCase().includes(term) ||
-        (a.businessName ?? '').toLowerCase().includes(term),
-    );
-  }, [rows, q]);
+  const filtered = rows;
 
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
