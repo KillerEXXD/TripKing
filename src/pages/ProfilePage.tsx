@@ -9,6 +9,7 @@ import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, VerificationChecklist } from '@/components/driver';
+import { MyKycDocsCard } from '@/components/driver/MyKycDocsCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatRating, initials } from '@/lib/utils';
@@ -156,6 +157,8 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
         </div>
       ) : null}
 
+      <MyKycDocsCard kind="driver" id={driver.id} />
+
       <Card className="gap-2">
         <div className="flex items-center justify-between">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Your vehicles</div>
@@ -244,7 +247,11 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
             onSave={save}
             initial={{ fullName: agent.fullName, email: agent.email ?? '', cityId: agent.businessCity?.id ?? '', profilePhotoUrl: agent.profilePhotoUrl }}
           />
-        ) : null}
+        ) : (
+          <Link to={`/agents/${agent.id}`} className="text-sm font-medium text-primary underline">
+            View your public profile →
+          </Link>
+        )}
       </Card>
 
       {agent.verification ? (
@@ -252,6 +259,8 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
           <VerificationChecklist verification={agent.verification} steps={AGENT_VERIFICATION_STEPS} />
         </div>
       ) : null}
+
+      <MyKycDocsCard kind="agent" id={agent.id} />
 
       <Button variant="outline" onClick={onSignOut} disabled={signingOut} className="w-full">
         <LogOut className="size-4" aria-hidden /> {signingOut ? 'Signing out…' : 'Sign out'}

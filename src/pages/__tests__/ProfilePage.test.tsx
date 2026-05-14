@@ -7,7 +7,7 @@ import type { Driver, User } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
-vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useMyAgent: vi.fn(), useUpdateDriver: vi.fn(), useUpdateAgent: vi.fn() }));
+vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useMyAgent: vi.fn(), useUpdateDriver: vi.fn(), useUpdateAgent: vi.fn(), useDriverKycDocs: vi.fn(() => ({ isPending: false, data: undefined })), useAgentKycDocs: vi.fn(() => ({ isPending: false, data: undefined })) }));
 import { useMyAgent, useMyDriver, useUpdateAgent, useUpdateDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
 import { useDriverVehicles } from '@/hooks/useVehicles';
