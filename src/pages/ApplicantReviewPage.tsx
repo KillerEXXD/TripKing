@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Car, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssignDriver, useRejectApplicant, useTrip, useTripApplicants } from '@/hooks/useTrips';
@@ -114,7 +114,7 @@ function ApplicantCard({
   );
 }
 
-function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
+function Applicants({ trip, isPoster, from }: { trip: Trip; isPoster: boolean; from: string | null }) {
   // The route auth is enforced server-side; gate the client query on isPoster so
   // a non-poster who lands here (deep link / stale tab) doesn't fire a guaranteed 403.
   const applicantsQuery = useTripApplicants(trip.id, isPoster);
@@ -133,11 +133,18 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
         onSuccess: (updated) => {
           if (!updated.passengerName) {
             // No passenger details yet — go to the trip and prompt the agent to fill them in.
+            // Forward `?from=` so the fill flow can return the agent to their queue.
             toast.success('Driver selected — add the passenger details to complete the booking.');
-            navigate(`/trips/${trip.id}?fillPassenger=1`);
+            const fwd = from ? `&from=${encodeURIComponent(from)}` : '';
+            navigate(`/trips/${trip.id}?fillPassenger=1${fwd}`);
           } else {
-            toast.success('Driver selected — share the trip link with the passenger.');
-            if (updated.passengerOtp) setAssignedTrip(updated);
+            toast.success(from ? 'Driver selected — back to your queue.' : 'Driver selected — share the trip link with the passenger.');
+            if (updated.passengerOtp) {
+              // Show the OTP modal; closing it (or having no OTP at all) returns to the queue.
+              setAssignedTrip(updated);
+            } else if (from) {
+              navigate(from);
+            }
           }
         },
         onError: () => toast.error("Couldn't select that driver — try again."),
@@ -170,7 +177,16 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
           onReject={() => onReject(a.id)}
         />
       ))}
-      {assignedTrip && assignedTrip.passengerOtp ? <PassengerLinkModal trip={assignedTrip} otp={assignedTrip.passengerOtp} onClose={() => setAssignedTrip(null)} /> : null}
+      {assignedTrip && assignedTrip.passengerOtp ? (
+        <PassengerLinkModal
+          trip={assignedTrip}
+          otp={assignedTrip.passengerOtp}
+          onClose={() => {
+            setAssignedTrip(null);
+            if (from) navigate(from);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -184,6 +200,13 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
 export function ApplicantReviewPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  // `?from=<path>` — set when the agent entered from a Home-tab work queue
+  // (e.g. `/queue/needs-action`). Used to override the back button + post-
+  // assignment navigation so the agent returns to the queue, not the
+  // generic /posted-trips hub.
+  const from = params.get('from');
+  const backTo = from || '/posted-trips';
   const { user } = useAuth();
   const tripQuery = useTrip(id);
   const notFound = !id || (tripQuery.isError && tripQuery.error instanceof ApiError && tripQuery.error.status === 404);
@@ -192,7 +215,7 @@ export function ApplicantReviewPage() {
   return (
     <div className="mx-auto max-w-md">
       <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
-        <button type="button" aria-label="Back to your posted trips" onClick={() => navigate('/posted-trips')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+        <button type="button" aria-label={from ? 'Back to your queue' : 'Back to your posted trips'} onClick={() => navigate(backTo)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>
         <div className="min-w-0">
@@ -222,7 +245,7 @@ export function ApplicantReviewPage() {
                 {formatKm(tripQuery.data.expectedDistanceKm)} · {formatINR(tripQuery.data.ratePerKm)}/km · {formatINR(tripQuery.data.totalFare)} fare · {formatINR(tripQuery.data.driverPayout)} driver payout
               </div>
             </Card>
-            <Applicants trip={tripQuery.data} isPoster={user?.id === tripQuery.data.postedByUserId} />
+            <Applicants trip={tripQuery.data} isPoster={user?.id === tripQuery.data.postedByUserId} from={from} />
           </>
         )}
       </div>

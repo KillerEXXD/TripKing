@@ -12,6 +12,7 @@ import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useTrips', () => ({
   useTrips: vi.fn(),
   useMyApplications: vi.fn(() => ({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn() })),
+  useCompleteTrip: vi.fn(() => ({ isPending: false, mutateAsync: vi.fn().mockResolvedValue(undefined) })),
 }));
 import { useTrips } from '@/hooks/useTrips';
 vi.mock('@/hooks/useVacancies', () => ({
@@ -109,6 +110,34 @@ describe('DriverHomePage', () => {
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
+  });
+
+  it('Driving-now card: rich details + End trip + Continue when a trip is in progress', async () => {
+    const completeMutateAsync = vi.fn().mockResolvedValue(undefined);
+    const useTripsMod = await import('@/hooks/useTrips');
+    vi.mocked(useTripsMod.useCompleteTrip).mockReturnValue({ isPending: false, mutateAsync: completeMutateAsync } as never);
+    const inProg = makeTrip({ id: 'in-progress-1', status: 'in_progress', passengerCount: 3 });
+    // useTrips is called for nearby, my-posts, AND my-driving — the my-driving call returns this trip.
+    let call = 0;
+    vi.mocked(useTrips).mockImplementation((args) => {
+      call++;
+      const driving = args && (args as { assignedDriverId?: string }).assignedDriverId === 'me';
+      return { isPending: false, isError: false, isSuccess: true, data: driving ? [inProg] : [], refetch: vi.fn() } as never;
+    });
+    expect(call).toBe(0);
+    renderHome();
+    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
+    expect(screen.getByText(/140 km/i)).toBeInTheDocument();
+    expect(screen.getByText(/3 pax/i)).toBeInTheDocument();
+    // Both action buttons are present.
+    const endBtn = screen.getByRole('button', { name: /end trip/i });
+    expect(endBtn).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^continue$/i })).toHaveAttribute('href', '/trips/in-progress-1');
+    // End trip wires through to useCompleteTrip with the trip id (confirm via window.confirm stub).
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(endBtn);
+    expect(completeMutateAsync).toHaveBeenCalledWith({ tripId: 'in-progress-1' });
+    confirmSpy.mockRestore();
   });
 
   it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {

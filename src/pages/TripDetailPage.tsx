@@ -839,7 +839,12 @@ export function TripDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const fillPassenger = new URLSearchParams(location.search).get('fillPassenger') === '1';
+  const params = new URLSearchParams(location.search);
+  const fillPassenger = params.get('fillPassenger') === '1';
+  // `?from=<path>` — set when the user entered from a Home-tab work queue.
+  // Overrides the default goBack target so they land back on the queue (which
+  // auto-bounces home once empty).
+  const from = params.get('from');
   const { user } = useAuth();
   // Effective role honours the admin role-switcher — an admin viewing-as-driver gets the
   // driver flow (Apply bar), not the poster/admin flow.
@@ -851,8 +856,9 @@ export function TripDetailPage() {
   const myDriverMissing = isDriver && myDriverQuery.isError && myDriverQuery.error instanceof ApiError && myDriverQuery.error.status === 404;
 
   // Always route to the user's own listing instead of history-back — otherwise the
-  // Trip Detail ⇄ Applicants pair creates a circular trap with no exit.
-  const goBack = () => navigate(isDriver ? '/my-trips' : '/posted-trips');
+  // Trip Detail ⇄ Applicants pair creates a circular trap with no exit. When the
+  // user entered from a work queue (`?from=...`), return them there instead.
+  const goBack = () => navigate(from || (isDriver ? '/my-trips' : '/posted-trips'));
   const notFound = !id || (tripQuery.isError && tripQuery.error instanceof ApiError && tripQuery.error.status === 404);
 
   return (
