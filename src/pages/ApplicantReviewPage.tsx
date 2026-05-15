@@ -115,7 +115,9 @@ function ApplicantCard({
 }
 
 function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
-  const applicantsQuery = useTripApplicants(trip.id);
+  // The route auth is enforced server-side; gate the client query on isPoster so
+  // a non-poster who lands here (deep link / stale tab) doesn't fire a guaranteed 403.
+  const applicantsQuery = useTripApplicants(trip.id, isPoster);
   const assign = useAssignDriver();
   const reject = useRejectApplicant();
   const navigate = useNavigate();
@@ -146,13 +148,17 @@ function Applicants({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
     reject.mutate({ tripId: trip.id, acceptanceId }, { onError: () => toast.error("Couldn't reject that applicant — try again.") });
   }
 
+  // Non-posters can't see the applicants list — the API would 403. Show a friendly
+  // explainer instead of firing a guaranteed-to-fail request.
+  if (!isPoster) {
+    return <Card><p className="text-sm text-secondary">Only the trip poster can see who applied. Go back to the trip if you want to apply yourself.</p></Card>;
+  }
   if (applicantsQuery.isPending) return <LoadingSkeleton rows={3} />;
   if (applicantsQuery.isError) return <ErrorState title="Couldn't load the applicants" message="Check your connection and try again." onRetry={() => void applicantsQuery.refetch()} />;
   if (applicants.length === 0) return <Card><p className="text-sm text-secondary">No one has applied to this trip yet.</p></Card>;
 
   return (
     <div className="space-y-3">
-      {!isPoster ? <p className="text-xs text-secondary">You can review applicants but only the trip poster can select one.</p> : null}
       {applicants.map((a) => (
         <ApplicantCard
           key={a.id}

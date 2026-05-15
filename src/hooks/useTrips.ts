@@ -109,11 +109,11 @@ export function useTripByOtp(otp: string | undefined) {
     },
   });
 }
-export function useTripApplicants(tripId: string | undefined) {
+export function useTripApplicants(tripId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ['trip', tripId, 'applicants'],
     queryFn: () => getTripApplicants(tripId as string),
-    enabled: !!tripId,
+    enabled: enabled && !!tripId,
     staleTime: STALE.live,
     // Applicants list is the screen the agent picks from — poll so a new applicant
     // shows up within ~15s and a withdrawn one disappears just as fast.
@@ -234,11 +234,11 @@ export function useUpdateTripPassenger() {
 
 // ─── Phase 4 trip_invitations hooks ─────────────────────────────────────────
 
-export function useTripInvites(tripId: string | undefined) {
+export function useTripInvites(tripId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ['trip', tripId, 'invites'],
     queryFn: () => getTripInvites(tripId as string),
-    enabled: !!tripId,
+    enabled: enabled && !!tripId,
     staleTime: STALE.live,
     refetchInterval: 15_000,
     refetchOnWindowFocus: true,

@@ -94,14 +94,20 @@ export function initSentry(): void {
         // filtered by the SW-infra noise patterns below.
         if (isOurSwBridgeEvent(event)) return event;
         const original = hint?.originalException as { status?: number } | undefined;
-        // 401 (bad/expired creds — the client refreshes) and 404 (stale links) are user errors, not bugs.
-        if (original && typeof original === 'object' && (original.status === 401 || original.status === 404)) {
+        // 401 / 403 / 404 / 409 are user-or-permission errors, not bugs.
+        //   401 — bad/expired creds (client refreshes)
+        //   403 — caller isn't allowed (e.g. non-poster hitting applicants/invites)
+        //   404 — stale link / row gone
+        //   409 — domain conflict ("KYC already approved", "video call already scheduled",
+        //         "trip is selected, not assigned", etc.)
+        const userErrorStatuses = new Set([401, 403, 404, 409]);
+        if (original && typeof original === 'object' && typeof original.status === 'number' && userErrorStatuses.has(original.status)) {
           return null;
         }
         const message = (event.exception?.values?.[0]?.value ?? event.message ?? '').toString();
         if (NOISE_MESSAGE_PATTERNS.some((re) => re.test(message))) return null;
         const apiStatus = event.contexts?.api_error?.status_code;
-        if ((apiStatus === 401 || apiStatus === 404) && /not found|unauthor/i.test(message)) return null;
+        if (typeof apiStatus === 'number' && userErrorStatuses.has(apiStatus)) return null;
         // Errors whose every stack frame is a browser extension aren't ours.
         const frames = event.exception?.values?.[0]?.stacktrace?.frames ?? [];
         if (frames.length > 0 && frames.every((f) => isExtensionFrame(f.filename ?? undefined))) return null;
