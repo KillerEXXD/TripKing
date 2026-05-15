@@ -220,6 +220,24 @@ function AgentHome({ agent }: { agent: Agent }) {
   );
 }
 
+/** Lightweight scaffold rendered while `/agents/me` is in-flight. Mirrors
+ *  HomeChromeFallback on the driver side — gives LCP something fast to paint. */
+function AgentHomeChromeFallback() {
+  return (
+    <div>
+      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-xs text-secondary">Welcome back</div>
+          <div className="text-base font-semibold">Loading your home…</div>
+        </div>
+      </header>
+      <div className="space-y-3 px-4 pt-3">
+        <LoadingSkeleton rows={3} />
+      </div>
+    </div>
+  );
+}
+
 /** `/` for an agent — post-and-shepherd home: actions, reputation, posts with applicants, recent posts. Built on `useMyAgent` / `useTrips` / `useNotifications`. */
 export function AgentHomePage() {
   const navigate = useNavigate();
@@ -240,9 +258,12 @@ export function AgentHomePage() {
     );
   }
   if (agentQuery.isPending) {
+    // Paint the header chrome immediately so LCP fires on the greeting text instead
+    // of waiting for /agents/me (~2.7s on mobile India). The header label/role pill
+    // are static; the rest of the home stack renders as a short skeleton below.
     return (
-      <main className="mx-auto max-w-md space-y-3 p-6">
-        <LoadingSkeleton rows={7} />
+      <main className="mx-auto max-w-md">
+        <AgentHomeChromeFallback />
       </main>
     );
   }

@@ -337,6 +337,30 @@ function DriverHome({ driver }: { driver: Driver }) {
  * Built on `useMyDriver` (the caller's profile), `useTrips`, `useVacancies`,
  * `useNotifications`. A 404 (no driver profile) → finish onboarding.
  */
+/** Minimal scaffold shown while /drivers/me is in flight. Renders only the header
+ *  chrome (Welcome back + greeting + role pill) so LCP fires on this small static
+ *  block, not on the queries-dependent card stack below. The greeting falls back to
+ *  the auth display name when the driver profile hasn't loaded yet. */
+function HomeChromeFallback() {
+  const { user } = useAuth();
+  return (
+    <div>
+      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-xs text-secondary">Welcome back</div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="truncate font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || 'Driver'}</span>
+            <Badge variant="success">Driver</Badge>
+          </div>
+        </div>
+      </header>
+      <div className="space-y-3 px-4 pb-4 pt-3">
+        <LoadingSkeleton rows={5} />
+      </div>
+    </div>
+  );
+}
+
 export function DriverHomePage() {
   const navigate = useNavigate();
   const driverQuery = useMyDriver(true);
@@ -356,9 +380,12 @@ export function DriverHomePage() {
     );
   }
   if (driverQuery.isPending) {
+    // Paint the page chrome immediately so LCP fires on the header text instead of
+    // waiting for /drivers/me (~2.7s on mobile India). Greeting comes from AuthContext;
+    // priority cards render as a single short skeleton below it.
     return (
-      <main className="mx-auto max-w-md space-y-3 p-6">
-        <LoadingSkeleton rows={7} />
+      <main className="mx-auto max-w-md">
+        <HomeChromeFallback />
       </main>
     );
   }
