@@ -6,6 +6,7 @@ import { useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Badge, Button, Card } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
+import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -228,6 +229,7 @@ function AgentHome({ agent }: { agent: Agent }) {
             Each card no-ops when its count is zero. Mirrors the Driver-home pattern (PR #66). */}
         <TripsInProgressCard trips={inProgressTrips} />
         <NeedsActionCard trips={needsActionTrips} totalApplicants={needsActionApplicants} />
+        <InvitesSentCard trips={myPosts} />
 
         <Link to="/profile" className="block w-full space-y-2 rounded-xl border bg-white px-3 py-2.5 transition-colors hover:border-primary/40">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-secondary">Your reputation</div>

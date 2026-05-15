@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronRight, Plus, Share2, Users } from 'lucide-react';
+import { ChevronRight, Plus, Send, Share2, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
@@ -61,6 +61,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
   // Prevents `Cannot read properties of undefined (reading 'variant')` crashes.
   const meta = STATUS_META[trip.status] ?? { variant: 'muted' as const, label: String(trip.status) };
   const hasApplicants = trip.applicantCount > 0;
+  const hasInvites = trip.pendingInvitationCount > 0;
   const reviewable = hasApplicants && trip.status === 'has_applicants';
   const shareable = trip.status === 'open' || trip.status === 'has_applicants';
   const dest = reviewable ? `/trips/${trip.id}/applicants` : `/trips/${trip.id}`;
@@ -82,11 +83,18 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
         </div>
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="text-secondary">Pickup: {formatPickupTime(trip.pickupAt)}</span>
-          {hasApplicants ? (
-            <Badge variant="warning">
-              <Users className="size-3" aria-hidden /> {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'}
-            </Badge>
-          ) : null}
+          <div className="flex items-center gap-1.5">
+            {hasInvites ? (
+              <Badge variant="info">
+                <Send className="size-3" aria-hidden /> {trip.pendingInvitationCount} invited
+              </Badge>
+            ) : null}
+            {hasApplicants ? (
+              <Badge variant="warning">
+                <Users className="size-3" aria-hidden /> {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'}
+              </Badge>
+            ) : null}
+          </div>
         </div>
       </Link>
       <div className="flex items-center justify-between border-t px-4 py-2.5 text-xs font-semibold">
@@ -97,10 +105,17 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
         ) : (
           <span />
         )}
-        <Link to={dest} className="flex items-center text-primary">
-          {reviewable ? 'Review applicants' : 'View details'}
-          <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
-        </Link>
+        <div className="flex items-center gap-3">
+          {hasInvites ? (
+            <Link to={`/trips/${trip.id}/invitations`} className="flex items-center text-blue-700">
+              View invites <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
+            </Link>
+          ) : null}
+          <Link to={dest} className="flex items-center text-primary">
+            {reviewable ? 'Review applicants' : 'View details'}
+            <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
+          </Link>
+        </div>
       </div>
     </Card>
   );

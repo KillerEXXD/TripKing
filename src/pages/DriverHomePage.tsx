@@ -11,6 +11,7 @@ import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { Badge, Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
+import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -274,7 +275,9 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myApplicationsQuery = useMyApplications();
 
   const nearby = nearbyQuery.data ?? [];
-  const postedWithApplicants = (myPostsQuery.data ?? []).filter((t) => t.status === 'has_applicants').length;
+  const myPosts = myPostsQuery.data ?? [];
+  const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
+  const hasPendingInvites = myPosts.some((t) => (t.pendingInvitationCount ?? 0) > 0);
 
   // Priority cards: a driver has at most one trip in each of these states at a time.
   const myDriving = myDrivingQuery.data ?? [];
@@ -346,6 +349,7 @@ function DriverHome({ driver }: { driver: Driver }) {
         {postedWithApplicants > 0 ? (
           <ActionCard tone="amber" icon={<Sparkles className="size-5" aria-hidden />} title={`${postedWithApplicants} trip you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`} hint="Review applicants and pick a driver." to="/posted-trips" />
         ) : null}
+        {hasPendingInvites ? <InvitesSentCard trips={myPosts} /> : null}
       </div>
 
       <div className="px-4 pt-3">
