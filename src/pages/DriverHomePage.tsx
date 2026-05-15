@@ -15,6 +15,7 @@ import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
+import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
@@ -265,6 +266,10 @@ function DriverHome({ driver }: { driver: Driver }) {
           subtitle="See what you've earned and where you're trending."
           cta={{ label: 'View earnings' }}
         />
+      </div>
+
+      <div className="px-4 pb-4">
+        <ReferralCodeCard role="driver" />
       </div>
 
       <div className="px-4 pb-4">
