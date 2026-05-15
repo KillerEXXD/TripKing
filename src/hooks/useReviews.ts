@@ -25,7 +25,7 @@ export function useCreateReview() {
     mutationFn: (input: ReviewInput) => createReview(input),
     onSuccess: (_d, v) => {
       void qc.invalidateQueries({ queryKey: ['reviews'] });
-      if (v.rateeUserId) void qc.invalidateQueries({ queryKey: ['driver'] });
+      if (v.rateeUserId) void qc.invalidateQueries({ queryKey: ['driver', v.rateeUserId] });
     },
   });
 }

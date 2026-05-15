@@ -58,7 +58,10 @@ describe('useVideoVerification hooks', () => {
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['video-verification', 'vv1'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['driver', 'd1'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['drivers'] });
+    // managerId is null on this fixture — must NOT invalidate agent caches
     expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['agent', null] });
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: ['agents'] });
   });
 
   it('useMarkVideoCallNoShow invalidates the video-verifications cache', async () => {
