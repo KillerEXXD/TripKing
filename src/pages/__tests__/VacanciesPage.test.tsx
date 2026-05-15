@@ -5,7 +5,11 @@ import { VacanciesPage } from '@/pages/VacanciesPage';
 import { formatClockTime } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
-vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn(), useMyActiveVacancies: vi.fn() }));
+vi.mock('@/hooks/useVacancies', () => ({
+  useVacancies: vi.fn(),
+  useMyActiveVacancies: vi.fn(),
+  useCancelVacancy: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
 import { useVacancies, useMyActiveVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
 import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';

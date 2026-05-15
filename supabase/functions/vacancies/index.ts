@@ -262,6 +262,69 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     return fullVacancy(id, true);
   }
 
+  // ── PATCH /vacancies/:id (owning driver/admin; only while status='active') ─
+  if (!sub && req.method === 'PATCH') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to edit a vacancy', 401);
+    if (!vac) return fail('NOT_FOUND', 'Vacancy not found', 404);
+    if (!isAdmin(u)) {
+      const did = await driverIdFor(u.id);
+      if (vac.driver_id !== did) return fail('FORBIDDEN', 'Not your vacancy', 403);
+      if (!(await rateLimitOk(db, `patch-vacancy:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many edits — try again shortly', 429);
+    }
+    if (vac.status !== 'active') return fail('CONFLICT', `Cannot edit a ${vac.status} vacancy`, 409);
+    const b = await readBody(req);
+    try { assertNoPhones(typeof b.notes === 'string' ? b.notes : null, 'notes'); } catch (e) {
+      if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
+      throw e;
+    }
+    const update: Record<string, unknown> = {};
+    if ('current_city_id' in b) {
+      const v = strOrNull(b.current_city_id);
+      if (!v) return fail('VALIDATION', 'current_city_id cannot be empty', 422);
+      update.current_city_id = v;
+    }
+    if ('current_place_id' in b) update.current_place_id = strOrNull(b.current_place_id);
+    if ('vehicle_id' in b) update.vehicle_id = strOrNull(b.vehicle_id);
+    if ('available_from' in b) {
+      const v = strOrNull(b.available_from);
+      if (!v) return fail('VALIDATION', 'available_from cannot be empty', 422);
+      update.available_from = v;
+    }
+    if ('available_until' in b) update.available_until = strOrNull(b.available_until);
+    if ('min_rate_per_km' in b) update.min_rate_per_km = typeof b.min_rate_per_km === 'number' ? b.min_rate_per_km : null;
+    if ('notes' in b) update.notes = strOrNull(b.notes);
+
+    let nextDestPairs: { city_id: string | null; place_id: string | null }[] | null = null;
+    if (Array.isArray(b.destinations)) {
+      const parsed = (b.destinations as unknown[]).map(parseDestEntry);
+      if (parsed.some((p) => p === null)) return fail('VALIDATION', 'each `destinations` entry needs a cityId or a placeId', 422);
+      nextDestPairs = parsed as { city_id: string | null; place_id: string | null }[];
+    } else if (Array.isArray(b.destination_city_ids) || Array.isArray(b.destination_place_ids)) {
+      const destCityIds = strArray(b.destination_city_ids);
+      const destPlaceIds = strArray(b.destination_place_ids);
+      nextDestPairs = destPlaceIds.length > 0
+        ? destPlaceIds.map((placeId, i) => ({ place_id: placeId, city_id: destCityIds[i] ?? null }))
+        : destCityIds.map((cityId) => ({ city_id: cityId, place_id: null }));
+    }
+
+    if (Object.keys(update).length > 0) {
+      const { error } = await db.from('vacancies').update(update).eq('id', id);
+      if (error) return pgFail(error);
+    }
+    if (nextDestPairs !== null) {
+      const { error: delErr } = await db.from('vacancy_destinations').delete().eq('vacancy_id', id);
+      if (delErr) return pgFail(delErr);
+      if (nextDestPairs.length > 0) {
+        const { error: insErr } = await db.from('vacancy_destinations').insert(nextDestPairs.map((p) => ({ vacancy_id: id, ...p })));
+        if (insErr) return pgFail(insErr);
+      }
+    }
+    cacheDeletePattern('vacancies:*');
+    purgeCloudflareAsync(VACANCY_PURGE_URLS);
+    return fullVacancy(id, false);
+  }
+
   // ── POST /vacancies/:id/cancel (owning driver/admin) ─────────────────────
   if (sub === 'cancel' && req.method === 'POST') {
     const u = await authUser(db, req);

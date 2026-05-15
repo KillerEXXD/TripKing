@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import type { Vacancy } from '@/types';
 
-vi.mock('@/hooks/useVacancies', () => ({ useMyActiveVacancies: vi.fn() }));
+vi.mock('@/hooks/useVacancies', () => ({
+  useMyActiveVacancies: vi.fn(),
+  useCancelVacancy: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
 import { useMyActiveVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useAdminConfig', () => ({ useAppSettings: vi.fn() }));
 import { useAppSettings } from '@/hooks/useAdminConfig';
@@ -59,12 +62,29 @@ describe('IAmAvailableCard', () => {
     expect(link).toHaveAttribute('href', '/vacancies/new');
   });
 
-  it('renders 1/2 with the "listed in one city" subtitle', () => {
+  it('renders 1/2 with the "each posting below is live" subtitle', () => {
     setState({ data: [vacancy('v1')] });
     renderCard();
-    expect(screen.getByText(/listed in one city/i)).toBeInTheDocument();
+    expect(screen.getByText(/each posting below is live/i)).toBeInTheDocument();
     expect(screen.getByText(/1 \/ 2 active/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /post availability/i })).toBeInTheDocument();
+  });
+
+  it('expands by default with ≥1 vacancy and toggles to collapsed when clicked', () => {
+    setState({ data: [vacancy('v1')] });
+    renderCard();
+    const toggle = screen.getByRole('button', { name: /1 \/ 2 active/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText(/Vellore/)).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/Vellore/)).toBeNull();
+  });
+
+  it('does not render the toggle when there are no postings', () => {
+    setState({ data: [] });
+    renderCard();
+    expect(screen.queryByRole('button', { name: /0 \/ 2 active/i })).toBeNull();
   });
 
   it('renders 2/2 with the Post button disabled + tooltip + "max reached" label', () => {

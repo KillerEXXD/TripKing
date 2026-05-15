@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { usePostVacancy } from '@/hooks/useVacancies';
+import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
@@ -20,13 +20,13 @@ const MIN_HOURS = 0.5;
 const MAX_HOURS = 24;
 const DEFAULT_HOURS = 4;
 
-function FlowHeader({ onBack }: { onBack: () => void }) {
+function FlowHeader({ onBack, title }: { onBack: () => void; title: string }) {
   return (
     <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
       <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
         <ArrowLeft className="size-5" aria-hidden />
       </button>
-      <h1 className="text-base font-semibold">Post your availability</h1>
+      <h1 className="text-base font-semibold">{title}</h1>
     </header>
   );
 }
@@ -55,9 +55,13 @@ function formatHours(h: number): string {
  */
 export function PostVacancyPage() {
   const navigate = useNavigate();
+  const { id: editId } = useParams<{ id: string }>();
+  const isEdit = !!editId;
   const postVacancy = usePostVacancy();
+  const updateVacancy = useUpdateVacancy();
   const myDriverQuery = useMyDriver();
   const citiesQuery = cityHooks.useList();
+  const vacancyQuery = useVacancy(editId);
 
   const [currentCityId, setCurrentCityId] = useState('');
   const [currentPlace, setCurrentPlace] = useState<Place | null>(null);
@@ -69,6 +73,29 @@ export function PostVacancyPage() {
   const [destQuery, setDestQuery] = useState('');
   const [minRatePerKm, setMinRatePerKm] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!isEdit || hydrated || !vacancyQuery.data) return;
+    const v = vacancyQuery.data;
+    setCurrentCityId(v.currentCity.id);
+    setCurrentPlace(v.currentPlace ?? null);
+    const from = new Date(v.availableFrom);
+    if (!Number.isNaN(from.getTime())) {
+      setStartLocal(toDatetimeLocalValue(from));
+      if (v.availableUntil) {
+        const until = new Date(v.availableUntil);
+        if (!Number.isNaN(until.getTime())) {
+          setHours(clampHours((until.getTime() - from.getTime()) / HOUR_MS));
+        }
+      }
+    }
+    setDestinationCityIds(v.destinationCities.map((c) => c.id));
+    setDestPlaces(v.destinationPlaces);
+    setMinRatePerKm(typeof v.minRatePerKm === 'number' ? v.minRatePerKm : '');
+    setNotes(v.notes ?? '');
+    setHydrated(true);
+  }, [isEdit, hydrated, vacancyQuery.data]);
 
   function toggleDestination(id: string) {
     setDestinationCityIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -83,7 +110,8 @@ export function PostVacancyPage() {
   const endDate = startValid ? new Date(startDate.getTime() + hours * HOUR_MS) : null;
   const sameDay = !!endDate && startDate.toDateString() === endDate.toDateString();
   const hasDest = destinationCityIds.length > 0 || destPlaces.length > 0;
-  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && hasDest && !postVacancy.isPending;
+  const pending = postVacancy.isPending || updateVacancy.isPending;
+  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && hasDest && !pending && (!isEdit || hydrated);
 
   async function onSubmit() {
     if (!currentCityId || !startValid || hours < MIN_HOURS || !hasDest) {
@@ -101,20 +129,45 @@ export function PostVacancyPage() {
       notes: notes.trim() || undefined,
     };
     try {
-      await postVacancy.mutateAsync(input);
-      toast.success('Availability posted');
-      navigate('/my-trips?tab=available');
+      if (isEdit && editId) {
+        await updateVacancy.mutateAsync({ id: editId, input });
+        toast.success('Availability updated');
+      } else {
+        await postVacancy.mutateAsync(input);
+        toast.success('Availability posted');
+      }
+      navigate('/vacancies');
     } catch {
-      toast.error("Couldn't post your availability — try again.");
+      toast.error(isEdit ? "Couldn't save your changes — try again." : "Couldn't post your availability — try again.");
     }
   }
 
   if (citiesQuery.isPending) {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} />
+        <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
         <div className="p-4">
           <LoadingSkeleton rows={5} />
+        </div>
+      </div>
+    );
+  }
+  if (isEdit && vacancyQuery.isPending) {
+    return (
+      <div className="mx-auto max-w-md">
+        <FlowHeader onBack={() => navigate('/vacancies')} title="Edit your availability" />
+        <div className="p-4">
+          <LoadingSkeleton rows={5} />
+        </div>
+      </div>
+    );
+  }
+  if (isEdit && vacancyQuery.isError) {
+    return (
+      <div className="mx-auto max-w-md">
+        <FlowHeader onBack={() => navigate('/vacancies')} title="Edit your availability" />
+        <div className="p-4">
+          <ErrorState title="Couldn't load this vacancy" message="We couldn't fetch the details — try again." onRetry={() => void vacancyQuery.refetch()} />
         </div>
       </div>
     );
@@ -122,7 +175,7 @@ export function PostVacancyPage() {
   if (citiesQuery.isError) {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} />
+        <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
         <div className="p-4">
           <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
         </div>
@@ -133,7 +186,7 @@ export function PostVacancyPage() {
   if (myDriverQuery.data && myDriverQuery.data.kycStatus !== 'approved') {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} />
+        <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
         <div className="p-4">
           <KycGateNotice heading="Get verified to post your availability" body="Once your account is verified — documents, your vehicle, and a quick video call — you can show as available so agents can find you." />
         </div>
@@ -147,7 +200,7 @@ export function PostVacancyPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <FlowHeader onBack={() => navigate('/vacancies')} />
+      <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
       <div className="space-y-3 p-4">
       <Card className="gap-3">
         <div className="space-y-1.5">
@@ -282,13 +335,13 @@ export function PostVacancyPage() {
         </label>
       </Card>
 
-      {postVacancy.isError ? <p className="text-sm text-red-700">Couldn&apos;t post your availability — please try again.</p> : null}
+      {postVacancy.isError || updateVacancy.isError ? <p className="text-sm text-red-700">{isEdit ? "Couldn't save your changes — please try again." : "Couldn't post your availability — please try again."}</p> : null}
       <div className="flex gap-3">
-        <Button type="button" variant="outline" onClick={() => navigate('/vacancies')} disabled={postVacancy.isPending}>
+        <Button type="button" variant="outline" onClick={() => navigate('/vacancies')} disabled={pending}>
           Cancel
         </Button>
         <Button type="button" variant="full" onClick={() => void onSubmit()} disabled={!canSubmit}>
-          {postVacancy.isPending ? 'Posting…' : 'Post availability'}
+          {pending ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save changes' : 'Post availability'}
         </Button>
       </div>
       </div>

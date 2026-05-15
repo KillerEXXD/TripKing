@@ -5,7 +5,7 @@ import { createElement, type ReactNode } from 'react';
 
 vi.mock('@/lib/api/services/vacancies');
 import * as svc from '@/lib/api/services/vacancies';
-import { useCancelVacancy, usePostVacancy, useVacancies, useVacancy } from '@/hooks/useVacancies';
+import { useCancelVacancy, usePostVacancy, useUpdateVacancy, useVacancies, useVacancy } from '@/hooks/useVacancies';
 
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -42,6 +42,18 @@ describe('useVacancies hooks', () => {
       await result.current.mutateAsync({} as never);
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['vacancies'] });
+  });
+
+  it('useUpdateVacancy calls patchVacancy and invalidates list + detail', async () => {
+    vi.mocked(svc.patchVacancy).mockResolvedValue({ id: 'v1' } as never);
+    const { invalidate, wrapper } = setup();
+    const { result } = renderHook(() => useUpdateVacancy(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ id: 'v1', input: { notes: 'updated' } as never });
+    });
+    expect(svc.patchVacancy).toHaveBeenCalledWith('v1', { notes: 'updated' });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['vacancies'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['vacancy', 'v1'] });
   });
 
   it('useCancelVacancy invalidates both the list and the cancelled vacancy detail', async () => {

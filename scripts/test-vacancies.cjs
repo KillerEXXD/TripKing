@@ -190,6 +190,23 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   const byStatus = await j('GET', '/vacancies?status=cancelled');
   check('GET /vacancies?status=cancelled → contains my vacancy', byStatus.status === 200 && (byStatus.json?.data || []).some((v) => v.id === vacancyId), `len=${byStatus.json?.data?.length}`);
 
+  // ── PATCH /vacancies/:id (owner edit while active) ─────────────────────
+  const editFresh = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destination_city_ids: [dest1], notes: 'edit-me' } });
+  const editId = editFresh.json?.data?.id;
+  check('PATCH setup: posted a fresh editable vacancy', editFresh.status === 200 && !!editId, `status=${editFresh.status} ${JSON.stringify(editFresh.json?.error || '')}`);
+  const editNoAuth = await j('PATCH', `/vacancies/${editId}`, { body: { notes: 'no auth' } });
+  check('PATCH /vacancies/:id without auth → 401', editNoAuth.status === 401, `status=${editNoAuth.status}`);
+  const editNotOwner = await j('PATCH', `/vacancies/${editId}`, { token: otherToken, body: { notes: 'not me' } });
+  check('PATCH /vacancies/:id by a non-owner → 403', editNotOwner.status === 403, `status=${editNotOwner.status}`);
+  const edited = await j('PATCH', `/vacancies/${editId}`, { token: driverToken, body: { notes: 'edited', min_rate_per_km: 22, destinations: [{ cityId: dest2 }] } });
+  const editedNotes = edited.json?.data?.notes;
+  const editedRate = edited.json?.data?.min_rate_per_km;
+  const editedDests = (edited.json?.data?.vacancy_destinations || []).map((vd) => vd.city?.id);
+  check('PATCH /vacancies/:id (owner) → 200 + fields updated + destinations replaced', edited.status === 200 && editedNotes === 'edited' && editedRate === 22 && editedDests.includes(dest2) && !editedDests.includes(dest1), `status=${edited.status} notes=${editedNotes} rate=${editedRate} dests=${JSON.stringify(editedDests)}`);
+  await j('POST', `/vacancies/${editId}/cancel`, { token: driverToken });
+  const editAfterCancel = await j('PATCH', `/vacancies/${editId}`, { token: driverToken, body: { notes: 'too late' } });
+  check('PATCH /vacancies/:id on a cancelled vacancy → 409', editAfterCancel.status === 409, `status=${editAfterCancel.status}`);
+
   // ── driver deactivation: a deactivated driver can't post a vacancy + their vacancies leave the public list ──
   const deact = await j('PATCH', `/drivers/${driverId}/active`, { token: adminToken, body: { is_active: false, reason: 'smoke deactivation' } });
   check('PATCH /drivers/:id/active {is_active:false} (admin) → 200 + is_active false', deact.status === 200 && deact.json?.data?.is_active === false, `status=${deact.status} ${JSON.stringify(deact.json?.error || deact.json?.data?.is_active)}`);

@@ -4,8 +4,12 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { PostVacancyPage } from '@/pages/PostVacancyPage';
 import { formatClockTime } from '@/lib/utils';
 
-vi.mock('@/hooks/useVacancies', () => ({ usePostVacancy: vi.fn() }));
-import { usePostVacancy } from '@/hooks/useVacancies';
+vi.mock('@/hooks/useVacancies', () => ({
+  usePostVacancy: vi.fn(),
+  useUpdateVacancy: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false, isError: false })),
+  useVacancy: vi.fn(() => ({ data: undefined, isPending: false, isError: false, refetch: vi.fn() })),
+}));
+import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
@@ -54,6 +58,17 @@ function renderPost() {
     <MemoryRouter initialEntries={['/vacancies/new']}>
       <Routes>
         <Route path="/vacancies/new" element={<PostVacancyPage />} />
+        <Route path="/vacancies" element={<div>vacancy feed</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+function renderEdit(id: string) {
+  return render(
+    <MemoryRouter initialEntries={[`/vacancies/${id}/edit`]}>
+      <Routes>
+        <Route path="/vacancies/:id/edit" element={<PostVacancyPage />} />
         <Route path="/vacancies" element={<div>vacancy feed</div>} />
       </Routes>
     </MemoryRouter>,
@@ -201,5 +216,31 @@ describe('PostVacancyPage', () => {
     renderPost();
     expect(screen.getByRole('link', { name: /go to verification/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^post availability$/i })).toBeNull();
+  });
+
+  it('edit mode prefills the form from the vacancy and submits via useUpdateVacancy', async () => {
+    const existing = {
+      id: 'v77',
+      driverId: 'd1',
+      currentCity: city('c1', 'Vellore'),
+      availableFrom: '2099-06-01T08:00:00.000Z',
+      availableUntil: '2099-06-01T12:00:00.000Z',
+      destinationCities: [city('c2', 'Chennai')],
+      destinationPlaces: [],
+      minRatePerKm: 18,
+      notes: 'edit me',
+      status: 'active',
+      createdAt: '2099-05-30T00:00:00.000Z',
+    };
+    vi.mocked(useVacancy).mockReturnValue({ data: existing, isPending: false, isError: false, refetch: vi.fn() } as never);
+    const updateAsync = vi.fn().mockResolvedValue(existing);
+    vi.mocked(useUpdateVacancy).mockReturnValue({ mutateAsync: updateAsync, isPending: false, isError: false } as never);
+    renderEdit('v77');
+    expect(await screen.findByRole('heading', { name: /edit your availability/i })).toBeInTheDocument();
+    await waitFor(() => expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('c1'));
+    expect(screen.getByDisplayValue('18')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^save changes$/i }));
+    await waitFor(() => expect(updateAsync).toHaveBeenCalledWith(expect.objectContaining({ id: 'v77', input: expect.objectContaining({ currentCityId: 'c1', destinationCityIds: ['c2'] }) })));
+    expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
   });
 });

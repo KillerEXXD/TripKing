@@ -98,6 +98,7 @@ export function AppRoutes() {
             <Route path="/vehicles/:id/photos" element={<VehiclePhotosPage />} />
             <Route path="/vacancies" element={<VacanciesPage />} />
             <Route path="/vacancies/new" element={<PostVacancyPage />} />
+            <Route path="/vacancies/:id/edit" element={<PostVacancyPage />} />
             <Route path="/alerts" element={<AlertsPage />} />
             <Route path="/alerts/new" element={<CreateAlertPage />} />
             <Route path="/alerts/:id" element={<AlertDetailPage />} />

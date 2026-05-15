@@ -3511,6 +3511,42 @@
             "$ref": "#/components/responses/Envelope"
           }
         }
+      },
+      "patch": {
+        "tags": ["vacancies"],
+        "summary": "Edit a vacancy (owning driver/admin; Bearer; only while status=active — 409 otherwise). Partial update — every field of POST /vacancies is optional. If `destinations` (or legacy `destination_*_ids`) is provided, the vacancy_destinations rows are fully replaced.",
+        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "current_city_id": { "type": "string" },
+                  "current_place_id": { "type": "string" },
+                  "vehicle_id": { "type": "string" },
+                  "available_from": { "type": "string" },
+                  "available_until": { "type": "string" },
+                  "destinations": { "type": "array", "items": { "type": "object", "properties": { "cityId": { "type": "string" }, "placeId": { "type": "string" } } } },
+                  "destination_city_ids": { "type": "array", "items": { "type": "string" } },
+                  "destination_place_ids": { "type": "array", "items": { "type": "string" } },
+                  "min_rate_per_km": { "type": "number" },
+                  "notes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/Envelope" },
+          "400": { "$ref": "#/components/responses/Envelope" },
+          "401": { "$ref": "#/components/responses/Envelope" },
+          "403": { "$ref": "#/components/responses/Envelope" },
+          "404": { "$ref": "#/components/responses/Envelope" },
+          "409": { "$ref": "#/components/responses/Envelope" },
+          "422": { "$ref": "#/components/responses/Envelope" },
+          "429": { "$ref": "#/components/responses/Envelope" }
+        }
       }
     },
     "/vacancies/{id}/cancel": {
