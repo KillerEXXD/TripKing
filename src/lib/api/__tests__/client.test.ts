@@ -63,7 +63,7 @@ describe('apiClient', () => {
     expect(init.body).toBe(JSON.stringify({ from_city_id: 'c1' }));
   });
 
-  it('attaches Authorization: Bearer when an access token is stored', async () => {
+  it('attaches Authorization: Bearer when an access token is stored, and does NOT send X-API-Key alongside (regression — item 6.6 of #114)', async () => {
     apiClient.setTokens('access-123', 'refresh-456');
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: null, error: null }));
     vi.stubGlobal('fetch', fetchMock);
@@ -72,6 +72,9 @@ describe('apiClient', () => {
 
     const headers = (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer access-123');
+    // X-API-Key is the anonymous-read credential; once a Bearer is present, sending the key
+    // alongside is meaningless (the Bearer wins) and only leaks it into edge-fn/CDN logs.
+    expect(headers['X-API-Key']).toBeUndefined();
   });
 
   it('does NOT attach auth headers on /auth endpoints', async () => {
