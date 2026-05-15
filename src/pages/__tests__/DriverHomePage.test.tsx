@@ -140,6 +140,18 @@ describe('DriverHomePage', () => {
     confirmSpy.mockRestore();
   });
 
+  it('shows the Invitation-waiting card on Home when the driver has a pending received invitation', () => {
+    const invited = makeTrip({ id: 'inv-9', toCity: city('c8', 'Bangalore'), invitationId: 'iv-1', invitationStatus: 'pending' });
+    vi.mocked(useTrips).mockImplementation((args) => {
+      const isInvited = !!args && (args as { invited?: string }).invited === 'me';
+      return { isPending: false, isError: false, isSuccess: true, data: isInvited ? [invited] : [], refetch: vi.fn() } as never;
+    });
+    renderHome();
+    const card = screen.getByRole('link', { name: /invitation to drive vellore to bangalore/i });
+    expect(card).toHaveAttribute('href', '/trips/inv-9');
+    expect(card).toHaveTextContent(/accept or decline/i);
+  });
+
   it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {
     setTrips([{ data: [makeTrip({ id: 't1' })] }, { data: [makeTrip({ id: 'p1', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
     renderHome();

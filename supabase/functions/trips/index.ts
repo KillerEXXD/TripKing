@@ -53,6 +53,9 @@ import { readBody, pgFail } from '../_shared/http.ts';
 
 // v3 (2026-05-14): added `posted_by_kyc_status` to every trip row (drives <VerifiedBadge>).
 // v4 (2026-05-15): added `pending_invitation_count` to every trip row (drives the "Invited" chip on /posted-trips).
+// v6 (2026-05-15): on `?invited=me` rows, stamp `invitation_id` + `invitation_status`; narrow
+//   the driver's Invited tab to status ∈ ('pending','applied') so a declined invite drops out
+//   of the queue immediately (the agent still sees it as 'declined' on `/trips/:id/invitations`).
 // v5 (2026-05-15): promoted list cache from `tier:'memory'` to `tier:'shared'` (api_metrics
 //   showed a 0.04% hit rate for trips on the per-isolate memory tier — Deno Deploy churns
 //   isolates fast enough that warmed memory is almost never reused). Shared tier costs one
@@ -639,14 +642,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       assignedDriver = did;
     }
     // Phase 4: ?invited=me — driver's "Invited" tab. Resolves the caller's driver_id then
-    // restricts the trip list to those carrying a pending/applied/declined trip_invitations row.
+    // restricts the trip list to those carrying a pending/applied trip_invitations row. Declined
+    // invites drop out of the queue immediately so the driver's Invited tab stays clean.
     const invitedParam = url.searchParams.get('invited');
     let invitedTripIds: string[] | null = null;
+    let invitationByTripId: Map<string, { id: string; status: string }> | null = null;
     if (invitedParam === 'me') {
       const did = await driverIdFor(u.id);
       if (!did) return ok([]); // no driver profile → nothing invited
-      const { data: invs } = await db.from('trip_invitations').select('trip_id').eq('driver_id', did).in('status', ['pending', 'applied', 'declined']);
-      invitedTripIds = (invs ?? []).map((r) => (r as { trip_id: string }).trip_id);
+      const { data: invs } = await db.from('trip_invitations').select('id, trip_id, status').eq('driver_id', did).in('status', ['pending', 'applied']);
+      const rows = (invs ?? []) as { id: string; trip_id: string; status: string }[];
+      invitationByTripId = new Map(rows.map((r) => [r.trip_id, { id: r.id, status: r.status }]));
+      invitedTripIds = rows.map((r) => r.trip_id);
       if (invitedTripIds.length === 0) return ok([]);
     }
     const near = parseNearRadius(url);
@@ -752,7 +759,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
           if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips', trip_id: r.id as string });
         }
       }
-      return redactTrip(r, rel, posterReveal);
+      const redacted = redactTrip(r, rel, posterReveal);
+      // Phase 4 (2026-05-15): on `?invited=me`, stamp the driver's invitation_id + status onto
+      // the row so the Invited tab can call `POST /trips/:id/invites/:invite_id/decline` without
+      // a second round-trip. Only present when the row came from the invited-tripIds set.
+      if (invitationByTripId) {
+        const inv = invitationByTripId.get(r.id as string);
+        if (inv) {
+          (redacted as Record<string, unknown>).invitation_id = inv.id;
+          (redacted as Record<string, unknown>).invitation_status = inv.status;
+        }
+      }
+      return redacted;
     }));
     if (distById) {
       rows = rows.map((r) => ({ ...r, distance_km: distById.get(r.id as string) ?? null }))

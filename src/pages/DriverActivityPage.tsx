@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
+import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
 import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
@@ -405,15 +405,7 @@ export function DriverActivityPage() {
             onShare={setShareTrip}
           />
         )}
-        {tab === 'invited' && (
-          <TripList
-            query={invitedQuery}
-            errorTitle="Couldn't load your invites"
-            emptyTitle="No invitations yet"
-            emptyMessage="When a trip manager invites you to a trip directly, it shows up here. You'll see their name and phone so you can call before you apply."
-            onShare={setShareTrip}
-          />
-        )}
+        {tab === 'invited' && <InvitedList query={invitedQuery} onShare={setShareTrip} />}
         {tab === 'posted' && (
           <TripList
             query={postedQuery}
@@ -453,6 +445,64 @@ function AppliedList({ query }: { query: ReturnType<typeof useMyApplications> })
     <div className="space-y-3">
       {apps.map((a) => (
         <ApplicationRow key={a.acceptanceId} app={a} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Driver's "Invited" tab — `<PostedTripCard>` per row plus an inline "Unavailable" action that
+ * declines the invite (server flips `trip_invitations.status` → 'declined'). The list filters
+ * out 'declined' invites server-side (`GET /trips?invited=me`), so on success the row drops out
+ * of the queue and the agent's `/trips/:id/invitations` shows the Declined badge.
+ */
+function InvitedList({
+  query,
+  onShare,
+}: {
+  query: ReturnType<typeof useTrips>;
+  onShare: (t: Trip) => void;
+}) {
+  const declineMutation = useDeclineTripInvite();
+  if (query.isPending) return <LoadingSkeleton rows={4} />;
+  if (query.isError) return <ErrorState title="Couldn't load your invites" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
+  const trips = query.data ?? [];
+  if (trips.length === 0) {
+    return (
+      <EmptyState
+        title="No invitations yet"
+        message="When a trip manager invites you to a trip directly, it shows up here. You'll see their name and phone so you can call before you apply."
+      />
+    );
+  }
+  async function onDecline(trip: Trip) {
+    if (!trip.invitationId) return;
+    if (!window.confirm("Tell the agent you can't take this trip? It'll be removed from your Invited list.")) return;
+    try {
+      await declineMutation.mutateAsync({ tripId: trip.id, inviteId: trip.invitationId });
+      toast.success('Marked as unavailable.');
+    } catch {
+      toast.error("Couldn't mark unavailable — please try again.");
+    }
+  }
+  return (
+    <div className="space-y-3">
+      {trips.map((t) => (
+        <div key={t.id} className="space-y-1.5">
+          <PostedTripCard trip={t} onShare={() => onShare(t)} />
+          {t.invitationStatus === 'pending' && t.invitationId ? (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => void onDecline(t)}
+                disabled={declineMutation.isPending}
+                className="text-xs font-semibold text-destructive hover:underline disabled:opacity-40"
+              >
+                {declineMutation.isPending ? 'Marking…' : 'Unavailable'}
+              </button>
+            </div>
+          ) : null}
+        </div>
       ))}
     </div>
   );

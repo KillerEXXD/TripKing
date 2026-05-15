@@ -6,8 +6,8 @@ import type { MyApplication, Trip, TripsQueryParams, User } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
-vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn(), useWithdrawApplication: vi.fn() }));
-import { useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn(), useWithdrawApplication: vi.fn(), useDeclineTripInvite: vi.fn() }));
+import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
 vi.mock('@/stores/myApplicationsStore', async () => {
   const actual = await vi.importActual<typeof import('@/stores/myApplicationsStore')>('@/stores/myApplicationsStore');
   return { ...actual, useMyApplicationsStore: vi.fn() };
@@ -72,6 +72,7 @@ function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsS
   vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn() } as never);
   vi.mocked(useCancelVacancy).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
+  vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
   vi.mocked(useMyApplicationsStore).mockImplementation(((selector?: (s: unknown) => unknown) => {
     const state = { byTrip: {}, recordApplication: vi.fn(), clearApplication: vi.fn() };
     return selector ? selector(state) : state;
@@ -88,6 +89,7 @@ describe('DriverActivityPage', () => {
     vi.mocked(useMyActiveVacancies).mockReset();
     vi.mocked(useCancelVacancy).mockReset();
     vi.mocked(useWithdrawApplication).mockReset();
+    vi.mocked(useDeclineTripInvite).mockReset();
     vi.mocked(useMyApplicationsStore).mockReset();
   });
 
@@ -179,6 +181,30 @@ describe('DriverActivityPage', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
     expect(screen.getByText('Vellore → Bangalore')).toBeInTheDocument();
+  });
+
+  it('Invited tab: shows an "Unavailable" button for pending invites, declining calls the mutation', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    setUp({ invited: tripsState({ data: [makeTrip({ id: 'i-1', toCity: city('c8', 'Bangalore'), invitationId: 'inv-1', invitationStatus: 'pending' })] }) });
+    vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync, isPending: false } as never);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^unavailable$/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    await Promise.resolve();
+    expect(mutateAsync).toHaveBeenCalledWith({ tripId: 'i-1', inviteId: 'inv-1' });
+    confirmSpy.mockRestore();
+  });
+
+  it('Invited tab: no "Unavailable" button when the invitation is already applied (or invitation_id is absent)', () => {
+    setUp({ invited: tripsState({ data: [
+      makeTrip({ id: 'i-a', invitationId: 'inv-a', invitationStatus: 'applied' }),
+      makeTrip({ id: 'i-b' }),
+    ] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
+    expect(screen.queryByRole('button', { name: /^unavailable$/i })).toBeNull();
   });
 
   it('surfaces an error on the Driving tab', () => {

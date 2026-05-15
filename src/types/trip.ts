@@ -108,6 +108,10 @@ export interface Trip {
   applicantCount: number;
   /** Number of `trip_invitations` rows in status='pending' for this trip — drives the "Invited" chip on `/posted-trips`. Always present (server defaults to 0). */
   pendingInvitationCount: number;
+  /** Only present on `GET /trips?invited=me` rows — the `trip_invitations.id` matching the caller. Drives the "Unavailable" decline action on the driver's Invited tab. */
+  invitationId?: string;
+  /** Only present on `GET /trips?invited=me` rows — the caller's invitation status (`pending` | `applied` — declined invites are filtered out of the list). */
+  invitationStatus?: TripInvitationStatus;
   createdAt: string;
   /** The passenger OTP — echoed only to the trip poster / admin (or returned by `POST /trips/:id/assign`). Used to build the passenger-portal link. */
   passengerOtp?: string;
