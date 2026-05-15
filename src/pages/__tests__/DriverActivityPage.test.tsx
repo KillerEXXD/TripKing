@@ -6,8 +6,13 @@ import type { MyApplication, Trip, TripsQueryParams, User } from '@/types';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
-vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn() }));
-import { useMyApplications, useTrips } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn(), useWithdrawApplication: vi.fn() }));
+import { useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
+vi.mock('@/stores/myApplicationsStore', async () => {
+  const actual = await vi.importActual<typeof import('@/stores/myApplicationsStore')>('@/stores/myApplicationsStore');
+  return { ...actual, useMyApplicationsStore: vi.fn() };
+});
+import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVacancies', () => ({ useMyActiveVacancies: vi.fn(), useCancelVacancy: vi.fn() }));
@@ -66,6 +71,11 @@ function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsS
   vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, data: { id: 'd1' }, refetch: vi.fn() } as never);
   vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn() } as never);
   vi.mocked(useCancelVacancy).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
+  vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
+  vi.mocked(useMyApplicationsStore).mockImplementation(((selector?: (s: unknown) => unknown) => {
+    const state = { byTrip: {}, recordApplication: vi.fn(), clearApplication: vi.fn() };
+    return selector ? selector(state) : state;
+  }) as never);
 }
 const renderPage = () => render(<MemoryRouter><DriverActivityPage /></MemoryRouter>);
 
@@ -77,6 +87,8 @@ describe('DriverActivityPage', () => {
     vi.mocked(useMyDriver).mockReset();
     vi.mocked(useMyActiveVacancies).mockReset();
     vi.mocked(useCancelVacancy).mockReset();
+    vi.mocked(useWithdrawApplication).mockReset();
+    vi.mocked(useMyApplicationsStore).mockReset();
   });
 
   it('shows the three tabs and lists the trips assigned to you by default', () => {
@@ -89,12 +101,61 @@ describe('DriverActivityPage', () => {
     expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
   });
 
-  it('the Applied tab lists your applications with their status and a trip link', () => {
+  it('a not-picked (rejected) Applied row expands inline, shows a status banner + limited details, and exposes no agent PII', () => {
     setUp({ applied: appsState({ data: [makeApp({ status: 'rejected', applicantQuotedRatePerKm: 13 })] }) });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
     expect(screen.getByText(/not selected/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /view trip/i })).toHaveAttribute('href', '/trips/tt1');
+    // No navigation link to the full /trips/:id page for a not-picked applicant.
+    expect(screen.queryByRole('link', { name: /view trip/i })).toBeNull();
+    // Expanding stays in place.
+    const toggle = screen.getByRole('button', { name: /view details/i });
+    fireEvent.click(toggle);
+    expect(screen.getByText(/you weren.t selected for this trip/i)).toBeInTheDocument();
+    // Agent identity must not be in the DOM even though the trip stub carries postedByName.
+    expect(screen.queryByText(/agent a/i)).toBeNull();
+    expect(screen.queryByRole('link', { name: /call/i })).toBeNull();
+    // No Withdraw button on a rejected row.
+    expect(screen.queryByRole('button', { name: /withdraw/i })).toBeNull();
+  });
+
+  it('an "applied" (awaiting decision) row shows the right banner + a Withdraw action that clears the store', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    const clearApplication = vi.fn();
+    setUp({ applied: appsState({ data: [makeApp({ status: 'applied', trip: makeTrip({ id: 't-app', status: 'open' }) })] }) });
+    vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync, isPending: false } as never);
+    vi.mocked(useMyApplicationsStore).mockImplementation(((selector?: (s: unknown) => unknown) => {
+      const state = { byTrip: {}, recordApplication: vi.fn(), clearApplication };
+      return selector ? selector(state) : state;
+    }) as never);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }));
+    expect(screen.getByText(/awaiting the agent.s decision/i)).toBeInTheDocument();
+    expect(screen.queryByText(/agent a/i)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /withdraw application/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    await Promise.resolve();
+    expect(mutateAsync).toHaveBeenCalledWith({ tripId: 't-app', acceptanceId: 'a1' });
+    expect(clearApplication).toHaveBeenCalledWith('t-app');
+    confirmSpy.mockRestore();
+  });
+
+  it('an "applied" row where another driver is already locked in shows the "another driver was selected" banner', () => {
+    setUp({ applied: appsState({ data: [makeApp({ status: 'applied', trip: makeTrip({ id: 't-lock', status: 'in_progress' }) })] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
+    fireEvent.click(screen.getByRole('button', { name: /view details/i }));
+    expect(screen.getByText(/another driver was selected for this trip/i)).toBeInTheDocument();
+  });
+
+  it('a selected Applied row keeps the "View trip" link to the full detail page (no inline expand)', () => {
+    setUp({ applied: appsState({ data: [makeApp({ status: 'selected', trip: makeTrip({ id: 't-sel' }) })] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
+    expect(screen.getByRole('link', { name: /view trip/i })).toHaveAttribute('href', '/trips/t-sel');
+    expect(screen.queryByRole('button', { name: /view details/i })).toBeNull();
   });
 
   it('the Posted tab lists the trips you posted yourself', () => {

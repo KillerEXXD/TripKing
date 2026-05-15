@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMyApplications, useTrips } from '@/hooks/useTrips';
+import { useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
+import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
 import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatClockTime, formatINR, formatKm, formatPickupTime, formatShortDate } from '@/lib/utils';
-import type { AcceptanceStatus, MyApplication, Trip, Vacancy } from '@/types';
+import type { AcceptanceStatus, MyApplication, Trip, TripStatus, Vacancy } from '@/types';
 
 type Tab = 'all' | 'driving' | 'invited' | 'applied' | 'selected' | 'completed' | 'cancelled' | 'available' | 'posted';
 const TABS: { id: Tab; label: string }[] = [
@@ -40,37 +41,156 @@ const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'suc
   expired: { label: 'Expired', variant: 'muted' },
 };
 
+/** Statuses where the driver was actually picked — they're entitled to the full trip detail page (agent contact, OTP flow). */
+function isPickedStatus(s: AcceptanceStatus): boolean {
+  return s === 'selected' || s === 'accepted';
+}
+
+function applicantBanner(status: AcceptanceStatus, tripStatus: TripStatus): string | null {
+  if (status === 'applied') {
+    if (tripStatus === 'selected' || tripStatus === 'accepted' || tripStatus === 'in_progress' || tripStatus === 'completed') {
+      return 'Another driver was selected for this trip. If they cancel, the agent can still pick you.';
+    }
+    return "Awaiting the agent's decision. If the chosen driver cancels, the agent can still pick you.";
+  }
+  if (status === 'rejected') return "You weren't selected for this trip.";
+  if (status === 'withdrawn') return 'You withdrew your application.';
+  if (status === 'expired') return 'This application expired before a decision was made.';
+  return null;
+}
+
 function ApplicationRow({ app }: { app: MyApplication }) {
   const t = app.trip;
   const badge = APPLICATION_BADGE[app.status] ?? APPLICATION_BADGE.applied;
+  const picked = isPickedStatus(app.status);
+  const [expanded, setExpanded] = useState(false);
+  const withdrawMutation = useWithdrawApplication();
+  const clearApplication = useMyApplicationsStore((s) => s.clearApplication);
+
+  async function onWithdraw() {
+    if (!window.confirm('Withdraw your application from this trip?')) return;
+    try {
+      await withdrawMutation.mutateAsync({ tripId: t.id, acceptanceId: app.acceptanceId });
+      clearApplication(t.id);
+      toast.success('Application withdrawn.');
+    } catch {
+      toast.error("Couldn't withdraw — please try again.");
+    }
+  }
+
+  const summary = (
+    <div className="block space-y-1.5 p-4 pb-3 text-left">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate font-bold">
+            {t.fromCity.name} → {t.toCity.name}
+          </div>
+          <div className="truncate text-xs text-secondary">
+            {formatKm(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · +{formatINR(t.driverBata)} bata
+          </div>
+        </div>
+        <Badge variant={badge.variant} className="shrink-0">
+          {badge.label}
+        </Badge>
+      </div>
+      <div className="text-xs text-secondary">
+        Pickup: {formatPickupTime(t.pickupAt)}
+        {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
+        {' · trip is '}
+        {STATUS_META[t.status].label.toLowerCase()}
+      </div>
+    </div>
+  );
+
+  if (picked) {
+    return (
+      <Card className="gap-0 p-0">
+        <Link to={`/trips/${t.id}`} className="block">
+          {summary}
+        </Link>
+        <div className="flex items-center justify-end border-t px-4 py-2.5 text-xs font-semibold">
+          <Link to={`/trips/${t.id}`} className="flex items-center text-primary">
+            View trip
+            <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
+          </Link>
+        </div>
+      </Card>
+    );
+  }
+
+  const banner = applicantBanner(app.status, t.status);
+  const carBits: string[] = [];
+  if (t.carTypeLabel) carBits.push(t.carTypeLabel);
+  carBits.push(`${t.seatsRequired} seats`);
+  carBits.push(t.acRequired ? 'AC' : 'Non-AC');
+
   return (
     <Card className="gap-0 p-0">
-      <Link to={`/trips/${t.id}`} className="block space-y-1.5 p-4 pb-3">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-bold">
-              {t.fromCity.name} → {t.toCity.name}
-            </div>
-            <div className="truncate text-xs text-secondary">
-              {formatKm(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · +{formatINR(t.driverBata)} bata
-            </div>
-          </div>
-          <Badge variant={badge.variant} className="shrink-0">
-            {badge.label}
-          </Badge>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded ? 'true' : 'false'}
+        aria-controls={`applied-${app.acceptanceId}-body`}
+        className="block w-full text-left"
+      >
+        {summary}
+      </button>
+      {expanded ? (
+        <div id={`applied-${app.acceptanceId}-body`} className="space-y-3 border-t px-4 py-3">
+          {banner ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{banner}</div>
+          ) : null}
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+            <dt className="text-secondary">Route</dt>
+            <dd className="text-right font-medium">{t.fromCity.name} → {t.toCity.name}</dd>
+            <dt className="text-secondary">Distance</dt>
+            <dd className="text-right font-medium">{formatKm(t.expectedDistanceKm)}</dd>
+            <dt className="text-secondary">Pickup</dt>
+            <dd className="text-right font-medium">{formatPickupTime(t.pickupAt)}</dd>
+            {t.fromPlace?.name ? (
+              <>
+                <dt className="text-secondary">Pickup area</dt>
+                <dd className="text-right font-medium">{t.fromPlace.name}</dd>
+              </>
+            ) : null}
+            <dt className="text-secondary">Fare</dt>
+            <dd className="text-right font-medium">{formatINR(t.totalFare)} ({formatINR(t.ratePerKm)}/km)</dd>
+            <dt className="text-secondary">Driver bata</dt>
+            <dd className="text-right font-medium">+{formatINR(t.driverBata)}</dd>
+            <dt className="text-secondary">Vehicle</dt>
+            <dd className="text-right font-medium">{carBits.join(' · ')}</dd>
+            {app.applicantQuotedRatePerKm ? (
+              <>
+                <dt className="text-secondary">Your quote</dt>
+                <dd className="text-right font-medium">{formatINR(app.applicantQuotedRatePerKm)}/km</dd>
+              </>
+            ) : null}
+          </dl>
         </div>
-        <div className="text-xs text-secondary">
-          Pickup: {formatPickupTime(t.pickupAt)}
-          {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
-          {' · trip is '}
-          {STATUS_META[t.status].label.toLowerCase()}
-        </div>
-      </Link>
-      <div className="flex items-center justify-end border-t px-4 py-2.5 text-xs font-semibold">
-        <Link to={`/trips/${t.id}`} className="flex items-center text-primary">
-          View trip
-          <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
-        </Link>
+      ) : null}
+      <div className="flex items-center justify-between border-t px-4 py-2.5 text-xs font-semibold">
+        {app.status === 'applied' ? (
+          <button
+            type="button"
+            onClick={() => void onWithdraw()}
+            disabled={withdrawMutation.isPending}
+            className="text-destructive hover:underline disabled:opacity-40"
+          >
+            {withdrawMutation.isPending ? 'Withdrawing…' : 'Withdraw application'}
+          </button>
+        ) : (
+          <span aria-hidden />
+        )}
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded ? 'true' : 'false'}
+          aria-controls={`applied-${app.acceptanceId}-body`}
+          className="flex items-center text-primary"
+        >
+          {expanded ? 'Hide details' : 'View details'}
+          <ChevronDown className={cn('ml-0.5 size-3.5 transition-transform', expanded && 'rotate-180')} aria-hidden />
+        </button>
       </div>
     </Card>
   );
