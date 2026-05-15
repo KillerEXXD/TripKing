@@ -17,6 +17,7 @@ const DriverActivityPage = lazyWithRetry(() => import('@/pages/DriverActivityPag
 const AwaitingDecisionPage = lazyWithRetry(() => import('@/pages/AwaitingDecisionPage'));
 const AgentInProgressQueuePage = lazyWithRetry(() => import('@/pages/queue/AgentInProgressQueuePage'));
 const AgentNeedsActionQueuePage = lazyWithRetry(() => import('@/pages/queue/AgentNeedsActionQueuePage'));
+const ReviewSelectionsPage = lazyWithRetry(() => import('@/pages/ReviewSelectionsPage'));
 const TripDetailPage = lazyWithRetry(() => import('@/pages/TripDetailPage'));
 const ApplicantReviewPage = lazyWithRetry(() => import('@/pages/ApplicantReviewPage'));
 const TripInvitationsPage = lazyWithRetry(() => import('@/pages/TripInvitationsPage'));
@@ -92,6 +93,7 @@ export function AppRoutes() {
             <Route path="/my-trips/awaiting" element={<AwaitingDecisionPage />} />
             <Route path="/queue/in-progress" element={<AgentInProgressQueuePage />} />
             <Route path="/queue/needs-action" element={<AgentNeedsActionQueuePage />} />
+            <Route path="/my-trips/review" element={<ReviewSelectionsPage />} />
             <Route path="/drivers/:id" element={<DriverProfilePage />} />
             <Route path="/agents/:id" element={<AgentProfilePage />} />
             <Route path="/profile" element={<ProfilePage />} />

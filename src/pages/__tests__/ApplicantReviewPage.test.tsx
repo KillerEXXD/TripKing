@@ -170,6 +170,48 @@ describe('ApplicantReviewPage', () => {
     expect(assignMut.mutate).toHaveBeenCalledWith({ tripId: 't1', acceptanceId: 'acc-rej' }, expect.anything());
   });
 
+  it('the trip summary card expands to show pickup, bata, GST, instructions', () => {
+    setTrip({ data: makeTrip({ driverInstructions: 'Pick up at gate 2', luggageNotes: '2 bags' }) });
+    setApplicants({ data: [] });
+    renderPage();
+    expect(screen.queryByText(/pick up at gate 2/i)).toBeNull();
+    const toggle = screen.getByRole('button', { expanded: false });
+    fireEvent.click(toggle);
+    expect(screen.getByText(/pick up at gate 2/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 bags/)).toBeInTheDocument();
+    expect(screen.getByText(/driver bata:/i)).toBeInTheDocument();
+  });
+
+  it('shows the driver social-proof line under the name (trips · ★ rating · reviews)', () => {
+    setApplicants({ data: [makeAcceptance()] });
+    renderPage();
+    expect(screen.getByText(/22 trips/)).toBeInTheDocument();
+    expect(screen.getByText(/★ 4\.6/)).toBeInTheDocument();
+    expect(screen.getByText(/\(8 reviews\)/)).toBeInTheDocument();
+  });
+
+  it('shows a "New driver" pill when the driver has no trips or reviews yet', () => {
+    setApplicants({
+      data: [
+        makeAcceptance({
+          driver: {
+            id: 'd2',
+            userId: 'u2',
+            displayHandle: 'XYZ',
+            fullName: 'Zara Khan',
+            profilePhotoUrl: '',
+            ratingAvg: 0,
+            ratingCount: 0,
+            totalTripsCompleted: 0,
+            topTags: [],
+          },
+        }),
+      ],
+    });
+    renderPage();
+    expect(screen.getByText(/new driver/i)).toBeInTheDocument();
+  });
+
   it('the back button returns to the posted-trips list', () => {
     setApplicants({ data: [] });
     renderPage();
