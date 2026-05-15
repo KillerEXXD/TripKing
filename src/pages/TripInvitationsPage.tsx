@@ -168,18 +168,30 @@ export function TripInvitationsPage() {
                 message="Check your connection and try again."
                 onRetry={() => void invitesQuery.refetch()}
               />
-            ) : (invitesQuery.data ?? []).length === 0 ? (
-              <EmptyState
-                title="No invitations sent for this trip yet"
-                message="Open the trip and invite specific KYC-approved drivers in the pickup city."
-                action={
-                  <Button asChild variant="outline" size="sm">
-                    <Link to={`/trips/${id}`}>Open trip</Link>
-                  </Button>
-                }
-              />
-            ) : (
-              (invitesQuery.data ?? []).map((inv) => (
+            ) : (() => {
+              // Hide system-withdrawn rows (migration 041 flips siblings to 'withdrawn'
+              // when the agent assigns a driver) — they're stale and not actionable.
+              const items = (invitesQuery.data ?? []).filter((i) => i.status !== 'withdrawn');
+              const assigned = trip.status !== 'open' && trip.status !== 'has_applicants';
+              if (items.length === 0) {
+                return assigned ? (
+                  <EmptyState
+                    title="No active invitations"
+                    message="All earlier invitations were withdrawn when you assigned a driver."
+                  />
+                ) : (
+                  <EmptyState
+                    title="No invitations sent for this trip yet"
+                    message="Open the trip and invite specific KYC-approved drivers in the pickup city."
+                    action={
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/trips/${id}`}>Open trip</Link>
+                      </Button>
+                    }
+                  />
+                );
+              }
+              return items.map((inv) => (
                 <InvitationCard
                   key={inv.id}
                   invite={inv}
@@ -188,8 +200,8 @@ export function TripInvitationsPage() {
                   withdrawing={withdraw.isPending}
                   onWithdraw={() => onWithdraw(inv.id)}
                 />
-              ))
-            )}
+              ));
+            })()}
           </>
         )}
       </div>
