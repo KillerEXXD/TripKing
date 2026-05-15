@@ -45,6 +45,7 @@ import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
+import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { stripPhones, assertNoPhones, PhoneInTextError, revealCache, logPiiReveal } from '../_shared/pii.ts';
 import { authUser, isAdmin } from '../_shared/auth.ts';
@@ -52,7 +53,12 @@ import { readBody, pgFail } from '../_shared/http.ts';
 
 // v3 (2026-05-14): added `posted_by_kyc_status` to every trip row (drives <VerifiedBadge>).
 // v4 (2026-05-15): added `pending_invitation_count` to every trip row (drives the "Invited" chip on /posted-trips).
-const CACHE_EPOCH = 'v4';
+// v5 (2026-05-15): promoted list cache from `tier:'memory'` to `tier:'shared'` (api_metrics
+//   showed a 0.04% hit rate for trips on the per-isolate memory tier — Deno Deploy churns
+//   isolates fast enough that warmed memory is almost never reused). Shared tier costs one
+//   extra round-trip to `api_cache` on a miss but lets warm caches survive across isolates.
+//   Mutations invalidate by entityKind='trip' / entityId='list'. Bump on response-shape changes.
+const CACHE_EPOCH = 'v5';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the
@@ -65,8 +71,9 @@ function tripsListCacheKey(filters: Record<string, string | number | undefined>)
   }
   return `trips:list:${parts.join(':') || 'all'}:${CACHE_EPOCH}`;
 }
-function invalidateTripsList(): void {
+async function invalidateTripsList(): Promise<void> {
   cacheDeletePattern('trips:list:*');
+  await sharedCacheInvalidateEntity('trip', 'list');
 }
 
 type Db = ReturnType<typeof serviceClient>;
@@ -715,7 +722,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
             limit,
           }),
           ttl: CacheTTL.SHORT,
-          tier: 'memory',
+          tier: 'shared',
+          cacheType: 'live',
+          entityKind: 'trip',
+          entityId: 'list',
         },
         fetcher,
       );
@@ -856,7 +866,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         p_trip_id: created.id,
       }); } catch { /* ignore */ }
     }
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(await fullTrip(created.id as string, u));
   }
 
@@ -1058,7 +1068,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
       await db.from('trips').update({ status: 'has_applicants' }).eq('id', tripId).eq('status', 'open');
       const { data: full } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('id', accId).single();
-      invalidateTripsList();
+      await invalidateTripsList();
       return ok(shapeAcceptance(full as Record<string, unknown>));
     }
     if (acceptanceId && !subsub && req.method === 'DELETE') {
@@ -1070,7 +1080,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       if (acc.driver_id !== did && !isAdmin(u)) return fail('FORBIDDEN', '', 403);
       const { error } = await db.from('trip_acceptances').update({ status: 'withdrawn', decision_at: new Date().toISOString() }).eq('id', acceptanceId);
       if (error) return pgFail(error);
-      invalidateTripsList();
+      await invalidateTripsList();
       return ok({ withdrawn: acceptanceId });
     }
     if (acceptanceId && subsub === 'reject' && req.method === 'POST') {
@@ -1085,7 +1095,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
       const { data, error } = await db.from('trip_acceptances').update({ status: 'rejected', decision_at: new Date().toISOString(), decision_note: (b.decision_note as string | null) ?? null }).eq('id', acceptanceId).eq('trip_id', tripId).select(ACCEPTANCE_SELECT).single();
       if (error) return pgFail(error);
-      invalidateTripsList();
+      await invalidateTripsList();
       return ok(shapeAcceptance(data as Record<string, unknown>));
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
@@ -1149,7 +1159,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       });
     }
     const t = await fullTrip(tripId, u!);
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(t);
   }
 
@@ -1293,7 +1303,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       payload_json: { trip_id: tripId },
     });
     const t = await fullTrip(tripId, u!);
-    invalidateTripsList();
+    await invalidateTripsList();
     // OTP echoed for dev parity; the agent UI uses this to copy/share with the passenger.
     return ok({ ...(t as Record<string, unknown>), passenger_otp: otp });
   }
@@ -1338,7 +1348,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       payload_json: { trip_id: tripId, reason },
     });
     const t = await fullTrip(tripId, u!);
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(t);
   }
 
@@ -1393,7 +1403,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
     }
     const t = await fullTrip(tripId, u!);
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(t);
   }
 
@@ -1565,7 +1575,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     );
     // Migration 039: trip is now consumed → the linked 'on_trip' vacancy expires.
     await syncVacanciesForTrip(db, 'start', tripId);
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -1588,7 +1598,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const { data: d } = await db.from('drivers').select('total_trips_completed').eq('id', trip.assigned_driver_id).maybeSingle();
       if (d) await db.from('drivers').update({ total_trips_completed: (Number(d.total_trips_completed) || 0) + 1 }).eq('id', trip.assigned_driver_id);
     }
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -1605,7 +1615,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).in('status', ['applied', 'selected']);
     // Migration 039: if the trip had been accepted, restore the linked vacancy (or expire it).
     await syncVacanciesForTrip(db, 'revert', tripId);
-    invalidateTripsList();
+    await invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
 
