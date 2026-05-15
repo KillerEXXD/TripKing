@@ -89,7 +89,7 @@ src/
 
 ## Caching — React Query `staleTime` (§6)
 
-`QueryClient` defaults: `{ staleTime: 5*60_000, gcTime: 30*60_000, refetchOnWindowFocus: false, retry: 1 }`. Per-resource overrides:
+`QueryClient` defaults: `{ staleTime: 30_000, gcTime: 30*60_000, refetchOnWindowFocus: false, retry: 1 }` (the LIVE tier — new hooks fail safe to fresh data; reference/lookup hooks must opt UP explicitly via `staleTime: STALE.master`). Per-resource overrides:
 
 | Data | `staleTime` |
 |---|---|

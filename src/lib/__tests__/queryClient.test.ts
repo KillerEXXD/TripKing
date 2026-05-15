@@ -14,9 +14,13 @@ import { ApiError } from '@/lib/api/client';
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 describe('queryClient — defaults', () => {
-  it('uses the spec defaults — staleTime master (15m), gcTime 30m, no refetch-on-focus, retry 1', () => {
+  it('uses the spec defaults — staleTime live (30s) so new hooks fail safe to fresh data, gcTime 30m, no refetch-on-focus, retry 1', () => {
     const q = queryClient.getDefaultOptions().queries;
-    expect(q?.staleTime).toBe(15 * 60_000);
+    // The default is the LIVE tier (30s), not the master tier (15min). Reference/lookup hooks
+    // must opt UP explicitly to `STALE.master` — silently inheriting a 15min stale window for
+    // a live query is the regression this assertion guards against.
+    expect(q?.staleTime).toBe(STALE.live);
+    expect(q?.staleTime).toBe(30_000);
     expect(q?.gcTime).toBe(30 * 60_000);
     expect(q?.refetchOnWindowFocus).toBe(false);
     expect(q?.retry).toBe(1);

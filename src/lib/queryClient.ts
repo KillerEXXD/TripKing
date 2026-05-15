@@ -76,7 +76,12 @@ export const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      staleTime: STALE.master,
+      // Default is the LIVE tier (30s) so any new hook that forgets to specify a staleTime
+      // fails safe to fresh data, not stale. Hooks that read reference / lookup data must
+      // opt UP explicitly via `staleTime: STALE.master`. Audited 2026-05-15 (item 5 of #114):
+      // every existing useQuery sets an explicit staleTime, so this change only affects future
+      // hooks. See docs/CACHE_BASELINE.md §7 for the per-tier guidance.
+      staleTime: STALE.live,
       gcTime: 30 * 60_000,
       refetchOnWindowFocus: false,
       retry: 1,
