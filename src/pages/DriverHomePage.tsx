@@ -240,11 +240,12 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
   const first = apps[0]!;
   const more = apps.length - 1;
   // One trip → land directly on its detail so the driver can Accept / Decline in one tap.
-  // Multiple → focused list at /my-trips/awaiting showing only the selections.
-  const href = apps.length === 1 ? `/trips/${first.trip.id}` : '/my-trips/awaiting';
+  // Multiple → focused list at /my-trips/review with the rich applicant-style cards.
+  const href = apps.length === 1 ? `/trips/${first.trip.id}` : '/my-trips/review';
   return (
     <Link
       to={href}
+      state={{ from: 'home' }}
       className="block rounded-2xl border-2 border-blue-300 bg-blue-50 p-4 transition-colors hover:bg-blue-100"
     >
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">

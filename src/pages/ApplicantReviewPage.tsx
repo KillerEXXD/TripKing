@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Car, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Car, CheckCircle2, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssignDriver, useRejectApplicant, useTrip, useTripApplicants } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +8,7 @@ import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, formatKm, initials } from '@/lib/utils';
+import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
 import type { AcceptanceStatus, Trip, TripAcceptance } from '@/types';
 
 const STATUS_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
@@ -62,14 +62,24 @@ function ApplicantCard({
           <Link to={`/drivers/${acceptance.driverId}`} className="font-bold underline-offset-2 hover:underline">
             {d?.fullName || 'A driver'}
           </Link>
-          <div className="text-xs text-secondary">
-            {d && d.ratingCount > 0 ? (
-              <>
-                <span className="font-semibold text-amber-600">★ {d.ratingAvg.toFixed(1)}</span> · {d.ratingCount} · {d.totalTripsCompleted} trips ·{' '}
-              </>
-            ) : null}
-            applied {appliedAt(acceptance.appliedAt)}
-          </div>
+          {d ? (
+            <div className="text-xs text-secondary">
+              {d.ratingCount > 0 || d.totalTripsCompleted > 0 ? (
+                <>
+                  {d.totalTripsCompleted} trip{d.totalTripsCompleted === 1 ? '' : 's'}
+                  {d.ratingCount > 0 ? (
+                    <>
+                      {' · '}
+                      <span className="font-semibold text-amber-600">★ {d.ratingAvg.toFixed(1)}</span> ({d.ratingCount} review{d.ratingCount === 1 ? '' : 's'})
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-secondary">New driver</span>
+              )}
+            </div>
+          ) : null}
+          <div className="text-xs text-secondary">applied {appliedAt(acceptance.appliedAt)}</div>
         </div>
         <Badge variant={meta.variant} className="shrink-0">
           {acceptance.status === 'accepted' || acceptance.status === 'selected' ? <CheckCircle2 className="size-3" aria-hidden /> : null} {meta.label}
@@ -108,6 +118,65 @@ function ApplicantCard({
           <Button variant="outline" size="sm" onClick={onAssign} disabled={assigning || rejecting}>
             {assigning ? 'Selecting…' : 'Reconsider — select this driver'}
           </Button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function TripSummaryCard({ trip, isPoster }: { trip: Trip; isPoster: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const panelId = `trip-summary-${trip.id}`;
+  return (
+    <Card className="gap-0 p-0">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded ? 'true' : 'false'}
+        aria-controls={panelId}
+        className="flex w-full items-start gap-2 p-4 text-left"
+      >
+        <div className="min-w-0 flex-1">
+          <div className="font-bold">
+            {trip.fromCity.name} → {trip.toCity.name}
+          </div>
+          <div className="text-xs text-secondary">
+            {formatKm(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · {formatINR(trip.driverPayout)} driver payout
+          </div>
+        </div>
+        <ChevronDown
+          className={`mt-0.5 size-4 shrink-0 text-secondary transition-transform ${expanded ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      </button>
+      {expanded ? (
+        <div id={panelId} className="space-y-1.5 border-t px-4 py-3 text-xs text-secondary">
+          <div><span className="font-semibold text-foreground">Pickup:</span> {formatPickupTime(trip.pickupAt)}</div>
+          <div>
+            <span className="font-semibold text-foreground">Vehicle:</span>{' '}
+            {[trip.carTypeLabel, `${trip.seatsRequired} seats`, trip.acRequired ? 'AC' : 'Non-AC'].filter(Boolean).join(' · ')}
+          </div>
+          <div>
+            <span className="font-semibold text-foreground">Driver bata:</span> {formatINR(trip.driverBata)}
+            {' · '}
+            <span className="font-semibold text-foreground">GST:</span> {formatINR(trip.gstAmount)}
+            {' · '}
+            <span className="font-semibold text-foreground">Commission:</span> {trip.commissionPct}%
+          </div>
+          <div>
+            <span className="font-semibold text-foreground">Extras:</span> paid by {trip.extrasPaidByPassenger ? 'passenger' : 'driver'}
+          </div>
+          {isPoster && trip.passengerName ? (
+            <div>
+              <span className="font-semibold text-foreground">Passenger:</span> {trip.passengerName}
+              {trip.passengerPhone ? ` · ${trip.passengerPhone}` : ''} · {trip.passengerCount} pax
+            </div>
+          ) : null}
+          {trip.luggageNotes ? <div><span className="font-semibold text-foreground">Luggage:</span> {trip.luggageNotes}</div> : null}
+          {trip.specialRequests ? <div><span className="font-semibold text-foreground">Special requests:</span> {trip.specialRequests}</div> : null}
+          {trip.driverInstructions ? (
+            <div className="whitespace-pre-wrap"><span className="font-semibold text-foreground">Instructions:</span> {trip.driverInstructions}</div>
+          ) : null}
         </div>
       ) : null}
     </Card>
@@ -237,14 +306,7 @@ export function ApplicantReviewPage() {
           <ErrorState title="Couldn't load this trip" message="Check your connection and try again." onRetry={() => void tripQuery.refetch()} />
         ) : (
           <>
-            <Card className="gap-1">
-              <div className="font-bold">
-                {tripQuery.data.fromCity.name} → {tripQuery.data.toCity.name}
-              </div>
-              <div className="text-xs text-secondary">
-                {formatKm(tripQuery.data.expectedDistanceKm)} · {formatINR(tripQuery.data.ratePerKm)}/km · {formatINR(tripQuery.data.totalFare)} fare · {formatINR(tripQuery.data.driverPayout)} driver payout
-              </div>
-            </Card>
+            <TripSummaryCard trip={tripQuery.data} isPoster={user?.id === tripQuery.data.postedByUserId} />
             <Applicants trip={tripQuery.data} isPoster={user?.id === tripQuery.data.postedByUserId} from={from} />
           </>
         )}
