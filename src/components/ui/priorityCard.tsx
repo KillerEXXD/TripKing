@@ -78,13 +78,17 @@ interface BaseProps {
   label: ReactNode;
   /** Lucide icon rendered to the left of the label. Pass `<Icon className="size-3.5" aria-hidden />`. */
   icon: ReactNode;
+  /** Optional content rendered on the right of the header row — countdown timer, secondary action, etc. */
+  rightAction?: ReactNode;
   /** Big bold line — usually the primary value (route, count, headline). */
   title: ReactNode;
   /** Optional secondary line in the tone's subtitle colour. */
   subtitle?: ReactNode;
-  /** Optional pill CTA rendered at the bottom. */
+  /** Optional pill CTA rendered at the bottom. Ignored if `footerSlot` is provided. */
   cta?: CtaProp;
-  /** Optional rich body (stat grids, etc.) rendered between subtitle and cta. */
+  /** Optional custom footer (button row, destructive button, etc.) rendered in place of the pill CTA. */
+  footerSlot?: ReactNode;
+  /** Optional rich body (stat grids, etc.) rendered between subtitle and footer. */
   children?: ReactNode;
   className?: string;
   /** Accessibility label override — useful when the visible text isn't descriptive enough on its own. */
@@ -107,7 +111,7 @@ type Props =
  *  - neither    → renders a static `<div>` (display-only)
  */
 export function PriorityCard(props: Props) {
-  const { tone, label, icon, title, subtitle, cta, children, className, ariaLabel } = props;
+  const { tone, label, icon, rightAction, title, subtitle, cta, footerSlot, children, className, ariaLabel } = props;
   const t = TONE[tone];
   const isInteractive = 'to' in props && props.to ? true : 'onClick' in props && props.onClick ? true : false;
   const containerClass = cn(
@@ -117,19 +121,36 @@ export function PriorityCard(props: Props) {
     className,
   );
 
-  const body = (
-    <>
+  const header = rightAction ? (
+    <div className="flex items-center justify-between gap-2">
       <div className={cn('flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide', t.label)}>
         {icon} {label}
       </div>
-      <div className={cn('mt-1 text-lg font-bold', t.title)}>{title}</div>
-      {subtitle ? <div className={cn('mt-0.5 text-xs', t.subtitle)}>{subtitle}</div> : null}
-      {children}
-      {cta ? (
+      <div className="shrink-0">{rightAction}</div>
+    </div>
+  ) : (
+    <div className={cn('flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide', t.label)}>
+      {icon} {label}
+    </div>
+  );
+
+  const footer = footerSlot
+    ? <div className="mt-3">{footerSlot}</div>
+    : cta
+      ? (
         <div className={cn('mt-3 inline-flex items-center gap-1 rounded-full px-4 py-1.5 text-sm font-semibold text-white', t.pill)}>
           {cta.label} {cta.icon ?? <ChevronRight className="size-4" aria-hidden />}
         </div>
-      ) : null}
+      )
+      : null;
+
+  const body = (
+    <>
+      {header}
+      <div className={cn('mt-1 text-lg font-bold', t.title)}>{title}</div>
+      {subtitle ? <div className={cn('mt-0.5 text-xs', t.subtitle)}>{subtitle}</div> : null}
+      {children}
+      {footer}
     </>
   );
 

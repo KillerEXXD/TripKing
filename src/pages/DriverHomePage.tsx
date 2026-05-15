@@ -108,27 +108,16 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
     }
   }
   return (
-    <div
-      role="button"
-      tabIndex={0}
+    <PriorityCard
       onClick={() => navigate(`/trips/${trip.id}`)}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/trips/${trip.id}`); } }}
-      aria-label={`Open trip ${trip.fromCity.name} to ${trip.toCity.name}`}
-      className="block cursor-pointer rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-            <Navigation className="size-3.5" aria-hidden /> Driving now
-          </div>
-          <div className="mt-1 text-lg font-bold text-emerald-950">
-            {trip.fromCity.name} → {trip.toCity.name}
-          </div>
-          <div className="mt-0.5 text-xs text-emerald-800">
-            {Math.round(trip.expectedDistanceKm)} km · {formatINR(trip.driverPayout)} payout
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-col gap-1.5">
+      ariaLabel={`Open trip ${trip.fromCity.name} to ${trip.toCity.name}`}
+      tone="emerald"
+      icon={<Navigation className="size-3.5" aria-hidden />}
+      label="Driving now"
+      title={`${trip.fromCity.name} → ${trip.toCity.name}`}
+      subtitle={`${Math.round(trip.expectedDistanceKm)} km · ${formatINR(trip.driverPayout)} payout`}
+      rightAction={
+        <div className="flex flex-col gap-1.5">
           <Button size="sm" variant="outline" className="bg-white" onClick={onEnd} disabled={completeMutation.isPending}>
             {completeMutation.isPending ? 'Ending…' : 'End trip'}
           </Button>
@@ -136,13 +125,14 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
             <Link to={`/trips/${trip.id}`} onClick={(e) => e.stopPropagation()}>Continue</Link>
           </Button>
         </div>
-      </div>
+      }
+    >
       <div className="mt-3 grid grid-cols-3 gap-2 border-t border-emerald-200 pt-2.5 text-xs text-emerald-900">
         <CurrentTripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
         <CurrentTripStat icon={<Navigation className="size-3.5" aria-hidden />} label="To destination" value={trip.distanceToDestinationKm ? `${Math.round(trip.distanceToDestinationKm)} km` : '—'} />
-        <CurrentTripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${trip.passengerCount} ${trip.passengerCount === 1 ? 'pax' : 'pax'}`} />
+        <CurrentTripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${trip.passengerCount} pax`} />
       </div>
-    </div>
+    </PriorityCard>
   );
 }
 

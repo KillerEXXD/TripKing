@@ -80,6 +80,40 @@ describe('PriorityCard', () => {
     expect(container.firstChild).toHaveClass('border-blue-300', 'bg-blue-50');
   });
 
+  it('renders rightAction on the right of the header row', () => {
+    render(
+      withRouter(
+        <PriorityCard
+          to="/"
+          tone="emerald"
+          icon={<Navigation className="size-3.5" aria-hidden />}
+          label="Driving now"
+          title="x"
+          rightAction={<span data-testid="countdown">02:30</span>}
+        />,
+      ),
+    );
+    expect(screen.getByTestId('countdown')).toHaveTextContent('02:30');
+  });
+
+  it('renders footerSlot in place of the pill CTA when provided', () => {
+    render(
+      withRouter(
+        <PriorityCard
+          to="/"
+          tone="emerald"
+          icon={null}
+          label="x"
+          title="x"
+          cta={{ label: 'should-not-render' }}
+          footerSlot={<button type="button" data-testid="custom-footer">Accept / Decline</button>}
+        />,
+      ),
+    );
+    expect(screen.getByTestId('custom-footer')).toBeInTheDocument();
+    expect(screen.queryByText(/should-not-render/i)).toBeNull();
+  });
+
   it('renders children between subtitle and CTA — supports rich bodies (stat grids, etc.)', () => {
     render(
       withRouter(

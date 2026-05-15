@@ -148,10 +148,10 @@ export function IAmAvailableCard({ driverId }: Props) {
   return (
     <div className="mx-4 mt-3" data-testid="i-am-available-card">
       {/*
-        Visually matches the PriorityCard emerald tone (border-2, hover) but uses a bespoke layout
-        because the header carries both a toggle AND a secondary Post button, plus an expandable
-        list below. Migrate to PriorityCard once it supports a header right-slot — see
-        docs/CARD_DESIGN_SYSTEM_RFC.md PR 6.
+        Visually matches the PriorityCard emerald tone (border-2, hover) but uses a bespoke layout.
+        Even after PR 6 added rightAction + footerSlot, this card has a large left-side icon chip
+        (size-10) and a count/chevron line inline with the subtitle, neither of which fits the
+        standard inline-icon + small-label header. Keeping bespoke; visual tokens stay aligned.
       */}
       <div className="overflow-hidden rounded-2xl border-2 border-emerald-300 bg-emerald-50 transition-colors hover:bg-emerald-100/60">
         <div
