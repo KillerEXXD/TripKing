@@ -760,8 +760,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     let rows = await Promise.all(rawRows.map(async (r) => {
       const rel = relationshipFor(r, u, myDriverId);
       let posterReveal = false;
+      const posterUserId = r.posted_by_user_id as string | undefined;
       if (rel === 'browse') {
-        const posterUserId = r.posted_by_user_id as string | undefined;
         if (posterUserId) {
           // Phase 4: ?invited=me trips pre-reveal the agent unconditionally — the
           // invited-trip-ids set we resolved above IS the reveal credential.
@@ -769,6 +769,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
           else posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
           if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips', trip_id: r.id as string });
         }
+      } else if ((rel === 'selected' || rel === 'accepted') && posterUserId) {
+        // The picked / accepted driver gets the agent's name + phone unconditionally (handshake
+        // Phase 2/3). Log the reveal so the access pattern is auditable — same trail as the
+        // applicant reveals above.
+        await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: `GET /trips (${rel})`, trip_id: r.id as string });
       }
       const redacted = redactTrip(r, rel, posterReveal);
       // Phase 4 (2026-05-15): on `?invited=me`, stamp the driver's invitation_id + status onto
@@ -989,8 +994,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     const rel = relationshipFor(raw, u, myDriverId);
     let posterReveal = false;
+    const posterUserId = raw.posted_by_user_id as string | undefined;
     if (rel === 'browse') {
-      const posterUserId = raw.posted_by_user_id as string | undefined;
       if (posterUserId) {
         const rc = revealCache(db);
         posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
@@ -1002,6 +1007,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         }
         if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips/:id', trip_id: raw.id as string });
       }
+    } else if ((rel === 'selected' || rel === 'accepted') && posterUserId) {
+      // The picked / accepted driver opens the trip detail and sees the agent's name + phone.
+      // Audit it — same trail as the applicant reveal above.
+      await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: `GET /trips/:id (${rel})`, trip_id: raw.id as string });
     }
     const redacted = redactTrip(raw, rel, posterReveal);
     // After-assignment counterparty verification: poster/admin gets the driver's checklist;
