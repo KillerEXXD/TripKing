@@ -183,14 +183,14 @@ describe('DriverActivityPage', () => {
     expect(screen.getByText('Vellore → Bangalore')).toBeInTheDocument();
   });
 
-  it('Invited tab: shows an "Unavailable" button for pending invites, declining calls the mutation', async () => {
+  it('Invited tab: shows a "Decline" button for pending invites, declining calls the mutation', async () => {
     const mutateAsync = vi.fn().mockResolvedValue(undefined);
     setUp({ invited: tripsState({ data: [makeTrip({ id: 'i-1', toCity: city('c8', 'Bangalore'), invitationId: 'inv-1', invitationStatus: 'pending' })] }) });
     vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync, isPending: false } as never);
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^unavailable$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
     expect(confirmSpy).toHaveBeenCalled();
     await Promise.resolve();
     expect(mutateAsync).toHaveBeenCalledWith({ tripId: 'i-1', inviteId: 'inv-1' });
@@ -223,7 +223,7 @@ describe('DriverActivityPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^unavailable$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
     await Promise.resolve();
     await Promise.resolve();
     expect(mutateAsync).toHaveBeenCalled();
@@ -237,19 +237,19 @@ describe('DriverActivityPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^unavailable$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
     expect(mutateAsync).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
 
-  it('Invited tab: no "Unavailable" button when the invitation is already applied (or invitation_id is absent)', () => {
+  it('Invited tab: no "Decline" button when the invitation is already applied (or invitation_id is absent)', () => {
     setUp({ invited: tripsState({ data: [
       makeTrip({ id: 'i-a', invitationId: 'inv-a', invitationStatus: 'applied' }),
       makeTrip({ id: 'i-b' }),
     ] }) });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    expect(screen.queryByRole('button', { name: /^unavailable$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^decline$/i })).toBeNull();
   });
 
   it('surfaces an error on the Driving tab', () => {
