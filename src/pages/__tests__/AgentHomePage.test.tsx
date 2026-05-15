@@ -68,19 +68,33 @@ describe('AgentHomePage', () => {
     expect(screen.getByText('onboarding page')).toBeInTheDocument();
   });
 
-  it('renders the agent home — greeting, the two always-on cards, reputation', () => {
+  it('renders the agent home — greeting, always-visible Post-a-trip CTA, reputation; hides empty Driving/Review placeholders', () => {
     setMyAgent({ data: agent });
     setTrips({ data: [] });
     renderHome();
-    // Greeting uses the first name from the loaded agent profile (here: the first word of "Agent A").
     expect(screen.getByText('Agent', { selector: 'span.truncate' })).toBeInTheDocument();
     expect(screen.getByText('Agent', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
-    // The Driving-now and Review cards are always rendered — empty-state copy with no posts.
-    expect(screen.getByText(/no trips in progress/i)).toBeInTheDocument();
-    expect(screen.getByText(/no applicants waiting/i)).toBeInTheDocument();
+    // Empty Driving-now and Review placeholders are no longer rendered.
+    expect(screen.queryByText(/no trips in progress/i)).toBeNull();
+    expect(screen.queryByText(/no applicants waiting/i)).toBeNull();
+    // The agent CTA — equivalent to the driver's "I'm vacant" — is always visible.
+    expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
+    expect(screen.getByText(/your analytics/i)).toBeInTheDocument();
     expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
+  });
+
+  it('hides the Driving-now card when no trips are in progress', () => {
+    setTrips({ data: [makeTrip({ status: 'open' })] });
+    renderHome();
+    expect(screen.queryByText(/driving now/i)).toBeNull();
+  });
+
+  it('hides the Review card when no trips have applicants', () => {
+    setTrips({ data: [makeTrip({ status: 'open' })] });
+    renderHome();
+    expect(screen.queryByText(/waiting for your decision/i)).toBeNull();
   });
 
   it('lists the agent\'s recent posts and surfaces the Review card when a post has applicants', () => {
