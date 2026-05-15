@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, ChevronRight, MapPin, Navigation, Sparkles, Star, TrendingUp } from 'lucide-react';
+import { Bell, CheckCircle2, ChevronRight, Clock, MapPin, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
-import { useMyApplications, useTrips } from '@/hooks/useTrips';
+import { useCompleteTrip, useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
@@ -105,8 +106,13 @@ function NearbyTripCard({ trip }: { trip: Trip }) {
  * Always the highest priority — supersedes every other home card while live.
  */
 /** Top-of-home card — always rendered. When the driver has no in-progress trip,
- *  shows an empty-state explaining what will appear here. */
+ *  shows an empty-state explaining what will appear here. With one in-progress
+ *  trip, surfaces the route + distance + payout + pickup time + passenger count
+ *  inline so the driver doesn't have to drill in to see them, plus an End trip
+ *  shortcut so they can complete the trip without an extra screen. */
 function CurrentTripCard({ trip }: { trip: Trip | undefined }) {
+  const navigate = useNavigate();
+  const completeMutation = useCompleteTrip();
   if (!trip) {
     return (
       <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
@@ -120,24 +126,66 @@ function CurrentTripCard({ trip }: { trip: Trip | undefined }) {
       </div>
     );
   }
+  const tripId = trip.id;
+  async function onEnd(e: React.MouseEvent) {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!window.confirm('End this trip now? Your payout will be queued.')) return;
+    try {
+      await completeMutation.mutateAsync({ tripId });
+      toast.success('Trip completed — your payout is queued.');
+    } catch {
+      toast.error("Couldn't complete the trip — please try again.");
+    }
+  }
   return (
-    <Link
-      to={`/trips/${trip.id}`}
-      className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => navigate(`/trips/${trip.id}`)}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/trips/${trip.id}`); } }}
+      aria-label={`Open trip ${trip.fromCity.name} to ${trip.toCity.name}`}
+      className="block cursor-pointer rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
     >
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-        <Navigation className="size-3.5" aria-hidden /> Driving now
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+            <Navigation className="size-3.5" aria-hidden /> Driving now
+          </div>
+          <div className="mt-1 text-lg font-bold text-emerald-950">
+            {trip.fromCity.name} → {trip.toCity.name}
+          </div>
+          <div className="mt-0.5 text-xs text-emerald-800">
+            {Math.round(trip.expectedDistanceKm)} km · {formatINR(trip.driverPayout)} payout
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-col gap-1.5">
+          <Button size="sm" variant="outline" className="bg-white" onClick={onEnd} disabled={completeMutation.isPending}>
+            {completeMutation.isPending ? 'Ending…' : 'End trip'}
+          </Button>
+          <Button asChild size="sm" className="bg-emerald-700 text-white hover:bg-emerald-800">
+            <Link to={`/trips/${trip.id}`} onClick={(e) => e.stopPropagation()}>Continue</Link>
+          </Button>
+        </div>
       </div>
-      <div className="mt-1 text-lg font-bold text-emerald-950">
-        {trip.fromCity.name} → {trip.toCity.name}
+      <div className="mt-3 grid grid-cols-3 gap-2 border-t border-emerald-200 pt-2.5 text-xs text-emerald-900">
+        <CurrentTripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
+        <CurrentTripStat icon={<Navigation className="size-3.5" aria-hidden />} label="To destination" value={trip.distanceToDestinationKm ? `${Math.round(trip.distanceToDestinationKm)} km` : '—'} />
+        <CurrentTripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${trip.passengerCount} ${trip.passengerCount === 1 ? 'pax' : 'pax'}`} />
       </div>
-      <div className="mt-0.5 text-xs text-emerald-800">
-        {Math.round(trip.expectedDistanceKm)} km · {formatINR(trip.driverPayout)} payout
+    </div>
+  );
+}
+
+function CurrentTripStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className="mt-0.5 text-emerald-700" aria-hidden>{icon}</span>
+      <div className="min-w-0">
+        <div className="text-[10px] uppercase tracking-wide text-emerald-700/80">{label}</div>
+        <div className="truncate font-semibold">{value}</div>
       </div>
-      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-1.5 text-sm font-semibold text-white">
-        Continue trip <ChevronRight className="size-4" aria-hidden />
-      </div>
-    </Link>
+    </div>
   );
 }
 

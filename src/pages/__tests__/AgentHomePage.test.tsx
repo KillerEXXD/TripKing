@@ -87,8 +87,47 @@ describe('AgentHomePage', () => {
     setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', status: 'has_applicants', applicantCount: 1, fromCity: city('c3', 'Bangalore') })] });
     renderHome();
     expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
-    expect(screen.getByText('Bangalore → Chennai')).toBeInTheDocument();
-    expect(screen.getByText(/need a driver/i)).toBeInTheDocument();
+    // Bangalore → Chennai shows in both the rich "Waiting" card and the recent-posts row.
+    expect(screen.getAllByText('Bangalore → Chennai').length).toBeGreaterThan(0);
+    expect(screen.getByText(/1 driver applied/i)).toBeInTheDocument();
+  });
+
+  it('Driving-now card: 1 trip → renders the rich single-trip card linking to detail', () => {
+    setTrips({ data: [makeTrip({ id: 'only-1', status: 'in_progress', passengerCount: 2 })] });
+    renderHome();
+    const link = screen.getByRole('link', { name: /open trip vellore to chennai/i });
+    expect(link).toHaveAttribute('href', '/trips/only-1');
+    // Rich inline details are visible on the home card.
+    expect(screen.getByText(/2 pax/i)).toBeInTheDocument();
+    expect(screen.getByText(/140 km/i)).toBeInTheDocument();
+  });
+
+  it('Driving-now card: 2+ trips → links to /queue/in-progress', () => {
+    setTrips({ data: [
+      makeTrip({ id: 'a', status: 'in_progress' }),
+      makeTrip({ id: 'b', status: 'in_progress' }),
+    ] });
+    renderHome();
+    const link = screen.getByRole('link', { name: /2 trips in progress/i });
+    expect(link).toHaveAttribute('href', '/queue/in-progress');
+  });
+
+  it('Review card: 1 trip needs a driver → rich card linking to the trip\'s applicants page', () => {
+    setTrips({ data: [makeTrip({ id: 'pick-me', status: 'has_applicants', applicantCount: 3 })] });
+    renderHome();
+    const link = screen.getByRole('link', { name: /review applicants for vellore to chennai/i });
+    expect(link).toHaveAttribute('href', '/trips/pick-me/applicants');
+    expect(screen.getByText(/3 drivers applied/i)).toBeInTheDocument();
+  });
+
+  it('Review card: 2+ trips → links to /queue/needs-action', () => {
+    setTrips({ data: [
+      makeTrip({ id: 'a', status: 'has_applicants', applicantCount: 1 }),
+      makeTrip({ id: 'b', status: 'has_applicants', applicantCount: 2 }),
+    ] });
+    renderHome();
+    const link = screen.getByRole('link', { name: /2 trips need a driver/i });
+    expect(link).toHaveAttribute('href', '/queue/needs-action');
   });
 
   it('shows the Get verified banner while the agent is not yet verified', () => {

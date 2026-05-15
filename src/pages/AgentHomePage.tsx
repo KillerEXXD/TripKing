@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, ChevronRight, Navigation, Sparkles, Star } from 'lucide-react';
+import { BarChart3, Bell, ChevronRight, Clock, Navigation, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -30,9 +30,10 @@ function Bellish({ count }: { count: number }) {
   );
 }
 /** Top-of-home card — shows the agent how many of their posted trips are actively
- *  running. Always rendered: when count is 0, an empty-state card explains what
- *  will appear here. Click (when active) → /posted-trips?status=in_progress. */
-function TripsInProgressCard({ count }: { count: number }) {
+ *  running. 0 → empty-state, not actionable. 1 → straight to that trip's detail.
+ *  ≥2 → focused work-queue at `/queue/in-progress`. */
+function TripsInProgressCard({ trips }: { trips: Trip[] }) {
+  const count = trips.length;
   if (count === 0) {
     return (
       <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
@@ -46,16 +47,42 @@ function TripsInProgressCard({ count }: { count: number }) {
       </div>
     );
   }
+  if (count === 1) {
+    const t = trips[0];
+    const driverName = t.assignedDriver?.fullName ?? (t.assignedDriverHandle ? `Driver ${t.assignedDriverHandle}` : 'Driver');
+    return (
+      <Link
+        to={`/trips/${t.id}`}
+        aria-label={`Open trip ${t.fromCity.name} to ${t.toCity.name}`}
+        className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
+      >
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+          <Navigation className="size-3.5" aria-hidden /> Driving now
+        </div>
+        <div className="mt-1 text-lg font-bold text-emerald-950">
+          {t.fromCity.name} → {t.toCity.name}
+        </div>
+        <div className="mt-0.5 text-xs text-emerald-800">
+          {Math.round(t.expectedDistanceKm)} km · {formatINR(t.driverPayout)} payout · {driverName}
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-emerald-200 pt-2.5 text-xs text-emerald-900">
+          <TripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(t.pickupAt)} />
+          <TripStat icon={<Navigation className="size-3.5" aria-hidden />} label="To destination" value={t.distanceToDestinationKm ? `${Math.round(t.distanceToDestinationKm)} km` : '—'} />
+          <TripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
+        </div>
+      </Link>
+    );
+  }
   return (
     <Link
-      to="/posted-trips?status=in_progress"
+      to="/queue/in-progress"
       className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
     >
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
         <Navigation className="size-3.5" aria-hidden /> Driving now
       </div>
       <div className="mt-1 text-lg font-bold text-emerald-950">
-        {count} trip{count === 1 ? '' : 's'} in progress
+        {count} trips in progress
       </div>
       <div className="mt-0.5 text-xs text-emerald-800">
         Tap to see drivers, passengers, and ETA for each.
@@ -67,10 +94,25 @@ function TripsInProgressCard({ count }: { count: number }) {
   );
 }
 
+function TripStat({ icon, label, value, tone = 'emerald' }: { icon: React.ReactNode; label: string; value: string; tone?: 'emerald' | 'amber' }) {
+  const labelTone = tone === 'amber' ? 'text-amber-700/80' : 'text-emerald-700/80';
+  const iconTone = tone === 'amber' ? 'text-amber-700' : 'text-emerald-700';
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className={`mt-0.5 ${iconTone}`} aria-hidden>{icon}</span>
+      <div className="min-w-0">
+        <div className={`text-[10px] uppercase tracking-wide ${labelTone}`}>{label}</div>
+        <div className="truncate font-semibold">{value}</div>
+      </div>
+    </div>
+  );
+}
+
 /** Trips the agent posted that have applicants but no driver selected yet.
- *  Always rendered: when tripCount is 0, an empty-state card explains what
- *  will appear here. Click (when active) → /posted-trips?status=has_applicants. */
-function NeedsActionCard({ tripCount, totalApplicants }: { tripCount: number; totalApplicants: number }) {
+ *  0 → empty-state, not actionable. 1 → straight to that trip's applicants.
+ *  ≥2 → focused work-queue at `/queue/needs-action`. */
+function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalApplicants: number }) {
+  const tripCount = trips.length;
   if (tripCount === 0) {
     return (
       <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
@@ -84,9 +126,37 @@ function NeedsActionCard({ tripCount, totalApplicants }: { tripCount: number; to
       </div>
     );
   }
+  if (tripCount === 1) {
+    const t = trips[0];
+    return (
+      <Link
+        to={`/trips/${t.id}/applicants`}
+        aria-label={`Review applicants for ${t.fromCity.name} to ${t.toCity.name}`}
+        className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
+      >
+        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+          <Sparkles className="size-3.5" aria-hidden /> Waiting for your decision
+        </div>
+        <div className="mt-1 text-lg font-bold text-amber-950">
+          {t.fromCity.name} → {t.toCity.name}
+        </div>
+        <div className="mt-0.5 text-xs text-amber-800">
+          {t.applicantCount} driver{t.applicantCount === 1 ? '' : 's'} applied · pick one
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
+          <TripStat tone="amber" icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(t.pickupAt)} />
+          <TripStat tone="amber" icon={<Wallet className="size-3.5" aria-hidden />} label="Payout" value={formatINR(t.driverPayout)} />
+          <TripStat tone="amber" icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
+        </div>
+        <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
+          Review applicants <ChevronRight className="size-4" aria-hidden />
+        </div>
+      </Link>
+    );
+  }
   return (
     <Link
-      to="/posted-trips?status=has_applicants"
+      to="/queue/needs-action"
       className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
     >
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
@@ -131,7 +201,7 @@ function AgentHome({ agent }: { agent: Agent }) {
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
 
   const myPosts = myPostsQuery.data ?? [];
-  const inProgressCount = myPosts.filter((t) => t.status === 'in_progress').length;
+  const inProgressTrips = myPosts.filter((t) => t.status === 'in_progress');
   const needsActionTrips = myPosts.filter((t) => t.status === 'has_applicants');
   const needsActionApplicants = needsActionTrips.reduce((sum, t) => sum + (t.applicantCount ?? 0), 0);
 
@@ -156,8 +226,8 @@ function AgentHome({ agent }: { agent: Agent }) {
 
         {/* Priority stack — surfaces in-flight work and decisions awaiting the agent.
             Each card no-ops when its count is zero. Mirrors the Driver-home pattern (PR #66). */}
-        <TripsInProgressCard count={inProgressCount} />
-        <NeedsActionCard tripCount={needsActionTrips.length} totalApplicants={needsActionApplicants} />
+        <TripsInProgressCard trips={inProgressTrips} />
+        <NeedsActionCard trips={needsActionTrips} totalApplicants={needsActionApplicants} />
 
         <Link to="/profile" className="block w-full space-y-2 rounded-xl border bg-white px-3 py-2.5 transition-colors hover:border-primary/40">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-secondary">Your reputation</div>
