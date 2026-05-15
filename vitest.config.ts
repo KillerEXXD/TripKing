@@ -37,16 +37,13 @@ export default defineConfig({
         'src/components/ui/**',
         '**/__tests__/**',
       ],
-      thresholds: {
-        // Floors set just below the actual coverage so a 1-file edit doesn't flake the gate.
-        // PR #29 (trip-types) temporarily dropped these to 84/70/68 when the new components
-        // shipped without focused unit tests; this commit lifts them back as TripTypeTabs /
-        // RouteChain / WaypointEditor land with point tests (Items 3 of the followups list).
-        statements: 85,
-        branches: 71,
-        functions: 69,
-        lines: 85,
-      },
+      // Thresholds are enforced by scripts/check-coverage-thresholds.cjs after a
+      // post-process dedupe step. On Windows, v8 records the same source file under
+      // both `c:\…` and `C:\…` cases (about half the entries register 0% hits), so
+      // vitest's own threshold check sees ~half the real coverage and fails the gate
+      // even when the codebase is well above the bar. The gate script reads
+      // coverage-final.json, merges case-insensitive duplicates by max-hits, then
+      // checks the same lines/statements/functions/branches floors.
     },
     mockReset: true,
     restoreMocks: true,
