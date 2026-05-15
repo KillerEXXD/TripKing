@@ -5,4 +5,5 @@ export * from './button';
 export * from './card';
 export * from './input';
 export * from './popover';
+export * from './priorityCard';
 export * from './calendar';

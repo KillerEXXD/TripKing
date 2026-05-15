@@ -1,10 +1,10 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, ChevronRight, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { BarChart3, Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { Badge, Button, Card } from '@/components/ui';
+import { Badge, Button, Card, PriorityCard } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
@@ -40,46 +40,33 @@ function TripsInProgressCard({ trips }: { trips: Trip[] }) {
     const t = trips[0];
     const driverName = t.assignedDriver?.fullName ?? (t.assignedDriverHandle ? `Driver ${t.assignedDriverHandle}` : 'Driver');
     return (
-      <Link
+      <PriorityCard
         to={`/trips/${t.id}`}
-        aria-label={`Open trip ${t.fromCity.name} to ${t.toCity.name}`}
-        className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
+        ariaLabel={`Open trip ${t.fromCity.name} to ${t.toCity.name}`}
+        tone="emerald"
+        icon={<Navigation className="size-3.5" aria-hidden />}
+        label="Driving now"
+        title={`${t.fromCity.name} → ${t.toCity.name}`}
+        subtitle={`${Math.round(t.expectedDistanceKm)} km · ${formatINR(t.driverPayout)} payout · ${driverName}`}
       >
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-          <Navigation className="size-3.5" aria-hidden /> Driving now
-        </div>
-        <div className="mt-1 text-lg font-bold text-emerald-950">
-          {t.fromCity.name} → {t.toCity.name}
-        </div>
-        <div className="mt-0.5 text-xs text-emerald-800">
-          {Math.round(t.expectedDistanceKm)} km · {formatINR(t.driverPayout)} payout · {driverName}
-        </div>
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-emerald-200 pt-2.5 text-xs text-emerald-900">
           <TripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(t.pickupAt)} />
           <TripStat icon={<Navigation className="size-3.5" aria-hidden />} label="To destination" value={t.distanceToDestinationKm ? `${Math.round(t.distanceToDestinationKm)} km` : '—'} />
           <TripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
         </div>
-      </Link>
+      </PriorityCard>
     );
   }
   return (
-    <Link
+    <PriorityCard
       to="/queue/in-progress"
-      className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100"
-    >
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-        <Navigation className="size-3.5" aria-hidden /> Driving now
-      </div>
-      <div className="mt-1 text-lg font-bold text-emerald-950">
-        {count} trips in progress
-      </div>
-      <div className="mt-0.5 text-xs text-emerald-800">
-        Tap to see drivers, passengers, and ETA for each.
-      </div>
-      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-1.5 text-sm font-semibold text-white">
-        View all <ChevronRight className="size-4" aria-hidden />
-      </div>
-    </Link>
+      tone="emerald"
+      icon={<Navigation className="size-3.5" aria-hidden />}
+      label="Driving now"
+      title={`${count} trips in progress`}
+      subtitle="Tap to see drivers, passengers, and ETA for each."
+      cta={{ label: 'View all' }}
+    />
   );
 }
 
@@ -106,49 +93,34 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
   if (tripCount === 1) {
     const t = trips[0];
     return (
-      <Link
+      <PriorityCard
         to={`/trips/${t.id}/applicants`}
-        aria-label={`Review applicants for ${t.fromCity.name} to ${t.toCity.name}`}
-        className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
+        ariaLabel={`Review applicants for ${t.fromCity.name} to ${t.toCity.name}`}
+        tone="amber"
+        icon={<Sparkles className="size-3.5" aria-hidden />}
+        label="Waiting for your decision"
+        title={`${t.fromCity.name} → ${t.toCity.name}`}
+        subtitle={`${t.applicantCount} driver${t.applicantCount === 1 ? '' : 's'} applied · pick one`}
+        cta={{ label: 'Review applicants' }}
       >
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
-          <Sparkles className="size-3.5" aria-hidden /> Waiting for your decision
-        </div>
-        <div className="mt-1 text-lg font-bold text-amber-950">
-          {t.fromCity.name} → {t.toCity.name}
-        </div>
-        <div className="mt-0.5 text-xs text-amber-800">
-          {t.applicantCount} driver{t.applicantCount === 1 ? '' : 's'} applied · pick one
-        </div>
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
           <TripStat tone="amber" icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(t.pickupAt)} />
           <TripStat tone="amber" icon={<Wallet className="size-3.5" aria-hidden />} label="Payout" value={formatINR(t.driverPayout)} />
           <TripStat tone="amber" icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
         </div>
-        <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
-          Review applicants <ChevronRight className="size-4" aria-hidden />
-        </div>
-      </Link>
+      </PriorityCard>
     );
   }
   return (
-    <Link
+    <PriorityCard
       to="/queue/needs-action"
-      className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
-    >
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
-        <Sparkles className="size-3.5" aria-hidden /> Waiting for your decision
-      </div>
-      <div className="mt-1 text-lg font-bold text-amber-950">
-        {tripCount} trip{tripCount === 1 ? '' : 's'} need a driver
-      </div>
-      <div className="mt-0.5 text-xs text-amber-800">
-        {totalApplicants} driver{totalApplicants === 1 ? '' : 's'} applied across {tripCount === 1 ? 'this trip' : 'these trips'}. Pick one.
-      </div>
-      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
-        Review <ChevronRight className="size-4" aria-hidden />
-      </div>
-    </Link>
+      tone="amber"
+      icon={<Sparkles className="size-3.5" aria-hidden />}
+      label="Waiting for your decision"
+      title={`${tripCount} trips need a driver`}
+      subtitle={`${totalApplicants} driver${totalApplicants === 1 ? '' : 's'} applied across these trips. Pick one.`}
+      cta={{ label: 'Review' }}
+    />
   );
 }
 
@@ -209,50 +181,35 @@ function AgentHome({ agent }: { agent: Agent }) {
         {needsActionTrips.length > 0 ? <NeedsActionCard trips={needsActionTrips} totalApplicants={needsActionApplicants} /> : null}
         <InvitesSentCard trips={myPosts} />
 
-        <Link to="/trips/new" className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-            <Plus className="size-3.5" aria-hidden /> Post a trip
-          </div>
-          <div className="mt-1 text-lg font-bold text-emerald-950">
-            Get a trip on the marketplace
-          </div>
-          <div className="mt-0.5 text-xs text-emerald-800">
-            Drivers see it in seconds. Pick the one you like best.
-          </div>
-          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-1.5 text-sm font-semibold text-white">
-            Post a trip <ChevronRight className="size-4" aria-hidden />
-          </div>
-        </Link>
+        <PriorityCard
+          to="/trips/new"
+          tone="emerald"
+          icon={<Plus className="size-3.5" aria-hidden />}
+          label="Post a trip"
+          title="Get a trip on the marketplace"
+          subtitle="Drivers see it in seconds. Pick the one you like best."
+          cta={{ label: 'Post a trip' }}
+        />
 
-        <Link to="/profile" className="block w-full space-y-2 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
-            <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden /> Your reputation
-          </div>
-          <div className="mt-1 text-lg font-bold text-amber-950">
-            {agent.totalTripsPosted} trips posted
-          </div>
-          <div className="mt-0.5 text-xs text-amber-800">
-            {agent.topTags[0] ?? 'Run trips smoothly to earn driver tags'}
-          </div>
-          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
-            View / edit profile <ChevronRight className="size-4" aria-hidden />
-          </div>
-        </Link>
+        <PriorityCard
+          to="/profile"
+          tone="amber"
+          icon={<Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />}
+          label="Your reputation"
+          title={`${agent.totalTripsPosted} trips posted`}
+          subtitle={agent.topTags[0] ?? 'Run trips smoothly to earn driver tags'}
+          cta={{ label: 'View / edit profile' }}
+        />
 
-        <Link to="/analytics" className="block rounded-2xl border-2 border-blue-300 bg-blue-50 p-4 transition-colors hover:bg-blue-100">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">
-            <BarChart3 className="size-3.5" aria-hidden /> Your analytics
-          </div>
-          <div className="mt-1 text-lg font-bold text-blue-950">
-            Trips posted, applicants, fares
-          </div>
-          <div className="mt-0.5 text-xs text-blue-800">
-            See how your trips are performing month over month.
-          </div>
-          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-700 px-4 py-1.5 text-sm font-semibold text-white">
-            View analytics <ChevronRight className="size-4" aria-hidden />
-          </div>
-        </Link>
+        <PriorityCard
+          to="/analytics"
+          tone="blue"
+          icon={<BarChart3 className="size-3.5" aria-hidden />}
+          label="Your analytics"
+          title="Trips posted, applicants, fares"
+          subtitle="See how your trips are performing month over month."
+          cta={{ label: 'View analytics' }}
+        />
       </div>
 
       <div className="px-4 pb-4">
