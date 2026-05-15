@@ -164,6 +164,30 @@ describe('DriverHomePage', () => {
     expect(screen.queryByRole('link', { name: /invitation to drive vellore to bangalore/i })).toBeNull();
   });
 
+  it('priority stack: hides "Driving now" when no in-progress trip; hides Review when no selected apps; I\'m vacant always renders', () => {
+    setMyDriver({ data: makeDriver() });
+    setTrips({ data: [] });
+    renderHome();
+    expect(screen.queryByText(/driving now/i)).toBeNull();
+    expect(screen.queryByText(/waiting for your decision/i)).toBeNull();
+    expect(screen.queryByText(/no trip in progress/i)).toBeNull();
+    expect(screen.queryByText(/no trips waiting for your decision/i)).toBeNull();
+    expect(screen.getByTestId('i-am-available-card')).toBeInTheDocument();
+  });
+
+  it('priority stack: renders Review when an application is in "selected" state, plus I\'m vacant below', async () => {
+    const useTripsMod = await import('@/hooks/useTrips');
+    const selectedApp = { acceptanceId: 'a-sel', status: 'selected' as const, appliedAt: '2099-05-31T00:00:00Z', trip: makeTrip({ id: 't-sel' }) };
+    vi.mocked(useTripsMod.useMyApplications).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [selectedApp], refetch: vi.fn() } as never);
+    setTrips({ data: [] });
+    renderHome();
+    expect(screen.getByText(/waiting for your decision/i)).toBeInTheDocument();
+    expect(screen.getByTestId('i-am-available-card')).toBeInTheDocument();
+    expect(screen.queryByText(/driving now/i)).toBeNull();
+    // Restore the file-level default so the next test isn't polluted with a selected app.
+    vi.mocked(useTripsMod.useMyApplications).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn() } as never);
+  });
+
   it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {
     setTrips([{ data: [makeTrip({ id: 't1' })] }, { data: [makeTrip({ id: 'p1', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
     renderHome();

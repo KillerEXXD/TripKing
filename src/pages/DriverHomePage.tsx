@@ -37,25 +37,27 @@ function Bellish({ count }: { count: number }) {
 
 function ReputationCard({ driver }: { driver: Driver }) {
   return (
-    <Link to={`/drivers/${driver.id}`} className="block w-full space-y-2 rounded-xl border bg-white px-3 py-2.5 text-left transition-colors hover:border-primary/40">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-secondary">Your reputation</div>
+    <Link to={`/drivers/${driver.id}`} className="block w-full space-y-2 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 text-left transition-colors hover:bg-amber-100">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+        <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden /> Your reputation
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2">
+        <div className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-2">
           <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">From passengers</div>
-          <div className="flex items-center gap-1 text-sm font-bold">
+          <div className="flex items-center gap-1 text-sm font-bold text-amber-950">
             <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />
             {driver.ratingCount > 0 ? `${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount}` : '— · no ratings'}
           </div>
-          <div className="mt-0.5 truncate text-[10px] text-secondary">{driver.topTags[0] ?? 'Complete trips to earn tags'}</div>
+          <div className="mt-0.5 truncate text-[10px] text-amber-800/80">{driver.topTags[0] ?? 'Complete trips to earn tags'}</div>
         </div>
-        <div className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2">
-          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-800">From agents</div>
-          <div className="text-sm font-bold">{driver.totalTripsCompleted} trips</div>
-          <div className="mt-0.5 truncate text-[10px] text-secondary">{driver.managerTopTags[0] ?? 'Run agent trips to earn tags'}</div>
+        <div className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-2">
+          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">From agents</div>
+          <div className="text-sm font-bold text-amber-950">{driver.totalTripsCompleted} trips</div>
+          <div className="mt-0.5 truncate text-[10px] text-amber-800/80">{driver.managerTopTags[0] ?? 'Run agent trips to earn tags'}</div>
         </div>
       </div>
-      <div className="flex items-center gap-1 text-[10px] text-secondary">
-        <ChevronRight className="size-3" aria-hidden /> View full profile
+      <div className="inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
+        View full profile <ChevronRight className="size-4" aria-hidden />
       </div>
     </Link>
   );
@@ -105,29 +107,13 @@ function NearbyTripCard({ trip }: { trip: Trip }) {
 
 /**
  * Top-of-home card for a trip the driver is actively running (`status='in_progress'`).
- * Always the highest priority — supersedes every other home card while live.
+ * Surfaces route + distance + payout + pickup + passenger count inline, plus an End
+ * trip shortcut so the driver can complete without drilling in. Caller gates on
+ * `inProgressTrip` truthiness — card is hidden when there's no live trip.
  */
-/** Top-of-home card — always rendered. When the driver has no in-progress trip,
- *  shows an empty-state explaining what will appear here. With one in-progress
- *  trip, surfaces the route + distance + payout + pickup time + passenger count
- *  inline so the driver doesn't have to drill in to see them, plus an End trip
- *  shortcut so they can complete the trip without an extra screen. */
-function CurrentTripCard({ trip }: { trip: Trip | undefined }) {
+function CurrentTripCard({ trip }: { trip: Trip }) {
   const navigate = useNavigate();
   const completeMutation = useCompleteTrip();
-  if (!trip) {
-    return (
-      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <Navigation className="size-3.5" aria-hidden /> Driving now
-        </div>
-        <div className="mt-1 text-sm font-medium text-slate-700">No trip in progress</div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          When you start a trip, it'll show up here so you can continue, track the route, and complete it.
-        </div>
-      </div>
-    );
-  }
   const tripId = trip.id;
   async function onEnd(e: React.MouseEvent) {
     e.stopPropagation();
@@ -224,19 +210,6 @@ function AssignedTripCard({ trip }: { trip: Trip }) {
  * becomes a concern.)
  */
 function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
-  if (apps.length === 0) {
-    return (
-      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <Sparkles className="size-3.5" aria-hidden /> Review
-        </div>
-        <div className="mt-1 text-sm font-medium text-slate-700">No trips waiting for your decision</div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          When an agent picks you for a trip you applied to, it'll show up here so you can Accept or Decline.
-        </div>
-      </div>
-    );
-  }
   const first = apps[0]!;
   const more = apps.length - 1;
   // One trip → land directly on its detail so the driver can Accept / Decline in one tap.
@@ -317,39 +290,31 @@ function DriverHome({ driver }: { driver: Driver }) {
       <div className="space-y-3 px-4 pb-4 pt-3">
         {driver.verification && <GetVerifiedBanner verification={driver.verification} />}
 
-        {/* Priority stack — Driving now / Review / I'm vacant, with placement that follows
-            which cards have live content. Empty state of every card is rendered always so
-            the driver always sees the same shape. */}
-        {(() => {
-          const hasInProgress = !!inProgressTrip;
-          const hasReview = awaitingDecision.length > 0;
-          const driving = <CurrentTripCard key="driving" trip={inProgressTrip} />;
-          const review = <AwaitingMyDecisionCard key="review" apps={awaitingDecision} />;
-          const vacant = <IAmAvailableCard key="vacant" driverId={driver.id} />;
-          // Rules:
-          //   both empty           → vacant first (promotes the call to post availability)
-          //   driving only         → vacant between (review still empty below)
-          //   review active (any)  → vacant last
-          let order: React.ReactNode[];
-          if (!hasInProgress && !hasReview) order = [vacant, driving, review];
-          else if (hasInProgress && !hasReview) order = [driving, vacant, review];
-          else order = [driving, review, vacant];
-          return <>{order}</>;
-        })()}
+        {/* Priority stack — natural top-down priority: live trip → action needed → CTA.
+            Driving now and Review are hidden when empty; I'm vacant always renders
+            (it's the platform's primary call-to-action — drivers must post availability
+            for the marketplace to work, and its own internal state handles the empty case). */}
+        {inProgressTrip ? <CurrentTripCard trip={inProgressTrip} /> : null}
+        {awaitingDecision.length > 0 ? <AwaitingMyDecisionCard apps={awaitingDecision} /> : null}
+        <IAmAvailableCard driverId={driver.id} />
         {pendingReceivedInvites.length > 0 ? <InvitesReceivedCard trips={pendingReceivedInvites} /> : null}
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
 
         <ReputationCard driver={driver} />
 
-        <Link to="/my-earnings" className="flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-50 to-emerald-100/40 px-4 py-3 transition-colors hover:border-primary/40">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-            <TrendingUp className="size-5" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">Your earnings</span>
-            <span className="block text-xs text-secondary">Trips, payouts and monthly trend</span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
+        <Link to="/my-earnings" className="block rounded-2xl border-2 border-teal-300 bg-teal-50 p-4 transition-colors hover:bg-teal-100">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-teal-700">
+            <TrendingUp className="size-3.5" aria-hidden /> Your earnings
+          </div>
+          <div className="mt-1 text-lg font-bold text-teal-950">
+            Trips, payouts & monthly trend
+          </div>
+          <div className="mt-0.5 text-xs text-teal-800">
+            See what you've earned and where you're trending.
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-teal-700 px-4 py-1.5 text-sm font-semibold text-white">
+            View earnings <ChevronRight className="size-4" aria-hidden />
+          </div>
         </Link>
       </div>
 
