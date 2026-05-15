@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, ChevronRight, Clock, MapPin, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, MapPin, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
@@ -58,23 +58,6 @@ function ReputationCard({ driver }: { driver: Driver }) {
         </div>
       </div>
     </PriorityCard>
-  );
-}
-
-function ActionCard({ tone, icon, title, hint, to }: { tone: 'amber' | 'violet'; icon: React.ReactNode; title: string; hint: string; to: string }) {
-  const palette = { amber: { card: 'border-amber-200 bg-amber-50/50', chip: 'bg-amber-100 text-amber-700' }, violet: { card: 'border-violet-200 bg-violet-50/50', chip: 'bg-violet-100 text-violet-700' } };
-  const p = palette[tone];
-  return (
-    <Link to={to} className={`block rounded-2xl border p-4 transition-colors hover:brightness-[0.98] ${p.card}`}>
-      <div className="flex items-center gap-3">
-        <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${p.chip}`}>{icon}</span>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">{title}</div>
-          <div className="truncate text-xs text-secondary">{hint}</div>
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
-      </div>
-    </Link>
   );
 }
 
@@ -300,7 +283,15 @@ function DriverHome({ driver }: { driver: Driver }) {
 
       <div className="space-y-3 px-4">
         {postedWithApplicants > 0 ? (
-          <ActionCard tone="amber" icon={<Sparkles className="size-5" aria-hidden />} title={`${postedWithApplicants} trip you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`} hint="Review applicants and pick a driver." to="/posted-trips" />
+          <PriorityCard
+            to="/posted-trips"
+            tone="amber"
+            icon={<Sparkles className="size-3.5" aria-hidden />}
+            label={`${postedWithApplicants > 1 ? 'Trips' : 'Trip'} you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`}
+            title={`${postedWithApplicants} ${postedWithApplicants > 1 ? 'trips' : 'trip'} need a driver`}
+            subtitle="Review applicants and pick a driver."
+            cta={{ label: 'Review applicants' }}
+          />
         ) : null}
         <InvitesSentCard trips={myPosts} />
       </div>
