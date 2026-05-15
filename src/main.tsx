@@ -5,6 +5,7 @@ import { initSentry } from '@/lib/sentry';
 import { installGlobalErrorHandlers } from '@/lib/globalErrorHandlers';
 import { installSwErrorBridge } from '@/lib/swErrorBridge';
 import { initPostHog } from '@/lib/posthog';
+import { wireWebVitals } from '@/lib/webVitals';
 import { installConsoleHook } from '@/lib/logBuffer';
 import { logger } from '@/lib/logger';
 import App from '@/App';
@@ -17,6 +18,7 @@ initSentry();
 installGlobalErrorHandlers();
 installSwErrorBridge();
 initPostHog();
+wireWebVitals();
 installConsoleHook();
 
 // Auto-updating service worker — new bundle activates immediately (no stale-bundle white screen).

@@ -31,9 +31,11 @@ Execute the complete `/smokeall` workflow (see `.claude/commands/smokeall.md`): 
 
 Execute the complete `/sentry` workflow (see `.claude/commands/sentry.md`): unresolved issues for `hudr/trip-king` (token from `.env.development`), categorised, high-impact issues investigated, synthetic/transient ones auto-resolved. Present the FULL report with all tables (bucket table, issues table, high-impact details, resolved-this-run, assessment).
 
-## Step 5 — PostHog — full report
+## Step 5 — PostHog — full report (includes Speed Insights)
 
-Execute the complete `/posthog` workflow (see `.claude/commands/posthog.md`): the HogQL queries (volume, daily activity, top pages, top visitors, geo/device/browser, custom events, client-side errors, rage clicks) for project `420735` (key from `.env.development`). Present the FULL report with all tables + the daily-activity bar chart.
+Execute the complete `/posthog` workflow (see `.claude/commands/posthog.md`): the HogQL queries (volume, daily activity, top pages, top visitors, geo/device/browser, custom events, client-side errors, rage clicks, **`$web_vitals`** speed insights) for project `420735` (key from `.env.development`). Present the FULL report with all tables + the daily-activity bar chart + the Speed Insights table (LCP / INP / CLS / FCP / TTFB at p75, with **rating** per Core Web Vitals thresholds, mobile-vs-desktop split, worst pages by LCP) + the action items each metric implies.
+
+If web-vitals is freshly wired (< 24h of data) or returns no rows, say "Speed Insights freshly wired — re-run in 24h" and skip the table. Otherwise treat any p75 in the **poor** band as a CRITICAL action item, **needs-improvement** as WARNING, and call out the specific page from the worst-pages query.
 
 ## Step 6 — Frontend deploy status (Vercel)
 
@@ -71,6 +73,7 @@ Present:
 | Edge-function smokes | X/12 green | [failing suites] | OK if 12/12 |
 | Sentry (trip-king) | X real issues | Y events, Z users | OK if 0 real |
 | PostHog (trip-king) | X visitors | Y events | INFO |
+| Speed Insights (Core Web Vitals, 24h) | OK/WARN/CRITICAL | LCP p75 X · INP p75 X · CLS X | poor on any metric = CRITICAL |
 | Frontend (Vercel) | READY/ERROR | built <hash> | OK/CRITICAL |
 | GitHub | X PRs, Y issues | Z failed workflows (24h) | … |
 
