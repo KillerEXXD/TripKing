@@ -21,6 +21,17 @@ import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { stripPhones, assertNoPhones, PhoneInTextError } from '../_shared/pii.ts';
 import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail as pgFailShared } from '../_shared/http.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { CacheTTL } from '../_shared/cache.ts';
+import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+
+// LIVE tier — short TTL, shared cache. Visibility-OR (published | own | admin) is per-caller, so
+// the cache key encodes the viewer identity (`admin` / `u:<uid>` / `anon`). Invalidation is coarse:
+// any review mutation (create, report, moderate) drops every key under entityKind='review',
+// entityId='all'. Reviews are read-heavy and writes are rare (one per trip per direction), so the
+// hit-rate ceiling stays high despite the broad invalidation. Bump epoch on response-shape changes.
+const CACHE_EPOCH = 'v1';
 
 const pgFail = (e: { code?: string; message: string }) =>
   pgFailShared(e, { dupMessage: 'A review for this trip and direction already exists' });
@@ -65,23 +76,33 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
   }
   // visibility for SELECTs: admins see all; an authed user sees published rows + their own (rater/ratee); anon sees published only.
   const visibilityOr = isAdmin(u) ? null : u ? `is_published.eq.true,rater_user_id.eq.${u.id},ratee_user_id.eq.${u.id}` : 'is_published.eq.true';
+  const viewerKey = isAdmin(u) ? 'admin' : u ? `u:${u.id}` : 'anon';
 
-  // ── GET /reviews (list) ──────────────────────────────────────────────────
+  // ── GET /reviews (list) — LIVE tier, shared cache (viewer-keyed; coarse invalidation) ────
   if (!id && req.method === 'GET') {
-    let q = db.from('reviews').select(REVIEW_SELECT);
-    const tripId = url.searchParams.get('trip_id');
-    if (tripId) q = q.eq('trip_id', tripId);
-    const ratee = url.searchParams.get('ratee_user_id');
-    if (ratee) q = q.eq('ratee_user_id', ratee);
-    const direction = url.searchParams.get('direction');
-    if (direction) q = q.eq('direction', direction);
-    if (url.searchParams.get('flagged') === 'true' && isAdmin(u)) q = q.eq('is_flagged', true); // the admin moderation queue
-    if (visibilityOr) q = q.or(visibilityOr);
-    const limit = Number(url.searchParams.get('limit') ?? '50');
-    q = q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
-    const { data, error } = await q;
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok((data ?? []).map((r) => shapeReview(r as Record<string, unknown>)));
+    const tripId = url.searchParams.get('trip_id') ?? '';
+    const ratee = url.searchParams.get('ratee_user_id') ?? '';
+    const direction = url.searchParams.get('direction') ?? '';
+    const flagged = url.searchParams.get('flagged') === 'true' && isAdmin(u);
+    const rawLimit = Number(url.searchParams.get('limit') ?? '50');
+    const effectiveLimit = Math.min(Number.isFinite(rawLimit) ? rawLimit : 50, 200);
+    const cacheKey = `reviews:list:trip-${tripId}:ratee-${ratee}:dir-${direction}:flagged-${flagged}:limit-${effectiveLimit}:viewer-${viewerKey}:${CACHE_EPOCH}`;
+    const { data, hit } = await withCache<Record<string, unknown>[]>(
+      { key: cacheKey, ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'review', entityId: 'all' },
+      async () => {
+        let q = db.from('reviews').select(REVIEW_SELECT);
+        if (tripId) q = q.eq('trip_id', tripId);
+        if (ratee) q = q.eq('ratee_user_id', ratee);
+        if (direction) q = q.eq('direction', direction);
+        if (flagged) q = q.eq('is_flagged', true);
+        if (visibilityOr) q = q.or(visibilityOr);
+        q = q.order('created_at', { ascending: false }).limit(effectiveLimit);
+        const { data, error } = await q;
+        if (error) throw new Error(error.message);
+        return (data ?? []).map((r) => shapeReview(r as Record<string, unknown>)) as Record<string, unknown>[];
+      },
+    );
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.SHORT, scope: 'private' });
   }
 
   // ── POST /reviews (the rater) ────────────────────────────────────────────
@@ -134,6 +155,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     };
     const { data: created, error } = await db.from('reviews').insert(insert).select('id').single();
     if (error) return pgFail(error);
+    await sharedCacheInvalidateEntity('review', 'all');
     if (rateeUserId) {
       // fire-and-forget — don't fail the review if the notification insert does
       await db.from('notifications').insert({
@@ -157,6 +179,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     const b = await readBody(req);
     const { error } = await db.from('reviews').update({ is_flagged: true, flag_reason: strOrNull(b.flag_reason) }).eq('id', id);
     if (error) return pgFail(error);
+    await sharedCacheInvalidateEntity('review', 'all');
     return fullReview(id);
   }
 
@@ -175,6 +198,7 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
     }
     const { error } = await db.from('reviews').update(update).eq('id', id);
     if (error) return pgFail(error);
+    await sharedCacheInvalidateEntity('review', 'all');
     return fullReview(id);
   }
 
