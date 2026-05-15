@@ -61,7 +61,7 @@ import { readBody, pgFail } from '../_shared/http.ts';
 //   isolates fast enough that warmed memory is almost never reused). Shared tier costs one
 //   extra round-trip to `api_cache` on a miss but lets warm caches survive across isolates.
 //   Mutations invalidate by entityKind='trip' / entityId='list'. Bump on response-shape changes.
-const CACHE_EPOCH = 'v5';
+const CACHE_EPOCH = 'v6';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the
@@ -647,9 +647,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const invitedParam = url.searchParams.get('invited');
     let invitedTripIds: string[] | null = null;
     let invitationByTripId: Map<string, { id: string; status: string }> | null = null;
+    let invitedDriverId: string | null = null;
     if (invitedParam === 'me') {
       const did = await driverIdFor(u.id);
       if (!did) return ok([]); // no driver profile → nothing invited
+      invitedDriverId = did;
       const { data: invs } = await db.from('trip_invitations').select('id, trip_id, status').eq('driver_id', did).in('status', ['pending', 'applied']);
       const rows = (invs ?? []) as { id: string; trip_id: string; status: string }[];
       invitationByTripId = new Map(rows.map((r) => [r.trip_id, { id: r.id, status: r.status }]));
@@ -663,12 +665,16 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const limitRaw = url.searchParams.get('limit');
     const limit = Math.min(limitRaw && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : 50, 100);
 
-    // Cache eligibility — skip when status would touch live-tracked trips: 'in_progress' includes
-    // the driver's live position in the row, which a 30s cache would stale. Open / has_applicants
-    // / assigned / completed / cancelled are safe; mixed lists (no status) we also skip out of
-    // caution. Per-trip detail caching is a Phase-4 follow-up.
+    // Cache eligibility — only skip when the caller explicitly asks for in_progress trips,
+    // because those rows carry the driver's live position (`current_lat/lng/at`) which a 30s
+    // cache would stale by up to that long. Every other case (including no status filter at
+    // all — driver "my trips", agent "posted by me", driver "invited") is cached: list views
+    // surface route + payout + pickup, not real-time position; the trip detail page is a
+    // separate endpoint that stays uncached and live. Up to 30s position lag in a list cell
+    // is acceptable. Before 2026-05: this gate also required statusArr.length > 0, which
+    // excluded ~43% of GET /trips traffic from the cache and capped hit rate ~2.65%.
     const statusArr = status ? status.split(',').map((s) => s.trim()).filter(Boolean) : [];
-    const cacheable = statusArr.length > 0 && !statusArr.includes('in_progress');
+    const cacheable = !statusArr.includes('in_progress');
     interface CachedShape {
       rows: Record<string, unknown>[];
       distEntries: [string, number][] | null;
@@ -723,6 +729,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
             via_city_id: viaCity,
             posted_by_user_id: postedBy,
             assigned_driver_id: assignedDriver,
+            // `invited=me` resolves to a caller-specific set of trip IDs (see invitedTripIds above).
+            // Including the resolved driver_id as the cache-key fragment scopes the entry per-driver
+            // so two drivers asking `?invited=me` never share an entry. Same trick we already use
+            // for `assigned_driver_id=me` (resolved before this point).
+            invited: invitedDriverId ? `me:${invitedDriverId}` : '',
             near_lat: near ? near.lat.toFixed(3) : '',
             near_lng: near ? near.lng.toFixed(3) : '',
             radius_m: near ? near.radiusM : '',
