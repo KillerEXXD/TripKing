@@ -132,14 +132,15 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
       && assign.json?.data?.driver_acceptance_status === 'pending'
       && !assign.json?.data?.passenger_otp,
     `status=${assign.status} ${JSON.stringify(assign.json?.data || assign.json?.error || '')}`);
-  // The driver Accepts → trip flips to `assigned` + the passenger OTP is generated.
+  // The driver Accepts → trip flips to `accepted` (migration 036 renamed the enum
+  // value from `assigned` → `accepted`) + the passenger OTP is generated.
   const accept = await j('POST', `/trips/${tid}/accept`, { token: dToken });
   const otp = accept.json?.data?.passenger_otp;
-  check('POST /trips/:id/accept (selected driver) → 200 + status assigned + passenger_otp',
-    accept.status === 200 && accept.json?.data?.status === 'assigned' && !!otp,
+  check('POST /trips/:id/accept (selected driver) → 200 + status accepted + passenger_otp',
+    accept.status === 200 && accept.json?.data?.status === 'accepted' && !!otp,
     `status=${accept.status} ${JSON.stringify(accept.json?.data || accept.json?.error || '')}`);
 
-  // ── PII redaction on GET /trips/:id (trip now assigned) ────────────────
+  // ── PII redaction on GET /trips/:id (trip now accepted) ───────────────
   const pPoster = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
   check('GET /trips/:id as the poster → passenger name+phone, posted_by_phone, passenger_otp; no hash', pPoster.passenger_name === 'Smoke Pax' && pPoster.passenger_phone === '+918888888888' && pPoster.posted_by_phone !== undefined && pPoster.passenger_otp === otp && !has(pPoster, 'passenger_otp_hash'), `${JSON.stringify({ n: pPoster.passenger_name, ph: pPoster.passenger_phone, pp: pPoster.posted_by_phone, otp: pPoster.passenger_otp })}`);
   const pDriver = (await j('GET', `/trips/${tid}`, { token: dToken })).json?.data || {};
