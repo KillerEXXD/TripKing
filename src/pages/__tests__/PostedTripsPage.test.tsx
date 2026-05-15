@@ -125,6 +125,21 @@ describe('PostedTripsPage', () => {
     expect(screen.getByText('share modal')).toBeInTheDocument();
   });
 
+  it('shows an "invited" badge + "View invites" link on cards with pending invitations', () => {
+    setTrips({ data: [makeTrip({ status: 'open', pendingInvitationCount: 3 })] });
+    renderPosted();
+    fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
+    expect(screen.getByText(/3 invited/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view invites/i })).toHaveAttribute('href', '/trips/t1/invitations');
+  });
+
+  it('hides the invited badge when there are no pending invitations', () => {
+    setTrips({ data: [makeTrip({ status: 'open', pendingInvitationCount: 0 })] });
+    renderPosted();
+    expect(screen.queryByText(/ invited/i)).toBeNull();
+    expect(screen.queryByRole('link', { name: /view invites/i })).toBeNull();
+  });
+
   it('Invited chip surfaces open trips with pending invitations (and hides them from Open)', () => {
     setTrips({ data: [
       makeTrip({ id: 't1', status: 'open', pendingInvitationCount: 0, fromCity: city('c1', 'Vellore') }),
