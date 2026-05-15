@@ -37,8 +37,9 @@ const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 // vacancies because Deno isolates churn fast enough that warmed memory is rarely reused. Shared
 // tier costs one extra round-trip to api_cache on a miss but lets warm caches survive across
 // isolates. Mutations invalidate by entityKind='vacancy' (entityId='list' for filtered lists,
-// the vacancy id for items). Bump the epoch when the response shape of GET /vacancies changes.
-const CACHE_EPOCH = 'v2';
+// the vacancy id for items). Bump the epoch when the response shape of GET /vacancies changes —
+// v3 added `linked_trip` + `linked_trip_id` (migration 039 / on_trip).
+const CACHE_EPOCH = 'v3';
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
   for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
@@ -58,7 +59,9 @@ type Db = ReturnType<typeof serviceClient>;
 const VACANCY_SELECT =
   '*, driver:drivers(id, user_id, full_name, phone, email, profile_photo_url, rating_avg, rating_count, total_trips_completed, top_tags, kyc_status, user:users!user_id(display_handle), current_city:cities!current_city_id(*)), ' +
   'vehicle:vehicles(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label)), ' +
-  'current_city:cities!current_city_id(*), current_place:places!current_place_id(*), vacancy_destinations(city:cities(*), place:places(*))';
+  'current_city:cities!current_city_id(*), current_place:places!current_place_id(*), vacancy_destinations(city:cities(*), place:places(*)), ' +
+  // Migration 039: when status='on_trip', the IAmAvailableCard banner shows the route/pickup of the trip that took the slot.
+  'linked_trip:trips!linked_trip_id(id, pickup_at, from_city:cities!from_city_id(id, name), to_city:cities!to_city_id(id, name))';
 
 /** Vacancies NEVER reveal driver PII (per design — applying/inviting is the gate). Flatten the driver's
  *  display_handle off `driver.user`, then strip name/phone/email/photo. Also scrubs phones from `notes`. */
@@ -131,9 +134,19 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         let q = db.from('vacancies').select(VACANCY_SELECT);
         const city = url.searchParams.get('current_city_id');
         if (city) q = q.eq('current_city_id', city);
+        // `status` accepts a single value or a comma-separated list. When omitted, the public
+        // /agent list defaults to ('active','matched') so 'on_trip'/'expired'/'cancelled' rows
+        // don't leak into "find a driver in X". The driver's own list (`?driver_id=…`) skips
+        // the default — they see their 'on_trip' rows on IAmAvailableCard.
         const status = url.searchParams.get('status');
-        if (status) q = q.eq('status', status);
         const driverId = url.searchParams.get('driver_id');
+        if (status) {
+          const arr = status.split(',').map((s) => s.trim()).filter(Boolean);
+          if (arr.length === 1) q = q.eq('status', arr[0]);
+          else if (arr.length > 1) q = q.in('status', arr);
+        } else if (!driverId) {
+          q = q.in('status', ['active', 'matched']);
+        }
         if (driverId) q = q.eq('driver_id', driverId);
         // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
         const { data: inactive } = await db.from('drivers').select('id').eq('is_active', false);

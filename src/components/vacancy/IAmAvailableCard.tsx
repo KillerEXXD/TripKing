@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge, Button } from '@/components/ui';
 import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
@@ -27,10 +27,26 @@ function windowLabel(v: Vacancy): string {
     : `${formatShortDate(from)} ${formatClockTime(from)} – ${formatShortDate(to)} ${formatClockTime(to)}`;
 }
 
+function OnTripBanner({ vacancy }: { vacancy: Vacancy }) {
+  const lt = vacancy.linkedTrip;
+  const route = lt && lt.fromCityName && lt.toCityName ? `${lt.fromCityName} → ${lt.toCityName}` : 'your accepted trip';
+  const when = lt ? formatShortDate(new Date(lt.pickupAt)) : null;
+  return (
+    <div className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden />
+      <p>
+        You&apos;ve accepted <span className="font-semibold">{route}</span>
+        {when ? <> on <span className="font-semibold">{when}</span></> : null}. This vacancy is hidden from agents and will be removed when the trip starts.
+      </p>
+    </div>
+  );
+}
+
 function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
   const cancel = useCancelVacancy();
   const where = vacancy.currentPlace?.name ?? vacancy.currentCity.name;
   const destinations = vacancy.destinationCities.map((c) => c.name).join(', ');
+  const onTrip = vacancy.status === 'on_trip';
 
   function onRemove() {
     if (!window.confirm(`Remove your availability from ${where}?`)) return;
@@ -64,15 +80,26 @@ function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
               {vacancy.notes ? <span className="text-xs text-secondary">“{vacancy.notes}”</span> : null}
             </div>
           ) : null}
+          {onTrip ? <OnTripBanner vacancy={vacancy} /> : null}
         </div>
         <div className="flex shrink-0 items-start gap-1">
-          <Link
-            to={`/vacancies/${vacancy.id}/edit`}
-            aria-label={`Edit availability from ${where}`}
-            className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50"
-          >
-            <Pencil className="size-4" aria-hidden />
-          </Link>
+          {onTrip ? (
+            <span
+              aria-label="Editing disabled — this vacancy is locked to an accepted trip"
+              className="rounded-md p-1.5 text-emerald-300"
+              title="Editing disabled — this vacancy is locked to an accepted trip"
+            >
+              <Pencil className="size-4" aria-hidden />
+            </span>
+          ) : (
+            <Link
+              to={`/vacancies/${vacancy.id}/edit`}
+              aria-label={`Edit availability from ${where}`}
+              className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50"
+            >
+              <Pencil className="size-4" aria-hidden />
+            </Link>
+          )}
           <button
             type="button"
             onClick={onRemove}

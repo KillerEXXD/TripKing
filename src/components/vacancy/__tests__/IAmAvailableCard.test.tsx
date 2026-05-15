@@ -133,4 +133,21 @@ describe('IAmAvailableCard', () => {
     renderCard();
     expect(screen.getByText(/2 \/ 2 active — max reached/)).toBeInTheDocument();
   });
+
+  it('renders the on_trip banner with the linked trip route + date and locks the edit affordance', () => {
+    const onTrip: Vacancy = {
+      ...vacancy('v1'),
+      status: 'on_trip',
+      linkedTripId: 'trip1',
+      linkedTrip: { id: 'trip1', pickupAt: '2099-06-02T08:00:00.000Z', fromCityName: 'Vellore', toCityName: 'Chennai' },
+    };
+    setState({ data: [onTrip] });
+    renderCard();
+    fireEvent.click(screen.getByRole('button', { name: /i'm vacant/i }));
+    expect(screen.getByText(/Vellore → Chennai/)).toBeInTheDocument();
+    expect(screen.getByText(/hidden from agents/i)).toBeInTheDocument();
+    // The edit affordance for an on_trip row is a non-link span; only Remove stays interactive.
+    expect(screen.queryByRole('link', { name: /edit availability/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /remove availability/i })).toBeInTheDocument();
+  });
 });

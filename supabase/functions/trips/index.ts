@@ -91,6 +91,65 @@ async function sha256hex(s: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Reconcile the driver's vacancies when their accepted trip moves through the lifecycle (migration 039).
+ *
+ *   'accept'  → flip any active vacancy whose [available_from, available_until] covers the trip's
+ *               pickup_at into 'on_trip' + linked_trip_id (hidden from agent search; banner shows
+ *               on the driver's own IAmAvailableCard).
+ *   'start'   → trip went in_progress; the slot is now consumed → vacancy 'expired'.
+ *   'revert'  → trip was cancelled or the agent unselected the accepted driver → put the vacancy
+ *               back to 'active' if its window is still in the future, else 'expired'.
+ *
+ * All paths are best-effort: a vacancy reconcile failure must not 500 the trip mutation.
+ */
+async function syncVacanciesForTrip(
+  db: Db,
+  action: 'accept' | 'start' | 'revert',
+  tripId: string,
+  opts: { driverId?: string | null; pickupAt?: string | null } = {},
+): Promise<void> {
+  try {
+    if (action === 'accept') {
+      if (!opts.driverId || !opts.pickupAt) return;
+      await db
+        .from('vacancies')
+        .update({ status: 'on_trip', linked_trip_id: tripId, updated_at: new Date().toISOString() })
+        .eq('driver_id', opts.driverId)
+        .eq('status', 'active')
+        .lte('available_from', opts.pickupAt)
+        .or(`available_until.is.null,available_until.gte.${opts.pickupAt}`);
+      return;
+    }
+    if (action === 'start') {
+      await db
+        .from('vacancies')
+        .update({ status: 'expired', updated_at: new Date().toISOString() })
+        .eq('linked_trip_id', tripId)
+        .eq('status', 'on_trip');
+      return;
+    }
+    // 'revert' — trip cancelled or driver unselected after accepting.
+    const nowIso = new Date().toISOString();
+    // window still in the future → back to 'active'
+    await db
+      .from('vacancies')
+      .update({ status: 'active', linked_trip_id: null, updated_at: nowIso })
+      .eq('linked_trip_id', tripId)
+      .eq('status', 'on_trip')
+      .or(`available_until.is.null,available_until.gt.${nowIso}`);
+    // anything left is past-window → expire it (still drop the link)
+    await db
+      .from('vacancies')
+      .update({ status: 'expired', linked_trip_id: null, updated_at: nowIso })
+      .eq('linked_trip_id', tripId)
+      .eq('status', 'on_trip');
+  } catch (e) {
+    // Side-effect: do not fail the parent request. withTiming will surface to Sentry if needed.
+    console.error('syncVacanciesForTrip failed', { action, tripId, error: (e as Error)?.message });
+  }
+}
+
 // ── waypoint plan (migration 024) ────────────────────────────────────────────
 type TripType = 'one_way' | 'round_trip' | 'multi_way';
 type WaypointInsert = {
@@ -1222,6 +1281,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       .eq('id', tripId);
     if (error) return pgFail(error);
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
+    // Migration 039: any active vacancy whose window covers this trip's pickup is now
+    // 'on_trip' (hidden from agent search, banner on the driver's IAmAvailableCard).
+    await syncVacanciesForTrip(db, 'accept', tripId, { driverId: did, pickupAt: trip.pickup_at });
     // Phase 3: notify the agent that the driver accepted (the OTP is now in play).
     await db.from('notifications').insert({
       user_id: trip.posted_by_user_id,
@@ -1313,6 +1375,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       })
       .eq('id', tripId);
     if (error) return pgFail(error);
+    // Migration 039: if the trip was 'accepted' (driver had committed), restore that
+    // driver's vacancy (or expire if its window has passed).
+    await syncVacanciesForTrip(db, 'revert', tripId);
     // Phase 3: notify the driver that the agent withdrew. They're back to 'applied'.
     if (trip.assigned_driver_id) {
       const { data: drvRow } = await db.from('drivers').select('user_id').eq('id', trip.assigned_driver_id).maybeSingle();
@@ -1498,6 +1563,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       { trip_id: tripId, started_at: now, start_odo_url: (b.start_odo_url as string | null) ?? null, start_odo_reading: (b.start_odo_reading as number | null) ?? null, start_odo_at: b.start_odo_url ? now : null },
       { onConflict: 'trip_id' },
     );
+    // Migration 039: trip is now consumed → the linked 'on_trip' vacancy expires.
+    await syncVacanciesForTrip(db, 'start', tripId);
     invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
@@ -1536,6 +1603,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const now = new Date().toISOString();
     await db.from('trips').update({ status: 'cancelled', cancelled_at: now, cancel_reason_id: (b.cancel_reason_id as string | null) ?? null }).eq('id', tripId);
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).in('status', ['applied', 'selected']);
+    // Migration 039: if the trip had been accepted, restore the linked vacancy (or expire it).
+    await syncVacanciesForTrip(db, 'revert', tripId);
     invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }

@@ -2,10 +2,35 @@
 import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
-import type { CityRow, DriverSummary, Place, PostVacancyInput, Vacancy, VacancyStatus, VehicleSummary } from '@/types';
+import type { CityRow, DriverSummary, Place, PostVacancyInput, Vacancy, VacancyLinkedTrip, VacancyStatus, VehicleSummary } from '@/types';
 
-export type VacancyTransformErrorCode = 'MISSING_ID' | 'MISSING_DRIVER_ID' | 'MISSING_CURRENT_CITY';
+export type VacancyTransformErrorCode = 'MISSING_ID' | 'MISSING_DRIVER_ID' | 'MISSING_CURRENT_CITY' | 'UNKNOWN_STATUS';
 export class VacancyTransformError extends ApiTransformError<VacancyTransformErrorCode> {}
+
+const VACANCY_STATUSES: readonly VacancyStatus[] = ['active', 'matched', 'on_trip', 'expired', 'cancelled'];
+function asStatus(raw: unknown, ctx: Record<string, unknown>): VacancyStatus {
+  const s = typeof raw === 'string' ? raw : '';
+  if (!s) return 'active';
+  if (!VACANCY_STATUSES.includes(s as VacancyStatus)) {
+    throw new VacancyTransformError(`UNKNOWN_STATUS "${s}"`, 'UNKNOWN_STATUS', { ...ctx, status: s });
+  }
+  return s as VacancyStatus;
+}
+function maybeLinkedTrip(raw: unknown): VacancyLinkedTrip | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const id = typeof o.id === 'string' ? o.id : '';
+  const pickupAt = typeof o.pickup_at === 'string' ? o.pickup_at : '';
+  if (!id || !pickupAt) return undefined;
+  const from = o.from_city as Record<string, unknown> | null | undefined;
+  const to = o.to_city as Record<string, unknown> | null | undefined;
+  return {
+    id,
+    pickupAt,
+    fromCityName: typeof from?.name === 'string' ? from.name : undefined,
+    toCityName: typeof to?.name === 'string' ? to.name : undefined,
+  };
+}
 type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined;
@@ -79,10 +104,12 @@ export function transformVacancy(api: Api): Vacancy {
     destinationPlaces,
     minRatePerKm: num(api.min_rate_per_km),
     notes: str(api.notes),
-    status: (str(api.status) ?? 'active') as VacancyStatus,
+    status: asStatus(api.status, ctx),
     cancelledAt: str(api.cancelled_at),
     createdAt: str(api.created_at) ?? new Date().toISOString(),
     distanceKm: num(api.distance_km),
+    linkedTripId: str(api.linked_trip_id),
+    linkedTrip: maybeLinkedTrip(api.linked_trip),
   };
 }
 
