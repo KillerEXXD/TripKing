@@ -34,14 +34,16 @@ const authUser = (db: Db, req: Request) => authUserShared(db, req, { defaultRole
 // Bump when the response shape changes so the memory cache (60s TTL) doesn't keep
 // returning the old shape — e.g. v2 nukes pre-`can_report_bugs` cached `/agents/me`
 // payloads that were tripping `MISSING_CAN_REPORT_BUGS` on the client transform.
-const CACHE_EPOCH = 'v2';
+// v3 (2026-05-15): added `referral_code` to the user join + `referral` summary block on /me
+// (Stage 1 of the referral program; migration 042).
+const CACHE_EPOCH = 'v3';
 function invalidateAgentMe(userId: string): void {
   cacheDelete(`agents:me:user-${userId}:${CACHE_EPOCH}`);
 }
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
-const AGENT_SELECT = '*, user:users!user_id(display_handle, can_report_bugs), business_city:cities!business_city_id(*)';
+const AGENT_SELECT = '*, user:users!user_id(display_handle, can_report_bugs, referral_code, referred_by_user_id), business_city:cities!business_city_id(*)';
 const PRIVATE_KYC_FIELDS = [
   'aadhaar_number_masked', 'aadhaar_front_path', 'aadhaar_back_path', 'selfie_path',
   'kyc_consent_at', 'kyc_reviewed_by', 'kyc_rejection_reason',
@@ -74,8 +76,32 @@ function flattenHandle(row: Row | null | undefined): Row | null {
   const u = out.user as Record<string, unknown> | null | undefined;
   out.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
   out.can_report_bugs = u && typeof u.can_report_bugs === 'boolean' ? u.can_report_bugs : false;
+  out.referral_code = u && typeof u.referral_code === 'string' ? u.referral_code : null;
+  out.referred_by_user_id = u && typeof u.referred_by_user_id === 'string' ? u.referred_by_user_id : null;
   delete out.user;
   return out;
+}
+
+/**
+ * Stage-1 referral summary stub for an agent's /me. Same shape as the driver one.
+ * Numbers are zero until Stage 4 (accrual) ships.
+ */
+function buildReferralStub(row: Row): Row {
+  return {
+    code: typeof row.referral_code === 'string' ? row.referral_code : null,
+    referred_by_user_id: typeof row.referred_by_user_id === 'string' ? row.referred_by_user_id : null,
+    summary: {
+      total_referred: 0,
+      verified_referrals: 0,
+      qualified_referrals: 0,
+      earning_active: 0,
+      cap_reached: 0,
+      lifetime_earned_paise: 0,
+      pending_paise: 0,
+      released_paise: 0,
+      withdrawable_paise: 0,
+    },
+  };
 }
 
 async function buildVerification(db: Db, tm: Row): Promise<Row> {
@@ -236,7 +262,8 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
         if (!data) return { ok: false };
         const row = await fetchAgent(data.id as string);
         if (!row) return { ok: false };
-        return { ok: true, body: { ...(flattenHandle(row) as Row), verification: await buildVerification(db, row) } };
+        const flat = flattenHandle(row) as Row;
+        return { ok: true, body: { ...flat, verification: await buildVerification(db, row), referral: buildReferralStub(flat) } };
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
