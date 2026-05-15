@@ -56,7 +56,10 @@ function isFilter(v: string | null): v is Filter {
 }
 
 export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => void }) {
-  const meta = STATUS_META[trip.status];
+  // Fallback to a muted "raw status" label if the server sends a value we don't
+  // have a mapping for (e.g. a new lifecycle state shipped before the client rebuild).
+  // Prevents `Cannot read properties of undefined (reading 'variant')` crashes.
+  const meta = STATUS_META[trip.status] ?? { variant: 'muted' as const, label: String(trip.status) };
   const hasApplicants = trip.applicantCount > 0;
   const reviewable = hasApplicants && trip.status === 'has_applicants';
   const shareable = trip.status === 'open' || trip.status === 'has_applicants';
