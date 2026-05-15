@@ -137,6 +137,28 @@ describe('TripInvitationsPage', () => {
     expect(screen.getByText(/no invitations sent for this trip yet/i)).toBeInTheDocument();
   });
 
+  it('hides withdrawn rows from the list (migration 041 sibling-withdraw)', () => {
+    setAuth(agent);
+    setTrip({ data: makeTrip() });
+    setInvites({ data: [
+      makeInvite({ id: 'inv-pending', status: 'pending' }),
+      makeInvite({ id: 'inv-withdrawn', status: 'withdrawn' }),
+    ] });
+    renderPage();
+    expect(screen.getByText(/awaiting driver/i)).toBeInTheDocument();
+    expect(screen.queryByText(/withdrawn/i)).toBeNull();
+  });
+
+  it('shows the assignment-aware empty state once the trip is past has_applicants', () => {
+    setAuth(agent);
+    setTrip({ data: makeTrip({ status: 'selected', pendingInvitationCount: 0 }) });
+    setInvites({ data: [makeInvite({ status: 'withdrawn' }), makeInvite({ id: 'inv2', status: 'withdrawn' })] });
+    renderPage();
+    expect(screen.getByText(/no active invitations/i)).toBeInTheDocument();
+    expect(screen.getByText(/withdrawn when you assigned a driver/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no invitations sent for this trip yet/i)).toBeNull();
+  });
+
   it('refuses to show invitations to non-posters', () => {
     setAuth(stranger);
     setTrip({ data: makeTrip() });
