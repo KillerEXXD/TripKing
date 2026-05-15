@@ -81,6 +81,16 @@ describe('InviteDriversCard', () => {
     expect(screen.getByText(/applied/i)).toBeInTheDocument();
   });
 
+  it('switches the button label to "Invite more" and shows a pending count when invites already exist', () => {
+    vi.mocked(useTripInvites).mockReturnValue({
+      isPending: false,
+      data: [makeInvite({ id: 'iv1', status: 'pending' }), makeInvite({ id: 'iv2', status: 'declined' })],
+    } as never);
+    render(<InviteDriversCard trip={makeTrip()} />);
+    expect(screen.getByRole('button', { name: /invite more/i })).toBeInTheDocument();
+    expect(screen.getByText(/1 pending · 1 declined/i)).toBeInTheDocument();
+  });
+
   it('renders an empty hint when there are no invites yet', () => {
     vi.mocked(useTripInvites).mockReturnValue({ isPending: false, data: [] } as never);
     render(<InviteDriversCard trip={makeTrip()} />);

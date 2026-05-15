@@ -12,6 +12,7 @@ import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { Badge, Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
+import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -273,11 +274,13 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
+  const invitedToDriveQuery = useTrips({ invited: 'me' });
 
   const nearby = nearbyQuery.data ?? [];
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
   const hasPendingInvites = myPosts.some((t) => (t.pendingInvitationCount ?? 0) > 0);
+  const pendingReceivedInvites = (invitedToDriveQuery.data ?? []).filter((t) => t.invitationStatus === 'pending');
 
   // Priority cards: a driver has at most one trip in each of these states at a time.
   const myDriving = myDrivingQuery.data ?? [];
@@ -325,6 +328,7 @@ function DriverHome({ driver }: { driver: Driver }) {
           else order = [driving, review, vacant];
           return <>{order}</>;
         })()}
+        {pendingReceivedInvites.length > 0 ? <InvitesReceivedCard trips={pendingReceivedInvites} /> : null}
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
 
         <ReputationCard driver={driver} />

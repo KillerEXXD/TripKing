@@ -29,6 +29,10 @@ export function InviteDriversCard({ trip }: { trip: Trip }) {
 
   if (invites.isPending) return <LoadingSkeleton rows={2} />;
   const items = invites.data ?? [];
+  const pendingCount = items.filter((i) => i.status === 'pending').length;
+  const declinedCount = items.filter((i) => i.status === 'declined').length;
+  const hasAnyInvite = items.length > 0;
+  const buttonLabel = pendingCount > 0 ? 'Invite more' : 'Invite';
 
   return (
     <Card className="gap-3">
@@ -38,10 +42,15 @@ export function InviteDriversCard({ trip }: { trip: Trip }) {
           <div className="text-xs text-secondary">
             Reach out to specific drivers — they&apos;ll see your name &amp; phone in their <span className="font-medium">Invited</span> tab.
           </div>
+          {hasAnyInvite ? (
+            <div className="mt-1 text-xs font-medium text-secondary">
+              {pendingCount} pending{declinedCount > 0 ? ` · ${declinedCount} declined` : ''}
+            </div>
+          ) : null}
         </div>
         {isOpen ? (
           <Button size="sm" variant="outline" onClick={() => setPicking(true)} className="gap-1.5 shrink-0">
-            <UserPlus className="size-3.5" aria-hidden /> Invite
+            <UserPlus className="size-3.5" aria-hidden /> {buttonLabel}
           </Button>
         ) : null}
       </div>
