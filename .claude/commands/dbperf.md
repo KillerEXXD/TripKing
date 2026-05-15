@@ -31,6 +31,25 @@ node scripts/db.cjs "select jobid, jobname, schedule, active from cron.job order
 
 Expected cron jobs: `rate-limits-cleanup` (daily 03:17 UTC, migration 013) — and that's it. `rate_limits` should be tiny (the cron purges rows older than a day); if it's grown big, the cron may not be running. `api_metrics` grows ~one row per request and has **no** cleanup cron yet — if it's large (>~100k rows / >50MB) flag it (a `metrics-cleanup-weekly`-style cron purging >30 days, like TournamentPro's, would be the fix). PostGIS is enabled (migrations 011/015) — `places` / `drivers` have GiST-indexed `geog`.
 
+## Step 2.5 — API cache hit rate (24h, per endpoint)
+
+The application-level `withCache` outcomes — distinct from Postgres buffer cache (Step 1). Reads the `cache_status` column on `api_metrics` (set by `_shared/timing.ts` from the `X-Cache` header that `tagCacheHit` stamps). This is how we'd catch a regression where a `withCache` call was dropped (source/prod divergence — see PR #143's restore of orphaned `/notifications` cache).
+
+```bash
+node scripts/db.cjs "SELECT endpoint, COUNT(*) FILTER (WHERE cache_status IN ('shared','memory')) AS hits, COUNT(*) FILTER (WHERE cache_status='miss') AS misses, COUNT(*) FILTER (WHERE cache_status IS NULL) AS unwrapped, ROUND(100.0 * COUNT(*) FILTER (WHERE cache_status IN ('shared','memory')) / NULLIF(COUNT(*) FILTER (WHERE cache_status IS NOT NULL), 0), 2) AS hit_rate_pct FROM api_metrics WHERE created_at > now() - interval '24 hours' GROUP BY endpoint ORDER BY (COUNT(*) FILTER (WHERE cache_status IS NOT NULL)) DESC NULLS LAST"
+```
+
+Reading the output:
+- **`hits` / `misses`**: requests that went through `withCache`. `hits/(hits+misses)` = the **hit rate**.
+- **`unwrapped`**: `cache_status IS NULL` — request didn't go through `withCache` at all. Some of this is intentional (POST/PATCH writes, auth-failure short-circuits, design-justified single-row GETs like `/alerts/:id`); a *new* high count on an endpoint that used to be wrapped is a regression signal.
+
+Baseline expectations (post-issue #114 rollout, see closing comment):
+- `trips`, `vacancies`, `notifications` — should show non-zero `shared` hits.
+- `alerts`, `reviews` — list endpoints wrapped; small absolute hit count fine at low traffic.
+- `drivers`, `agents`, `analytics` — currently uncached lists (not in scope of #114).
+
+Flag in the report if any *previously-wrapped* endpoint shows 0 hits + 0 misses (cache wrapper likely dropped — orphan / regression).
+
 ## Step 3 — Migrations applied vs on disk
 
 ```bash
@@ -64,6 +83,17 @@ Note: TripKing applies migrations with `node scripts/db.cjs --file …` (the Man
 | api_metrics | … | … | WARN if >100k / >50MB (no cleanup cron) |
 | rate_limits | … | … | WARN if >few hundred (cron may be stuck) |
 | admin_audit_log | … | … | INFO |
+
+### API cache hit rates (24h)
+| Endpoint | Hits | Misses | Unwrapped | Hit % | Status |
+| trips | … | … | … | … | OK if shared hits > 0 |
+| vacancies | … | … | … | … | OK if shared hits > 0 |
+| notifications | … | … | … | … | OK if shared hits > 0 |
+| alerts | … | … | … | … | OK if hits+misses present (low volume) |
+| reviews | … | … | … | … | OK if hits+misses present |
+| <other> | … | … | … | … | INFO |
+
+Flag any endpoint where `hits + misses == 0` AND it used to be wrapped (regression / orphaned cache wrapper — see PR #143).
 
 ### Cron jobs
 | jobid | name | schedule | active |
