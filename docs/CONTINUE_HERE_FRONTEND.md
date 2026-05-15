@@ -76,3 +76,4 @@ You can build a Group-2 screen any time — it'll render `<ErrorState>` until th
 ## Keys & access
 
 The browser app talks to the REST API (the deployed edge functions via the `/api` Vite proxy), not Supabase directly — `.env.development` has `VITE_API_BASE_URL` / `VITE_TRIPKING_API_KEY`. Full credential reference is in `CLAUDE.md`'s "Supabase project & credentials" section — never ask the user for tokens.
+
