@@ -135,6 +135,8 @@ function renderDetail(entries: string[] = ['/trips/t1']) {
       <Routes>
         <Route path="/trips/:id" element={<TripDetailPage />} />
         <Route path="/trips" element={<div>trip feed</div>} />
+        <Route path="/my-trips" element={<div>my trips list</div>} />
+        <Route path="/posted-trips" element={<div>posted trips list</div>} />
         <Route path="/profile" element={<div>profile page</div>} />
         <Route path="/verify/documents" element={<div>verify documents page</div>} />
         <Route path="/trips/:id/applicants" element={<div>applicant review</div>} />
@@ -212,11 +214,11 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('review section')).toBeInTheDocument();
   });
 
-  it('the back arrow returns to the trip feed when there is no history', () => {
+  it('the back arrow returns to the driver\'s trip list when there is no history', () => {
     setTrip({ data: makeTrip() });
     renderDetail();
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
-    expect(screen.getByText('trip feed')).toBeInTheDocument();
+    expect(screen.getByText('my trips list')).toBeInTheDocument();
   });
 
   it('a driver applies with their vehicle and records the application', async () => {
@@ -265,14 +267,15 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('applicant review')).toBeInTheDocument();
   });
 
-  it('lets the assigned driver start the trip with the passenger OTP', async () => {
+  it('lets the assigned driver start the trip with the passenger OTP + odometer reading', async () => {
     setTrip({ data: makeTrip({ status: 'accepted', assignedDriverId: 'd1' }) });
     renderDetail();
     expect(screen.getByText(/you're driving this trip/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
     fireEvent.change(screen.getByLabelText(/passenger otp/i), { target: { value: '654321' } });
+    fireEvent.change(screen.getByLabelText(/start odometer reading/i), { target: { value: '42000' } });
     fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
-    await waitFor(() => expect(startMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { passengerOtp: '654321' } }));
+    await waitFor(() => expect(startMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { passengerOtp: '654321', startOdoReading: 42000 } }));
   });
 
   it('lets the assigned driver complete an in-progress trip', async () => {
@@ -286,8 +289,9 @@ describe('TripDetailPage', () => {
     vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
     setTrip({ data: makeTrip({ status: 'accepted', passengerOtp: '123456' }) });
     renderDetail();
-    expect(screen.getByText(/share the trip with your passenger/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /share the passenger link/i }));
+    expect(screen.getByText(/passenger otp/i)).toBeInTheDocument();
+    expect(screen.getByText('123456')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /send a passenger link/i }));
     expect(screen.getByText(/\/passenger\/123456/)).toBeInTheDocument();
   });
 

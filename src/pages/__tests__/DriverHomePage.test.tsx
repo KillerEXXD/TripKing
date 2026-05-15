@@ -9,12 +9,18 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
-vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn() }));
+vi.mock('@/hooks/useTrips', () => ({
+  useTrips: vi.fn(),
+  useMyApplications: vi.fn(() => ({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn() })),
+}));
 import { useTrips } from '@/hooks/useTrips';
 vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
 import { useVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
-vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn(() => ({ data: [] })) } }));
+vi.mock('@/hooks/useAdminConfig', () => ({
+  cityHooks: { useList: vi.fn(() => ({ data: [] })) },
+  useAppSettings: vi.fn(() => ({ isPending: false, data: { maxActiveVacanciesPerDriver: 2 } })),
+}));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
 
 const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -90,15 +96,13 @@ describe('DriverHomePage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders the driver home — greeting, action tiles, reputation, empty feed', () => {
+  it('renders the driver home — greeting, reputation, empty feed', () => {
     setMyDriver({ data: makeDriver() });
     setTrips({ data: [] });
     renderHome();
     // Greeting uses the first name from the loaded profile, not the role label.
     expect(screen.getByText('Ravi')).toBeInTheDocument();
     expect(screen.getByText('Driver')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /find a trip/i })).toHaveAttribute('href', '/trips');
-    expect(screen.getByRole('link', { name: /i'm available/i })).toHaveAttribute('href', '/vacancies/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
