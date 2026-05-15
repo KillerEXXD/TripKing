@@ -186,11 +186,25 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
           referredByUserId = ref.id as string;
         }
       }
-      await db.from('users').upsert(
-        { id: userId, phone, display_name: displayName || undefined, role, referred_by_user_id: referredByUserId },
-        { onConflict: 'id', ignoreDuplicates: false },
-      );
-      if (referredByUserId) referralAttribution = 'attached';
+      // handle_new_user trigger has already inserted the public.users row (with empty
+      // phone, default display_name, default role). Use a FRESH service-role client to
+      // bypass any session state the original `db` picked up from signInWithPassword
+      // (otherwise the user's RLS context applies and column updates silently no-op).
+      const adminDb = serviceClient();
+      const updatePayload: Record<string, unknown> = { phone, role };
+      if (displayName) updatePayload.display_name = displayName;
+      if (referredByUserId) updatePayload.referred_by_user_id = referredByUserId;
+      const userUpdate = await adminDb.from('users').update(updatePayload).eq('id', userId);
+      if (userUpdate.error) console.error('[auth] users update error', userUpdate.error.message);
+      if (referredByUserId) {
+        referralAttribution = 'attached';
+        // Belt-and-braces: explicitly create the referral_links row (also via adminDb).
+        const linkInsert = await adminDb.from('referral_links').upsert(
+          { referrer_user_id: referredByUserId, referred_user_id: userId, referred_user_role: role, status: 'signed_up' },
+          { onConflict: 'referred_user_id', ignoreDuplicates: true },
+        );
+        if (linkInsert.error) console.error('[auth] referral_links upsert error', linkInsert.error.message);
+      }
     }
     const u = await publicUser(db, userId);
     // account-level kill switch — a suspended user can't get a session (orthogonal to KYC; flipped by an admin)

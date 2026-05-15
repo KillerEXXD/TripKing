@@ -34,9 +34,11 @@ const authUser = (db: Db, req: Request) => authUserShared(db, req, { defaultRole
 // Bump when the response shape changes so the memory cache (60s TTL) doesn't keep
 // returning the old shape — e.g. v2 nukes pre-`can_report_bugs` cached `/agents/me`
 // payloads that were tripping `MISSING_CAN_REPORT_BUGS` on the client transform.
+// v4 (2026-05-16): referral.summary now reads from referral_balances + counts referral_links
+// (Stage 4 of the referral program; migration 045).
 // v3 (2026-05-15): added `referral_code` to the user join + `referral` summary block on /me
 // (Stage 1 of the referral program; migration 042).
-const CACHE_EPOCH = 'v3';
+const CACHE_EPOCH = 'v4';
 function invalidateAgentMe(userId: string): void {
   cacheDelete(`agents:me:user-${userId}:${CACHE_EPOCH}`);
 }
@@ -83,24 +85,49 @@ function flattenHandle(row: Row | null | undefined): Row | null {
 }
 
 /**
- * Stage-1 referral summary stub for an agent's /me. Same shape as the driver one.
- * Numbers are zero until Stage 4 (accrual) ships.
+ * Stage-4 referral summary for an agent's /me. Same shape + same logic as drivers.
  */
-function buildReferralStub(row: Row): Row {
+async function buildReferralBlock(db: Db, row: Row): Promise<Row> {
+  const userId = row.user_id as string | undefined;
+  const summary = {
+    total_referred: 0,
+    verified_referrals: 0,
+    qualified_referrals: 0,
+    earning_active: 0,
+    cap_reached: 0,
+    lifetime_earned_paise: 0,
+    pending_paise: 0,
+    released_paise: 0,
+    withdrawable_paise: 0,
+  };
+  if (userId) {
+    const [balanceRes, linksRes] = await Promise.all([
+      db.from('referral_balances').select('*').eq('user_id', userId).maybeSingle(),
+      db.from('referral_links').select('status').eq('referrer_user_id', userId),
+    ]);
+    const bal = balanceRes.data as Row | null;
+    if (bal) {
+      summary.lifetime_earned_paise = Number(bal.lifetime_earned_paise ?? 0);
+      summary.withdrawable_paise = Math.max(0, Number(bal.net_paise ?? 0));
+      summary.released_paise = summary.withdrawable_paise;
+      summary.earning_active = Number(bal.earning_active_count ?? 0);
+      summary.cap_reached = Number(bal.cap_reached_count ?? 0);
+      summary.total_referred = Number(bal.total_referred_count ?? 0);
+    }
+    for (const r of (linksRes.data ?? []) as Row[]) {
+      const s = String(r.status);
+      if (s === 'verified' || s === 'paid_trips_started' || s === 'qualified' || s === 'earning_active' || s === 'cap_reached') {
+        summary.verified_referrals += 1;
+      }
+      if (s === 'qualified' || s === 'earning_active' || s === 'cap_reached') {
+        summary.qualified_referrals += 1;
+      }
+    }
+  }
   return {
     code: typeof row.referral_code === 'string' ? row.referral_code : null,
     referred_by_user_id: typeof row.referred_by_user_id === 'string' ? row.referred_by_user_id : null,
-    summary: {
-      total_referred: 0,
-      verified_referrals: 0,
-      qualified_referrals: 0,
-      earning_active: 0,
-      cap_reached: 0,
-      lifetime_earned_paise: 0,
-      pending_paise: 0,
-      released_paise: 0,
-      withdrawable_paise: 0,
-    },
+    summary,
   };
 }
 
@@ -263,7 +290,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
         const row = await fetchAgent(data.id as string);
         if (!row) return { ok: false };
         const flat = flattenHandle(row) as Row;
-        return { ok: true, body: { ...flat, verification: await buildVerification(db, row), referral: buildReferralStub(flat) } };
+        return { ok: true, body: { ...flat, verification: await buildVerification(db, row), referral: await buildReferralBlock(db, flat) } };
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No agent profile yet — create one with POST /agents', 404);
