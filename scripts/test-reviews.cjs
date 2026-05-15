@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Smoke test for the /reviews edge function. Bootstraps a full trip (post → apply → assign →
- * OTP-start → complete) so a review can actually be posted.
+ * accept → OTP-start → complete) so a review can actually be posted.
  *   REVIEWS_API_BASE=https://<ref>.supabase.co/functions/v1 node scripts/test-reviews.cjs
  * Skips cleanly (exit 0) if REVIEWS_API_BASE is unset.
  *
@@ -73,9 +73,14 @@ async function postTrip(agentToken, cityA, cityB, carTypeId) {
   const apply = await j('POST', `/trips/${tripId}/applicants`, { token: driver.token, body: {} });
   const acceptanceId = apply.json?.data?.id;
   check('driver applied', apply.status === 200 && !!acceptanceId, `status=${apply.status} ${JSON.stringify(apply.json?.error || '')}`);
+  // Two-step handshake (migration 030): /assign flips status to `selected` (no OTP),
+  // then the driver's /accept flips to `accepted` (migration 036 renamed from `assigned`)
+  // and generates the OTP.
   const assign = await j('POST', `/trips/${tripId}/assign`, { token: agent.token, body: { acceptance_id: acceptanceId } });
-  const otp = assign.json?.data?.passenger_otp;
-  check('trip assigned + OTP returned', assign.status === 200 && !!otp, `status=${assign.status} ${JSON.stringify(assign.json?.error || '')}`);
+  check('trip selected (handshake Phase 2)', assign.status === 200 && assign.json?.data?.status === 'selected', `status=${assign.status} ${JSON.stringify(assign.json?.error || assign.json?.data?.status || '')}`);
+  const accept = await j('POST', `/trips/${tripId}/accept`, { token: driver.token });
+  const otp = accept.json?.data?.passenger_otp;
+  check('trip accepted + OTP returned', accept.status === 200 && accept.json?.data?.status === 'accepted' && !!otp, `status=${accept.status} ${JSON.stringify(accept.json?.error || '')}`);
   const start = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp } });
   check('trip started', start.status === 200, `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
   const complete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: {} });

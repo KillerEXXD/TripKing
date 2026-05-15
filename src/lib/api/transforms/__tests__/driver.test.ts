@@ -80,9 +80,10 @@ describe('transformDriverPublic', () => {
     expect(() => transformDriverPublic({ id: 'd9', user_id: 'u9' })).toThrow(DriverTransformError);
     expect(() => transformDriverPublic({ id: 'd9', user_id: 'u9' })).toThrow(/MISSING_DISPLAY_HANDLE/);
   });
-  it('throws MISSING_CAN_REPORT_BUGS when the API omits the bug-reporter flag', async () => {
+  it('defaults canReportBugs to false when the API omits the bug-reporter flag', async () => {
     const { transformDriverPublic } = await import('@/lib/api/transforms/driver');
-    expect(() => transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001' })).toThrow(/MISSING_CAN_REPORT_BUGS/);
+    const d = transformDriverPublic({ id: 'd9', user_id: 'u9', display_handle: 'AFFE001' });
+    expect(d.canReportBugs).toBe(false);
   });
   it('carries can_report_bugs through to canReportBugs', async () => {
     const { transformDriverPublic } = await import('@/lib/api/transforms/driver');

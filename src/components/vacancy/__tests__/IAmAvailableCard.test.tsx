@@ -55,10 +55,10 @@ describe('IAmAvailableCard', () => {
   it('renders 0/2 with the empty-state subtitle and an enabled Post button', () => {
     setState({ data: [] });
     renderCard();
-    expect(screen.getByText(/I'm available/i)).toBeInTheDocument();
+    expect(screen.getByText(/I'm vacant/i)).toBeInTheDocument();
     expect(screen.getByText(/Let agents find you/i)).toBeInTheDocument();
     expect(screen.getByText(/0 \/ 2 active/)).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: /post availability/i });
+    const link = screen.getByRole('link', { name: /post vacant/i });
     expect(link).toHaveAttribute('href', '/vacancies/new');
   });
 
@@ -67,7 +67,7 @@ describe('IAmAvailableCard', () => {
     renderCard();
     expect(screen.getByText(/each posting below is live/i)).toBeInTheDocument();
     expect(screen.getByText(/1 \/ 2 active/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /post availability/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /post vacant/i })).toBeInTheDocument();
   });
 
   it('expands by default with ≥1 vacancy and toggles to collapsed when clicked', () => {
@@ -92,8 +92,8 @@ describe('IAmAvailableCard', () => {
     renderCard();
     expect(screen.getByText(/2 \/ 2 active — max reached/)).toBeInTheDocument();
     // No link to /vacancies/new when at the limit
-    expect(screen.queryByRole('link', { name: /post availability/i })).toBeNull();
-    const btn = screen.getByRole('button', { name: /post availability \(disabled/i });
+    expect(screen.queryByRole('link', { name: /post vacant/i })).toBeNull();
+    const btn = screen.getByRole('button', { name: /post vacant \(disabled/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute('title', expect.stringContaining('Max 2 active vacancies'));
   });
@@ -110,7 +110,7 @@ describe('IAmAvailableCard', () => {
     renderCard();
     expect(screen.getByText(/3 \/ 5 active/)).toBeInTheDocument();
     // 3 < 5 → Post still enabled
-    expect(screen.getByRole('link', { name: /post availability/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /post vacant/i })).toBeInTheDocument();
   });
 
   it('disables the Post button when count >= configured max (e.g. 1/1)', () => {
@@ -118,7 +118,7 @@ describe('IAmAvailableCard', () => {
     setState({ data: [vacancy('v1')] });
     renderCard();
     expect(screen.getByText(/1 \/ 1 active — max reached/)).toBeInTheDocument();
-    const btn = screen.getByRole('button', { name: /post availability \(disabled/i });
+    const btn = screen.getByRole('button', { name: /post vacant \(disabled/i });
     expect(btn).toBeDisabled();
     expect(btn).toHaveAttribute('title', expect.stringContaining('Max 1 active vacancy'));
   });

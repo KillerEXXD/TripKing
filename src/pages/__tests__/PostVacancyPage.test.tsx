@@ -100,9 +100,9 @@ describe('PostVacancyPage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('keeps "Post availability" disabled until a city and at least one destination are set (the start time defaults to now)', () => {
+  it('keeps "Post vacant" disabled until a city and at least one destination are set (the start time defaults to now)', () => {
     renderPost();
-    const submit = () => screen.getByRole('button', { name: /^post availability$/i });
+    const submit = () => screen.getByRole('button', { name: /^post vacant$/i });
     expect(submit()).toBeDisabled();
     fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
     expect(submit()).toBeDisabled(); // still no destination
@@ -145,7 +145,7 @@ describe('PostVacancyPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
     fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4 → 4.5
     fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4.5 → 5
-    fireEvent.click(screen.getByRole('button', { name: /^post availability$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^post vacant$/i }));
     const start = new Date('2099-06-01T09:00'); // datetime-local strings parse as local time
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(
@@ -165,19 +165,19 @@ describe('PostVacancyPage', () => {
     const mutateAsync = setPost();
     renderPost();
     fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
-    expect(screen.getByRole('button', { name: /^post availability$/i })).toBeDisabled(); // no destination yet
+    expect(screen.getByRole('button', { name: /^post vacant$/i })).toBeDisabled(); // no destination yet
     fireEvent.click(screen.getByRole('button', { name: /a place that's not in the list/i }));
     fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i })); // adds Katpadi, Vellore
     const chip = screen.getByRole('button', { name: /remove the destination katpadi/i });
     expect(chip).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^post availability$/i })).toBeEnabled(); // a destination place alone is enough
+    expect(screen.getByRole('button', { name: /^post vacant$/i })).toBeEnabled(); // a destination place alone is enough
     fireEvent.click(chip); // removable
     expect(screen.queryByRole('button', { name: /remove the destination katpadi/i })).toBeNull();
     // re-add it, also pick a city chip, submit
     fireEvent.click(screen.getByRole('button', { name: /a place that's not in the list/i }));
     fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
-    fireEvent.click(screen.getByRole('button', { name: /^post availability$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^post vacant$/i }));
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ currentCityId: 'c1', destinationCityIds: ['c2'], destinations: [{ cityId: 'c2' }, { placeId: 'p1' }] })),
     );
@@ -200,7 +200,7 @@ describe('PostVacancyPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /pin your exact spot/i }));
     fireEvent.click(screen.getByRole('button', { name: /mock-pick-place/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
-    fireEvent.click(screen.getByRole('button', { name: /^post availability$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^post vacant$/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ currentCityId: 'c1', currentPlaceId: 'p1', destinationCityIds: ['c2'] })));
     expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
   });
@@ -215,7 +215,7 @@ describe('PostVacancyPage', () => {
     setMyDriver('docs_submitted');
     renderPost();
     expect(screen.getByRole('link', { name: /go to verification/i })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^post availability$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^post vacant$/i })).toBeNull();
   });
 
   it('edit mode prefills the form from the vacancy and submits via useUpdateVacancy', async () => {

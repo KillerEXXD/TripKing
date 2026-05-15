@@ -14,7 +14,10 @@ vi.mock('@/hooks/useTrips', () => ({
   useMyApplications: vi.fn(() => ({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn() })),
 }));
 import { useTrips } from '@/hooks/useTrips';
-vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
+vi.mock('@/hooks/useVacancies', () => ({
+  useVacancies: vi.fn(),
+  useMyActiveVacancies: vi.fn(() => ({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn() })),
+}));
 import { useVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
 vi.mock('@/hooks/useAdminConfig', () => ({

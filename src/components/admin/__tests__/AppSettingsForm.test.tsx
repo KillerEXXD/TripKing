@@ -81,7 +81,7 @@ describe('AppSettingsForm', () => {
     expect(screen.getByDisplayValue('1. Call before arrival')).toBeInTheDocument();
 
     // The new field — verify label + bounds + value + hint copy
-    const maxLabel = screen.getByText(/Max active "I'm available" posts per driver/i);
+    const maxLabel = screen.getByText(/Max active "I'm vacant" posts per driver/i);
     expect(maxLabel).toBeInTheDocument();
     const maxInput = maxLabel.closest('label')?.querySelector('input') as HTMLInputElement;
     expect(maxInput).not.toBeNull();
@@ -94,7 +94,7 @@ describe('AppSettingsForm', () => {
   it('editing the max-vacancies value updates the draft (the field is controlled — typing a different number replaces it)', () => {
     setSettings();
     render(<AppSettingsForm />);
-    const maxLabel = screen.getByText(/Max active "I'm available" posts per driver/i);
+    const maxLabel = screen.getByText(/Max active "I'm vacant" posts per driver/i);
     const maxInput = maxLabel.closest('label')?.querySelector('input') as HTMLInputElement;
 
     fireEvent.change(maxInput, { target: { value: '5' } });
@@ -106,7 +106,7 @@ describe('AppSettingsForm', () => {
     const mutate = setUpdate();
     render(<AppSettingsForm />);
 
-    const maxLabel = screen.getByText(/Max active "I'm available" posts per driver/i);
+    const maxLabel = screen.getByText(/Max active "I'm vacant" posts per driver/i);
     const maxInput = maxLabel.closest('label')?.querySelector('input') as HTMLInputElement;
     fireEvent.change(maxInput, { target: { value: '7' } });
 

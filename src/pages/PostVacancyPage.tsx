@@ -287,7 +287,7 @@ export function PostVacancyPage() {
                 <button
                   key={c.id}
                   type="button"
-                  aria-pressed={active}
+                  aria-pressed={active ? 'true' : 'false'}
                   onClick={() => toggleDestination(c.id)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold ${active ? 'border-primary bg-primary/15 text-primary' : 'border-input bg-background hover:border-primary/40'}`}
                 >
@@ -336,12 +336,12 @@ export function PostVacancyPage() {
       </Card>
 
       {postVacancy.isError || updateVacancy.isError ? <p className="text-sm text-red-700">{isEdit ? "Couldn't save your changes — please try again." : "Couldn't post your availability — please try again."}</p> : null}
-      <div className="flex gap-3">
-        <Button type="button" variant="outline" onClick={() => navigate('/vacancies')} disabled={pending}>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" className="shrink-0" onClick={() => navigate('/vacancies')} disabled={pending}>
           Cancel
         </Button>
-        <Button type="button" variant="full" onClick={() => void onSubmit()} disabled={!canSubmit}>
-          {pending ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save changes' : 'Post availability'}
+        <Button type="button" variant="full" className="min-w-0 flex-1" onClick={() => void onSubmit()} disabled={!canSubmit}>
+          {pending ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save changes' : 'Post vacant'}
         </Button>
       </div>
       </div>

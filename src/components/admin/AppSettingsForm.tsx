@@ -22,8 +22,8 @@ const NUMERIC_FIELDS: { key: NumericKey; label: string; min?: number; max?: numb
   { key: 'defaultCommissionPct', label: 'Default commission %', min: 0, max: 30, hint: 'Pre-fills the Post-a-trip form.' },
   { key: 'defaultGstAmount', label: 'Default GST (₹)', min: 0, hint: 'Flat rupee amount per trip (NOT a percentage). Pre-fills the Post-a-trip form.' },
   { key: 'defaultDriverBata', label: 'Default driver bata (₹ / day)', min: 0, hint: 'Per-day amount. Multi-day trips multiply this by the day count automatically.' },
-  { key: 'maxActiveVacanciesPerDriver', label: 'Max active "I\'m available" posts per driver', min: 1, max: 10, hint: 'Soft enforcement — lowering this doesn\'t cancel existing posts; only new posts see the new ceiling.' },
-  { key: 'inviteMaxRadiusKm', label: 'Invite radius from driver vacancy (km)', min: 1, max: 200, hint: 'When an agent invites a driver from that driver\'s "I\'m available" post, the trip\'s pickup must be within this many km of the vacancy\'s announced city.' },
+  { key: 'maxActiveVacanciesPerDriver', label: 'Max active "I\'m vacant" posts per driver', min: 1, max: 10, hint: 'Soft enforcement — lowering this doesn\'t cancel existing posts; only new posts see the new ceiling.' },
+  { key: 'inviteMaxRadiusKm', label: 'Invite radius from driver vacancy (km)', min: 1, max: 200, hint: 'When an agent invites a driver from that driver\'s "I\'m vacant" post, the trip\'s pickup must be within this many km of the vacancy\'s announced city.' },
 ];
 
 /** Single-row platform config — the 8 `app_settings` fields. */

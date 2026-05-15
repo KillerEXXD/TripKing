@@ -4,7 +4,6 @@
  * The image itself carries the details; per product, it has no QR code and no URL printed
  * on it — the link lives only in the text caption.
  */
-import { toBlob } from 'html-to-image';
 import { formatINR, formatKm } from '@/lib/utils';
 import type { Trip, Waypoint } from '@/types';
 
@@ -132,8 +131,12 @@ export function buildShareCaption(trip: Trip, opts: { withUrl?: boolean } = { wi
   return lines.join('\n');
 }
 
-/** Snapshot a DOM node to a PNG blob (2× for retina; white bg so it's not black on Telegram). */
+/** Snapshot a DOM node to a PNG blob (2× for retina; white bg so it's not black on Telegram).
+ *  `html-to-image` is dynamically imported — keeps the lib out of the initial chunk for
+ *  every page that touches a Trip (RouteChain pulls in `shareVariant`/`VARIANT_LABEL` from
+ *  this module on every trip card), avoiding the cssRules SecurityError noise on page load. */
 export async function nodeToPngBlob(node: HTMLElement): Promise<Blob> {
+  const { toBlob } = await import('html-to-image');
   const blob = await toBlob(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
   if (!blob) throw new Error('html-to-image returned no blob');
   return blob;
