@@ -856,15 +856,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const rows = (data ?? []).map((r) => {
       const rec = r as Record<string, unknown>;
       const t = rec.trip as Record<string, unknown> | null;
-      // the caller is an applicant (not yet assigned) on these trips. They DID apply, so by the
-      // `can_reveal_agent` predicate they're entitled to the poster's name/phone — keep it. Strip OTP only.
+      // Migration 038 tightened `can_reveal_agent`: only acceptances in ('selected','accepted')
+      // (or admin/self) reveal the poster's name/phone. The driver-scoped query above means the
+      // caller is a driver, so admin/self aren't in play here — we can check the row's own status.
       if (t) {
         delete t.passenger_otp_hash; delete t.passenger_otp;
-        // strip passenger PII (irrelevant to the applicant) but keep posted_by_*; flatten posted_by_handle
         delete t.passenger_name; delete t.passenger_phone;
         const posterUser = t.posted_by_user as Record<string, unknown> | null | undefined;
         t.posted_by_handle = posterUser && typeof posterUser.display_handle === 'string' ? posterUser.display_handle : null;
         delete t.posted_by_user;
+        const accStatus = rec.status as string | undefined;
+        if (accStatus !== 'selected' && accStatus !== 'accepted') {
+          delete t.posted_by_name;
+          delete t.posted_by_phone;
+        }
         scrubTripText(t);
         sortWaypoints(t);
       }

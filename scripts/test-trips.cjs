@@ -121,6 +121,15 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const applied = await j('GET', '/trips/applied', { token: dToken });
   const mineApp = (applied.json?.data || []).find((a) => a.trip_id === tid);
   check('GET /trips/applied (driver) → contains my application + its browse-safe joined trip', applied.status === 200 && !!mineApp && mineApp.id === aid && !!mineApp.trip?.from_city?.name && !has(mineApp.trip, 'passenger_phone'), `${JSON.stringify(applied.json?.data || applied.json?.error || '').slice(0, 200)}`);
+  // Migration 038: an applied-but-not-yet-picked driver must NOT see the agent's name/phone.
+  // can_reveal_agent now requires acceptance status in ('selected','accepted').
+  check("GET /trips/applied (applied-only) → posted_by_name / posted_by_phone hidden",
+    !mineApp?.trip?.posted_by_name && !mineApp?.trip?.posted_by_phone,
+    `name=${JSON.stringify(mineApp?.trip?.posted_by_name)} phone=${JSON.stringify(mineApp?.trip?.posted_by_phone)}`);
+  const pPreSelect = (await j('GET', `/trips/${tid}`, { token: dToken })).json?.data || {};
+  check("GET /trips/:id (applied-only driver) → posted_by_name / posted_by_phone hidden",
+    !pPreSelect.posted_by_name && !pPreSelect.posted_by_phone,
+    `name=${JSON.stringify(pPreSelect.posted_by_name)} phone=${JSON.stringify(pPreSelect.posted_by_phone)}`);
 
   // Phase 2 of the two-step handshake: assign now produces `selected` (NOT `assigned`) and does
   // not generate the OTP — the driver must POST /accept first.
