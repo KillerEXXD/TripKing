@@ -516,10 +516,10 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
   }
   const busy = acceptMutation.isPending || declineMutation.isPending;
   return (
-    <Card className="border-emerald-300 bg-emerald-50">
+    <Card className="border-2 border-emerald-300 bg-emerald-50">
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
           {trip.acceptanceDeadlineAt ? (
             <CountdownTimer
               deadline={trip.acceptanceDeadlineAt}
@@ -576,10 +576,10 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
     }
   }
   return (
-    <Card className="border-amber-300 bg-amber-50">
+    <Card className="border-2 border-amber-300 bg-amber-50">
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Awaiting acceptance</div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Awaiting acceptance</div>
           {trip.acceptanceDeadlineAt ? (
             <CountdownTimer
               deadline={trip.acceptanceDeadlineAt}
@@ -701,8 +701,8 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {showTracking ? <TripTracking trip={trip} /> : null}
 
       {viewer.isPoster && trip.passengerOtp && (trip.status === 'accepted' || trip.status === 'in_progress') ? (
-        <Card className="gap-2 border-emerald-300 bg-emerald-50">
-          <div className="text-sm font-semibold text-emerald-900">Passenger OTP</div>
+        <Card className="gap-2 border-2 border-emerald-300 bg-emerald-50">
+          <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Passenger OTP</div>
           <div className="text-center font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900">{trip.passengerOtp}</div>
           <p className="text-xs text-emerald-800">
             Share this code with your passenger. The driver enters it when they meet to start the trip.
