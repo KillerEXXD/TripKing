@@ -56,10 +56,14 @@ export function useFinalizeVideoCall() {
     onSuccess: (vv) => {
       void qc.invalidateQueries({ queryKey: ['video-verifications'] });
       void qc.invalidateQueries({ queryKey: ['video-verification', vv.id] });
-      if (vv.driverId) void qc.invalidateQueries({ queryKey: ['driver', vv.driverId] });
-      if (vv.managerId) void qc.invalidateQueries({ queryKey: ['agent', vv.managerId] });
-      void qc.invalidateQueries({ queryKey: ['drivers'] });
-      void qc.invalidateQueries({ queryKey: ['agents'] });
+      if (vv.driverId) {
+        void qc.invalidateQueries({ queryKey: ['driver', vv.driverId] });
+        void qc.invalidateQueries({ queryKey: ['drivers'] });
+      }
+      if (vv.managerId) {
+        void qc.invalidateQueries({ queryKey: ['agent', vv.managerId] });
+        void qc.invalidateQueries({ queryKey: ['agents'] });
+      }
     },
   });
 }
@@ -71,10 +75,14 @@ export function useSetVideoCallStatus() {
     onSuccess: (vv) => {
       void qc.invalidateQueries({ queryKey: ['video-verifications'] });
       void qc.invalidateQueries({ queryKey: ['video-verification', vv.id] });
-      if (vv.driverId) void qc.invalidateQueries({ queryKey: ['driver', vv.driverId] });
-      if (vv.managerId) void qc.invalidateQueries({ queryKey: ['agent', vv.managerId] });
-      void qc.invalidateQueries({ queryKey: ['drivers'] });
-      void qc.invalidateQueries({ queryKey: ['agents'] });
+      if (vv.driverId) {
+        void qc.invalidateQueries({ queryKey: ['driver', vv.driverId] });
+        void qc.invalidateQueries({ queryKey: ['drivers'] });
+      }
+      if (vv.managerId) {
+        void qc.invalidateQueries({ queryKey: ['agent', vv.managerId] });
+        void qc.invalidateQueries({ queryKey: ['agents'] });
+      }
     },
   });
 }

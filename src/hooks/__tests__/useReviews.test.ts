@@ -42,7 +42,7 @@ describe('useReviews hooks', () => {
       await result.current.mutateAsync({ rateeUserId: 'u9' } as never);
     });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['reviews'] });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['driver'] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['driver', 'u9'] });
   });
 
   it('useReportReview + useModerateReview invalidate the reviews cache', async () => {

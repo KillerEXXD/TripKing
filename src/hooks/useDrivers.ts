@@ -159,6 +159,7 @@ export function useSubmitDriverKycDocs() {
     onSuccess: (d) => {
       void qc.invalidateQueries({ queryKey: ['driver', 'me'] });
       void qc.invalidateQueries({ queryKey: ['driver', d.id] });
+      void qc.invalidateQueries({ queryKey: ['drivers'] });
     },
   });
 }
@@ -169,6 +170,7 @@ export function useSubmitAgentKycDocs() {
     onSuccess: (a) => {
       void qc.invalidateQueries({ queryKey: ['agent', 'me'] });
       void qc.invalidateQueries({ queryKey: ['agent', a.id] });
+      void qc.invalidateQueries({ queryKey: ['agents'] });
     },
   });
 }
