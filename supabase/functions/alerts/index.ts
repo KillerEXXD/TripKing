@@ -24,6 +24,15 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { authUser, isAdmin } from '../_shared/auth.ts';
 import { readBody, pgFail } from '../_shared/http.ts';
+import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { CacheTTL } from '../_shared/cache.ts';
+import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
+import { setCacheControl } from '../_shared/httpCache.ts';
+
+// LIVE tier — short TTL, shared cache (Postgres `api_cache`) keyed by the caller's user id.
+// The list is owner-scoped (RLS via `eq('user_id', u.id)`), so each user gets their own cache row.
+// Mutations invalidate by entityKind='alert', entityId=<the owner's user id>. Bump on shape changes.
+const CACHE_EPOCH = 'v1';
 
 const ALERT_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*)';
 const WRITABLE = [
@@ -57,11 +66,17 @@ const handler = withTiming('alerts', async (req: Request): Promise<Response> => 
   const u = await authUser(db, req);
   if (!u) return fail('UNAUTHORIZED', 'Sign in to manage alerts', 401);
 
-  // ── GET /alerts (the caller's) ───────────────────────────────────────────
+  // ── GET /alerts (the caller's) — LIVE tier, per-user shared cache ────────
   if (!id && req.method === 'GET') {
-    const { data, error } = await db.from('alerts').select(ALERT_SELECT).eq('user_id', u.id).order('created_at', { ascending: false }).limit(200);
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    const { data, hit } = await withCache<Record<string, unknown>[]>(
+      { key: `alerts:list:user-${u.id}:${CACHE_EPOCH}`, ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'alert', entityId: u.id },
+      async () => {
+        const { data, error } = await db.from('alerts').select(ALERT_SELECT).eq('user_id', u.id).order('created_at', { ascending: false }).limit(200);
+        if (error) throw new Error(error.message);
+        return (data ?? []) as Record<string, unknown>[];
+      },
+    );
+    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.SHORT, scope: 'private' });
   }
 
   // ── POST /alerts ─────────────────────────────────────────────────────────
@@ -72,6 +87,7 @@ const handler = withTiming('alerts', async (req: Request): Promise<Response> => 
     if (!insert.from_city_id || typeof insert.from_city_id !== 'string') return fail('VALIDATION', 'from_city_id is required', 422);
     const { data: created, error } = await db.from('alerts').insert(insert).select('id').single();
     if (error) return pgFail(error);
+    await sharedCacheInvalidateEntity('alert', u.id);
     return fullAlert(created.id as string);
   }
 
@@ -95,6 +111,7 @@ const handler = withTiming('alerts', async (req: Request): Promise<Response> => 
     if (Object.keys(patch).length === 0) return fail('VALIDATION', 'Nothing to update', 422);
     const { error } = await db.from('alerts').update(patch).eq('id', id);
     if (error) return pgFail(error);
+    await sharedCacheInvalidateEntity('alert', u.id);
     return fullAlert(id);
   }
 
@@ -103,6 +120,7 @@ const handler = withTiming('alerts', async (req: Request): Promise<Response> => 
     if (!owner) return fail('FORBIDDEN', 'Not your alert', 403);
     const { error } = await db.from('alerts').delete().eq('id', id);
     if (error) return pgFail(error);
+    await sharedCacheInvalidateEntity('alert', u.id);
     return ok({ deleted: id });
   }
 
