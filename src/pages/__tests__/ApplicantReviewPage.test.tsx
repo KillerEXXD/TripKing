@@ -143,11 +143,11 @@ describe('ApplicantReviewPage', () => {
     expect(rejectMut.mutate).toHaveBeenCalledWith({ tripId: 't1', acceptanceId: 'acc2' }, expect.anything());
   });
 
-  it('a non-poster sees the list read-only with a note', () => {
+  it('a non-poster sees an explainer instead of the applicants list (the API would 403)', () => {
     setAuth(driver);
     setApplicants({ data: [makeAcceptance()] });
     renderPage();
-    expect(screen.getByText(/only the trip poster can select/i)).toBeInTheDocument();
+    expect(screen.getByText(/only the trip poster can see who applied/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /select this driver/i })).toBeNull();
   });
 
