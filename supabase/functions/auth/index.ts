@@ -33,7 +33,8 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 import { bearer } from '../_shared/auth.ts';
 import { readBody } from '../_shared/http.ts';
 
-const CACHE_EPOCH = 'v1';
+// v2 (2026-05-15): added referral_code + referred_by_user_id (migration 042 / Stage 1).
+const CACHE_EPOCH = 'v2';
 
 const DEV_OTP = '12345'; // PLACEHOLDER default until a real SMS provider is wired (see TODO above)
 type Db = ReturnType<typeof serviceClient>;
@@ -60,7 +61,11 @@ async function findAuthUserForPhone(db: Db, phone: string): Promise<{ id: string
 }
 
 async function publicUser(db: Db, id: string) {
-  const { data, error } = await db.from('users').select('id, role, phone, email, display_name, preferred_language, is_active').eq('id', id).maybeSingle();
+  const { data, error } = await db
+    .from('users')
+    .select('id, role, phone, email, display_name, preferred_language, is_active, referral_code, referred_by_user_id')
+    .eq('id', id)
+    .maybeSingle();
   if (error) throw new Error(error.message);
   return data;
 }
@@ -118,6 +123,12 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     const password = await derivedPassword(phone);
     const email = syntheticEmail(phone);
     const displayName = typeof body.display_name === 'string' ? body.display_name : '';
+    // Optional referral attribution. Only applied for NEW users (the immutability guard
+    // in migration 042 enforces this server-side too — a returning user's referred_by_user_id
+    // is never overwritten). Unknown / self-referral / second-attempt are ignored silently
+    // for sign-in (we don't want to break a returning user's session over a stale URL param)
+    // but reported so the client can show feedback to brand-new users on their first signup.
+    const referralCodeIn = typeof body.referral_code === 'string' ? body.referral_code.trim().toUpperCase() : '';
     // Self-signup as 'admin' is dev-only. In production (TRIPKING_DEV_MODE !== 'true') it's rejected —
     // admins are provisioned out-of-band: the first one via SQL, thereafter via PATCH /admin/users/:id
     // by an existing admin. Defaults to dev mode because the dev-OTP placeholder relies on it; flip
@@ -152,13 +163,34 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
     // handle_new_user trigger usually does this from user_metadata; this is a safety net). For an
     // EXISTING user, DON'T clobber their role/display_name on sign-in — role changes go through
     // POST /drivers|/agents (or an admin grant), not by re-authenticating.
+    let referralAttribution: 'attached' | 'self_referral_blocked' | 'unknown_code' | 'already_attributed' | 'invalid' | 'none' = 'none';
     if (existing) {
       await db.from('users').upsert({ id: userId, phone }, { onConflict: 'id', ignoreDuplicates: true });
+      // Returning user — referred_by_user_id is immutable (migration 042 guard). Surface why.
+      if (referralCodeIn) {
+        const { data: existingRow } = await db.from('users').select('referred_by_user_id').eq('id', userId).maybeSingle();
+        referralAttribution = existingRow?.referred_by_user_id ? 'already_attributed' : 'invalid';
+      }
     } else {
+      // NEW user — try to resolve referral_code → referrer_user_id. Self-referral and unknown
+      // codes are reported but never block signup.
+      let referredByUserId: string | null = null;
+      if (referralCodeIn) {
+        const { data: ref } = await db.from('users').select('id').eq('referral_code', referralCodeIn).maybeSingle();
+        if (!ref) {
+          referralAttribution = 'unknown_code';
+        } else if (ref.id === userId) {
+          // unreachable in practice (we only just created the auth user) but defence in depth
+          referralAttribution = 'self_referral_blocked';
+        } else {
+          referredByUserId = ref.id as string;
+        }
+      }
       await db.from('users').upsert(
-        { id: userId, phone, display_name: displayName || undefined, role },
+        { id: userId, phone, display_name: displayName || undefined, role, referred_by_user_id: referredByUserId },
         { onConflict: 'id', ignoreDuplicates: false },
       );
+      if (referredByUserId) referralAttribution = 'attached';
     }
     const u = await publicUser(db, userId);
     // account-level kill switch — a suspended user can't get a session (orthogonal to KYC; flipped by an admin)
@@ -166,7 +198,12 @@ const handler = withTiming('auth', async (req: Request): Promise<Response> => {
       return fail('ACCOUNT_SUSPENDED', 'This account has been suspended. Please contact support.', 403);
     }
 
-    return ok({ user: u, access_token: signIn.session.access_token, refresh_token: signIn.session.refresh_token });
+    return ok({
+      user: u,
+      access_token: signIn.session.access_token,
+      refresh_token: signIn.session.refresh_token,
+      referral_attribution: referralAttribution,
+    });
   }
 
   // ── POST /auth/refresh ───────────────────────────────────────────────────

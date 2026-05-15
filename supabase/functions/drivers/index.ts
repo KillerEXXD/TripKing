@@ -36,9 +36,11 @@ import { readBody, pgFail } from '../_shared/http.ts';
 import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 
 // Bump on response-shape changes — wipes every cached /me without a manual purge.
+// v3 (2026-05-15): added `referral_code` to the user join + `referral` summary block on /me
+// (Stage 1 of the referral program; migration 042).
 // v2 (2026-05-14): added `can_report_bugs` to the flattened shape; stale v1
 // cache entries were tripping `MISSING_CAN_REPORT_BUGS` on the client transform.
-const CACHE_EPOCH = 'v2';
+const CACHE_EPOCH = 'v3';
 function invalidateDriverMe(userId: string): void {
   cacheDelete(`drivers:me:user-${userId}:${CACHE_EPOCH}`);
 }
@@ -63,9 +65,9 @@ function purgeVacanciesFor(driverId: string): void {
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
 const DRIVER_SELECT =
-  '*, user:users!user_id(display_handle, can_report_bugs), home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
+  '*, user:users!user_id(display_handle, can_report_bugs, referral_code, referred_by_user_id), home_city:cities!home_city_id(*), current_city:cities!current_city_id(*), ' +
   'vehicles(id, year, seats, ac, is_primary, is_active, registration_number, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
-const AGENT_SELECT = '*, user:users!user_id(display_handle), business_city:cities!business_city_id(*)';
+const AGENT_SELECT = '*, user:users!user_id(display_handle, referral_code, referred_by_user_id), business_city:cities!business_city_id(*)';
 
 // fields that must not be exposed to anyone other than the owning driver or an admin
 const PRIVATE_KYC_FIELDS = [
@@ -99,15 +101,43 @@ const stripPrivateKyc = (drv: Row): Row => {
   for (const f of PRIVATE_KYC_FIELDS) delete out[f];
   return out;
 };
-/** Flatten the joined `user:{display_handle, can_report_bugs}` onto the row. Non-mutating. */
+/** Flatten the joined `user:{display_handle, can_report_bugs, referral_code, referred_by_user_id}` onto the row. Non-mutating. */
 function flattenHandle(row: Row | null | undefined): Row | null {
   if (!row) return (row ?? null) as null;
   const out = { ...row };
   const u = out.user as Record<string, unknown> | null | undefined;
   out.display_handle = u && typeof u.display_handle === 'string' ? u.display_handle : null;
   out.can_report_bugs = u && typeof u.can_report_bugs === 'boolean' ? u.can_report_bugs : false;
+  out.referral_code = u && typeof u.referral_code === 'string' ? u.referral_code : null;
+  out.referred_by_user_id = u && typeof u.referred_by_user_id === 'string' ? u.referred_by_user_id : null;
   delete out.user;
   return out;
+}
+
+/**
+ * Stage-1 referral summary stub. Returned on the owner's GET /drivers/me (and the agent
+ * equivalent). Numbers are zero until Stage 4 ships the accrual ledger; this just gives
+ * the frontend a stable shape to bind to from day one.
+ *
+ * Future: read from referral_links + referral_balances views (Stage 4) and per-tier state
+ * (Stage 5). The shape extends naturally — only the numbers move.
+ */
+function buildReferralStub(row: Row): Row {
+  return {
+    code: typeof row.referral_code === 'string' ? row.referral_code : null,
+    referred_by_user_id: typeof row.referred_by_user_id === 'string' ? row.referred_by_user_id : null,
+    summary: {
+      total_referred: 0,
+      verified_referrals: 0,
+      qualified_referrals: 0,
+      earning_active: 0,
+      cap_reached: 0,
+      lifetime_earned_paise: 0,
+      pending_paise: 0,
+      released_paise: 0,
+      withdrawable_paise: 0,
+    },
+  };
 }
 
 /** server-computed onboarding/verification summary — the client just renders this. */
@@ -344,7 +374,8 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
         const driverId = data.id as string;
         const row = await fetchDriver(driverId);
         if (!row) return { ok: false, reason: 'no_profile' };
-        return { ok: true, body: { ...(flattenHandle(row) as Row), verification: await buildVerification(db, row) } };
+        const flat = flattenHandle(row) as Row;
+        return { ok: true, body: { ...flat, verification: await buildVerification(db, row), referral: buildReferralStub(flat) } };
       },
     );
     if (!payload.ok) return fail('NOT_FOUND', 'No driver profile yet — create one with POST /drivers', 404);
