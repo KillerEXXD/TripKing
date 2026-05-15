@@ -147,9 +147,15 @@ export function IAmAvailableCard({ driverId }: Props) {
 
   return (
     <div className="mx-4 mt-3" data-testid="i-am-available-card">
-      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50">
+      {/*
+        Visually matches the PriorityCard emerald tone (border-2, hover) but uses a bespoke layout
+        because the header carries both a toggle AND a secondary Post button, plus an expandable
+        list below. Migrate to PriorityCard once it supports a header right-slot — see
+        docs/CARD_DESIGN_SYSTEM_RFC.md PR 6.
+      */}
+      <div className="overflow-hidden rounded-2xl border-2 border-emerald-300 bg-emerald-50 transition-colors hover:bg-emerald-100/60">
         <div
-          className={`flex items-start gap-3 p-4 ${hasList ? 'cursor-pointer hover:bg-emerald-100/40' : ''}`}
+          className={`flex items-start gap-3 p-4 ${hasList ? 'cursor-pointer' : ''}`}
           {...(hasList
             ? {
                 role: 'button',

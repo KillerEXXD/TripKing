@@ -50,10 +50,9 @@ function renderCard(trips: Trip[]) {
 }
 
 describe('InvitesSentCard', () => {
-  it('renders the empty state when no trip has pending invitations', () => {
-    renderCard([makeTrip({ pendingInvitationCount: 0 })]);
-    expect(screen.getByText(/no pending invites/i)).toBeInTheDocument();
-    expect(screen.queryByRole('link')).toBeNull();
+  it('renders nothing when no trip has pending invitations (consistent with the hide-empty pattern)', () => {
+    const { container } = renderCard([makeTrip({ pendingInvitationCount: 0 })]);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('links to the single trip\'s invitations page when exactly one trip has pending invites', () => {

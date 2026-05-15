@@ -235,7 +235,6 @@ function DriverHome({ driver }: { driver: Driver }) {
   const nearby = nearbyQuery.data ?? [];
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
-  const hasPendingInvites = myPosts.some((t) => (t.pendingInvitationCount ?? 0) > 0);
   // Belt-and-braces: also exclude trips the driver has already applied to. The backend trigger
   // sync_trip_invitation_on_apply (migration 033) flips the invitation pending → applied when
   // the driver applies, but a re-invite from the agent rewrites the row back to pending — this
@@ -303,7 +302,7 @@ function DriverHome({ driver }: { driver: Driver }) {
         {postedWithApplicants > 0 ? (
           <ActionCard tone="amber" icon={<Sparkles className="size-5" aria-hidden />} title={`${postedWithApplicants} trip you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`} hint="Review applicants and pick a driver." to="/posted-trips" />
         ) : null}
-        {hasPendingInvites ? <InvitesSentCard trips={myPosts} /> : null}
+        <InvitesSentCard trips={myPosts} />
       </div>
 
       <div className="px-4 pt-3">
