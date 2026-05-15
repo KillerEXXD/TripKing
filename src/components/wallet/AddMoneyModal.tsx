@@ -32,13 +32,11 @@ export function AddMoneyModal({ onClose }: Props) {
     if (!isValid) return;
     try {
       const init = await initiate.mutateAsync({ amountPaise: rupees * 100 });
-      if (init.stubbed) {
-        const result = await verify.mutateAsync({ topupId: init.topupId });
-        toast.success(`Added ${formatINR(rupees)} to your wallet (test mode)`);
-        if (result.alreadyCredited) toast.info('Already credited');
+      const result = await verify.mutateAsync({ topupId: init.topupId });
+      if (result.alreadyCredited) {
+        toast.info('Already credited');
       } else {
-        // Real Razorpay flow lands when credentials are wired (Stage 2 backend ships stubbed today).
-        toast.error('Razorpay checkout not yet wired — please try again later');
+        toast.success(`Added ${formatINR(rupees)} to your wallet`);
       }
       onClose();
     } catch {
@@ -93,7 +91,7 @@ export function AddMoneyModal({ onClose }: Props) {
               {busy ? 'Processing…' : `Add ${formatINR(rupees || 0)}`}
             </Button>
 
-            <p className="text-center text-[11px] text-secondary">Powered by Razorpay (test mode while in development)</p>
+            <p className="text-center text-[11px] text-secondary">UPI / card top-ups via Razorpay coming soon — for now top-ups credit instantly.</p>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
