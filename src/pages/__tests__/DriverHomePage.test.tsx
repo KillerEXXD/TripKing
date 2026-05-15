@@ -148,8 +148,20 @@ describe('DriverHomePage', () => {
     });
     renderHome();
     const card = screen.getByRole('link', { name: /invitation to drive vellore to bangalore/i });
-    expect(card).toHaveAttribute('href', '/trips/inv-9');
+    expect(card).toHaveAttribute('href', '/trips/inv-9?from=/');
     expect(card).toHaveTextContent(/accept or decline/i);
+  });
+
+  it('hides the Invitation-waiting card when the driver has already applied to that trip', async () => {
+    const invited = makeTrip({ id: 'inv-9', toCity: city('c8', 'Bangalore'), invitationId: 'iv-1', invitationStatus: 'pending' });
+    vi.mocked(useTrips).mockImplementation((args) => {
+      const isInvited = !!args && (args as { invited?: string }).invited === 'me';
+      return { isPending: false, isError: false, isSuccess: true, data: isInvited ? [invited] : [], refetch: vi.fn() } as never;
+    });
+    const { useMyApplications } = await import('@/hooks/useTrips');
+    vi.mocked(useMyApplications).mockReturnValueOnce({ isPending: false, isError: false, isSuccess: true, data: [{ acceptanceId: 'a1', status: 'applied', appliedAt: '2099-05-30T00:00:00Z', trip: invited }], refetch: vi.fn() } as never);
+    renderHome();
+    expect(screen.queryByRole('link', { name: /invitation to drive vellore to bangalore/i })).toBeNull();
   });
 
   it('priority stack: hides "Driving now" when no in-progress trip; hides Review when no selected apps; I\'m vacant always renders', () => {

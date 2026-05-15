@@ -58,7 +58,8 @@ describe('InvitesReceivedCard', () => {
   it('links to the trip detail with route + payout when there is exactly one invitation', () => {
     renderCard([makeTrip({ id: 'inv-1', driverPayout: 3000 })]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/trips/inv-1');
+    // ?from=/ tells TripDetailPage's back button to return to driver Home, not /my-trips.
+    expect(link).toHaveAttribute('href', '/trips/inv-1?from=/');
     expect(link).toHaveTextContent(/vellore → chennai/i);
     expect(link).toHaveTextContent(/accept or decline/i);
   });

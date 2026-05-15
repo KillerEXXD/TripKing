@@ -37,25 +37,27 @@ function Bellish({ count }: { count: number }) {
 
 function ReputationCard({ driver }: { driver: Driver }) {
   return (
-    <Link to={`/drivers/${driver.id}`} className="block w-full space-y-2 rounded-xl border bg-white px-3 py-2.5 text-left transition-colors hover:border-primary/40">
-      <div className="text-[10px] font-semibold uppercase tracking-wider text-secondary">Your reputation</div>
+    <Link to={`/drivers/${driver.id}`} className="block w-full space-y-2 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 text-left transition-colors hover:bg-amber-100">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+        <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden /> Your reputation
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg border border-amber-100 bg-amber-50 px-2.5 py-2">
+        <div className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-2">
           <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">From passengers</div>
-          <div className="flex items-center gap-1 text-sm font-bold">
+          <div className="flex items-center gap-1 text-sm font-bold text-amber-950">
             <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />
             {driver.ratingCount > 0 ? `${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount}` : '— · no ratings'}
           </div>
-          <div className="mt-0.5 truncate text-[10px] text-secondary">{driver.topTags[0] ?? 'Complete trips to earn tags'}</div>
+          <div className="mt-0.5 truncate text-[10px] text-amber-800/80">{driver.topTags[0] ?? 'Complete trips to earn tags'}</div>
         </div>
-        <div className="rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-2">
-          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-blue-800">From agents</div>
-          <div className="text-sm font-bold">{driver.totalTripsCompleted} trips</div>
-          <div className="mt-0.5 truncate text-[10px] text-secondary">{driver.managerTopTags[0] ?? 'Run agent trips to earn tags'}</div>
+        <div className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-2">
+          <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">From agents</div>
+          <div className="text-sm font-bold text-amber-950">{driver.totalTripsCompleted} trips</div>
+          <div className="mt-0.5 truncate text-[10px] text-amber-800/80">{driver.managerTopTags[0] ?? 'Run agent trips to earn tags'}</div>
         </div>
       </div>
-      <div className="flex items-center gap-1 text-[10px] text-secondary">
-        <ChevronRight className="size-3" aria-hidden /> View full profile
+      <div className="inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
+        View full profile <ChevronRight className="size-4" aria-hidden />
       </div>
     </Link>
   );
@@ -252,7 +254,14 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
   const hasPendingInvites = myPosts.some((t) => (t.pendingInvitationCount ?? 0) > 0);
-  const pendingReceivedInvites = (invitedToDriveQuery.data ?? []).filter((t) => t.invitationStatus === 'pending');
+  // Belt-and-braces: also exclude trips the driver has already applied to. The backend trigger
+  // sync_trip_invitation_on_apply (migration 033) flips the invitation pending → applied when
+  // the driver applies, but a re-invite from the agent rewrites the row back to pending — this
+  // client-side guard hides those without depending on a clean backend state.
+  const appliedTripIds = new Set((myApplicationsQuery.data ?? []).map((a) => a.trip.id));
+  const pendingReceivedInvites = (invitedToDriveQuery.data ?? []).filter(
+    (t) => t.invitationStatus === 'pending' && !appliedTripIds.has(t.id),
+  );
 
   // Priority cards: a driver has at most one trip in each of these states at a time.
   const myDriving = myDrivingQuery.data ?? [];
@@ -293,15 +302,19 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        <Link to="/my-earnings" className="flex items-center gap-3 rounded-xl border bg-gradient-to-br from-emerald-50 to-emerald-100/40 px-4 py-3 transition-colors hover:border-primary/40">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-            <TrendingUp className="size-5" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">Your earnings</span>
-            <span className="block text-xs text-secondary">Trips, payouts and monthly trend</span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
+        <Link to="/my-earnings" className="block rounded-2xl border-2 border-teal-300 bg-teal-50 p-4 transition-colors hover:bg-teal-100">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-teal-700">
+            <TrendingUp className="size-3.5" aria-hidden /> Your earnings
+          </div>
+          <div className="mt-1 text-lg font-bold text-teal-950">
+            Trips, payouts & monthly trend
+          </div>
+          <div className="mt-0.5 text-xs text-teal-800">
+            See what you've earned and where you're trending.
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-teal-700 px-4 py-1.5 text-sm font-semibold text-white">
+            View earnings <ChevronRight className="size-4" aria-hidden />
+          </div>
         </Link>
       </div>
 

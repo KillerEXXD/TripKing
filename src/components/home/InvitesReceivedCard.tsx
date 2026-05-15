@@ -18,7 +18,7 @@ export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
     const trip = trips[0];
     return (
       <Link
-        to={`/trips/${trip.id}`}
+        to={`/trips/${trip.id}?from=/`}
         aria-label={`Invitation to drive ${trip.fromCity.name} to ${trip.toCity.name} — tap to accept or decline`}
         className="block rounded-2xl border-2 border-indigo-300 bg-indigo-50 p-4 transition-colors hover:bg-indigo-100"
       >
