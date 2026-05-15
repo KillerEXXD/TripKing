@@ -6,8 +6,11 @@ import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
 
 vi.mock('@/components/trip/InviteDriversCard', () => ({ InviteDriversCard: () => null }));
-vi.mock('@/hooks/useTrips', () => ({ useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useAcceptTrip: vi.fn(() => ({ mutate: vi.fn(), isPending: false })), useDeclineTrip: vi.fn(() => ({ mutate: vi.fn(), isPending: false })), useCancelAssignment: vi.fn(() => ({ mutate: vi.fn(), isPending: false })), isTripLive: vi.fn(() => false) }));
-import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => {
+  const noOverlap = Object.freeze({ isPending: false, isSuccess: true, data: Object.freeze([]) });
+  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
+});
+import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger, useAcceptTrip, useDeclineTrip, useCancelAssignment } from '@/hooks/useTrips';
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(() => ({ data: null, isFetching: false, isSuccess: false })), isLookupablePhone: vi.fn(() => false) }));
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
 import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
@@ -103,18 +106,29 @@ let withdrawMutateAsync: ReturnType<typeof vi.fn>;
 let startMutateAsync: ReturnType<typeof vi.fn>;
 let completeMutateAsync: ReturnType<typeof vi.fn>;
 let cancelMutateAsync: ReturnType<typeof vi.fn>;
+let acceptMutateAsync: ReturnType<typeof vi.fn>;
+let declineMutateAsync: ReturnType<typeof vi.fn>;
+let cancelAssignMutateAsync: ReturnType<typeof vi.fn>;
+let updatePassengerMutateAsync: ReturnType<typeof vi.fn>;
 function setMutations() {
   applyMutateAsync = vi.fn().mockResolvedValue({ id: 'a1', appliedAt: '2099-05-31T00:00:00.000Z' });
   withdrawMutateAsync = vi.fn().mockResolvedValue(undefined);
   startMutateAsync = vi.fn().mockResolvedValue({});
   completeMutateAsync = vi.fn().mockResolvedValue({});
   cancelMutateAsync = vi.fn().mockResolvedValue({});
+  acceptMutateAsync = vi.fn().mockResolvedValue({});
+  declineMutateAsync = vi.fn().mockResolvedValue({});
+  cancelAssignMutateAsync = vi.fn().mockResolvedValue({});
+  updatePassengerMutateAsync = vi.fn().mockResolvedValue({});
   vi.mocked(useApplyToTrip).mockReturnValue({ mutateAsync: applyMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync: withdrawMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useStartTrip).mockReturnValue({ mutateAsync: startMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useCompleteTrip).mockReturnValue({ mutateAsync: completeMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useCancelTrip).mockReturnValue({ mutateAsync: cancelMutateAsync, isPending: false, isError: false } as never);
-  vi.mocked(useUpdateTripPassenger).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue({}), isPending: false, isError: false } as never);
+  vi.mocked(useUpdateTripPassenger).mockReturnValue({ mutateAsync: updatePassengerMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useAcceptTrip).mockReturnValue({ mutateAsync: acceptMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useDeclineTrip).mockReturnValue({ mutateAsync: declineMutateAsync, isPending: false, isError: false } as never);
+  vi.mocked(useCancelAssignment).mockReturnValue({ mutateAsync: cancelAssignMutateAsync, isPending: false, isError: false } as never);
 }
 const CANCEL_REASONS = [
   { id: 'cr1', label: 'Passenger no longer needs the ride', appliesTo: 'both', sortOrder: 1, isActive: true },
@@ -317,6 +331,144 @@ describe('TripDetailPage', () => {
     vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
     setTrip({ data: makeTrip({ status: 'in_progress' }) });
     renderDetail();
+    expect(screen.queryByRole('button', { name: /cancel this trip/i })).toBeNull();
+  });
+
+  // ── Selected handshake ────────────────────────────────────────────────────
+
+  it('the selected driver sees the Accept card and Accept calls the accept mutation (no overlapping applications)', async () => {
+    setTrip({ data: makeTrip({ status: 'selected', assignedDriverId: 'd1' }) });
+    renderDetail();
+    expect(screen.getByText(/you've been selected/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^accept$/i }));
+    await waitFor(() => expect(acceptMutateAsync).toHaveBeenCalledWith({ tripId: 't1', withdrawAcceptanceIds: [] }));
+  });
+
+  it('the selected driver can decline (with a confirm prompt)', async () => {
+    setTrip({ data: makeTrip({ status: 'selected', assignedDriverId: 'd1' }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
+    await waitFor(() => expect(declineMutateAsync).toHaveBeenCalledWith({ tripId: 't1' }));
+    confirmSpy.mockRestore();
+  });
+
+  it("declining cancels if the driver dismisses the confirm prompt", () => {
+    setTrip({ data: makeTrip({ status: 'selected', assignedDriverId: 'd1' }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
+    expect(declineMutateAsync).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('a 409 on accept tells the driver the trip is no longer available', async () => {
+    acceptMutateAsync = vi.fn().mockRejectedValue(new ApiError('Gone', 409));
+    vi.mocked(useAcceptTrip).mockReturnValue({ mutateAsync: acceptMutateAsync, isPending: false, isError: false } as never);
+    setTrip({ data: makeTrip({ status: 'selected', assignedDriverId: 'd1' }) });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /^accept$/i }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no longer available/i)));
+  });
+
+  // ── Agent awaiting acceptance ────────────────────────────────────────────
+
+  it('the poster sees the Awaiting-acceptance banner and can withdraw the selection', async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'selected', assignedDriverHandle: 'Z9X8Y7Q' }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderDetail();
+    expect(screen.getAllByText(/awaiting acceptance/i).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /withdraw selection/i }));
+    await waitFor(() => expect(cancelAssignMutateAsync).toHaveBeenCalledWith({ tripId: 't1' }));
+    confirmSpy.mockRestore();
+  });
+
+  // ── Passenger edit ───────────────────────────────────────────────────────
+
+  it('lets the poster edit passenger details inline and save them', async () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'open' }) });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
+    fireEvent.change(screen.getByLabelText(/passenger name/i), { target: { value: 'New Name' } });
+    fireEvent.click(screen.getByRole('button', { name: /save passenger details/i }));
+    await waitFor(() => expect(updatePassengerMutateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      tripId: 't1',
+      input: expect.objectContaining({ passengerName: 'New Name' }),
+    })));
+  });
+
+  // ── ApplyBar variants ────────────────────────────────────────────────────
+
+  it('shows the rate/note inputs when the driver toggles "Quote a different rate"', () => {
+    setTrip({ data: makeTrip() });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /quote a different rate/i }));
+    expect(screen.getByPlaceholderText(/short note to the manager/i)).toBeInTheDocument();
+  });
+
+  it('shows the multi-vehicle dropdown when the driver has more than one active vehicle', () => {
+    setTrip({ data: makeTrip() });
+    setVehicles({
+      data: [
+        makeVehicle(),
+        makeVehicle({ id: 'v2', makeLabel: 'Maruti', modelName: 'Dzire', registrationNumber: 'TN02CD5678' }),
+      ],
+    });
+    renderDetail();
+    expect(screen.getByRole('combobox', { name: /apply with/i })).toBeInTheDocument();
+  });
+
+  // ── Cancel-reasons states ────────────────────────────────────────────────
+
+  it('shows a loading state for the cancellation-reasons select while it loads', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'open' }) });
+    setCancelReasons({ isPending: true, data: [] });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /cancel this trip/i }));
+    expect(screen.getByText(/loading reasons/i)).toBeInTheDocument();
+  });
+
+  it('shows an error state with retry when cancellation reasons fail to load', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'open' }) });
+    const refetch = vi.fn();
+    setCancelReasons({ isPending: false, isError: true, data: [], refetch });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /cancel this trip/i }));
+    expect(screen.getByText(/couldn't load cancellation reasons/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(refetch).toHaveBeenCalled();
+  });
+
+  it('keep-the-trip button collapses the cancel card without firing the mutation', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'open' }) });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /cancel this trip/i }));
+    expect(screen.getByText(/cancel this trip\?/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /keep the trip/i }));
+    expect(cancelMutateAsync).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /cancel this trip/i })).toBeInTheDocument();
+  });
+
+  // ── Driver-posted trip ───────────────────────────────────────────────────
+
+  it('labels the poster as a driver when the trip was posted by a driver', () => {
+    setTrip({ data: makeTrip({ postedByRole: 'driver' }) });
+    renderDetail();
+    expect(screen.getByText(/another driver passing on a trip/i)).toBeInTheDocument();
+  });
+
+  // ── Status badges ────────────────────────────────────────────────────────
+
+  it('renders the cancelled status badge and hides all driver/poster CTAs', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'cancelled' }) });
+    renderDetail();
+    expect(screen.getByText('Cancelled')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /cancel this trip/i })).toBeNull();
   });
 });
