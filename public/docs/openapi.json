@@ -1413,7 +1413,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress",
+        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress. Rate-limited: 5 attempts per driver+trip per 60s; 6th = 429.",
         "parameters": [
           {
             "$ref": "#/components/parameters/id"
@@ -1451,6 +1451,9 @@
             "$ref": "#/components/responses/Envelope"
           },
           "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
             "$ref": "#/components/responses/Envelope"
           }
         }
