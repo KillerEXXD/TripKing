@@ -87,6 +87,12 @@ export function initSentry(): void {
         'ResizeObserver loop limit exceeded',
         'ResizeObserver loop completed with undelivered notifications',
         'Non-Error promise rejection captured',
+        // Browser-extension content scripts (Grammarly, password managers, etc.) fire
+        // synthetic DOM events that Sentry's breadcrumb-DOM integration tries to label;
+        // when the extension's injected node has a missing tagName the label-extractor
+        // crashes inside Sentry's own chunk. Last stack frame is content.js (the
+        // extension), so our isExtensionFrame guard below doesn't catch it.
+        /Cannot read properties of undefined \(reading ['"]toUpperCase['"]\)/,
       ],
       beforeSend(event, hint) {
         // Always let our own SW-bridge events through — they're explicitly captured by
