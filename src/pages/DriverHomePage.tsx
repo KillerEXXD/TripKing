@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, CheckCircle2, ChevronRight, Clock, MapPin, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,29 +38,26 @@ function Bellish({ count }: { count: number }) {
 
 function ReputationCard({ driver }: { driver: Driver }) {
   return (
-    <Link to={`/drivers/${driver.id}`} className="block w-full space-y-2 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 text-left transition-colors hover:bg-amber-100">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
-        <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden /> Your reputation
-      </div>
-      <div className="grid grid-cols-2 gap-2">
+    <PriorityCard
+      to={`/drivers/${driver.id}`}
+      tone="amber"
+      icon={<Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />}
+      label="Your reputation"
+      title={driver.ratingCount > 0 ? `★ ${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount} ratings` : 'No ratings yet'}
+      subtitle={`${driver.totalTripsCompleted} trips completed`}
+      cta={{ label: 'View full profile' }}
+    >
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <div className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-2">
           <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">From passengers</div>
-          <div className="flex items-center gap-1 text-sm font-bold text-amber-950">
-            <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />
-            {driver.ratingCount > 0 ? `${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount}` : '— · no ratings'}
-          </div>
-          <div className="mt-0.5 truncate text-[10px] text-amber-800/80">{driver.topTags[0] ?? 'Complete trips to earn tags'}</div>
+          <div className="truncate text-[10px] text-amber-800/80">{driver.topTags[0] ?? 'Complete trips to earn tags'}</div>
         </div>
         <div className="rounded-lg border border-amber-200 bg-white/70 px-2.5 py-2">
           <div className="mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-800">From agents</div>
-          <div className="text-sm font-bold text-amber-950">{driver.totalTripsCompleted} trips</div>
-          <div className="mt-0.5 truncate text-[10px] text-amber-800/80">{driver.managerTopTags[0] ?? 'Run agent trips to earn tags'}</div>
+          <div className="truncate text-[10px] text-amber-800/80">{driver.managerTopTags[0] ?? 'Run agent trips to earn tags'}</div>
         </div>
       </div>
-      <div className="inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
-        View full profile <ChevronRight className="size-4" aria-hidden />
-      </div>
-    </Link>
+    </PriorityCard>
   );
 }
 
@@ -183,23 +181,15 @@ function CurrentTripStat({ icon, label, value }: { icon: React.ReactNode; label:
  */
 function AssignedTripCard({ trip }: { trip: Trip }) {
   return (
-    <Link
+    <PriorityCard
       to={`/trips/${trip.id}`}
-      className="block rounded-2xl border-2 border-amber-300 bg-amber-50 p-4 transition-colors hover:bg-amber-100"
-    >
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
-        <CheckCircle2 className="size-3.5" aria-hidden /> Ready to start
-      </div>
-      <div className="mt-1 text-lg font-bold text-amber-950">
-        {trip.fromCity.name} → {trip.toCity.name}
-      </div>
-      <div className="mt-0.5 text-xs text-amber-800">
-        Pickup: {formatPickupTime(trip.pickupAt)} · {Math.round(trip.expectedDistanceKm)} km
-      </div>
-      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
-        Start the trip <ChevronRight className="size-4" aria-hidden />
-      </div>
-    </Link>
+      tone="amber"
+      icon={<CheckCircle2 className="size-3.5" aria-hidden />}
+      label="Ready to start"
+      title={`${trip.fromCity.name} → ${trip.toCity.name}`}
+      subtitle={`Pickup: ${formatPickupTime(trip.pickupAt)} · ${Math.round(trip.expectedDistanceKm)} km`}
+      cta={{ label: 'Start the trip' }}
+    />
   );
 }
 
@@ -216,24 +206,16 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
   // Multiple → focused list at /my-trips/review with the rich applicant-style cards.
   const href = apps.length === 1 ? `/trips/${first.trip.id}` : '/my-trips/review';
   return (
-    <Link
+    <PriorityCard
       to={href}
-      state={{ from: 'home' }}
-      className="block rounded-2xl border-2 border-blue-300 bg-blue-50 p-4 transition-colors hover:bg-blue-100"
-    >
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">
-        <Sparkles className="size-3.5" aria-hidden /> {apps.length} trip{apps.length === 1 ? '' : 's'} waiting for your decision
-      </div>
-      <div className="mt-1 text-base font-bold text-blue-950">
-        {first.trip.fromCity.name} → {first.trip.toCity.name}
-      </div>
-      <div className="mt-0.5 text-xs text-blue-800">
-        Pickup: {formatPickupTime(first.trip.pickupAt)}{more > 0 ? ` · +${more} more` : ''}
-      </div>
-      <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-700 px-4 py-1.5 text-sm font-semibold text-white">
-        Review <ChevronRight className="size-4" aria-hidden />
-      </div>
-    </Link>
+      linkState={{ from: 'home' }}
+      tone="indigo"
+      icon={<Sparkles className="size-3.5" aria-hidden />}
+      label={`${apps.length} trip${apps.length === 1 ? '' : 's'} waiting for your decision`}
+      title={`${first.trip.fromCity.name} → ${first.trip.toCity.name}`}
+      subtitle={`Pickup: ${formatPickupTime(first.trip.pickupAt)}${more > 0 ? ` · +${more} more` : ''}`}
+      cta={{ label: 'Review' }}
+    />
   );
 }
 
@@ -302,20 +284,15 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        <Link to="/my-earnings" className="block rounded-2xl border-2 border-teal-300 bg-teal-50 p-4 transition-colors hover:bg-teal-100">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-teal-700">
-            <TrendingUp className="size-3.5" aria-hidden /> Your earnings
-          </div>
-          <div className="mt-1 text-lg font-bold text-teal-950">
-            Trips, payouts & monthly trend
-          </div>
-          <div className="mt-0.5 text-xs text-teal-800">
-            See what you've earned and where you're trending.
-          </div>
-          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-teal-700 px-4 py-1.5 text-sm font-semibold text-white">
-            View earnings <ChevronRight className="size-4" aria-hidden />
-          </div>
-        </Link>
+        <PriorityCard
+          to="/my-earnings"
+          tone="teal"
+          icon={<TrendingUp className="size-3.5" aria-hidden />}
+          label="Your earnings"
+          title="Trips, payouts & monthly trend"
+          subtitle="See what you've earned and where you're trending."
+          cta={{ label: 'View earnings' }}
+        />
       </div>
 
       <div className="px-4 pb-4">
