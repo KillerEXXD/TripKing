@@ -22,14 +22,55 @@ select properties.$geoip_country_name c, count() n from events where timestamp >
 select properties.$device_type d, count() n from events where timestamp > now() - interval 7 day group by d order by n desc limit 10
 select properties.$browser b, count() n from events where timestamp > now() - interval 7 day group by b order by n desc limit 10
 -- client-side errors / exceptions (the app may capture these as $exception or a custom api_error event)
-select event, properties.endpoint, properties.status, count() n from events where event in ('$exception','api_error','$web_vitals') and timestamp > now() - interval 7 day group by 1,2,3 order by n desc limit 25
+select event, properties.endpoint, properties.status, count() n from events where event in ('$exception','api_error') and timestamp > now() - interval 7 day group by 1,2,3 order by n desc limit 25
 -- rage clicks (if autocapture is on)
 select count() from events where event = '$rageclick' and timestamp > now() - interval 7 day
 -- custom TripKing events (anything not starting with $)
 select event, count() n from events where event not like '$%' and timestamp > now() - interval 7 day group by event order by n desc limit 25
+
+-- ── Speed Insights (Core Web Vitals via `web-vitals` → `$web_vitals` events; wired in src/lib/webVitals.ts) ──
+-- p50 / p75 / p90 per metric, last 24h
+select properties.metric_name name,
+       count() n,
+       round(quantile(0.50)(toFloat(properties.metric_value)), 2) p50,
+       round(quantile(0.75)(toFloat(properties.metric_value)), 2) p75,
+       round(quantile(0.90)(toFloat(properties.metric_value)), 2) p90
+from events
+where event = '$web_vitals' and timestamp > now() - interval 24 hour
+group by name order by name
+-- mobile vs desktop p75
+select properties.metric_name name,
+       properties.$device_type device,
+       count() n,
+       round(quantile(0.75)(toFloat(properties.metric_value)), 2) p75
+from events
+where event = '$web_vitals' and timestamp > now() - interval 24 hour
+group by name, device order by name, device
+-- worst pages by LCP p75 (>= 3 samples to avoid one-off noise)
+select properties.$pathname path,
+       count() n,
+       round(quantile(0.75)(toFloat(properties.metric_value)), 0) lcp_p75_ms
+from events
+where event = '$web_vitals' and properties.metric_name = 'LCP' and timestamp > now() - interval 24 hour
+group by path having n >= 3 order by lcp_p75_ms desc limit 10
+-- rating distribution per metric (good / needs-improvement / poor)
+select properties.metric_name name, properties.metric_rating rating, count() n
+from events
+where event = '$web_vitals' and timestamp > now() - interval 24 hour
+group by name, rating order by name, rating
 ```
 
-(`posthog-js` is initialised in the PWA — `$pageview` comes from the `PostHogPageviewTracker` component; `$autocapture`/`$rageclick` depend on whether autocapture is on. Handle "no rows" gracefully.)
+### Web-vitals thresholds (Core Web Vitals spec — render verdict + action)
+
+| Metric | Good | Needs improvement | Poor | Action when poor |
+|---|---|---|---|---|
+| **LCP** | ≤ 2.5 s | 2.5 – 4 s | > 4 s | Server TTFB + render-blocking JS; check `/metrics` for slow API on the LCP page; lazy-load non-critical chunks; reserve image space (no late-loading hero images) |
+| **INP** | ≤ 200 ms | 200 – 500 ms | > 500 ms | Long tasks in event handlers; expensive React renders; debounce inputs; move work to `requestIdleCallback` |
+| **CLS** | ≤ 0.1 | 0.1 – 0.25 | > 0.25 | Images without explicit width/height; skeleton swaps not matching the real layout; fonts swapping in late (use `font-display: optional`) |
+| **FCP** | ≤ 1.8 s | 1.8 – 3 s | > 3 s | Reduce initial chunk size; preload critical fonts; cache HTML on edge |
+| **TTFB** | ≤ 0.8 s | 0.8 – 1.8 s | > 1.8 s | Origin / cold start / DB round-trip; surface in `/metrics` (server-side `api_metrics`) and `/dbperf` |
+
+(`posthog-js` is initialised in the PWA — `$pageview` comes from `PostHogPageviewTracker`; `$web_vitals` comes from `src/lib/webVitals.ts`.)
 
 ## Step 2 — Report
 
@@ -56,8 +97,26 @@ select event, count() n from events where event not like '$%' and timestamp > no
 ### Client-side errors / exceptions
 | Event | Endpoint | Status | Count |
 
+### Speed Insights (last 24h)
+| Metric | p75 | Rating | Verdict |
+|---|---:|---|---|
+| LCP | …ms | good/ni/poor | brief diagnosis from `/metrics` if poor |
+| INP | …ms | good/ni/poor | … |
+| CLS | … | good/ni/poor | … |
+| FCP | …ms | good/ni/poor | … |
+| TTFB | …ms | good/ni/poor | … |
+
+Mobile p75 vs Desktop p75 — flag the gap (mobile usually 2-3× worse on Indian connections).
+
+Worst pages by LCP p75 (with ≥ 3 samples) — top 3-5 routes; the slowest is the first thing to fix.
+
 ### Notable
 [rage clicks count · traffic spikes · error-event spikes · the most-hit page · anything odd]
+
+### Action items (severity-sorted)
+- **CRITICAL** when any metric p75 is in the **poor** band on >25% of mobile traffic — list the specific page + the recommended action from the threshold table above.
+- **WARNING** when p75 is in the **needs improvement** band on a high-traffic page.
+- **INFO** when web-vitals is freshly wired (<24h of data) or only a handful of samples — note and ask for more time.
 ```
 
 If PostHog's near-empty (just `tripking_smoke_test` + a stray `$pageview`), say "freshly wired — no real traffic yet" and skip the empty tables.
