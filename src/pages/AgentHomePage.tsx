@@ -8,6 +8,7 @@ import { Badge, Button, Card, PriorityCard } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
+import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
@@ -210,6 +211,10 @@ function AgentHome({ agent }: { agent: Agent }) {
           subtitle="See how your trips are performing month over month."
           cta={{ label: 'View analytics' }}
         />
+      </div>
+
+      <div className="px-4 pb-4">
+        <ReferralCodeCard role="agent" />
       </div>
 
       <div className="px-4 pb-4">

@@ -2,6 +2,7 @@ import type { CityRow } from './adminConfig';
 import type { NearRadius, Place } from './place';
 import type { VehicleSummary } from './trip';
 import type { VideoOutcome, VideoVerificationStatus } from './videoVerification';
+import type { ReferralSummary } from './referral';
 
 export type KycStatus = 'pending' | 'docs_submitted' | 'video_pending' | 'ready_for_approval' | 'approved' | 'rejected' | 'resubmit_required';
 
@@ -66,6 +67,10 @@ export interface Driver extends DriverPublic {
   aadhaarMasked?: string;
   drivingLicenseNumber?: string;
   drivingLicenseExpiry?: string;
+  /** Stage 1 of the referral program — the user's own 8-char code. Optional until backend ships. */
+  referralCode?: string;
+  /** Server-computed totals (zeroed until Stage 4 payouts land). */
+  referralSummary?: ReferralSummary;
 }
 
 /** Pre-reveal agent shape (the twin of `DriverPublic`). */
@@ -91,6 +96,9 @@ export interface Agent extends AgentPublic {
   // owner/admin-only
   verification?: VerificationSummary;
   aadhaarMasked?: string;
+  /** Stage 1 of the referral program — the user's own 8-char code. Optional until backend ships. */
+  referralCode?: string;
+  referralSummary?: ReferralSummary;
 }
 
 export interface DriversQueryParams {
