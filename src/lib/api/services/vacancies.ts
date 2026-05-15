@@ -32,6 +32,9 @@ export function getVacancy(id: string): Promise<Vacancy> {
 export function postVacancy(input: PostVacancyInput): Promise<Vacancy> {
   return apiClient.post<Api>('/vacancies', toApiPostVacancy(input)).then((r) => transformVacancy(unwrap(r.data)));
 }
+export function patchVacancy(id: string, input: Partial<PostVacancyInput>): Promise<Vacancy> {
+  return apiClient.patch<Api>(`/vacancies/${id}`, toApiPostVacancy(input as PostVacancyInput)).then((r) => transformVacancy(unwrap(r.data)));
+}
 export function cancelVacancy(id: string): Promise<Vacancy> {
   return apiClient.post<Api>(`/vacancies/${id}/cancel`, {}).then((r) => transformVacancy(unwrap(r.data)));
 }

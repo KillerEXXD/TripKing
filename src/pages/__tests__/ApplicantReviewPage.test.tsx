@@ -88,6 +88,7 @@ function renderPage() {
       <Routes>
         <Route path="/trips/:id/applicants" element={<ApplicantReviewPage />} />
         <Route path="/trips/:id" element={<div>trip detail</div>} />
+        <Route path="/posted-trips" element={<div>posted trips list</div>} />
         <Route path="/drivers/:id" element={<div>driver profile</div>} />
       </Routes>
     </MemoryRouter>,
@@ -169,10 +170,10 @@ describe('ApplicantReviewPage', () => {
     expect(assignMut.mutate).toHaveBeenCalledWith({ tripId: 't1', acceptanceId: 'acc-rej' }, expect.anything());
   });
 
-  it('the back button returns to the trip', () => {
+  it('the back button returns to the posted-trips list', () => {
     setApplicants({ data: [] });
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /back to the trip/i }));
-    expect(screen.getByText('trip detail')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /back to your posted trips/i }));
+    expect(screen.getByText('posted trips list')).toBeInTheDocument();
   });
 });

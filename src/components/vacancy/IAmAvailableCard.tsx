@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPinned, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge, Button } from '@/components/ui';
 import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
@@ -40,7 +41,7 @@ function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
   }
 
   return (
-    <div className="rounded-xl border border-emerald-200 bg-white p-3 shadow-xs">
+    <div className="bg-white p-3 first:rounded-t-none [&:not(:first-child)]:border-t [&:not(:first-child)]:border-emerald-100">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1 space-y-1.5 text-sm">
           <div>
@@ -64,15 +65,24 @@ function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
             </div>
           ) : null}
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          disabled={cancel.isPending}
-          aria-label={`Remove availability from ${where}`}
-          className="shrink-0 rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-40"
-        >
-          <Trash2 className="size-4" aria-hidden />
-        </button>
+        <div className="flex shrink-0 items-start gap-1">
+          <Link
+            to={`/vacancies/${vacancy.id}/edit`}
+            aria-label={`Edit availability from ${where}`}
+            className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50"
+          >
+            <Pencil className="size-4" aria-hidden />
+          </Link>
+          <button
+            type="button"
+            onClick={onRemove}
+            disabled={cancel.isPending}
+            aria-label={`Remove availability from ${where}`}
+            className="rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-40"
+          >
+            <Trash2 className="size-4" aria-hidden />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -94,49 +104,76 @@ export function IAmAvailableCard({ driverId }: Props) {
   const count = vacancies.length;
   const atLimit = count >= max;
   const loading = query.isPending;
+  const hasList = count > 0;
+  const [collapsed, setCollapsed] = useState(false);
+  const expanded = hasList && !collapsed;
+  const listId = 'my-vacancies-list';
 
   return (
-    <div className="mx-4 mt-3 space-y-2" data-testid="i-am-available-card">
-      <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-hidden>
-          <MapPinned className="size-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold text-emerald-900">I&apos;m vacant</div>
-          <p className="mt-0.5 text-xs text-emerald-800">
-            {count === 0
-              ? 'Let agents find you for trips going from your city.'
-              : 'Each posting below is live. Remove the ones you no longer want.'}
-          </p>
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-emerald-900">
-              {loading ? `— / ${max} active` : `${count} / ${max} active`}
-              {atLimit ? ' — max reached' : ''}
-            </span>
-            {atLimit ? (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled
-                title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — remove one before posting another.`}
-                aria-label={`Post vacant (disabled — at the ${max}-active limit)`}
-              >
-                <Plus className="size-4" aria-hidden /> Post
-              </Button>
-            ) : (
-              <Button asChild size="sm" variant="default">
-                <Link to="/vacancies/new" aria-label="Post vacant">
+    <div className="mx-4 mt-3" data-testid="i-am-available-card">
+      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50">
+        <div className="flex items-start gap-3 p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-hidden>
+            <MapPinned className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="font-semibold text-emerald-900">I&apos;m vacant</div>
+            <p className="mt-0.5 text-xs text-emerald-800">
+              {count === 0
+                ? 'Let agents find you for trips going from your city.'
+                : 'Each posting below is live. Remove the ones you no longer want.'}
+            </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {hasList ? (
+                <button
+                  type="button"
+                  onClick={() => setCollapsed((c) => !c)}
+                  aria-expanded={expanded ? 'true' : 'false'}
+                  aria-controls={listId}
+                  className="flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100/60"
+                >
+                  {loading ? `— / ${max} active` : `${count} / ${max} active`}
+                  {atLimit ? ' — max reached' : ''}
+                  <ChevronDown
+                    className={`size-4 transition-transform ${expanded ? '' : '-rotate-90'}`}
+                    aria-hidden
+                  />
+                </button>
+              ) : (
+                <span className="text-xs font-medium text-emerald-900">
+                  {loading ? `— / ${max} active` : `${count} / ${max} active`}
+                  {atLimit ? ' — max reached' : ''}
+                </span>
+              )}
+              {atLimit ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled
+                  title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — remove one before posting another.`}
+                  aria-label={`Post vacant (disabled — at the ${max}-active limit)`}
+                >
                   <Plus className="size-4" aria-hidden /> Post
-                </Link>
-              </Button>
-            )}
+                </Button>
+              ) : (
+                <Button asChild size="sm" variant="default">
+                  <Link to="/vacancies/new" aria-label="Post vacant">
+                    <Plus className="size-4" aria-hidden /> Post
+                  </Link>
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {vacancies.map((v) => (
-        <MyVacancyCard key={v.id} vacancy={v} />
-      ))}
+        {expanded ? (
+          <div id={listId} className="border-t border-emerald-200 bg-white">
+            {vacancies.map((v) => (
+              <MyVacancyCard key={v.id} vacancy={v} />
+            ))}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

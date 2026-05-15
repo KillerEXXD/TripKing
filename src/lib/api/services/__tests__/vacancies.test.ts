@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import * as transforms from '@/lib/api/transforms/vacancy';
-import { cancelVacancy, getVacancies, getVacancy, postVacancy } from '@/lib/api/services/vacancies';
+import { cancelVacancy, getVacancies, getVacancy, patchVacancy, postVacancy } from '@/lib/api/services/vacancies';
 
 function ok<T>(data: T) {
   return Promise.resolve({ success: true, data, error: null } as const);
@@ -35,6 +35,12 @@ describe('vacancies service', () => {
     const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ id: 'v1' }) as never);
     await postVacancy({} as never);
     expect(post).toHaveBeenCalledWith('/vacancies', { stub: true });
+  });
+
+  it('patchVacancy → PATCH /vacancies/:id with the toApiPostVacancy body', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 'v1' }) as never);
+    await patchVacancy('v1', { notes: 'edited' } as never);
+    expect(patch).toHaveBeenCalledWith('/vacancies/v1', { stub: true });
   });
 
   it('cancelVacancy → POST /vacancies/:id/cancel with an empty body', async () => {

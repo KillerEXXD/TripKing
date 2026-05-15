@@ -5,7 +5,11 @@ import { VacanciesPage } from '@/pages/VacanciesPage';
 import { formatClockTime } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
-vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn(), useMyActiveVacancies: vi.fn() }));
+vi.mock('@/hooks/useVacancies', () => ({
+  useVacancies: vi.fn(),
+  useMyActiveVacancies: vi.fn(),
+  useCancelVacancy: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+}));
 import { useVacancies, useMyActiveVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
 import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
@@ -122,7 +126,7 @@ describe('VacanciesPage', () => {
     setVacancies({ data: [] });
     renderVacancies();
     expect(screen.queryByTestId('i-am-available-card')).toBeNull();
-    expect(screen.queryByRole('link', { name: /post availability/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /post vacant/i })).toBeNull();
   });
 
   it('a driver with a profile sees the card with the Post button enabled', () => {
@@ -133,7 +137,7 @@ describe('VacanciesPage', () => {
     renderVacancies();
     expect(screen.getByTestId('i-am-available-card')).toBeInTheDocument();
     expect(screen.getByText(/0 \/ 2 active/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /post availability/i })).toHaveAttribute('href', '/vacancies/new');
+    expect(screen.getByRole('link', { name: /post vacant/i })).toHaveAttribute('href', '/vacancies/new');
   });
 
   it('a driver at 2/2 active sees the card with the Post button disabled', () => {
@@ -146,8 +150,8 @@ describe('VacanciesPage', () => {
     setVacancies({ data: [] });
     renderVacancies();
     expect(screen.getByText(/2 \/ 2 active — max reached/)).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /post availability/i })).toBeNull();
-    const btn = screen.getByRole('button', { name: /post availability \(disabled/i });
+    expect(screen.queryByRole('link', { name: /post vacant/i })).toBeNull();
+    const btn = screen.getByRole('button', { name: /post vacant \(disabled/i });
     expect(btn).toBeDisabled();
   });
 });
