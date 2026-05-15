@@ -130,17 +130,32 @@ A referred user should **not** become qualified merely because they signed up or
 
 ## 7. Promotional Credits Rule
 
-Promotional credits are used to encourage onboarding and first usage. However:
+### 7.1 Onboarding launch credit
+
+Every new Driver and every new Agent receives a **launch credit** at signup, deposited into their Cash Wallet as a non-withdrawable promotional balance.
+
+| Persona | Default launch credit | Configurable |
+| ------- | --------------------: | -----------: |
+| Driver  |                ₹1,000 |          Yes |
+| Agent   |                ₹1,000 |          Yes |
+
+The credit amount is **admin-configurable per persona** (see §18.6). At ₹1,000 / ₹50 per fee, this funds approximately **20 free trips per persona** before users start spending real money.
+
+### 7.2 Spending rule
+
+Promotional credits are spent **first** on every platform-fee debit, ahead of real-money sub-balances. Once exhausted, the persona must top up the Cash Wallet with real money to continue completing trips.
+
+### 7.3 Anti-abuse rule
 
 > Promotional credits must never generate withdrawable referral earnings.
 
-If the referred user pays the ₹50 platform fee using promotional credits:
+If a platform fee is paid using promotional credits, the corresponding referrer earns ₹0 for that side of that trip:
 
 | Fee source          | Referral earning generated? |
 | ------------------- | --------------------------: |
 | Promotional credits |                          No |
 
-Referral earnings begin only after the referred user has exhausted promotional credits and starts paying eligible real platform fees.
+Referral earnings on a given side begin only after that side's launch credit is exhausted and they start paying eligible real platform fees.
 
 User-facing message:
 
@@ -150,15 +165,25 @@ User-facing message:
 
 ## 8. Wallet Structure
 
-The product should clearly separate wallet balances.
+The product separates user-side wallet balances and the platform-side App Wallet.
+
+### 8.1 User-side balances (per Driver, per Agent)
 
 | Wallet Bucket              | Purpose                                |            Withdrawable? | Can Pay Platform Fee? | Can Trigger Referral Earning? |
 | -------------------------- | -------------------------------------- | -----------------------: | --------------------: | ----------------------------: |
-| Promotional Credits        | Signup/launch credits                  |                       No |                   Yes |                            No |
+| Promotional Credits        | Signup/launch credits (₹1,000 default) |                       No |                   Yes |                            No |
 | Cash Wallet                | User top-up via UPI/card/net banking   | No, except refund policy |                   Yes |                           Yes |
 | Referral Earnings Pending  | Earned but under hold/review           |                       No |                    No |                            No |
 | Referral Earnings Released | Approved referral earnings             |                      Yes |   Yes, after transfer |                            No |
 | Earnings Transfer Credit   | Released earnings moved to Trip Wallet |                       No |                   Yes |                            No |
+
+### 8.2 Platform-side balance (App Wallet — admin-only)
+
+| Wallet                | Purpose                                                    | Visible to            |
+| --------------------- | ---------------------------------------------------------- | --------------------- |
+| App Wallet            | Holds every platform fee collected from Drivers and Agents | Admin only            |
+
+The **App Wallet** is the platform's accounts receivable. Every ₹50 debited from a Driver's wallet AND every ₹50 debited from an Agent's wallet on a completed trip is credited to the App Wallet, with full audit (which trip, which side, which source). Admin can view the running balance, filter by date / persona / payment source, and export. See §18.7.
 
 ---
 
@@ -188,9 +213,24 @@ This prevents circular earning loops.
 
 ---
 
-## 10. Platform Fee Payment Source Rules
+## 10. Platform Fee Charging — dual-side
 
-Every completed-trip platform fee should track the source of payment.
+### 10.1 Both sides pay
+
+Every completed trip generates **two independent platform-fee charges**:
+
+| Side   | Default fee | Configurable | Source wallet                  | Destination |
+| ------ | ----------: | -----------: | ------------------------------ | ----------- |
+| Driver |         ₹50 |          Yes | Driver's wallet (promo → cash) | App Wallet  |
+| Agent  |         ₹50 |          Yes | Agent's wallet (promo → cash)  | App Wallet  |
+
+So a single completed trip moves **₹100 total** into the App Wallet (₹50 from each side) when both fees are configured at the default.
+
+The **per-side fee amount** is admin-configurable (see §18.6). Driver and Agent can be set independently — e.g., the Agent fee could be ₹75 while the Driver fee stays ₹50.
+
+### 10.2 Source-of-funds rule per side
+
+The two debits are independent and each tracks its own `payment_source`:
 
 | Platform Fee Payment Source         | Referral Payout Generated? |
 | ----------------------------------- | -------------------------: |
@@ -201,27 +241,32 @@ Every completed-trip platform fee should track the source of payment.
 | Referral Earnings Released directly |                         No |
 | Admin bonus credit                  |                         No |
 | Coupon/discount                     |                         No |
-| Mixed payment                       |               Configurable |
 
-Recommended launch rule:
+The **referrer of each side** earns or doesn't earn based on **that side's** source. Example for one trip:
 
-> Referral earnings should be generated only when the full ₹50 platform fee is paid from Cash Wallet or direct real-money payment.
+- Driver paid from launch credit + Agent paid from Cash Wallet → **Driver's referrer earns ₹0**, **Agent's referrer earns ₹50**.
+- Driver paid from Cash Wallet + Agent paid from Cash Wallet → **both referrers earn ₹50**.
+- Both paid from launch credit → both referrers earn ₹0 (one trip closer to "launch credit exhausted" on each side).
+
+### 10.3 Insufficient balance
+
+A trip cannot be marked completed until **both** the Driver-side fee and the Agent-side fee can be charged. If either side has insufficient combined balance (promo + cash), the completion is blocked server-side and the affected user is sent to top up their Cash Wallet.
 
 ---
 
 ## 11. Payment Deduction Order
 
-When the user pays a platform fee, the app should deduct from wallet balances in this order unless the user chooses otherwise:
+When charging a platform fee from one side's wallet, the app deducts from sub-balances in this order (admin-configurable in `wallet_settings.payment_source_priority`):
 
 1. Promotional Credits
 2. Earnings Transfer Credit
 3. Cash Wallet / real-money top-up
 
-However, the app must separately track the source used.
+The fee is debited from a **single source** — no mixing per fee. The first source with sufficient balance pays the whole ₹50. The `payment_source` recorded on that side's `platform_fee_charges` row determines whether referral accrual fires for that side.
 
-Recommended launch rule for mixed payments:
+Recommended launch rule:
 
-> Only a full ₹50 real-money platform fee should trigger the ₹50 referral payout.
+> Only a full per-side platform fee paid from real money (Cash Wallet top-up or direct UPI) triggers a referral payout for that side.
 
 ---
 
@@ -404,6 +449,38 @@ Per source: cash wallet ✓, direct UPI/card ✓, promotional credits ✗, earni
 ### 18.5 Withdrawal Configuration
 
 Per role: minimum withdrawal, daily withdrawal limit, monthly withdrawal limit, payout method, hold period, admin approval required, fraud review required, new-user withdrawal delay, high-risk-user withdrawal restriction.
+
+### 18.6 Platform Fee & Onboarding Credit Configuration
+
+Per persona, admin-editable:
+
+| Knob                                | Default |
+| ----------------------------------- | ------: |
+| Driver platform fee per trip        |     ₹50 |
+| Agent platform fee per trip         |     ₹50 |
+| Driver onboarding launch credit     |  ₹1,000 |
+| Agent onboarding launch credit      |  ₹1,000 |
+
+Changes take effect from the next trip / next signup. Existing in-flight trips and existing users are not retroactively affected.
+
+### 18.7 App Wallet (admin-only view)
+
+A new admin screen `/administration/app-wallet`:
+
+- **Running balance** — total ₹ collected across all platform-fee charges, all-time and within selected date range.
+- **Audit table** — one row per `platform_fee_charges` deposit:
+  - Trip ID + route
+  - Side (Driver / Agent)
+  - Payer name + role
+  - Amount (₹)
+  - Payment source (cash_wallet / direct_upi / promo_credit / earnings_transfer_credit / etc.)
+  - Status (charged / refunded / failed)
+  - Timestamp
+- **Filters** — date range, side, payment source, status, payer search.
+- **Export** — CSV download for accounting reconciliation.
+- **Breakdown stats** — total from Drivers vs Agents, total from real money vs promo, per-day chart.
+
+Admin cannot debit the App Wallet from this screen; the App Wallet only ever credits (from fee charges) or debits via documented refund flows.
 
 ---
 
