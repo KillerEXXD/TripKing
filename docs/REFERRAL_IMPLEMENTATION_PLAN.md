@@ -18,7 +18,8 @@ On top of those, the referral system itself contributes: attribution + tier-base
 
 **Confirmed scope decisions:**
 - Wallet, platform-fee charging, payment-source tracking — all **net-new and in scope**.
-- Promo credits **do not exist today** — placeholder hook in the gate; real promo ledger is future.
+- **Onboarding launch credits are in scope** — every new Driver and every new Agent gets a configurable launch credit at signup (default ₹1,000 each). Spent first on platform fees, never withdrawable, never triggers referral. (Updates spec §7.)
+- **Platform fee is dual-side** — every completed trip charges Driver ₹50 AND Agent ₹50 (each independently configurable in admin). Both deposits land in a new platform-side **App Wallet** with full audit, admin-only. (Updates spec §10 + §18.6 + §18.7.)
 - Driver/Agent verification **already exists** — read `kyc_status='approved'`; do not rebuild.
 - Migrations slot in starting at **042** (latest is 041).
 - Razorpay (or Cashfree) is required for top-ups and payouts; merchant onboarding is assumed complete.
@@ -73,10 +74,14 @@ Everything below is **admin-editable via `/administration`** with audit logging.
 | Welcome bonus to referred user on signup | ₹0 | `referral_settings.welcome_bonus_paise` |
 | Welcome bonus to referrer on each new signup | ₹0 | `referral_settings.referrer_signup_bonus_paise` |
 
-### B. Wallet & withdrawals (`wallet_settings` row)
+### B. Wallet, fees, promo & withdrawals (`wallet_settings` row)
 
 | Knob | Default | Stored in |
 |---|---|---|
+| **Driver platform fee per trip** | ₹50 | `wallet_settings.driver_platform_fee_paise` |
+| **Agent platform fee per trip** | ₹50 | `wallet_settings.agent_platform_fee_paise` |
+| **Driver onboarding launch credit** | ₹1,000 | `wallet_settings.driver_signup_promo_credit_paise` |
+| **Agent onboarding launch credit** | ₹1,000 | `wallet_settings.agent_signup_promo_credit_paise` |
 | Top-up min / max-per-txn / max-per-day | ₹50 / ₹50,000 / ₹100,000 | `wallet_settings.{min_topup,max_topup_per_txn,max_topup_per_user_per_day}_paise` |
 | Top-up preset amounts (UI) | [100, 250, 500, 1000] | `wallet_settings.topup_presets_paise` JSONB |
 | Transfer-to-wallet preset amounts | [100, 250, 500, 1000] | `wallet_settings.transfer_presets_paise` JSONB |
@@ -89,7 +94,6 @@ Everything below is **admin-editable via `/administration`** with audit logging.
 | Payout provider / method | razorpay / UPI | `wallet_settings.payout_provider`, `payout_method` |
 | **Eligible payment sources for referral accrual** | [`cash_wallet`, `direct_upi`] | `wallet_settings.eligible_payment_sources_for_referral` JSONB |
 | **Payment source priority** (debit order) | [promo, transferred, cash_wallet] | `wallet_settings.payment_source_priority` JSONB |
-| Default platform fee % | 10% | `wallet_settings.default_platform_fee_pct` |
 
 ### C. Fraud & risk (`fraud_settings` row + `fraud_action_rules` table)
 
@@ -175,44 +179,59 @@ Use the prototype as the visual contract for Stages 1–10.
 
 ---
 
-## Stage 2 — Cash Wallet (top-up only)
+## Stage 2 — Cash Wallet + Onboarding Launch Credit
 
-**Goal:** users can top up real money via UPI/card and see their balance. No spending yet.
+**Goal:** users can top up real money via UPI/card AND every new Driver/Agent receives the configured launch credit (₹1,000 default each) at signup. Visible breakdown of promo vs real money.
 
 **DB (migration 043):**
 - `cash_wallets` (one row per user): `id`, `user_id` UNIQUE, `is_active`, timestamps.
-- `cash_wallet_ledger`: `id`, `wallet_id`, `entry_type` (CHECK), `amount_paise` (signed), `payment_source` (CHECK), `reference_type`, `reference_id`, `note`, `created_at`. Index `(wallet_id, created_at)`.
+- `cash_wallet_ledger`: `id`, `wallet_id`, `entry_type` (CHECK: `topup`/`fee_debit`/`refund`/`transfer_in_from_referral`/`promo_credit_grant`/`adjustment`), `amount_paise` (signed), `payment_source` (CHECK: `direct_upi`/`direct_card`/`promo_credit`/`earnings_transfer_credit`/`admin_bonus`/`coupon`/null), `sub_balance` (CHECK: `promo`/`transferred`/`cash`) — tracks which sub-balance the entry affects, `reference_type`, `reference_id`, `note`, `created_at`. Indexes `(wallet_id, created_at)`, `(wallet_id, sub_balance)`.
 - `cash_wallet_topups`: `id`, `user_id`, `amount_paise`, `provider`, `provider_order_id`, `provider_payment_id`, `status` (CHECK), timestamps.
-- View `cash_wallet_balances` = SUM(ledger).
-- Sub-balance accounting via separate `transferred_in_paise` rollup (used in Stage 6 for source precedence).
+- View `cash_wallet_balances` per user with three sub-balances: `promo_paise`, `transferred_paise`, `cash_paise`, plus `total_paise`.
+- Trigger on `users` row creation (or on first driver/trip_manager profile creation): insert a `promo_credit_grant` ledger entry for the configured per-persona amount from `wallet_settings.driver_signup_promo_credit_paise` / `agent_signup_promo_credit_paise`. Idempotent — never grants twice for the same user. Driver users who later add an Agent profile get the Agent grant too (and vice versa) — once each.
+- Backfill: grant launch credits to all existing Drivers/Agents on migration apply (one-shot, audited).
 
 **Razorpay integration:**
 - `.env.development` adds `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 - New edge function `wallet`: `POST /wallet/topup/initiate`, `POST /wallet/topup/verify` (HMAC-verify signature, idempotent on `provider_payment_id`), `POST /wallet/webhook/razorpay`, `GET /wallet`.
 
-**Frontend:** Types in `src/types/wallet.ts`; `useCashWallet` hook. `/wallet` page — balance card, "Add money" modal (presets), Razorpay Checkout SDK, ledger list.
+**Frontend:** Types in `src/types/wallet.ts`; `useCashWallet` hook. `/wallet` page — balance card with **three sub-balance breakdown** (Launch credit / Real money / From referral), "Add money" modal (presets), Razorpay Checkout SDK, ledger list with sub-balance-tinted rows.
 
-**Tests:** signature-verification unit; `scripts/test-wallet-topup.cjs` against Razorpay test mode.
+**Tests:** signature-verification unit; `scripts/test-wallet-topup.cjs` against Razorpay test mode; `scripts/test-onboarding-promo.cjs` (new signup → ₹1,000 promo credit auto-granted; not granted twice; admin can change the amount and next signup uses new value).
 
-**Definition of done:** ₹500 top-up via Razorpay test mode appears in wallet, exactly one ledger row.
+**Definition of done:** new Driver signup shows ₹1,000 launch credit immediately; ₹500 top-up via Razorpay test mode appears as `cash` sub-balance; total balance = sum of sub-balances; admin edits `driver_signup_promo_credit_paise` to ₹1,500 → next signup gets ₹1,500.
 
 ---
 
-## Stage 3 — Platform Fee Charging at Trip Completion
+## Stage 3 — Dual-Side Platform Fee Charging + App Wallet
 
-**Goal:** every completed trip charges the agent's platform fee from cash wallet, recorded with `payment_source`. No referral accrual yet.
+**Goal:** every completed trip charges **both** the Driver-side fee AND the Agent-side fee, each from that user's wallet (promo first, then cash, per `payment_source_priority`). Both deposits land in the App Wallet with full audit. No referral accrual yet.
 
 **DB (migration 044):**
-- `platform_fee_charges`: `id`, `trip_id` FK UNIQUE, `payer_user_id`, `amount_paise`, `payment_source` (CHECK), `cash_wallet_ledger_id` FK NULL, `status` (CHECK), `failure_reason`, timestamps.
-- Trigger on `trips` `AFTER UPDATE` when `status` → `completed`: insert pending fee row → debit cash wallet → mark charged. Insufficient balance → mark failed; **block the completion confirmation** server-side.
+- `platform_fee_charges`: `id`, `trip_id` FK, **`side` (CHECK: `driver`/`agent`)**, `payer_user_id`, `amount_paise` (from `wallet_settings.{driver,agent}_platform_fee_paise`), `payment_source` (CHECK), `cash_wallet_ledger_id` FK NULL, `sub_balance_used` (CHECK: `promo`/`transferred`/`cash`), `status` (CHECK: `pending`/`charged`/`failed`/`refunded`), `failure_reason`, timestamps. UNIQUE `(trip_id, side)` — exactly two rows per completed trip.
+- `app_wallet_ledger`: `id`, `entry_type` (CHECK: `fee_credit`/`refund_debit`/`adjustment`), `amount_paise` (signed), `platform_fee_charge_id` FK NULL, `note`, `created_at`. Indexes `(created_at)`, `(platform_fee_charge_id)`.
+- View `app_wallet_balance` = SUM(`app_wallet_ledger`).
+- Trigger on `trips` `AFTER UPDATE` when `status` → `completed`:
+  - For each side (`driver`, `agent`):
+    - Insert `platform_fee_charges` row in `pending`.
+    - Pick source per `payment_source_priority` from that side's wallet (promo → transferred → cash). The first sub-balance with sufficient funds pays the whole fee — no mixing.
+    - Debit `cash_wallet_ledger` with that `sub_balance` and `payment_source` set accordingly.
+    - Mark `platform_fee_charges` `charged` and insert paired `app_wallet_ledger` `fee_credit` row.
+  - If **either** side has insufficient balance → mark **both** `platform_fee_charges` rows `failed` (atomic — never half-charge a trip), block the completion confirmation, and surface which side is short.
+  - Idempotent on `(trip_id, side)` — re-running the trigger never double-charges.
 
-**Edge functions:** Extend `trips` to surface `INSUFFICIENT_WALLET_BALANCE`; expose `platformFeeAmountPaise` and `platformFeeStatus` on `trips` GET.
+**Edge functions:**
+- Extend `trips` to surface `INSUFFICIENT_WALLET_BALANCE` with which side (`driver_short` / `agent_short`).
+- Extend `trips` GET to expose `platformFeeBreakdown`: `{ driver: { amountPaise, status, source }, agent: { amountPaise, status, source } }`.
 
-**Frontend:** Wallet-balance pill in agent header; low-balance warning; "Insufficient balance" modal at trip-completion → deep-link to `/wallet`. `/wallet/charges` receipts page.
+**Frontend:**
+- Wallet-balance pill in **both** Driver and Agent headers; low-balance warning when balance < configured per-side fee.
+- "Insufficient balance" modal at trip-completion attempt → deep-link the affected user(s) to `/wallet`. If both are short, both must top up before the agent can complete.
+- `/wallet/charges` receipts page on each persona showing only their own side's debits.
 
-**Tests:** trigger unit tests; `scripts/test-platform-fee.cjs`.
+**Tests:** trigger unit tests (both sides charged on completion; promo-first source selection per side; insufficient balance on either side blocks completion atomically; idempotency on duplicate UPDATEs); `scripts/test-platform-fee.cjs` covering: ₹1,000 promo lasts 20 trips per side; admin changes Driver fee to ₹75 → next trip charges Driver ₹75 / Agent ₹50.
 
-**Definition of done:** trip completes → fee debited → row written with `payment_source='cash_wallet'`. Insufficient balance blocks completion with clear error.
+**Definition of done:** completed trip writes exactly 2 rows in `platform_fee_charges` and 2 rows in `app_wallet_ledger`; sub-balance bleeds promo first; admin can see both deposits in App Wallet (Stage 5+); insufficient balance on either side blocks completion with clear per-side error.
 
 ---
 
@@ -235,7 +254,10 @@ Use the prototype as the visual contract for Stages 1–10.
 
 If ALL pass → bump count, transition status, insert accrual, bump total. Cap reached → status `cap_reached`.
 
-**Resolves both sides per trip:** the trip's driver AND the agent are both checked — each may have their own referrer. The ₹50 is per-side, per-trip.
+**Resolves both sides per trip independently:** Stage 3 produces TWO `platform_fee_charges` rows per completed trip (one for `side='driver'`, one for `side='agent'`). The accrual trigger fires once per row. Each side has its own referrer link and its own eligibility check based on **that side's** `payment_source`. So a single trip can:
+- Pay both referrers (both fees from real money),
+- Pay one referrer but not the other (mixed sources),
+- Pay neither (both from promo).
 
 **Edge functions:** new `referrals` function — `GET /me/referrals`, `GET /me/referrals/:id`.
 
@@ -262,7 +284,9 @@ If ALL pass → bump count, transition status, insert accrual, bump total. Cap r
 
 **Edge function:** extend `admin` with CRUD endpoints for each: `/admin/referral-tiers`, `/admin/referral-settings`, `/admin/wallet-settings`, `/admin/fraud-settings`, `/admin/fraud-action-rules`, `/admin/notification-templates`.
 
-**Frontend:** new `SECTIONS` entries in [AdminConfigPage.tsx](../src/pages/administration/AdminConfigPage.tsx) — Referral Tiers, Referral Settings, Wallet Settings, Fraud Settings, Fraud Action Rules, Notification Templates. Validation: tier ranges non-overlapping per role/pair; eligible-sources must include ≥1 real-money source; topup min ≤ max ≤ daily cap; action rules cover every (flag_type × severity) combo.
+**Frontend:** new `SECTIONS` entries in [AdminConfigPage.tsx](../src/pages/administration/AdminConfigPage.tsx) — Referral Tiers, Referral Settings, Wallet Settings, Fraud Settings, Fraud Action Rules, Notification Templates. **Wallet Settings** must include the four new per-persona knobs (Driver fee, Agent fee, Driver promo grant, Agent promo grant) prominently grouped as "Platform fees & onboarding credits". Validation: tier ranges non-overlapping per role/pair; eligible-sources must include ≥1 real-money source; topup min ≤ max ≤ daily cap; action rules cover every (flag_type × severity) combo; per-side fee > 0; promo grants ≥ 0.
+
+**Plus new admin page:** `/administration/app-wallet` (spec §18.7) — running balance, audit table over `platform_fee_charges` joined to `app_wallet_ledger`, filters (date range, side, payment source, status, payer search), CSV export, breakdown stats (Driver vs Agent, real money vs promo, per-day chart). Read-only — no ability to debit the App Wallet manually except through documented refund flows.
 
 **Tests:** `scripts/test-admin-referral-config.cjs`.
 
@@ -372,12 +396,12 @@ Notifications fanout (migration 049): extend `notifications.type` CHECK to add `
 ## Critical files
 
 **Migrations (new):**
-`042_referral_attribution.sql`, `043_cash_wallet.sql`, `044_platform_fee_charging.sql`, `045_referral_ledger_and_accrual.sql`, `046_referral_tiers_and_settings.sql`, `047_earnings_transfer.sql`, `048_withdrawals.sql`, `049_referral_notifications.sql`, `050_referral_fraud.sql`
+`042_referral_attribution.sql`, `043_cash_wallet_and_promo_grant.sql`, `044_platform_fee_charging_dual_side_and_app_wallet.sql`, `045_referral_ledger_and_accrual.sql`, `046_referral_tiers_and_settings.sql`, `047_earnings_transfer.sql`, `048_withdrawals.sql`, `049_referral_notifications.sql`, `050_referral_fraud.sql`
 
 **Edge functions (new):** `wallet`, `referrals`
 **Edge functions (extend):** `auth`, `drivers`, `agents`, `trips`, `admin`, `notifications`
 
-**Frontend (new):** `src/types/{referral,wallet}.ts`, `src/lib/api/services/{referrals,wallet,withdrawals}.ts`, `src/lib/api/transforms/{referral,wallet}.ts`, `src/hooks/{useReferral,useCashWallet,useWithdrawals}.ts`, `src/components/{referral,wallet}/*`, `src/pages/{Wallet,Referrals}.tsx`, `src/pages/administration/{ReferralsAdmin,WithdrawalsAdmin}.tsx`
+**Frontend (new):** `src/types/{referral,wallet,appWallet}.ts`, `src/lib/api/services/{referrals,wallet,withdrawals,appWallet}.ts`, `src/lib/api/transforms/{referral,wallet,appWallet}.ts`, `src/hooks/{useReferral,useCashWallet,useWithdrawals,useAppWallet}.ts`, `src/components/{referral,wallet,appWallet}/*`, `src/pages/{Wallet,Referrals}.tsx`, `src/pages/administration/{ReferralsAdmin,WithdrawalsAdmin,AppWalletAdmin}.tsx`
 **Frontend (extend):** [AdminConfigPage.tsx](../src/pages/administration/AdminConfigPage.tsx), `App.tsx` routes, `AppLayout` nav, `public/docs/openapi.yaml`+`.json`
 
 **Smoke tests:** `scripts/test-{referral-attribution,wallet-topup,platform-fee,referral-accrual,admin-referral-config,earnings-transfer,withdrawal-flow,referral-fraud}.cjs`
