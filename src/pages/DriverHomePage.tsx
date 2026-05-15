@@ -105,29 +105,13 @@ function NearbyTripCard({ trip }: { trip: Trip }) {
 
 /**
  * Top-of-home card for a trip the driver is actively running (`status='in_progress'`).
- * Always the highest priority — supersedes every other home card while live.
+ * Surfaces route + distance + payout + pickup + passenger count inline, plus an End
+ * trip shortcut so the driver can complete without drilling in. Caller gates on
+ * `inProgressTrip` truthiness — card is hidden when there's no live trip.
  */
-/** Top-of-home card — always rendered. When the driver has no in-progress trip,
- *  shows an empty-state explaining what will appear here. With one in-progress
- *  trip, surfaces the route + distance + payout + pickup time + passenger count
- *  inline so the driver doesn't have to drill in to see them, plus an End trip
- *  shortcut so they can complete the trip without an extra screen. */
-function CurrentTripCard({ trip }: { trip: Trip | undefined }) {
+function CurrentTripCard({ trip }: { trip: Trip }) {
   const navigate = useNavigate();
   const completeMutation = useCompleteTrip();
-  if (!trip) {
-    return (
-      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <Navigation className="size-3.5" aria-hidden /> Driving now
-        </div>
-        <div className="mt-1 text-sm font-medium text-slate-700">No trip in progress</div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          When you start a trip, it'll show up here so you can continue, track the route, and complete it.
-        </div>
-      </div>
-    );
-  }
   const tripId = trip.id;
   async function onEnd(e: React.MouseEvent) {
     e.stopPropagation();
@@ -224,19 +208,6 @@ function AssignedTripCard({ trip }: { trip: Trip }) {
  * becomes a concern.)
  */
 function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
-  if (apps.length === 0) {
-    return (
-      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <Sparkles className="size-3.5" aria-hidden /> Review
-        </div>
-        <div className="mt-1 text-sm font-medium text-slate-700">No trips waiting for your decision</div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          When an agent picks you for a trip you applied to, it'll show up here so you can Accept or Decline.
-        </div>
-      </div>
-    );
-  }
   const first = apps[0]!;
   const more = apps.length - 1;
   // One trip → land directly on its detail so the driver can Accept / Decline in one tap.
@@ -310,25 +281,13 @@ function DriverHome({ driver }: { driver: Driver }) {
       <div className="space-y-3 px-4 pb-4 pt-3">
         {driver.verification && <GetVerifiedBanner verification={driver.verification} />}
 
-        {/* Priority stack — Driving now / Review / I'm vacant, with placement that follows
-            which cards have live content. Empty state of every card is rendered always so
-            the driver always sees the same shape. */}
-        {(() => {
-          const hasInProgress = !!inProgressTrip;
-          const hasReview = awaitingDecision.length > 0;
-          const driving = <CurrentTripCard key="driving" trip={inProgressTrip} />;
-          const review = <AwaitingMyDecisionCard key="review" apps={awaitingDecision} />;
-          const vacant = <IAmAvailableCard key="vacant" driverId={driver.id} />;
-          // Rules:
-          //   both empty           → vacant first (promotes the call to post availability)
-          //   driving only         → vacant between (review still empty below)
-          //   review active (any)  → vacant last
-          let order: React.ReactNode[];
-          if (!hasInProgress && !hasReview) order = [vacant, driving, review];
-          else if (hasInProgress && !hasReview) order = [driving, vacant, review];
-          else order = [driving, review, vacant];
-          return <>{order}</>;
-        })()}
+        {/* Priority stack — natural top-down priority: live trip → action needed → CTA.
+            Driving now and Review are hidden when empty; I'm vacant always renders
+            (it's the platform's primary call-to-action — drivers must post availability
+            for the marketplace to work, and its own internal state handles the empty case). */}
+        {inProgressTrip ? <CurrentTripCard trip={inProgressTrip} /> : null}
+        {awaitingDecision.length > 0 ? <AwaitingMyDecisionCard apps={awaitingDecision} /> : null}
+        <IAmAvailableCard driverId={driver.id} />
         {pendingReceivedInvites.length > 0 ? <InvitesReceivedCard trips={pendingReceivedInvites} /> : null}
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
 
