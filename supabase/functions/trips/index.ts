@@ -1640,6 +1640,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const did = u ? await driverIdFor(u.id) : null;
     if (!u || (trip.assigned_driver_id !== did && !isAdmin(u))) return fail('FORBIDDEN', 'Only the assigned driver can start the trip', 403);
     if (trip.status !== 'accepted') return fail('CONFLICT', `Trip is "${trip.status}", not "accepted"`, 409);
+    // Brute-force protection for the 5-digit passenger OTP: 5 attempts per driver+trip per 60s.
+    if (!(await rateLimitOk(db, `start-trip:${u.id}:${tripId}`, 5, 60))) return fail('RATE_LIMITED', 'Too many wrong OTP attempts — wait a minute and retry', 429);
     const b = await readBody(req);
     const otpHash = await sha256hex(String(b.passenger_otp ?? ''));
     if (!trip.passenger_otp_hash || otpHash !== trip.passenger_otp_hash) return fail('INVALID_OTP', 'Incorrect passenger OTP', 401);
