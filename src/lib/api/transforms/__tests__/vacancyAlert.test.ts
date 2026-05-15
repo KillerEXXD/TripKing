@@ -49,6 +49,27 @@ describe('transformVacancy', () => {
     expect(v.destinationPlaces.map((p) => p.name)).toEqual(['Mahabalipuram', 'Tirupati Bus Stand']);
     expect(v.distanceKm).toBe(4.2);
   });
+  it('maps the on_trip status with a linked_trip summary and throws on an unknown status', () => {
+    const v = transformVacancy({
+      id: 'vac4',
+      driver_id: 'd1',
+      current_city: city('c1', 'Vellore'),
+      status: 'on_trip',
+      linked_trip_id: 'trip1',
+      linked_trip: {
+        id: 'trip1',
+        pickup_at: '2026-06-02T08:00:00Z',
+        from_city: { id: 'c1', name: 'Vellore' },
+        to_city: { id: 'c2', name: 'Chennai' },
+      },
+    });
+    expect(v.status).toBe('on_trip');
+    expect(v.linkedTripId).toBe('trip1');
+    expect(v.linkedTrip?.fromCityName).toBe('Vellore');
+    expect(v.linkedTrip?.toCityName).toBe('Chennai');
+    expect(v.linkedTrip?.pickupAt).toBe('2026-06-02T08:00:00Z');
+    expect(() => transformVacancy({ id: 'x', driver_id: 'd1', current_city: city('c1', 'V'), status: 'bogus' })).toThrow(/UNKNOWN_STATUS/);
+  });
 });
 
 describe('transformAlert', () => {

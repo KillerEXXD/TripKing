@@ -14,7 +14,7 @@ export function getVacancies(params?: VacanciesQueryParams): Promise<Vacancy[]> 
   if (params?.currentCityId) q.current_city_id = params.currentCityId;
   if (params?.destinationCityId) q.destination_city_id = params.destinationCityId;
   if (params?.destinationPlaceId) q.destination_place_id = params.destinationPlaceId;
-  if (params?.status) q.status = params.status;
+  if (params?.status) q.status = Array.isArray(params.status) ? params.status.join(',') : params.status;
   if (params?.driverId) q.driver_id = params.driverId;
   if (params?.near) {
     q.near_lat = params.near.lat;

@@ -12,13 +12,15 @@ export function useVacancy(id: string | undefined) {
 }
 
 /**
- * The signed-in driver's currently-active vacancies. Drives the "I'm available"
- * card's X/2 counter + the matching backend limit (POST /vacancies rejects a 3rd
- * with 409 CONFLICT — see supabase/functions/vacancies/index.ts).
+ * The signed-in driver's currently-active vacancies — includes both freshly-posted
+ * 'active' rows AND 'on_trip' rows (a vacancy auto-suspended because the driver
+ * accepted a trip whose pickup_at lands inside its window — migration 039). Both
+ * count against the X/2 limit (the slot is still occupied), and the 'on_trip' row
+ * renders a banner on its card explaining why it's hidden from agents.
  * Disabled until we know the caller's driverId.
  */
 export function useMyActiveVacancies(driverId: string | undefined) {
-  const params: VacanciesQueryParams = { driverId, status: 'active' };
+  const params: VacanciesQueryParams = { driverId, status: ['active', 'on_trip'] };
   return useQuery({
     queryKey: ['vacancies', driverId ? params : { driverId: 'pending' }],
     queryFn: () => getVacancies(params),

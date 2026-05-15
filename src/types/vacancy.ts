@@ -2,7 +2,15 @@ import type { CityRow } from './adminConfig';
 import type { NearRadius, Place } from './place';
 import type { DriverSummary, VehicleSummary } from './trip';
 
-export type VacancyStatus = 'active' | 'matched' | 'expired' | 'cancelled';
+export type VacancyStatus = 'active' | 'matched' | 'on_trip' | 'expired' | 'cancelled';
+
+/** Slim summary of the trip that consumed this vacancy — present only when status='on_trip' (migration 039). */
+export interface VacancyLinkedTrip {
+  id: string;
+  pickupAt: string;
+  fromCityName?: string;
+  toCityName?: string;
+}
 
 /** "I'm available in city X, willing to drive to one of these destinations." */
 export interface Vacancy {
@@ -26,6 +34,9 @@ export interface Vacancy {
   createdAt: string;
   /** Straight-line km from the `?near_*` centre to the driver's current point — present only on a radius-filtered list. */
   distanceKm?: number;
+  /** Set when this vacancy has been suspended by an accepted trip (status='on_trip'). */
+  linkedTripId?: string;
+  linkedTrip?: VacancyLinkedTrip;
 }
 
 /** One destination on a posted vacancy — a curated city, a precise place, or both (≥1 required). */
@@ -57,7 +68,8 @@ export interface VacanciesQueryParams {
   currentCityId?: string;
   destinationCityId?: string;
   destinationPlaceId?: string;
-  status?: VacancyStatus;
+  /** A single status, or an array — serialised as a comma-separated `?status=` for the backend. */
+  status?: VacancyStatus | VacancyStatus[];
   driverId?: string;
   /** Restrict to drivers whose current point is within the radius (nearest first). */
   near?: NearRadius;

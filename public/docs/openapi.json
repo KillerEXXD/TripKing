@@ -3332,7 +3332,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "List vacancies (public; vacancies of deactivated drivers are excluded) — joins driver+vehicle summary, current_city/current_place, and destination cities + places (vacancy_destinations: [{ city, place }]). When near_lat+near_lng+radius_km are all given, restricted to vacancies whose current point (current_place → current_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km.",
+        "summary": "List vacancies (public; vacancies of deactivated drivers are excluded) — joins driver+vehicle summary, current_city/current_place, destination cities + places (vacancy_destinations: [{ city, place }]), and `linked_trip` (id/pickup_at/from_city/to_city) when status=on_trip (migration 039). When near_lat+near_lng+radius_km are all given, restricted to vacancies whose current point (current_place → current_city fallback) is within radius_km (capped at 100), nearest first, each row carrying distance_km. `status` accepts a single value OR a comma-separated list (e.g. `?status=active,on_trip`); when omitted AND no `driver_id` is given, the public list defaults to (active, matched) so on_trip/expired/cancelled rows do not leak into agent \"find a driver\" searches.",
         "parameters": [
           {
             "name": "current_city_id",
@@ -3359,7 +3359,8 @@
             "name": "status",
             "in": "query",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "description": "comma-separated list allowed; values: active | matched | on_trip | expired | cancelled"
             }
           },
           {
@@ -3513,39 +3514,98 @@
         }
       },
       "patch": {
-        "tags": ["vacancies"],
+        "tags": [
+          "vacancies"
+        ],
         "summary": "Edit a vacancy (owning driver/admin; Bearer; only while status=active — 409 otherwise). Partial update — every field of POST /vacancies is optional. If `destinations` (or legacy `destination_*_ids`) is provided, the vacancy_destinations rows are fully replaced.",
-        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "current_city_id": { "type": "string" },
-                  "current_place_id": { "type": "string" },
-                  "vehicle_id": { "type": "string" },
-                  "available_from": { "type": "string" },
-                  "available_until": { "type": "string" },
-                  "destinations": { "type": "array", "items": { "type": "object", "properties": { "cityId": { "type": "string" }, "placeId": { "type": "string" } } } },
-                  "destination_city_ids": { "type": "array", "items": { "type": "string" } },
-                  "destination_place_ids": { "type": "array", "items": { "type": "string" } },
-                  "min_rate_per_km": { "type": "number" },
-                  "notes": { "type": "string" }
+                  "current_city_id": {
+                    "type": "string"
+                  },
+                  "current_place_id": {
+                    "type": "string"
+                  },
+                  "vehicle_id": {
+                    "type": "string"
+                  },
+                  "available_from": {
+                    "type": "string"
+                  },
+                  "available_until": {
+                    "type": "string"
+                  },
+                  "destinations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "cityId": {
+                          "type": "string"
+                        },
+                        "placeId": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "destination_city_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "destination_place_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "min_rate_per_km": {
+                    "type": "number"
+                  },
+                  "notes": {
+                    "type": "string"
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "$ref": "#/components/responses/Envelope" },
-          "400": { "$ref": "#/components/responses/Envelope" },
-          "401": { "$ref": "#/components/responses/Envelope" },
-          "403": { "$ref": "#/components/responses/Envelope" },
-          "404": { "$ref": "#/components/responses/Envelope" },
-          "409": { "$ref": "#/components/responses/Envelope" },
-          "422": { "$ref": "#/components/responses/Envelope" },
-          "429": { "$ref": "#/components/responses/Envelope" }
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "400": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
+            "$ref": "#/components/responses/Envelope"
+          }
         }
       }
     },
