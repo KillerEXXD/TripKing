@@ -32,7 +32,7 @@ ls supabase/functions/ | grep -v _shared
 node scripts/db.cjs "select distinct endpoint from public.api_metrics where created_at > now() - interval '24 hours' order by 1"
 ```
 
-There are 12 functions: `admin, auth, trips, notifications, vehicles, drivers, agents, vacancies, alerts, reviews, analytics, places`. A function with **zero** calls in 24h is fine (low-traffic). A function that was called but has **no metrics rows** is an instrumentation gap (it should be wrapped with `withTiming('<name>', …)`).
+There are 16 functions: `admin, agents, alerts, analytics, auth, bug-reports, debug, drivers, notifications, passengers, places, reviews, trips, vacancies, vehicles, video-verifications`. Cross-check against `ls supabase/functions/ | grep -v '^_'` — that's the source of truth. A function with **zero** calls in 24h is fine (low-traffic). A function that was called but has **no metrics rows** is an instrumentation gap (it should be wrapped with `withTiming('<name>', …)`).
 
 ## Step 4 — GitHub health
 
