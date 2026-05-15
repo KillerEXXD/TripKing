@@ -614,8 +614,35 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const raw = data as Record<string, unknown>;
     await enrichPostedByKyc([raw]);
     await enrichPendingInvitationCount([raw]);
+    await enrichPlatformFeeBreakdown([raw]);
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     return redactTrip(raw, relationshipFor(raw, u, myDriverId), false);
+  }
+
+  /**
+   * Stage-3: attach { driver: {amount_paise, status, payment_source}, agent: {...} }
+   * to the trip. Empty {} when the trip hasn't completed yet (no fee charges exist).
+   */
+  async function enrichPlatformFeeBreakdown(rows: Record<string, unknown>[]): Promise<void> {
+    if (rows.length === 0) return;
+    const ids = rows.map((r) => typeof r.id === 'string' ? r.id : '').filter(Boolean);
+    if (ids.length === 0) return;
+    const { data } = await db
+      .from('platform_fee_charges')
+      .select('trip_id, side, amount_paise, payment_source, status')
+      .in('trip_id', ids);
+    const m = new Map<string, { driver?: Record<string, unknown>; agent?: Record<string, unknown> }>();
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const tid = String(row.trip_id);
+      const slot = m.get(tid) ?? {};
+      const side = row.side === 'driver' ? 'driver' : 'agent';
+      slot[side] = { amount_paise: Number(row.amount_paise), payment_source: row.payment_source, status: row.status };
+      m.set(tid, slot);
+    }
+    for (const r of rows) {
+      const tid = typeof r.id === 'string' ? r.id : '';
+      r.platform_fee_breakdown = m.get(tid) ?? {};
+    }
   }
 
   // ── GET /trips (list) — Bearer required ──────────────────────────────────
@@ -991,6 +1018,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const raw = data as Record<string, unknown>;
     await enrichPostedByKyc([raw]);
     await enrichPendingInvitationCount([raw]);
+    await enrichPlatformFeeBreakdown([raw]);
     const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
     const rel = relationshipFor(raw, u, myDriverId);
     let posterReveal = false;
@@ -1637,7 +1665,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (trip.status !== 'in_progress') return fail('CONFLICT', `Trip is "${trip.status}", not "in_progress"`, 409);
     const b = await readBody(req);
     const now = new Date().toISOString();
-    await db.from('trips').update({ status: 'completed' }).eq('id', tripId);
+    // Status update fires charge_platform_fee_on_complete (migration 044) which charges
+    // BOTH the Driver-side and Agent-side platform fees atomically. If either wallet is
+    // short, the trigger RAISES and the whole update is rolled back.
+    const { error: completeErr } = await db.from('trips').update({ status: 'completed' }).eq('id', tripId);
+    if (completeErr) {
+      const msg = completeErr.message || '';
+      if (msg.includes('INSUFFICIENT_WALLET_BALANCE_DRIVER')) {
+        return fail('INSUFFICIENT_WALLET_BALANCE_DRIVER', 'Driver-side platform fee could not be charged — driver wallet is short. Driver must top up before this trip can be completed.', 402);
+      }
+      if (msg.includes('INSUFFICIENT_WALLET_BALANCE_AGENT')) {
+        return fail('INSUFFICIENT_WALLET_BALANCE_AGENT', 'Agent-side platform fee could not be charged — agent (trip poster) wallet is short. Agent must top up before this trip can be completed.', 402);
+      }
+      return fail('DB_ERROR', msg, 500);
+    }
     await db.from('trip_executions').upsert(
       { trip_id: tripId, completed_at: now, end_odo_url: (b.end_odo_url as string | null) ?? null, end_odo_reading: (b.end_odo_reading as number | null) ?? null, end_odo_at: b.end_odo_url ? now : null, driver_notes: (b.driver_notes as string | null) ?? null },
       { onConflict: 'trip_id' },
