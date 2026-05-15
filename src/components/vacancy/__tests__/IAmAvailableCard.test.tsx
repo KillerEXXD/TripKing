@@ -70,21 +70,25 @@ describe('IAmAvailableCard', () => {
     expect(screen.getByRole('link', { name: /post vacant/i })).toBeInTheDocument();
   });
 
-  it('expands by default with ≥1 vacancy and toggles to collapsed when clicked', () => {
+  it('starts collapsed with ≥1 vacancy and toggles open/closed when the header is clicked', () => {
     setState({ data: [vacancy('v1')] });
     renderCard();
-    const toggle = screen.getByRole('button', { name: /1 \/ 2 active/i });
+    // The whole header is the toggle (role="button"); the only header-level button is the toggle itself.
+    const toggle = screen.getByRole('button', { name: /i'm vacant/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/Vellore/)).toBeNull(); // collapsed by default — list not rendered
+    fireEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText(/Vellore/)).toBeInTheDocument();
-    fireEvent.click(toggle);
+    fireEvent.click(toggle); // click again to collapse
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText(/Vellore/)).toBeNull();
   });
 
-  it('does not render the toggle when there are no postings', () => {
+  it('does not make the header a toggle when there are no postings', () => {
     setState({ data: [] });
     renderCard();
-    expect(screen.queryByRole('button', { name: /0 \/ 2 active/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /i'm vacant/i })).toBeNull();
   });
 
   it('renders 2/2 with the Post button disabled + tooltip + "max reached" label', () => {

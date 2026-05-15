@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, MapPinned, Pencil, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -105,14 +105,35 @@ export function IAmAvailableCard({ driverId }: Props) {
   const atLimit = count >= max;
   const loading = query.isPending;
   const hasList = count > 0;
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const expanded = hasList && !collapsed;
   const listId = 'my-vacancies-list';
+
+  const toggle = () => setCollapsed((c) => !c);
+  const onHeaderKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggle();
+    }
+  };
+  const stop = (e: ReactMouseEvent) => e.stopPropagation();
 
   return (
     <div className="mx-4 mt-3" data-testid="i-am-available-card">
       <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-emerald-50">
-        <div className="flex items-start gap-3 p-4">
+        <div
+          className={`flex items-start gap-3 p-4 ${hasList ? 'cursor-pointer hover:bg-emerald-100/40' : ''}`}
+          {...(hasList
+            ? {
+                role: 'button',
+                tabIndex: 0,
+                onClick: toggle,
+                onKeyDown: onHeaderKeyDown,
+                'aria-expanded': expanded ? 'true' : 'false',
+                'aria-controls': listId,
+              }
+            : {})}
+        >
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700" aria-hidden>
             <MapPinned className="size-5" />
           </span>
@@ -124,32 +145,22 @@ export function IAmAvailableCard({ driverId }: Props) {
                 : 'Each posting below is live. Remove the ones you no longer want.'}
             </p>
             <div className="mt-2 flex items-center justify-between gap-2">
-              {hasList ? (
-                <button
-                  type="button"
-                  onClick={() => setCollapsed((c) => !c)}
-                  aria-expanded={expanded ? 'true' : 'false'}
-                  aria-controls={listId}
-                  className="flex items-center gap-1 rounded-md px-1 py-0.5 -mx-1 text-xs font-medium text-emerald-900 hover:bg-emerald-100/60"
-                >
-                  {loading ? `— / ${max} active` : `${count} / ${max} active`}
-                  {atLimit ? ' — max reached' : ''}
+              <span className="flex items-center gap-1 text-xs font-medium text-emerald-900">
+                {loading ? `— / ${max} active` : `${count} / ${max} active`}
+                {atLimit ? ' — max reached' : ''}
+                {hasList ? (
                   <ChevronDown
                     className={`size-4 transition-transform ${expanded ? '' : '-rotate-90'}`}
                     aria-hidden
                   />
-                </button>
-              ) : (
-                <span className="text-xs font-medium text-emerald-900">
-                  {loading ? `— / ${max} active` : `${count} / ${max} active`}
-                  {atLimit ? ' — max reached' : ''}
-                </span>
-              )}
+                ) : null}
+              </span>
               {atLimit ? (
                 <Button
                   size="sm"
                   variant="outline"
                   disabled
+                  onClick={stop}
                   title={`Max ${max} active ${max === 1 ? 'vacancy' : 'vacancies'} — remove one before posting another.`}
                   aria-label={`Post vacant (disabled — at the ${max}-active limit)`}
                 >
@@ -157,7 +168,7 @@ export function IAmAvailableCard({ driverId }: Props) {
                 </Button>
               ) : (
                 <Button asChild size="sm" variant="default">
-                  <Link to="/vacancies/new" aria-label="Post vacant">
+                  <Link to="/vacancies/new" onClick={stop} aria-label="Post vacant">
                     <Plus className="size-4" aria-hidden /> Post
                   </Link>
                 </Button>
