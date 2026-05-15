@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
@@ -67,6 +67,7 @@ export function useTrips(params?: TripsQueryParams) {
   return useQuery({
     queryKey: ['trips', params ?? {}],
     queryFn: () => getTrips(params),
+    placeholderData: keepPreviousData,
     staleTime: staleForStatus(params?.status),
     // Lists: poll while any row could still change. We pick the tightest interval that
     // matches the filter — selected/in_progress lists tick at 5s, others at 15s. If the

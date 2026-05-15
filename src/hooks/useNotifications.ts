@@ -1,9 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { getNotifications, markAllNotificationsRead, markNotificationRead } from '@/lib/api/services/notifications';
 
 export function useNotifications(params?: { unreadOnly?: boolean; limit?: number }) {
-  return useQuery({ queryKey: ['notifications', params ?? {}], queryFn: () => getNotifications(params), staleTime: STALE.live });
+  return useQuery({ queryKey: ['notifications', params ?? {}], queryFn: () => getNotifications(params), placeholderData: keepPreviousData, staleTime: STALE.live });
 }
 export function useUnreadNotificationCount() {
   const { data } = useNotifications({ unreadOnly: true });

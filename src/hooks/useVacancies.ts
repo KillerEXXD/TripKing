@@ -1,11 +1,11 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import { cancelVacancy, getVacancies, getVacancy, patchVacancy, postVacancy } from '@/lib/api/services/vacancies';
 import type { PostVacancyInput, VacanciesQueryParams } from '@/types';
 
 export function useVacancies(params?: VacanciesQueryParams) {
-  return useQuery({ queryKey: ['vacancies', params ?? {}], queryFn: () => getVacancies(params), staleTime: STALE.live });
+  return useQuery({ queryKey: ['vacancies', params ?? {}], queryFn: () => getVacancies(params), placeholderData: keepPreviousData, staleTime: STALE.live });
 }
 export function useVacancy(id: string | undefined) {
   return useQuery({ queryKey: ['vacancy', id], queryFn: () => getVacancy(id as string), enabled: !!id, staleTime: STALE.live });

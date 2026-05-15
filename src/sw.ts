@@ -41,11 +41,13 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 // JS / CSS bundles — SWR so the next load picks up the fresh build in background.
+// Bundles are fingerprinted, so the only effect of this TTL is how quickly an idle PWA
+// notices a fresh deploy. 1h (was 24h) — hot-fixes propagate to active installs same day.
 registerRoute(
   ({ request }) => request.destination === 'script' || request.destination === 'style',
   new StaleWhileRevalidate({
     cacheName: 'static-assets',
-    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 })],
+    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 })],
   }),
 );
 
