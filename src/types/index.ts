@@ -14,3 +14,4 @@ export * from './analytics';
 export * from './passenger';
 export * from './bugReport';
 export * from './referral';
+export * from './wallet';
