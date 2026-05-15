@@ -1,8 +1,9 @@
 /**
  * useBugReports — React Query bindings over `src/lib/api/services/bugReports`.
- * Live data: `staleTime: 30_000` per CLAUDE.md §"Caching".
+ * Live data: `staleTime: STALE.live` (30s) per CLAUDE.md §"Caching".
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { STALE } from '@/lib/queryClient';
 import {
   getBugAttachmentUploadUrl,
   getBugComments,
@@ -21,13 +22,11 @@ import type {
   PostBugReportInput,
 } from '@/types';
 
-const STALE = 30_000;
-
 export function useBugReports(filters?: BugReportFilters) {
   return useQuery({
     queryKey: ['bug-reports', filters ?? {}],
     queryFn: () => getBugReports(filters),
-    staleTime: STALE,
+    staleTime: STALE.live,
   });
 }
 
@@ -36,7 +35,7 @@ export function useBugReport(id: string | undefined) {
     queryKey: ['bug-report', id],
     queryFn: () => getBugReport(id as string),
     enabled: !!id,
-    staleTime: STALE,
+    staleTime: STALE.live,
   });
 }
 
@@ -45,7 +44,7 @@ export function useBugComments(id: string | undefined) {
     queryKey: ['bug-report', id, 'comments'],
     queryFn: () => getBugComments(id as string),
     enabled: !!id,
-    staleTime: STALE,
+    staleTime: STALE.live,
   });
 }
 

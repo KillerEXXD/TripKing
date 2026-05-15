@@ -22,7 +22,10 @@ export function useVacancy(id: string | undefined) {
 export function useMyActiveVacancies(driverId: string | undefined) {
   const params: VacanciesQueryParams = { driverId, status: ['active', 'on_trip'] };
   return useQuery({
-    queryKey: ['vacancies', driverId ? params : { driverId: 'pending' }],
+    // No 'pending' sentinel: `enabled: !!driverId` already gates the fetch, so a queryKey
+    // tied to a non-existent driverId would never resolve. The old sentinel created phantom
+    // cache rows that lingered across sessions. The key is stable on (driverId, 'active').
+    queryKey: ['vacancies', driverId, 'active'],
     queryFn: () => getVacancies(params),
     enabled: !!driverId,
     staleTime: STALE.live,

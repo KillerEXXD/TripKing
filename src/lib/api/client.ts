@@ -215,8 +215,11 @@ class ApiClient {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (init.headers) new Headers(init.headers).forEach((v, k) => (headers[k] = v));
     if (!authEndpoint) {
-      if (API_KEY) headers['X-API-Key'] = API_KEY;
       const token = this.getAccessToken();
+      // X-API-Key is the anonymous-read credential. Once a Bearer is present we send Bearer
+      // alone — sending the key alongside is meaningless (the Bearer wins) and only leaks
+      // the key into edge-fn/CDN access logs.
+      if (API_KEY && !token) headers['X-API-Key'] = API_KEY;
       if (token) headers['Authorization'] = `Bearer ${token}`;
     }
 

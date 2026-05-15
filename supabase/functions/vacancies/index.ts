@@ -44,7 +44,11 @@ const CACHE_EPOCH = 'v4';
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
   for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-    // Round geo to 3 decimals (~110m precision) to raise the hit rate.
+    // Intentional precision/hit-rate tradeoff: round geo to 3 decimals (~110m at the
+    // equator, ~85m at Vellore's latitude) so callers within the same 110m grid cell share
+    // a cache row. The server query still uses the raw coords from the URL — only the cache
+    // KEY is rounded. Higher precision (4dp ≈ 11m) would collapse hit rate; lower (2dp ≈ 1km)
+    // would group too many distinct neighbourhoods together. 3dp is the chosen tradeoff.
     if ((k === 'near_lat' || k === 'near_lng') && v) {
       const n = Number(v);
       params.push(`${k}-${Number.isFinite(n) ? n.toFixed(3) : v}`);
