@@ -2,7 +2,7 @@
 import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
-import type { CityRow, DriverSummary, Place, PostVacancyInput, Vacancy, VacancyLinkedTrip, VacancyStatus, VehicleSummary } from '@/types';
+import type { CityRow, DriverSummary, Place, PostVacancyInput, Vacancy, VacancyInviteSummary, VacancyLinkedTrip, VacancyStatus, VehicleSummary } from '@/types';
 
 export type VacancyTransformErrorCode = 'MISSING_ID' | 'MISSING_DRIVER_ID' | 'MISSING_CURRENT_CITY' | 'UNKNOWN_STATUS';
 export class VacancyTransformError extends ApiTransformError<VacancyTransformErrorCode> {}
@@ -15,6 +15,32 @@ function asStatus(raw: unknown, ctx: Record<string, unknown>): VacancyStatus {
     throw new VacancyTransformError(`UNKNOWN_STATUS "${s}"`, 'UNKNOWN_STATUS', { ...ctx, status: s });
   }
   return s as VacancyStatus;
+}
+function maybeMyInvites(raw: unknown): VacancyInviteSummary[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: VacancyInviteSummary[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue;
+    const o = r as Record<string, unknown>;
+    const id = typeof o.id === 'string' ? o.id : '';
+    const tripId = typeof o.trip_id === 'string' ? o.trip_id : '';
+    const status = o.status === 'pending' || o.status === 'applied' ? o.status : null;
+    if (!id || !tripId || !status) continue;
+    const trip = (o.trip as Record<string, unknown> | null | undefined) ?? null;
+    const from = trip?.from_city as Record<string, unknown> | null | undefined;
+    const to = trip?.to_city as Record<string, unknown> | null | undefined;
+    const pickupAt = typeof trip?.pickup_at === 'string' ? (trip.pickup_at as string) : '';
+    out.push({
+      id,
+      tripId,
+      status,
+      pickupAt,
+      fromCityName: typeof from?.name === 'string' ? from.name : undefined,
+      toCityName: typeof to?.name === 'string' ? to.name : undefined,
+      createdAt: typeof o.created_at === 'string' ? o.created_at : '',
+    });
+  }
+  return out.length > 0 ? out : undefined;
 }
 function maybeLinkedTrip(raw: unknown): VacancyLinkedTrip | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
@@ -110,6 +136,7 @@ export function transformVacancy(api: Api): Vacancy {
     distanceKm: num(api.distance_km),
     linkedTripId: str(api.linked_trip_id),
     linkedTrip: maybeLinkedTrip(api.linked_trip),
+    myInvites: maybeMyInvites(api.my_invites),
   };
 }
 

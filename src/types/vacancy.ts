@@ -12,6 +12,22 @@ export interface VacancyLinkedTrip {
   toCityName?: string;
 }
 
+/**
+ * One invitation the *current viewer* (an agent/admin) has already sent to this vacancy's driver.
+ * Server-attached, viewer-scoped, status ∈ {pending, applied}. Drives the "N invites sent" badge
+ * on VacancyCard and the "Already invited" disabled rows in InviteToTripDialog. Absent for
+ * anonymous / driver callers.
+ */
+export interface VacancyInviteSummary {
+  id: string;
+  tripId: string;
+  status: 'pending' | 'applied';
+  pickupAt: string;
+  fromCityName?: string;
+  toCityName?: string;
+  createdAt: string;
+}
+
 /** "I'm available in city X, willing to drive to one of these destinations." */
 export interface Vacancy {
   id: string;
@@ -37,6 +53,8 @@ export interface Vacancy {
   /** Set when this vacancy has been suspended by an accepted trip (status='on_trip'). */
   linkedTripId?: string;
   linkedTrip?: VacancyLinkedTrip;
+  /** Invites the current viewer has already sent to this driver (server-scoped to viewer; absent for anon/driver). */
+  myInvites?: VacancyInviteSummary[];
 }
 
 /** One destination on a posted vacancy — a curated city, a precise place, or both (≥1 required). */
