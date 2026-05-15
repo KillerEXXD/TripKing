@@ -309,11 +309,19 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('GET /trips?invited=me (invited driver) → contains the trip + posted_by_name pre-revealed (Phase 4)',
     invitedTab.status === 200 && !!invitedTrip && typeof invitedTrip.posted_by_name === 'string' && invitedTrip.posted_by_name.length > 0,
     `len=${invitedTab.json?.data?.length} posted_by_name=${JSON.stringify(invitedTrip?.posted_by_name)}`);
+  // ?invited=me rows carry the caller's invitation_id + invitation_status so the UI can decline without an extra round-trip.
+  check('GET /trips?invited=me → invitation_id + invitation_status stamped on the row (pending)',
+    !!invitedTrip && invitedTrip.invitation_id === inviteId && invitedTrip.invitation_status === 'pending',
+    `invitation_id=${JSON.stringify(invitedTrip?.invitation_id)} invitation_status=${JSON.stringify(invitedTrip?.invitation_status)}`);
   // Driver declines the invite.
   const declineByOther = await j('POST', `/trips/${inviteTripId}/invites/${inviteId}/decline`, { token: token, body: { reason: 'busy' } });
   check('POST /trips/:id/invites/:invite_id/decline by non-invitee → 403', declineByOther.status === 403, `status=${declineByOther.status}`);
   const declineInvite = await j('POST', `/trips/${inviteTripId}/invites/${inviteId}/decline`, { token: dToken, body: { reason: 'too far' } });
   check('POST /trips/:id/invites/:invite_id/decline (invitee) → 200', declineInvite.status === 200, `status=${declineInvite.status} ${JSON.stringify(declineInvite.json?.error || '')}`);
+  // After decline the trip drops out of the driver's Invited tab (status='declined' is filtered out server-side).
+  const invitedAfter = await j('GET', '/trips?invited=me', { token: dToken });
+  const stillThere = (invitedAfter.json?.data || []).some((t) => t.id === inviteTripId);
+  check('GET /trips?invited=me after decline → trip no longer in the driver\'s Invited list', invitedAfter.status === 200 && !stillThere, `still_there=${stillThere}`);
   // Re-invite + agent withdraws.
   const reInvite = await j('POST', `/trips/${inviteTripId}/invites`, { token, body: { driver_ids: [drvId] } });
   const reInviteId = reInvite.json?.data?.created?.[0]?.id;

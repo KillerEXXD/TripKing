@@ -81,6 +81,14 @@ describe('transformTrip', () => {
     expect(transformTrip(fullTrip).pendingInvitationCount).toBe(0);
     expect(transformTrip({ ...fullTrip, pending_invitation_count: 3 }).pendingInvitationCount).toBe(3);
   });
+  it('maps invitation_id + invitation_status when present (?invited=me rows), undefined otherwise', () => {
+    const t0 = transformTrip(fullTrip);
+    expect(t0.invitationId).toBeUndefined();
+    expect(t0.invitationStatus).toBeUndefined();
+    const t1 = transformTrip({ ...fullTrip, invitation_id: 'inv-1', invitation_status: 'pending' });
+    expect(t1.invitationId).toBe('inv-1');
+    expect(t1.invitationStatus).toBe('pending');
+  });
   it('maps the joined from_place / to_place and a radius-list distance_km', () => {
     const t = transformTrip({
       ...fullTrip,
