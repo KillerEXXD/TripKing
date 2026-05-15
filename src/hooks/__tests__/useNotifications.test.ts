@@ -30,6 +30,32 @@ describe('useNotifications hooks', () => {
     expect(qc.getQueryData(['notifications', { unreadOnly: true }])).toEqual([{ id: 'n1' }]);
   });
 
+  it('useNotifications keeps the previous data while a filter-change refetch is in flight', async () => {
+    // First filter: unreadOnly=true → 2 rows
+    vi.mocked(svc.getNotifications).mockResolvedValueOnce([{ id: 'n1' }, { id: 'n2' }] as never);
+    const { wrapper } = setup();
+    const { result, rerender } = renderHook(({ unreadOnly }: { unreadOnly: boolean }) => useNotifications({ unreadOnly }), {
+      wrapper,
+      initialProps: { unreadOnly: true },
+    });
+    await waitFor(() => expect(result.current.data).toHaveLength(2));
+
+    // Flip to unreadOnly=false — the queryKey changes; the refetch is now slow.
+    let resolveSecond: (v: unknown[]) => void = () => {};
+    vi.mocked(svc.getNotifications).mockReturnValueOnce(new Promise<unknown[]>((r) => { resolveSecond = r; }) as never);
+    rerender({ unreadOnly: false });
+
+    // While the second fetch is pending, data must still be the previous 2 rows
+    // (without keepPreviousData this would be undefined → spinner flash).
+    expect(result.current.data).toHaveLength(2);
+    expect(result.current.isPlaceholderData).toBe(true);
+
+    // Resolve the second fetch and assert the swap happens.
+    resolveSecond([{ id: 'n3' }, { id: 'n4' }, { id: 'n5' }]);
+    await waitFor(() => expect(result.current.data).toHaveLength(3));
+    expect(result.current.isPlaceholderData).toBe(false);
+  });
+
   it('useUnreadNotificationCount returns the length of the unread list, 0 before it resolves', async () => {
     vi.mocked(svc.getNotifications).mockResolvedValue([{ id: 'n1' }, { id: 'n2' }, { id: 'n3' }] as never);
     const { wrapper } = setup();
