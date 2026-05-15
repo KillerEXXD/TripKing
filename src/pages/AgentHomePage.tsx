@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, ChevronRight, Clock, Navigation, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { BarChart3, Bell, ChevronRight, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -31,23 +31,11 @@ function Bellish({ count }: { count: number }) {
   );
 }
 /** Top-of-home card — shows the agent how many of their posted trips are actively
- *  running. 0 → empty-state, not actionable. 1 → straight to that trip's detail.
- *  ≥2 → focused work-queue at `/queue/in-progress`. */
+ *  running. Caller gates on `trips.length > 0` so the empty placeholder is hidden
+ *  (an agent already knows whether their trips are in flight — empty teaches nothing).
+ *  1 → straight to that trip's detail. ≥2 → focused work-queue at `/queue/in-progress`. */
 function TripsInProgressCard({ trips }: { trips: Trip[] }) {
   const count = trips.length;
-  if (count === 0) {
-    return (
-      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <Navigation className="size-3.5" aria-hidden /> Driving now
-        </div>
-        <div className="mt-1 text-sm font-medium text-slate-700">No trips in progress</div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          When your trips are being driven, they'll show up here with the driver, passenger, and live ETA.
-        </div>
-      </div>
-    );
-  }
   if (count === 1) {
     const t = trips[0];
     const driverName = t.assignedDriver?.fullName ?? (t.assignedDriverHandle ? `Driver ${t.assignedDriverHandle}` : 'Driver');
@@ -109,24 +97,12 @@ function TripStat({ icon, label, value, tone = 'emerald' }: { icon: React.ReactN
   );
 }
 
-/** Trips the agent posted that have applicants but no driver selected yet.
- *  0 → empty-state, not actionable. 1 → straight to that trip's applicants.
- *  ≥2 → focused work-queue at `/queue/needs-action`. */
+/** Trips the agent posted that have applicants but no driver selected yet. Caller
+ *  gates on `trips.length > 0` so the empty placeholder is hidden (the notification
+ *  bell + `Has applicants` badge on /posted-trips already surface this — empty is
+ *  noise). 1 → straight to that trip's applicants. ≥2 → focused work-queue. */
 function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalApplicants: number }) {
   const tripCount = trips.length;
-  if (tripCount === 0) {
-    return (
-      <div className="rounded-2xl border-2 border-slate-200 bg-slate-50 p-4">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-          <Sparkles className="size-3.5" aria-hidden /> Review
-        </div>
-        <div className="mt-1 text-sm font-medium text-slate-700">No applicants waiting</div>
-        <div className="mt-0.5 text-xs text-slate-500">
-          When drivers apply to your trips, they'll show up here so you can pick one.
-        </div>
-      </div>
-    );
-  }
   if (tripCount === 1) {
     const t = trips[0];
     return (
@@ -225,32 +201,57 @@ function AgentHome({ agent }: { agent: Agent }) {
       <div className="space-y-3 px-4 pb-4 pt-3">
         {agent.verification && agent.kycStatus !== 'approved' ? <GetVerifiedBanner verification={agent.verification} steps={AGENT_VERIFICATION_STEPS} /> : null}
 
-        {/* Priority stack — surfaces in-flight work and decisions awaiting the agent.
-            Each card no-ops when its count is zero. Mirrors the Driver-home pattern (PR #66). */}
-        <TripsInProgressCard trips={inProgressTrips} />
-        <NeedsActionCard trips={needsActionTrips} totalApplicants={needsActionApplicants} />
+        {/* Priority stack — natural top-down priority: live trips → decisions needed → invites
+            outstanding → CTA. The first three cards are hidden when empty (an agent already
+            knows whether they have work — placeholders are noise). "Post a trip" is the
+            always-visible CTA — the agent's equivalent of the driver's "I'm vacant". */}
+        {inProgressTrips.length > 0 ? <TripsInProgressCard trips={inProgressTrips} /> : null}
+        {needsActionTrips.length > 0 ? <NeedsActionCard trips={needsActionTrips} totalApplicants={needsActionApplicants} /> : null}
         <InvitesSentCard trips={myPosts} />
 
-        <Link to="/profile" className="block w-full space-y-2 rounded-xl border bg-white px-3 py-2.5 transition-colors hover:border-primary/40">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-secondary">Your reputation</div>
-          <div className="flex items-center gap-1 text-sm font-bold">
-            <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden /> {agent.totalTripsPosted} trips posted
+        <Link to="/trips/new" className="block rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 transition-colors hover:bg-emerald-100">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+            <Plus className="size-3.5" aria-hidden /> Post a trip
           </div>
-          <div className="truncate text-[10px] text-secondary">{agent.topTags[0] ?? 'Run trips smoothly to earn driver tags'}</div>
-          <div className="flex items-center gap-1 text-[10px] text-secondary">
-            <ChevronRight className="size-3" aria-hidden /> View / edit your profile
+          <div className="mt-1 text-lg font-bold text-emerald-950">
+            Get a trip on the marketplace
+          </div>
+          <div className="mt-0.5 text-xs text-emerald-800">
+            Drivers see it in seconds. Pick the one you like best.
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-emerald-700 px-4 py-1.5 text-sm font-semibold text-white">
+            Post a trip <ChevronRight className="size-4" aria-hidden />
           </div>
         </Link>
 
-        <Link to="/analytics" className="flex items-center gap-3 rounded-xl border bg-gradient-to-br from-blue-50 to-blue-100/40 px-4 py-3 transition-colors hover:border-primary/40">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
-            <BarChart3 className="size-5" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">Your analytics</span>
-            <span className="block text-xs text-secondary">Trips posted, applicants, fares</span>
-          </span>
-          <ChevronRight className="size-4 shrink-0 text-secondary" aria-hidden />
+        <Link to="/profile" className="block w-full space-y-2 rounded-2xl border-2 border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-amber-700">
+            <Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden /> Your reputation
+          </div>
+          <div className="mt-1 text-lg font-bold text-amber-950">
+            {agent.totalTripsPosted} trips posted
+          </div>
+          <div className="mt-0.5 text-xs text-amber-800">
+            {agent.topTags[0] ?? 'Run trips smoothly to earn driver tags'}
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-amber-700 px-4 py-1.5 text-sm font-semibold text-white">
+            View / edit profile <ChevronRight className="size-4" aria-hidden />
+          </div>
+        </Link>
+
+        <Link to="/analytics" className="block rounded-2xl border-2 border-blue-300 bg-blue-50 p-4 transition-colors hover:bg-blue-100">
+          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-blue-700">
+            <BarChart3 className="size-3.5" aria-hidden /> Your analytics
+          </div>
+          <div className="mt-1 text-lg font-bold text-blue-950">
+            Trips posted, applicants, fares
+          </div>
+          <div className="mt-0.5 text-xs text-blue-800">
+            See how your trips are performing month over month.
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-700 px-4 py-1.5 text-sm font-semibold text-white">
+            View analytics <ChevronRight className="size-4" aria-hidden />
+          </div>
         </Link>
       </div>
 
