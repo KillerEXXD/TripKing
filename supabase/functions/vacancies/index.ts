@@ -23,6 +23,7 @@ import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
+import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
 import { redactDriver, stripPhones, assertNoPhones, PhoneInTextError } from '../_shared/pii.ts';
@@ -31,9 +32,12 @@ import { readBody, pgFail } from '../_shared/http.ts';
 
 const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 
-// LIVE tier — short TTLs, memory-only (per-isolate). The cluster has few isolates and a 30s
-// staleness window is acceptable; the DB round-trip for a shared-cache lookup would erase the
-// benefit. Bump the epoch when the response shape of GET /vacancies changes.
+// LIVE tier — short TTLs, shared cache (memory + Postgres `api_cache`). The original assumption
+// that per-isolate memory was enough was wrong in practice: api_metrics showed a 0% hit rate for
+// vacancies because Deno isolates churn fast enough that warmed memory is rarely reused. Shared
+// tier costs one extra round-trip to api_cache on a miss but lets warm caches survive across
+// isolates. Mutations invalidate by entityKind='vacancy' (entityId='list' for filtered lists,
+// the vacancy id for items). Bump the epoch when the response shape of GET /vacancies changes.
 const CACHE_EPOCH = 'v2';
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
@@ -108,7 +112,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       return ok(shapeVacancy(data as Record<string, unknown>));
     }
     const { data, hit } = await withCache<Record<string, unknown> | null>(
-      { key: `vacancies:item:${vacancyId}:${CACHE_EPOCH}`, ttl: CacheTTL.SHORT, tier: 'memory' },
+      { key: `vacancies:item:${vacancyId}:${CACHE_EPOCH}`, ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'vacancy', entityId: vacancyId },
       async () => {
         const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
         if (error) throw new Error(error.message);
@@ -119,10 +123,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
   }
 
-  // ── GET /vacancies (list) — LIVE tier, 30s memory cache, public-safe ─────
+  // ── GET /vacancies (list) — LIVE tier, 30s shared cache (memory + api_cache), public-safe ─
   if (!id && req.method === 'GET') {
     const { data: rows, hit } = await withCache<Record<string, unknown>[]>(
-      { key: vacanciesListKey(url), ttl: CacheTTL.SHORT, tier: 'memory' },
+      { key: vacanciesListKey(url), ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'vacancy', entityId: 'list' },
       async () => {
         let q = db.from('vacancies').select(VACANCY_SELECT);
         const city = url.searchParams.get('current_city_id');
@@ -247,6 +251,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_vacancy', { p_vacancy_id: vacancyId }); } catch { /* ignore */ }
     cacheDeletePattern('vacancies:*');
+    await sharedCacheInvalidateEntity('vacancy', 'list');
     purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(vacancyId, false);
   }
@@ -321,6 +326,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       }
     }
     cacheDeletePattern('vacancies:*');
+    await Promise.all([
+      sharedCacheInvalidateEntity('vacancy', 'list'),
+      sharedCacheInvalidateEntity('vacancy', id),
+    ]);
     purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(id, false);
   }
@@ -338,6 +347,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const { error } = await db.from('vacancies').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id);
     if (error) return pgFail(error);
     cacheDeletePattern('vacancies:*');
+    await Promise.all([
+      sharedCacheInvalidateEntity('vacancy', 'list'),
+      sharedCacheInvalidateEntity('vacancy', id),
+    ]);
     purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(id, false);
   }

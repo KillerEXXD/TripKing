@@ -27,6 +27,7 @@ import { serviceClient } from '../_shared/supabase.ts';
 import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { cacheDelete } from '../_shared/cache.ts';
+import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
 import { revealCache, redactDriver, logPiiReveal } from '../_shared/pii.ts';
@@ -526,6 +527,9 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     });
     invalidateDriverMe(ownerId);
     purgeVacanciesFor(id); // /vacancies cache must reflect the new is_active state (issue #21)
+    // /vacancies list is now shared-tier (cache_type 'live', entity 'vacancy'/'list') — must
+    // invalidate so the driver's vacancies reappear (or disappear) immediately for everyone.
+    await sharedCacheInvalidateEntity('vacancy', 'list');
     return respondDriver(id, true);
   }
 
