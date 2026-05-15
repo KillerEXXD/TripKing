@@ -15,6 +15,9 @@ npm run test:coverage || { echo "❌ Tests or coverage thresholds failed — fix
 echo "📋  test-required gate (docs/TEST_POLICY.md)"
 node scripts/check-tests-required.cjs || exit 1
 
+echo "🛡️   PII / public-scope gate (#114 item 10)"
+node scripts/check-pii-public-scope.cjs || exit 1
+
 echo "🏗️   npm run build"
 npm run build || { echo "❌ Build failed — fix before pushing."; exit 1; }
 
