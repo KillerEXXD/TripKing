@@ -20,7 +20,7 @@ import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
-import { Badge, Button, Card } from '@/components/ui';
+import { Badge, Button, Card, PriorityCard } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -516,38 +516,39 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
   }
   const busy = acceptMutation.isPending || declineMutation.isPending;
   return (
-    <Card className="border-2 border-emerald-300 bg-emerald-50">
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">You&apos;ve been selected</div>
-          {trip.acceptanceDeadlineAt ? (
-            <CountdownTimer
-              deadline={trip.acceptanceDeadlineAt}
-              prefix="Accept within"
-              expiredLabel="Expired — being reassigned…"
-              className="text-xs text-emerald-800"
-            />
-          ) : null}
-        </div>
-        <div className="text-base font-bold text-emerald-900">Accept this trip to start.</div>
-        <p className="text-xs text-emerald-800">
-          If you don&apos;t respond before the timer hits zero, it&apos;ll go back to other applicants.
-        </p>
+    <>
+      <PriorityCard
+        tone="emerald"
+        icon={<CheckCircle2 className="size-3.5" aria-hidden />}
+        label="You've been selected"
+        rightAction={trip.acceptanceDeadlineAt ? (
+          <CountdownTimer
+            deadline={trip.acceptanceDeadlineAt}
+            prefix="Accept within"
+            expiredLabel="Expired — being reassigned…"
+            className="text-xs text-emerald-800"
+          />
+        ) : null}
+        title="Accept this trip to start."
+        subtitle="If you don't respond before the timer hits zero, it'll go back to other applicants."
+        footerSlot={
+          <div className="flex gap-2">
+            <Button variant="full" size="lg" className="flex-1" onClick={() => setConfirming(true)} disabled={busy}>
+              {acceptMutation.isPending ? 'Accepting…' : 'Accept'}
+            </Button>
+            <Button variant="outline" size="lg" className="text-destructive" onClick={() => void onDecline()} disabled={busy}>
+              {declineMutation.isPending ? 'Declining…' : 'Decline'}
+            </Button>
+          </div>
+        }
+      >
         {trip.postedByName ? (
-          <p className="text-xs text-emerald-800">
+          <p className="mt-0.5 text-xs text-emerald-800">
             Picked by <b>{trip.postedByName}</b>
             {callHref ? <> · <a href={callHref} className="underline">Call to confirm</a></> : null}
           </p>
         ) : null}
-      </div>
-      <div className="mt-3 flex gap-2">
-        <Button variant="full" size="lg" className="flex-1" onClick={() => setConfirming(true)} disabled={busy}>
-          {acceptMutation.isPending ? 'Accepting…' : 'Accept'}
-        </Button>
-        <Button variant="outline" size="lg" className="text-destructive" onClick={() => void onDecline()} disabled={busy}>
-          {declineMutation.isPending ? 'Declining…' : 'Decline'}
-        </Button>
-      </div>
+      </PriorityCard>
       <AcceptTripDialog
         trip={trip}
         open={confirming}
@@ -555,7 +556,7 @@ function SelectedDriverCard({ trip }: { trip: Trip }) {
         onConfirm={(ids) => void runAccept(ids)}
         pending={acceptMutation.isPending}
       />
-    </Card>
+    </>
   );
 }
 
@@ -576,34 +577,33 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
     }
   }
   return (
-    <Card className="border-2 border-amber-300 bg-amber-50">
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-amber-700">Awaiting acceptance</div>
-          {trip.acceptanceDeadlineAt ? (
-            <CountdownTimer
-              deadline={trip.acceptanceDeadlineAt}
-              prefix="Decides within"
-              expiredLabel="Expired — finding another driver…"
-              className="text-xs text-amber-800"
-            />
-          ) : null}
+    <PriorityCard
+      tone="amber"
+      icon={<Clock className="size-3.5" aria-hidden />}
+      label="Awaiting acceptance"
+      rightAction={trip.acceptanceDeadlineAt ? (
+        <CountdownTimer
+          deadline={trip.acceptanceDeadlineAt}
+          prefix="Decides within"
+          expiredLabel="Expired — finding another driver…"
+          className="text-xs text-amber-800"
+        />
+      ) : null}
+      title={<>Waiting for <b>{driverName}</b> to accept.</>}
+      footerSlot={
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" className="text-destructive" onClick={() => void onCancel()} disabled={cancelMutation.isPending}>
+            {cancelMutation.isPending ? 'Withdrawing…' : 'Withdraw selection'}
+          </Button>
         </div>
-        <div className="text-sm font-semibold text-amber-900">
-          Waiting for <b>{driverName}</b> to accept.
-        </div>
-        {driverPhone ? (
-          <p className="text-xs text-amber-800">
-            <a href={`tel:${driverPhone}`} className="underline">Call them</a> to confirm.
-          </p>
-        ) : null}
-      </div>
-      <div className="mt-2 flex justify-end">
-        <Button variant="outline" size="sm" className="text-destructive" onClick={() => void onCancel()} disabled={cancelMutation.isPending}>
-          {cancelMutation.isPending ? 'Withdrawing…' : 'Withdraw selection'}
-        </Button>
-      </div>
-    </Card>
+      }
+    >
+      {driverPhone ? (
+        <p className="mt-0.5 text-xs text-amber-800">
+          <a href={`tel:${driverPhone}`} className="underline">Call them</a> to confirm.
+        </p>
+      ) : null}
+    </PriorityCard>
   );
 }
 
@@ -701,6 +701,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {showTracking ? <TripTracking trip={trip} /> : null}
 
       {viewer.isPoster && trip.passengerOtp && (trip.status === 'accepted' || trip.status === 'in_progress') ? (
+        // Bespoke layout — 3xl mono OTP is the centerpiece and doesn't fit PriorityCard's title slot.
         <Card className="gap-2 border-2 border-emerald-300 bg-emerald-50">
           <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Passenger OTP</div>
           <div className="text-center font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900">{trip.passengerOtp}</div>
