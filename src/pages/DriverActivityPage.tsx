@@ -451,10 +451,10 @@ function AppliedList({ query }: { query: ReturnType<typeof useMyApplications> })
 }
 
 /**
- * Driver's "Invited" tab — `<PostedTripCard>` per row plus an inline "Unavailable" action that
- * declines the invite (server flips `trip_invitations.status` → 'declined'). The list filters
- * out 'declined' invites server-side (`GET /trips?invited=me`), so on success the row drops out
- * of the queue and the agent's `/trips/:id/invitations` shows the Declined badge.
+ * Driver's "Invited" tab — `<PostedTripCard>` per row plus an inline "Decline" action that flips
+ * `trip_invitations.status` → 'declined'. The list filters out 'declined' invites server-side
+ * (`GET /trips?invited=me`), so on success the row drops out of the queue and the agent's
+ * `/trips/:id/invitations` shows the Declined badge.
  */
 function InvitedList({
   query,
@@ -477,12 +477,12 @@ function InvitedList({
   }
   async function onDecline(trip: Trip) {
     if (!trip.invitationId) return;
-    if (!window.confirm("Tell the agent you can't take this trip? It'll be removed from your Invited list.")) return;
+    if (!window.confirm("Decline this invite? It'll be removed from your Invited list and the agent will see it as declined.")) return;
     try {
       await declineMutation.mutateAsync({ tripId: trip.id, inviteId: trip.invitationId });
-      toast.success('Marked as unavailable.');
+      toast.success('Invite declined.');
     } catch {
-      toast.error("Couldn't mark unavailable — please try again.");
+      toast.error("Couldn't decline — please try again.");
     }
   }
   return (
@@ -498,7 +498,7 @@ function InvitedList({
                 disabled={declineMutation.isPending}
                 className="text-xs font-semibold text-destructive hover:underline disabled:opacity-40"
               >
-                {declineMutation.isPending ? 'Marking…' : 'Unavailable'}
+                {declineMutation.isPending ? 'Declining…' : 'Decline'}
               </button>
             </div>
           ) : null}

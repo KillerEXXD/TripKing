@@ -135,6 +135,7 @@ export function useMyApplications() {
 }
 
 const useInvalidateTrips = createInvalidator('trips', 'trip');
+const useInvalidateVacanciesFromTrips = createInvalidator('vacancies', 'vacancy');
 
 export function usePostTrip() {
   const invalidate = useInvalidateTrips();
@@ -253,9 +254,15 @@ export function useInvitedTrips() {
 
 export function useInviteDrivers() {
   const invalidate = useInvalidateTrips();
+  const invalidateVacancies = useInvalidateVacanciesFromTrips();
   return useMutation({
     mutationFn: ({ tripId, driverIds }: { tripId: string; driverIds: string[] }) => inviteDrivers(tripId, driverIds),
-    onSuccess: (_d, v) => invalidate(v.tripId),
+    onSuccess: (_d, v) => {
+      invalidate(v.tripId);
+      // Refresh /vacancies so the "N invites sent" badge + the dialog's "Already invited" rows
+      // reflect the new invite without a manual page refresh.
+      invalidateVacancies();
+    },
   });
 }
 

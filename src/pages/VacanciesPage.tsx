@@ -13,10 +13,10 @@ import { cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
-import { Badge, Button, Card } from '@/components/ui';
+import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
-import type { NearRadius, Trip, Vacancy } from '@/types';
+import type { NearRadius, Trip, Vacancy, VacancyInviteSummary } from '@/types';
 
 function availableLabel(v: Vacancy): string {
   const from = new Date(v.availableFrom);
@@ -38,6 +38,7 @@ function VacancyCard({ vacancy, canInvite }: { vacancy: Vacancy; canInvite: bool
   const driver = vacancy.driver;
   const veh = vehicleLabel(vacancy);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const myInvites = vacancy.myInvites ?? [];
   const ratingSub =
     driver && driver.ratingCount > 0
       ? `★ ${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount} · ${driver.totalTripsCompleted} trips`
@@ -50,6 +51,7 @@ function VacancyCard({ vacancy, canInvite }: { vacancy: Vacancy; canInvite: bool
         </Link>
         {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
       </div>
+      {canInvite && myInvites.length > 0 ? <MyInvitesBadge invites={myInvites} /> : null}
       <div className="text-xs text-secondary">
         <MapPin className="-mt-0.5 inline size-3" aria-hidden /> Available in {vacancy.currentPlace?.name ?? vacancy.currentCity.name} · {availableLabel(vacancy)}
         {vacancy.distanceKm != null ? ` · ${vacancy.distanceKm} km away` : ''}
@@ -93,6 +95,7 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
   const trips = useTrips({ status: ['open', 'has_applicants'], postedByUserId: myUserId });
   const inviteDrivers = useInviteDrivers();
   const eligible = (trips.data ?? []).filter((t) => t.status === 'open' || t.status === 'has_applicants');
+  const alreadyInvitedTripIds = new Set((vacancy.myInvites ?? []).map((i) => i.tripId));
   const handle = vacancy.driver?.displayHandle ?? '';
   const driverId = vacancy.driver?.id ?? '';
   return (
@@ -120,6 +123,7 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
                   key={t.id}
                   trip={t}
                   disabled={inviteDrivers.isPending || !driverId}
+                  alreadyInvited={alreadyInvitedTripIds.has(t.id)}
                   onPick={() => {
                     if (!driverId) return;
                     inviteDrivers.mutate(
@@ -153,11 +157,11 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
   );
 }
 
-function TripPickRow({ trip, disabled, onPick }: { trip: Trip; disabled: boolean; onPick: () => void }) {
+function TripPickRow({ trip, disabled, alreadyInvited, onPick }: { trip: Trip; disabled: boolean; alreadyInvited: boolean; onPick: () => void }) {
   return (
     <button
       type="button"
-      disabled={disabled}
+      disabled={disabled || alreadyInvited}
       onClick={onPick}
       className="flex w-full items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-left transition-colors hover:border-primary/40 disabled:opacity-60"
     >
@@ -169,8 +173,52 @@ function TripPickRow({ trip, disabled, onPick }: { trip: Trip; disabled: boolean
           {formatShortDate(new Date(trip.pickupAt))} · {formatClockTime(new Date(trip.pickupAt))} · {formatINR(trip.driverPayout)}
         </div>
       </div>
-      <Badge variant="outline">Invite</Badge>
+      <Badge variant={alreadyInvited ? 'muted' : 'outline'}>{alreadyInvited ? 'Already invited' : 'Invite'}</Badge>
     </button>
+  );
+}
+
+/**
+ * "N invites sent" pill — clickable popover listing the trips the current agent has already
+ * invited this driver to. Status is server-filtered to pending/applied; declined/withdrawn/expired
+ * don't show. Each row links to the trip's detail page.
+ */
+function MyInvitesBadge({ invites }: { invites: VacancyInviteSummary[] }) {
+  const n = invites.length;
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="self-start rounded-full border border-input bg-muted/40 px-2.5 py-0.5 text-xs font-medium text-secondary hover:border-primary/40 hover:bg-muted"
+          aria-label={`${n} invite${n === 1 ? '' : 's'} sent — show trips`}
+        >
+          {n} invite{n === 1 ? '' : 's'} sent
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 space-y-1.5 p-2">
+        <div className="px-1 pb-1 text-xs font-semibold text-secondary">Invites you sent to this driver</div>
+        {invites.map((inv) => {
+          const route = inv.fromCityName && inv.toCityName ? `${inv.fromCityName} → ${inv.toCityName}` : 'Trip';
+          const when = inv.pickupAt ? `${formatShortDate(new Date(inv.pickupAt))} · ${formatClockTime(new Date(inv.pickupAt))}` : '';
+          return (
+            <Link
+              key={inv.id}
+              to={`/trips/${inv.tripId}`}
+              className="flex items-center justify-between gap-3 rounded-lg border bg-white px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/40"
+            >
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{route}</div>
+                {when ? <div className="text-secondary">{when}</div> : null}
+              </div>
+              <Badge variant={inv.status === 'applied' ? 'outline' : 'muted'}>
+                {inv.status === 'applied' ? 'Applied' : 'Pending'}
+              </Badge>
+            </Link>
+          );
+        })}
+      </PopoverContent>
+    </Popover>
   );
 }
 

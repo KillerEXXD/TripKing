@@ -140,6 +140,39 @@ describe('VacanciesPage', () => {
     expect(screen.getByRole('link', { name: /post vacant/i })).toHaveAttribute('href', '/vacancies/new');
   });
 
+  it('shows a "N invites sent" badge for an agent who has already invited this driver', () => {
+    vi.mocked(useEffectiveRole).mockReturnValue('trip_manager');
+    setVacancies({
+      data: [
+        makeVacancy({
+          myInvites: [
+            { id: 'inv1', tripId: 'trip1', status: 'pending', pickupAt: '2099-06-01T07:00:00.000Z', fromCityName: 'Vellore', toCityName: 'Chennai', createdAt: '2099-05-30T01:00:00.000Z' },
+            { id: 'inv2', tripId: 'trip2', status: 'applied', pickupAt: '2099-06-02T08:00:00.000Z', fromCityName: 'Vellore', toCityName: 'Bangalore', createdAt: '2099-05-30T02:00:00.000Z' },
+          ],
+        }),
+      ],
+    });
+    renderVacancies();
+    const badge = screen.getByRole('button', { name: /2 invites sent/i });
+    expect(badge).toBeInTheDocument();
+    fireEvent.click(badge);
+    // Popover is portal-rendered; the trip rows should appear with route + status pills.
+    expect(screen.getByText(/Vellore → Chennai/)).toBeInTheDocument();
+    expect(screen.getByText(/Vellore → Bangalore/)).toBeInTheDocument();
+    expect(screen.getByText('Pending')).toBeInTheDocument();
+    expect(screen.getByText('Applied')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Vellore → Chennai/ })).toHaveAttribute('href', '/trips/trip1');
+  });
+
+  it('hides the invites-sent badge when the viewer is a driver (myInvites absent)', () => {
+    vi.mocked(useEffectiveRole).mockReturnValue('driver');
+    vi.mocked(useMyDriver).mockReturnValue({ data: { id: 'dme' } } as never);
+    vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, data: [] } as never);
+    setVacancies({ data: [makeVacancy()] });
+    renderVacancies();
+    expect(screen.queryByRole('button', { name: /invite.*sent/i })).toBeNull();
+  });
+
   it('a driver at 2/2 active sees the card with the Post button disabled', () => {
     vi.mocked(useEffectiveRole).mockReturnValue('driver');
     vi.mocked(useMyDriver).mockReturnValue({ data: { id: 'd1' } } as never);

@@ -70,6 +70,30 @@ describe('transformVacancy', () => {
     expect(v.linkedTrip?.pickupAt).toBe('2026-06-02T08:00:00Z');
     expect(() => transformVacancy({ id: 'x', driver_id: 'd1', current_city: city('c1', 'V'), status: 'bogus' })).toThrow(/UNKNOWN_STATUS/);
   });
+  it('maps my_invites (viewer-scoped) and skips invalid rows', () => {
+    const v = transformVacancy({
+      id: 'vac5',
+      driver_id: 'd1',
+      current_city: city('c1', 'Vellore'),
+      my_invites: [
+        {
+          id: 'inv1',
+          trip_id: 'trip1',
+          status: 'pending',
+          created_at: '2026-05-26T01:00:00Z',
+          trip: { id: 'trip1', pickup_at: '2026-06-01T07:00:00Z', from_city: { name: 'Vellore' }, to_city: { name: 'Chennai' } },
+        },
+        { id: 'inv-bad', trip_id: 'trip2', status: 'declined' }, // wrong status — skipped
+        { id: 'inv-bad2', status: 'pending' }, // missing trip_id — skipped
+      ],
+    });
+    expect(v.myInvites?.length).toBe(1);
+    expect(v.myInvites?.[0]).toMatchObject({ id: 'inv1', tripId: 'trip1', status: 'pending', fromCityName: 'Vellore', toCityName: 'Chennai', pickupAt: '2026-06-01T07:00:00Z' });
+  });
+  it('leaves myInvites undefined when the field is absent', () => {
+    const v = transformVacancy({ id: 'vac6', driver_id: 'd1', current_city: city('c1', 'Vellore') });
+    expect(v.myInvites).toBeUndefined();
+  });
 });
 
 describe('transformAlert', () => {

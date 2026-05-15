@@ -68,6 +68,40 @@ const VACANCY_SELECT =
   // Migration 039: when status='on_trip', the IAmAvailableCard banner shows the route/pickup of the trip that took the slot.
   'linked_trip:trips!linked_trip_id(id, pickup_at, from_city:cities!from_city_id(id, name), to_city:cities!to_city_id(id, name))';
 
+/**
+ * Per-caller "invites I (the viewing agent) have already sent to this driver". Computed AFTER the
+ * shared cache so it stays viewer-specific (the cached payload is identical for everyone). Status is
+ * limited to pending/applied — declined/withdrawn/expired don't count toward the badge.
+ */
+async function attachMyInvites(
+  db: Db,
+  rows: Record<string, unknown>[],
+  viewerUserId: string,
+): Promise<Record<string, unknown>[]> {
+  if (rows.length === 0) return rows;
+  const driverIds = [...new Set(rows.map((r) => (r.driver_id as string) ?? '').filter(Boolean))];
+  if (driverIds.length === 0) return rows;
+  const { data: invites } = await db
+    .from('trip_invitations')
+    .select('id, trip_id, driver_id, status, created_at, trip:trips!trip_id(id, pickup_at, from_city:cities!from_city_id(name), to_city:cities!to_city_id(name))')
+    .eq('invited_by_user_id', viewerUserId)
+    .in('driver_id', driverIds)
+    .in('status', ['pending', 'applied'])
+    .order('created_at', { ascending: false });
+  const byDriver = new Map<string, Record<string, unknown>[]>();
+  for (const inv of (invites ?? []) as Record<string, unknown>[]) {
+    const did = inv.driver_id as string;
+    const arr = byDriver.get(did) ?? [];
+    arr.push(inv);
+    byDriver.set(did, arr);
+  }
+  return rows.map((r) => {
+    const did = r.driver_id as string;
+    const list = byDriver.get(did);
+    return list && list.length > 0 ? { ...r, my_invites: list } : r;
+  });
+}
+
 /** Vacancies NEVER reveal driver PII (per design — applying/inviting is the gate). Flatten the driver's
  *  display_handle off `driver.user`, then strip name/phone/email/photo. Also scrubs phones from `notes`. */
 function shapeVacancy(row: Record<string, unknown> | null | undefined): Record<string, unknown> | null {
@@ -133,6 +167,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
 
   // ── GET /vacancies (list) — LIVE tier, 30s shared cache (memory + api_cache), public-safe ─
   if (!id && req.method === 'GET') {
+    // Per-caller my_invites (agent/admin viewing the list) is resolved after the cache so the
+    // shared cache row stays public — every viewer reads the same cached payload, then their own
+    // invites are stitched in below.
+    const viewer = await authUser(db, req);
     const { data: rows, hit } = await withCache<Record<string, unknown>[]>(
       { key: vacanciesListKey(url), ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'vacancy', entityId: 'list' },
       async () => {
@@ -193,7 +231,11 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         return out.map((r) => shapeVacancy(r) as Record<string, unknown>);
       },
     );
-    return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
+    const enriched = viewer ? await attachMyInvites(db, rows, viewer.id) : rows;
+    // Viewer-specific data → keep the public cache header, but signal to caches that the bytes
+    // depend on the bearer (i.e. don't share an authed response with anonymous callers).
+    const resp = setCacheControl(tagCacheHit(ok(enriched), hit), { ttl: CacheTTL.SHORT, scope: viewer ? 'private' : 'public' });
+    return resp;
   }
 
   // ── POST /vacancies (driver — post my availability) ──────────────────────
