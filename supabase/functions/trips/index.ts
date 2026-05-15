@@ -1482,12 +1482,22 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         }
       }
       // Upsert — re-inviting a previously-declined/withdrawn driver bumps status back to 'pending'.
+      // BUT if the driver has already applied/been-selected/accepted on this trip, keep the
+      // invitation at 'applied' so the driver's "Invitation waiting" home card doesn't reappear
+      // (the apply-side trigger sync_trip_invitation_on_apply only handles the other direction).
       const now = new Date().toISOString();
+      const { data: existingAcc } = await db
+        .from('trip_acceptances')
+        .select('driver_id, status')
+        .eq('trip_id', tripId)
+        .in('driver_id', eligibleRows.map((r) => r.id))
+        .in('status', ['applied', 'selected', 'accepted']);
+      const appliedSet = new Set(((existingAcc ?? []) as { driver_id: string }[]).map((r) => r.driver_id));
       const rows = eligibleRows.map((r) => ({
         trip_id: tripId,
         driver_id: r.id,
         invited_by_user_id: u.id,
-        status: 'pending' as const,
+        status: (appliedSet.has(r.id) ? 'applied' : 'pending') as 'applied' | 'pending',
         declined_reason: null,
         updated_at: now,
       }));

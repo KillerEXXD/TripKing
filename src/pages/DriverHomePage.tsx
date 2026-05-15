@@ -281,7 +281,14 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
   const hasPendingInvites = myPosts.some((t) => (t.pendingInvitationCount ?? 0) > 0);
-  const pendingReceivedInvites = (invitedToDriveQuery.data ?? []).filter((t) => t.invitationStatus === 'pending');
+  // Belt-and-braces: also exclude trips the driver has already applied to. The backend trigger
+  // sync_trip_invitation_on_apply (migration 033) flips the invitation pending → applied when
+  // the driver applies, but a re-invite from the agent rewrites the row back to pending — this
+  // client-side guard hides those without depending on a clean backend state.
+  const appliedTripIds = new Set((myApplicationsQuery.data ?? []).map((a) => a.trip.id));
+  const pendingReceivedInvites = (invitedToDriveQuery.data ?? []).filter(
+    (t) => t.invitationStatus === 'pending' && !appliedTripIds.has(t.id),
+  );
 
   // Priority cards: a driver has at most one trip in each of these states at a time.
   const myDriving = myDrivingQuery.data ?? [];
