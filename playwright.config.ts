@@ -4,11 +4,18 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright config — end-to-end browser tests under `e2e/`.
  *
  * `npm run test:e2e` boots a Vite dev server on a dedicated port (4399 — `npm run dev` defaults to
- * 3002, which collides with other worktrees) and runs the specs against it. The specs stub the REST
- * API at the network layer (Playwright `page.route` on the `/api` paths), so they're deterministic
- * and don't need the deployed Supabase functions; `serviceWorkers: 'block'` keeps the PWA service
- * worker out of the way so those route handlers always win. `webServer.reuseExistingServer` reuses
- * a dev server already on 4399 (e.g. from a prior run). CI: 2 retries, 1 worker, no `.only`, HTML report.
+ * 3002, which collides with other worktrees) and runs the specs against it. The dev server's
+ * `/api/*` proxy forwards to the deployed Supabase edge functions, so when the browser hits the
+ * REST API it lands on REAL data — no stubs. Specs build their preconditions via `e2e/helpers-api.ts`
+ * (`mintDriver`, `postTrip`, …) which calls the same Supabase host directly via Playwright's
+ * `request` context. Two writers, one DB: parallel-safe by `e2e-…` naming + nightly purge cron
+ * (migration 054). See `docs/TEST_POLICY.md` §"E2E preconditions are real".
+ *
+ * `PLAYWRIGHT_API_BASE` (default = the dev Supabase) overrides where setup calls land — useful
+ * for pointing CI at a dedicated tripking-e2e project if one is provisioned later.
+ *
+ * `serviceWorkers: 'block'` keeps the PWA SW out of the way during runs. `webServer.reuseExisting`
+ * reuses a dev server already on 4399 from a prior run. CI: 2 retries, 1 worker, no `.only`.
  */
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 4399);
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
