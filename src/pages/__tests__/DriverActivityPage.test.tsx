@@ -160,6 +160,17 @@ describe('DriverActivityPage', () => {
     expect(screen.queryByRole('button', { name: /view details/i })).toBeNull();
   });
 
+  it('renders an applied row without crashing when the trip carries an unrecognised status (Sentry regression)', () => {
+    // Prior to the STATUS_META fallback, an unrecognised t.status (e.g. server enum
+    // drift) crashed render with "Cannot read properties of undefined (reading 'variant')".
+    setUp({ applied: appsState({ data: [makeApp({ status: 'applied', trip: makeTrip({ id: 't-unk', toCity: city('c8', 'Pondicherry'), status: 'unknown_future_status' as never }) })] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
+    // Render succeeds (route → city line + fallback status label). Pre-fix, this threw.
+    expect(screen.getByText('Vellore → Pondicherry')).toBeInTheDocument();
+    expect(screen.getByText(/trip is unknown_future_status/i)).toBeInTheDocument();
+  });
+
   it('the Posted tab lists the trips you posted yourself', () => {
     setUp({ posted: tripsState({ data: [makeTrip({ id: 'p-1', toCity: city('c9', 'Salem') })] }) });
     renderPage();
