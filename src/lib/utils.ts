@@ -62,11 +62,19 @@ export function formatPickupTime(iso: string): string {
 }
 
 /**
- * First-name from a full name: "Ravi Kumar" → "Ravi". Empty string for nullish input.
+ * Short display name for the header greeting: first name + the next word's initial when
+ * present. "Ravi" → "Ravi", "Ravi Kumar" → "Ravi K", "Ravi Kumar Sharma" → "Ravi K"
+ * (only one initial — the header has limited width and one initial is the convention
+ * comparable apps use). Empty string for nullish input.
  */
 export function getFirstName(full: string | undefined | null): string {
   if (!full) return '';
-  return full.trim().split(/\s+/)[0] ?? '';
+  const parts = full.trim().split(/\s+/);
+  const first = parts[0] ?? '';
+  const second = parts[1];
+  if (!second) return first;
+  const initial = second.charAt(0).toUpperCase();
+  return initial ? `${first} ${initial}` : first;
 }
 
 /**
