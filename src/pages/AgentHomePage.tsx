@@ -1,22 +1,20 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, Clock, Gift, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { BarChart3, Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { Badge, Button, Card, PriorityCard } from '@/components/ui';
+import { Button, Card, PriorityCard } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
 import { HomeTile } from '@/components/home/HomeTile';
+import { ReferralActionTile } from '@/components/home/ReferralActionTile';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
 import type { Agent, Trip } from '@/types';
-
-const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applicants: 'Has applicants', selected: 'Awaiting acceptance', accepted: 'Accepted', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled' };
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
@@ -127,26 +125,6 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
   );
 }
 
-function PostedTripRow({ trip }: { trip: Trip }) {
-  return (
-    <Link to={trip.status === 'has_applicants' ? `/trips/${trip.id}/applicants` : `/trips/${trip.id}`} className="block">
-      <Card className="gap-1.5 transition-colors hover:border-primary/40">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
-            <div className="text-xs text-secondary">{formatPickupTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout</div>
-          </div>
-          <Badge variant={trip.status === 'has_applicants' ? 'warning' : trip.status === 'accepted' || trip.status === 'in_progress' ? 'info' : trip.status === 'completed' ? 'muted' : trip.status === 'cancelled' ? 'destructive' : 'success'}>{STATUS_LABEL[trip.status]}</Badge>
-        </div>
-        {trip.applicantCount > 0 ? (
-          <div className="flex items-center gap-1 text-xs text-amber-700">
-            <Sparkles className="size-3" aria-hidden /> {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'}
-          </div>
-        ) : null}
-      </Card>
-    </Link>
-  );
-}
 function AgentHome({ agent }: { agent: Agent }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
@@ -205,52 +183,18 @@ function AgentHome({ agent }: { agent: Agent }) {
           cta={{ label: 'View / edit profile' }}
         />
 
-        {/* Quick-access tile row: square, rounded, colour-coded.
-            Analytics (blue) + Referrals (emerald). The full ReferralCodeCard
-            with share buttons + share targets still renders below. */}
-        <div className="grid grid-cols-2 gap-2">
-          <HomeTile to="/analytics" icon={BarChart3} label="Analytics" sub="Trips & fare trend" tone="blue"    ariaLabel="View analytics" />
-          <HomeTile to="/referrals" icon={Gift}      label="Referrals" sub="Refer & earn"      tone="emerald" ariaLabel="View referrals" />
+        {/* Quick-access tile row: compact 3-col grid. Analytics (1 col) +
+            Referrals tile (2 cols, with code + Copy + WhatsApp inline). */}
+        <div className="grid grid-cols-3 gap-2">
+          <HomeTile to="/analytics" icon={BarChart3} label="Analytics" sub="Trends" tone="blue" ariaLabel="View analytics" />
+          <div className="col-span-2">
+            <ReferralActionTile role="agent" />
+          </div>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <ReferralCodeCard role="agent" />
       </div>
 
       <div className="px-4 pb-4">
         <InstallAppCard dismissable />
-      </div>
-
-      <div className="space-y-3 px-4">
-        <div>
-          <div className="mb-2 flex items-center justify-between px-1">
-            <h2 className="text-sm font-semibold">Your recent trips</h2>
-            {myPostsQuery.isSuccess ? <Badge variant="muted">{myPosts.length}</Badge> : null}
-          </div>
-          {myPostsQuery.isPending ? (
-            <LoadingSkeleton rows={2} />
-          ) : myPostsQuery.isError ? (
-            <ErrorState title="Couldn't load your trips" message="Check your connection and try again." onRetry={() => void myPostsQuery.refetch()} />
-          ) : myPosts.length === 0 ? (
-            <Card className="items-center text-center">
-              <div className="text-sm font-medium">You haven't posted a trip yet</div>
-              <Button asChild variant="full" size="sm">
-                <Link to="/trips/new">Post your first trip</Link>
-              </Button>
-            </Card>
-          ) : (
-            <div className="space-y-2">
-              {myPosts.slice(0, 3).map((t) => (
-                <PostedTripRow key={t.id} trip={t} />
-              ))}
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/posted-trips">All your posts →</Link>
-              </Button>
-            </div>
-          )}
-        </div>
-
       </div>
     </div>
   );
