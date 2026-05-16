@@ -82,7 +82,8 @@ describe('AgentHomePage', () => {
     // The agent CTA — equivalent to the driver's "I'm vacant" — is always visible.
     expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
-    expect(screen.getByText(/your analytics/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /view analytics/i })).toHaveAttribute('href', '/analytics');
+    expect(screen.getByRole('link', { name: /view referrals/i })).toHaveAttribute('href', '/referrals');
     expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
