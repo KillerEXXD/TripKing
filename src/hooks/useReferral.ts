@@ -7,6 +7,7 @@ import {
   getMyReferralEarnings,
   getMyReferred,
   getMyWithdrawals,
+  getReferralLink,
   patchAdminWithdrawal,
   requestReferralWithdrawal,
   transferReferralToCashWallet,
@@ -86,6 +87,17 @@ export function useTransferReferralToCashWallet() {
       void qc.invalidateQueries({ queryKey: ['agent', 'me'] });
     },
     meta: { toastOnError: true },
+  });
+}
+
+// ── Stage 8 — link drilldown ────────────────────────────────────────────────
+
+export function useReferralLink(linkId: string | undefined) {
+  return useQuery({
+    queryKey: ['referrals', 'link', linkId],
+    queryFn: () => getReferralLink(linkId as string),
+    enabled: !!linkId,
+    staleTime: STALE.profile,
   });
 }
 
