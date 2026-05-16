@@ -161,9 +161,9 @@ function AgentHome({ agent }: { agent: Agent }) {
       <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{getFirstName(agent.fullName) || user?.displayName || 'Agent'}</span>
-            <Badge variant="secondary">Agent</Badge>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{getFirstName(agent.fullName) || user?.displayName || 'Agent'}</span>
+            <span aria-label="Agent" title="Agent" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-amber-950">A</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5">

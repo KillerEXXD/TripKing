@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Bell, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard, ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { Badge, Card } from '@/components/ui';
+import { Card } from '@/components/ui';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { getFirstName, initials } from '@/lib/utils';
 
@@ -87,9 +87,9 @@ export function HomePage() {
       <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || user?.phone || 'Admin'}</span>
-            <Badge variant="info">Admin</Badge>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || user?.phone || 'Admin'}</span>
+            <span aria-label="Admin" title="Admin" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">Ad</span>
           </div>
         </div>
         <div className="flex items-center gap-1">

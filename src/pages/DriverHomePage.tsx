@@ -231,9 +231,9 @@ function DriverHome({ driver }: { driver: Driver }) {
       <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
-            <Badge variant="success">Driver</Badge>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
+            <span aria-label="Driver" title="Driver" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">D</span>
             {cities.length > 0 ? <NearCityPicker cities={cities} value={nearCityId} onChange={setNearCityId} /> : null}
           </div>
         </div>
@@ -341,9 +341,9 @@ function HomeChromeFallback() {
       <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="truncate font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || 'Driver'}</span>
-            <Badge variant="success">Driver</Badge>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || 'Driver'}</span>
+            <span aria-label="Driver" title="Driver" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">D</span>
           </div>
         </div>
       </header>
