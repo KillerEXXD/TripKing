@@ -126,6 +126,22 @@ describe('transformTrip', () => {
     expect(t.assignedDriver?.currentLocationAt).toBe('2026-06-01T10:30:00Z');
     expect(t.distanceToDestinationKm).toBe(37.2);
   });
+  it('surfaces platform_fee_breakdown when present (Stage 3)', () => {
+    const t = transformTrip({
+      ...fullTrip,
+      status: 'completed',
+      platform_fee_breakdown: {
+        driver: { amount_paise: 5000, payment_source: 'cash_wallet', status: 'charged' },
+        agent: { amount_paise: 5000, payment_source: 'promo_credit', status: 'charged' },
+      },
+    });
+    expect(t.platformFeeBreakdown?.driver).toEqual({ amountPaise: 5000, paymentSource: 'cash_wallet', status: 'charged' });
+    expect(t.platformFeeBreakdown?.agent?.paymentSource).toBe('promo_credit');
+  });
+  it('platform_fee_breakdown returns undefined when absent / empty', () => {
+    expect(transformTrip(fullTrip).platformFeeBreakdown).toBeUndefined();
+    expect(transformTrip({ ...fullTrip, platform_fee_breakdown: {} }).platformFeeBreakdown).toBeUndefined();
+  });
 });
 
 describe('transformTripAcceptance', () => {

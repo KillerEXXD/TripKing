@@ -9,6 +9,7 @@ import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
+import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
@@ -165,7 +166,8 @@ function AgentHome({ agent }: { agent: Agent }) {
             <Badge variant="secondary">Agent</Badge>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          <WalletPill />
           <Bellish count={unread} />
           <ProfileAvatar name={agent.fullName || user?.displayName || 'Agent'} photoUrl={agent.profilePhotoUrl} />
         </div>

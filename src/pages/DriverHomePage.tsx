@@ -16,6 +16,7 @@ import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
+import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
@@ -236,7 +237,8 @@ function DriverHome({ driver }: { driver: Driver }) {
             {cities.length > 0 ? <NearCityPicker cities={cities} value={nearCityId} onChange={setNearCityId} /> : null}
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          <WalletPill />
           <Bellish count={unread} />
           <ProfileAvatar name={driver.fullName || user?.displayName || 'Driver'} photoUrl={driver.profilePhotoUrl} />
         </div>

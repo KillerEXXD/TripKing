@@ -37,6 +37,7 @@ const CreateAlertPage = lazyWithRetry(() => import('@/pages/CreateAlertPage'));
 const AlertDetailPage = lazyWithRetry(() => import('@/pages/AlertDetailPage'));
 const NotificationsPage = lazyWithRetry(() => import('@/pages/NotificationsPage'));
 const WalletPage = lazyWithRetry(() => import('@/pages/WalletPage'));
+const WalletChargesPage = lazyWithRetry(() => import('@/pages/WalletChargesPage'));
 const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazyWithRetry(() => import('@/pages/administration/AdministrationPage'));
 const AdminConfigPage = lazyWithRetry(() => import('@/pages/administration/AdminConfigPage'));
@@ -113,6 +114,7 @@ export function AppRoutes() {
             <Route path="/alerts/:id" element={<AlertDetailPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/wallet" element={<WalletPage />} />
+            <Route path="/wallet/charges" element={<WalletChargesPage />} />
             <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
             <Route path="/administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
             <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
