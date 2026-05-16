@@ -200,6 +200,14 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         const { data: inactive } = await db.from('drivers').select('id').eq('is_active', false);
         const inactiveIds = (inactive ?? []).map((r) => r.id as string);
         if (inactiveIds.length) q = q.not('driver_id', 'in', `(${inactiveIds.join(',')})`);
+        // Invite-picker passes the trip poster's user_id to hide their own vacancy from
+        // the candidate list (a driver-user wearing both hats — they can't invite themselves).
+        const excludeUserId = url.searchParams.get('exclude_user_id');
+        if (excludeUserId) {
+          const { data: own } = await db.from('drivers').select('id').eq('user_id', excludeUserId);
+          const ownIds = (own ?? []).map((r) => r.id as string);
+          if (ownIds.length) q = q.not('driver_id', 'in', `(${ownIds.join(',')})`);
+        }
         const destCity = url.searchParams.get('destination_city_id');
         const destPlace = url.searchParams.get('destination_place_id');
         if (destCity || destPlace) {

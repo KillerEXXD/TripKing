@@ -109,6 +109,8 @@ export interface DriversQueryParams {
   search?: string;
   /** Restrict to drivers whose (fresh) current position is within the radius (nearest first). */
   near?: NearRadius;
+  /** Exclude rows whose owning user.id matches — used by the invite picker to hide the trip poster's own driver. */
+  excludeUserId?: string;
   page?: number;
   limit?: number;
   sort?: string;

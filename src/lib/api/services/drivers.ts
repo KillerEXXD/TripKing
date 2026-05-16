@@ -59,6 +59,7 @@ function driverQuery(params?: DriversQueryParams): Record<string, unknown> {
     q.near_lng = params.near.lng;
     q.radius_km = params.near.radiusKm;
   }
+  if (params?.excludeUserId) q.exclude_user_id = params.excludeUserId;
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
   if (params?.sort) q.sort = params.sort;

@@ -267,6 +267,10 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     let q = db.from('drivers').select(DRIVER_SELECT, { count: 'exact' });
     const city = url.searchParams.get('current_city_id');
     if (city) q = q.eq('current_city_id', city);
+    // Invite-picker passes the trip poster's user_id to hide their own driver row
+    // from the candidate list (a driver-user wearing both hats — can't invite self).
+    const excludeUserId = url.searchParams.get('exclude_user_id');
+    if (excludeUserId) q = q.neq('user_id', excludeUserId);
     const kyc = csv(url.searchParams.get('kyc_status'));
     if (kyc.length === 1) q = q.eq('kyc_status', kyc[0]);
     else if (kyc.length > 1) q = q.in('kyc_status', kyc);

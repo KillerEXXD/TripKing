@@ -613,14 +613,19 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
    * notification to each invitee. Returns the created rows + the skipped driver ids.
    */
   async function inviteDrivers(
-    trip: { id: string; from_city_id: string | null },
+    trip: { id: string; from_city_id: string | null; posted_by_user_id: string },
     inviterUserId: string,
     driverIds: string[],
-  ): Promise<{ created: { id: string; driver_id: string }[]; skipped: string[] }> {
-    if (driverIds.length === 0) return { created: [], skipped: [] };
+  ): Promise<{ created: { id: string; driver_id: string }[]; skipped: string[]; selfInvited: string[] }> {
+    if (driverIds.length === 0) return { created: [], skipped: [], selfInvited: [] };
     const { data: eligible } = await db.from('drivers').select('id, user_id').in('id', driverIds).eq('is_active', true).eq('kyc_status', 'approved');
     let eligibleRows = (eligible ?? []) as { id: string; user_id: string }[];
-    const skipped = driverIds.filter((id) => !eligibleRows.some((r) => r.id === id));
+    // A driver-user can't be invited to a trip they posted (they wear both hats).
+    // This is independent of the *inviter* — admins can invite on behalf of an agent,
+    // but the trip's actual poster is still the right person to exclude.
+    const selfInvited = eligibleRows.filter((r) => r.user_id === trip.posted_by_user_id).map((r) => r.id);
+    eligibleRows = eligibleRows.filter((r) => r.user_id !== trip.posted_by_user_id);
+    const skipped = driverIds.filter((id) => !eligibleRows.some((r) => r.id === id) && !selfInvited.includes(id));
     if (eligibleRows.length > 0 && trip.from_city_id) {
       const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
       const maxKm = typeof settings?.invite_max_radius_km === 'number' ? settings.invite_max_radius_km : 15;
@@ -679,7 +684,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         });
       }
     }
-    return { created, skipped };
+    return { created, skipped, selfInvited };
   }
   /**
    * Adds `posted_by_kyc_status` to each row by batch-fetching kyc_status from
@@ -1051,7 +1056,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         const top5 = matches.slice(0, 5).map((m) => m.driverId);
         if (top5.length > 0) {
           const { created: inv } = await inviteDrivers(
-            { id: created.id as string, from_city_id: plan.from_city_id ?? null },
+            { id: created.id as string, from_city_id: plan.from_city_id ?? null, posted_by_user_id: u.id },
             u.id,
             top5,
           );
@@ -1245,6 +1250,12 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const u = await authUser(db, req);
       if (!u) return fail('UNAUTHORIZED', 'Sign in to apply', 401);
       if (!(await rateLimitOk(db, `apply-trip:${u.id}`, 120, 60))) return fail('RATE_LIMITED', 'Too many applications — try again shortly', 429);
+      // You can't apply to a trip you posted (a driver-user wearing both hats).
+      const { data: tripOwner } = await db.from('trips').select('posted_by_user_id').eq('id', tripId).maybeSingle();
+      if (!tripOwner) return fail('NOT_FOUND', 'Trip not found', 404);
+      if ((tripOwner as { posted_by_user_id: string }).posted_by_user_id === u.id) {
+        return fail('SELF_APPLY_FORBIDDEN', "You posted this trip — you can't apply to it.", 403);
+      }
       const did = await driverIdFor(u.id);
       if (!did) return fail('FORBIDDEN', 'You need a driver profile to apply', 403);
       const { data: drv } = await db.from('drivers').select('kyc_status, is_active').eq('id', did).maybeSingle();
@@ -1679,12 +1690,15 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         : [];
       if (ids.length === 0) return fail('VALIDATION', 'driver_ids must be a non-empty array of driver UUIDs', 422);
       try {
-        const { created, skipped } = await inviteDrivers(
-          { id: tripId, from_city_id: trip.from_city_id ?? null },
+        const { created, skipped, selfInvited } = await inviteDrivers(
+          { id: tripId, from_city_id: trip.from_city_id ?? null, posted_by_user_id: trip.posted_by_user_id },
           u.id,
           ids,
         );
-        return ok({ created, skipped });
+        if (created.length === 0 && selfInvited.length === ids.length) {
+          return fail('SELF_INVITE_FORBIDDEN', "You can't invite yourself to a trip you posted.", 403);
+        }
+        return ok({ created, skipped, self_invited: selfInvited });
       } catch (e) {
         const err = e as { code?: string; message?: string };
         return pgFail({ code: err.code, message: err.message ?? 'Failed to create invitations' });
