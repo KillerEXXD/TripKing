@@ -7,7 +7,7 @@ vi.mock('@/hooks/useReviews', () => ({ useCreateReview: vi.fn() }));
 import { useCreateReview } from '@/hooks/useReviews';
 vi.mock('@/hooks/useAdminConfig', () => ({ useReviewTagsByCategory: vi.fn() }));
 import { useReviewTagsByCategory } from '@/hooks/useAdminConfig';
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 import { toast } from 'sonner';
 
 function setCreate(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPending: boolean }> = {}) {
@@ -54,12 +54,23 @@ describe('ReviewForm', () => {
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ score: 3, tagIds: ['tag1'] })));
   });
 
-  it('treats a 409 (already reviewed) as success and calls onDone', async () => {
+  it('sends the typed comment in the mutation payload', async () => {
+    const mutateAsync = setCreate();
+    render(<ReviewForm tripId="t1" direction="manager_to_driver" rateeNoun="the driver" />);
+    fireEvent.change(screen.getByLabelText(/comment/i), { target: { value: 'Great driver — very polite.' } });
+    fireEvent.click(screen.getByRole('button', { name: /submit review/i }));
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ comment: 'Great driver — very polite.' })),
+    );
+  });
+
+  it('shows an info toast (not success) when a 409 says the review already exists, and calls onDone', async () => {
     const onDone = vi.fn();
     setCreate({ mutateAsync: vi.fn().mockRejectedValue(new ApiError('A review for this trip and direction already exists', 409)) });
     render(<ReviewForm tripId="t1" direction="manager_to_driver" rateeNoun="the driver" onDone={onDone} />);
     fireEvent.click(screen.getByRole('button', { name: /submit review/i }));
-    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+    await waitFor(() => expect(toast.info).toHaveBeenCalled());
+    expect(toast.success).not.toHaveBeenCalled();
     expect(onDone).toHaveBeenCalled();
   });
 

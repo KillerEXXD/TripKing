@@ -45,7 +45,7 @@ export function ReviewForm({ tripId, direction, rateeNoun, onDone }: ReviewFormP
       onDone?.();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        toast.success(`You've already reviewed ${rateeNoun} for this trip.`);
+        toast.info(`You've already submitted a review for ${rateeNoun} — it can't be changed once posted.`);
         onDone?.();
         return;
       }

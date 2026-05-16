@@ -32,7 +32,8 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 // entityId='all'. Reviews are read-heavy and writes are rare (one per trip per direction), so the
 // hit-rate ceiling stays high despite the broad invalidation. Bump epoch on response-shape changes.
 // v2 (2026-05-16): bumped after QA-data reset wipe.
-const CACHE_EPOCH = 'v2';
+// v3 (2026-05-16): bumped to flush any stuck entries after the silent-409 / stale-score report.
+const CACHE_EPOCH = 'v3';
 
 const pgFail = (e: { code?: string; message: string }) =>
   pgFailShared(e, { dupMessage: 'A review for this trip and direction already exists' });
