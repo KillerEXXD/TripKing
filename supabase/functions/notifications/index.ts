@@ -23,7 +23,8 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 // /vacancies, KYC changes, trip lifecycle) — those paths do NOT call this function so they can't
 // invalidate the cache. Acceptable: the 30s TTL bounds the lag (matches the existing live tier and
 // the SW NetworkFirst strategy on /notifications). Mark-read paths in THIS function do invalidate.
-const CACHE_EPOCH = 'v1';
+// v2 (2026-05-16): bumped after QA-data reset wipe.
+const CACHE_EPOCH = 'v2';
 
 const handler = withTiming('notifications', async (req: Request): Promise<Response> => {
   const pre = corsPreflight(req);

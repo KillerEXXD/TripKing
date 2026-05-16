@@ -31,7 +31,8 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 // any review mutation (create, report, moderate) drops every key under entityKind='review',
 // entityId='all'. Reviews are read-heavy and writes are rare (one per trip per direction), so the
 // hit-rate ceiling stays high despite the broad invalidation. Bump epoch on response-shape changes.
-const CACHE_EPOCH = 'v1';
+// v2 (2026-05-16): bumped after QA-data reset wipe.
+const CACHE_EPOCH = 'v2';
 
 const pgFail = (e: { code?: string; message: string }) =>
   pgFailShared(e, { dupMessage: 'A review for this trip and direction already exists' });
