@@ -1092,6 +1092,24 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
         throw e;
       }
+      // Vehicle eligibility (server-side guard — the picker filters too, but the API is the
+      // source of truth). Year ≥ app_settings.min_vehicle_year, insurance not expired, vehicle
+      // belongs to the applying driver, vehicle is active.
+      const submittedVehicleId = (b.vehicle_id as string | null) ?? null;
+      if (submittedVehicleId) {
+        const { data: veh } = await db.from('vehicles')
+          .select('driver_id, year, insurance_expiry, is_active')
+          .eq('id', submittedVehicleId)
+          .maybeSingle();
+        if (!veh) return fail('VEHICLE_INELIGIBLE', 'Vehicle not found', 400);
+        if ((veh as { driver_id: string }).driver_id !== did) return fail('VEHICLE_INELIGIBLE', 'That vehicle is not registered to you', 400);
+        if ((veh as { is_active: boolean }).is_active === false) return fail('VEHICLE_INELIGIBLE', 'That vehicle is inactive — pick another or reactivate it.', 400);
+        const { data: settings } = await db.from('app_settings').select('min_vehicle_year').eq('id', 1).maybeSingle();
+        const minYear = Number((settings as { min_vehicle_year?: number } | null)?.min_vehicle_year ?? 2015);
+        if (Number((veh as { year: number }).year) < minYear) return fail('VEHICLE_INELIGIBLE', `Vehicle too old — minimum year is ${minYear}.`, 400);
+        const insExp = (veh as { insurance_expiry: string | null }).insurance_expiry;
+        if (insExp && new Date(insExp).getTime() < Date.now()) return fail('VEHICLE_INELIGIBLE', 'Insurance has expired — renew before applying.', 400);
+      }
       // A unique index on (trip_id, driver_id) prevents two acceptance rows for the same
       // driver+trip, even after withdraw/reject (DELETE soft-marks status='withdrawn',
       // doesn't remove the row). So re-applying after withdraw/reject = resurrect the
@@ -1689,6 +1707,16 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const { data: d } = await db.from('drivers').select('total_trips_completed').eq('id', trip.assigned_driver_id).maybeSingle();
       if (d) await db.from('drivers').update({ total_trips_completed: (Number(d.total_trips_completed) || 0) + 1 }).eq('id', trip.assigned_driver_id);
     }
+    // Notify the agent (trip poster) so they know to leave a review.
+    if (trip.posted_by_user_id) {
+      await db.from('notifications').insert({
+        user_id: trip.posted_by_user_id,
+        type: 'trip_completed',
+        title: 'Trip completed',
+        body: 'Your driver completed the trip — tap to leave a review.',
+        payload_json: { trip_id: tripId },
+      });
+    }
     await invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
@@ -1706,6 +1734,21 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await db.from('trip_acceptances').update({ status: 'rejected', decision_at: now }).eq('trip_id', tripId).in('status', ['applied', 'selected']);
     // Migration 039: if the trip had been accepted, restore the linked vacancy (or expire it).
     await syncVacanciesForTrip(db, 'revert', tripId);
+    // If a driver had already accepted, tell them the trip is off — otherwise they'd
+    // turn up at pickup with the OTP only to find the trip is gone.
+    if (trip.assigned_driver_id) {
+      const { data: drvRow } = await db.from('drivers').select('user_id').eq('id', trip.assigned_driver_id).maybeSingle();
+      const driverUserId = drvRow?.user_id as string | undefined;
+      if (driverUserId) {
+        await db.from('notifications').insert({
+          user_id: driverUserId,
+          type: 'trip_cancelled',
+          title: 'Trip cancelled',
+          body: 'The agent cancelled this trip. You don\'t need to drive — and the OTP no longer works.',
+          payload_json: { trip_id: tripId },
+        });
+      }
+    }
     await invalidateTripsList();
     return ok(await fullTrip(tripId, u!));
   }
