@@ -88,6 +88,17 @@ const LISTS: Record<string, ListCfg> = {
   languages: { table: 'languages', pk: 'code', orderBy: 'display_order', reorderable: true, filters: [] },
   'review-tags': { table: 'review_tags', pk: 'id', orderBy: 'sort_order', reorderable: true, filters: ['category'] },
   'cancel-reasons': { table: 'cancel_reasons', pk: 'id', orderBy: 'sort_order', reorderable: true, filters: ['applies_to'] },
+  // Stage-5 referral admin lists (migration 046)
+  'referral-tiers':         { table: 'referral_tiers',         pk: 'id', orderBy: 'sort_order', reorderable: true,  filters: ['applies_to_role'] },
+  'fraud-action-rules':     { table: 'fraud_action_rules',     pk: 'id', orderBy: 'sort_order', reorderable: true,  filters: ['flag_type', 'severity'] },
+  'notification-templates': { table: 'notification_templates', pk: 'id', orderBy: 'sort_order', reorderable: true,  filters: ['type', 'locale'] },
+};
+
+// Singleton settings tables (single row, id=1) handled by a generic block below.
+const SINGLETONS: Record<string, { table: string; adminOnlyRead?: boolean }> = {
+  'wallet-settings':   { table: 'wallet_settings' },
+  'referral-settings': { table: 'referral_settings' },
+  'fraud-settings':    { table: 'fraud_settings', adminOnlyRead: true },
 };
 
 type Db = ReturnType<typeof serviceClient>;
@@ -117,6 +128,56 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
   const segments = (m ? m[1] : '').split('/').filter(Boolean);
   const url = new URL(req.url);
   const db = serviceClient();
+
+  // ── /admin/<singleton-settings> (Stage 5: wallet-settings, referral-settings, fraud-settings) ──
+  if (segments.length === 1 && SINGLETONS[segments[0]]) {
+    const cfg = SINGLETONS[segments[0]];
+    if (req.method === 'GET') {
+      if (cfg.adminOnlyRead) {
+        const a = await requireAdmin(db, req);
+        if (a instanceof Response) return a;
+      }
+      const { data, error } = await db.from(cfg.table).select('*').eq('id', 1).single();
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data);
+    }
+    if (req.method === 'PUT' || req.method === 'PATCH') {
+      const a = await requireAdmin(db, req);
+      if (a instanceof Response) return a;
+      const body = await readBody(req);
+      const { data: before } = await db.from(cfg.table).select('*').eq('id', 1).single();
+      const { data, error } = await db.from(cfg.table).update(body).eq('id', 1).select('*').single();
+      if (error) return pgFail(error);
+      await audit(db, a.id, 'update', cfg.table, '1', before, data);
+      await sharedCacheInvalidateType('admin');
+      purgeCloudflareAsync(purgeUrlsFor([`/functions/v1/admin/${segments[0]}`]));
+      return ok(data);
+    }
+    return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/${segments[0]}`, 405);
+  }
+
+  // ── /admin/app-wallet (Stage 5; admin-only read of platform's accounts receivable) ──
+  if (segments[0] === 'app-wallet') {
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
+    if (segments.length === 1 && req.method === 'GET') {
+      // Summary + recent ledger
+      const { data: bal } = await db.from('app_wallet_balance').select('*').single();
+      const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') ?? '100')));
+      // join the underlying fee charge for trip + side context
+      const { data: rows, error } = await db
+        .from('app_wallet_ledger')
+        .select(`
+          id, entry_type, amount_paise, note, created_at,
+          fee:platform_fee_charges!platform_fee_charge_id(id, trip_id, side, payer_user_id, payment_source, status)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok({ balance: bal ?? { total_paise: 0, lifetime_collected_paise: 0, lifetime_refunded_paise: 0, entries: 0 }, ledger: rows ?? [] });
+    }
+    return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/app-wallet`, 405);
+  }
 
   // ── /admin/app-settings (singleton) ──────────────────────────────────────
   if (segments[0] === 'app-settings' && segments.length === 1) {
