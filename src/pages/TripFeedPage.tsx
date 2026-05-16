@@ -16,7 +16,7 @@ const FEED_STATUSES: TripStatus[] = ['open', 'has_applicants'];
 
 function TripCard({ trip }: { trip: Trip }) {
   return (
-    <Link to={`/trips/${trip.id}`} className="block">
+    <Link to={`/trips/${trip.id}?from=/trips`} className="block">
       <Card className="gap-2 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
