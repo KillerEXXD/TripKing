@@ -16,13 +16,17 @@
   box-shadow:
     0 -1px 0 rgba(0, 0, 0, 0.05),
     0 -6px 20px rgba(0, 0, 0, 0.05);
-  /* Equal-ish top + bottom padding for vertical centering of the stacked
-   * icon + label pair, plus iOS safe-area inset on top of the bottom 10px.
-   * Was a `padding: 10px 20px` shorthand + a Tailwind pb-[env(...)] class on
-   * the JSX; the Tailwind class overrode the shorthand's padding-bottom, so
-   * on desktop (where env() resolves to 0) the bottom 10px disappeared and
-   * the labels rendered flush against the viewport edge. */
-  padding: 10px 20px calc(10px + env(safe-area-inset-bottom, 0px));
+  /* Use longhand properties (not the shorthand) — the calc(env(...)) form
+   * in `padding: 10px 20px calc(...)` was unreliable through the build
+   * pipeline on some targets and the bottom 10px collapsed, clipping the
+   * stacked labels. Longhand splits + an explicit min-height guarantees
+   * the icon + label stack always has room (icon ~28 + gap 4 + label 10
+   * + 10/10 top/bottom = 62px floor). */
+  padding-top: 10px;
+  padding-right: 20px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left: 20px;
+  min-height: 72px;
 }
 
 .bottom-nav-button {
