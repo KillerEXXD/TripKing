@@ -8,19 +8,30 @@ import { WithdrawalCard } from '@/components/referral/WithdrawalCard';
 import { EarningsTimelineChart } from '@/components/referral/EarningsTimelineChart';
 import { ReferredUserTable } from '@/components/referral/ReferredUserTable';
 import { ReferralTermsAndFAQ } from '@/components/referral/ReferralTermsAndFAQ';
-import { formatINR } from '@/lib/utils';
+import { cn, formatINR } from '@/lib/utils';
 
 function rupees(paise: number): string {
   return formatINR(Math.round(paise / 100));
 }
 
-function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
+// Same accent vocabulary as HomeTileRow — keeps the redesign tile pattern
+// consistent across the app: each accent pair (--color-<x>-accent +
+// --color-<x>-accent-light) drives the left border, label colour, and bg
+// tint in one step. Green = Referred, blue = Lifetime, purple = Withdrawable.
+const ACCENT = {
+  green:  { border: 'border-l-green-accent',  label: 'text-green-accent',  bg: 'bg-green-accent-light'  },
+  blue:   { border: 'border-l-blue-accent',   label: 'text-blue-accent',   bg: 'bg-blue-accent-light'   },
+  purple: { border: 'border-l-purple-accent', label: 'text-purple-accent', bg: 'bg-purple-accent-light' },
+} as const;
+
+function Stat({ accent, icon, label, value, sub }: { accent: keyof typeof ACCENT; icon: React.ReactNode; label: string; value: string; sub?: string }) {
+  const tone = ACCENT[accent];
   return (
-    <Card className="gap-1">
-      <SectionLabel className="flex items-center gap-1.5">
+    <Card className={cn('gap-1 border-l-4', tone.border, tone.bg)}>
+      <SectionLabel className={cn('flex items-center gap-1.5', tone.label)}>
         {icon} {label}
       </SectionLabel>
-      <div className="text-2xl font-bold tabular-nums">{value}</div>
+      <div className="text-2xl font-bold tabular-nums text-foreground">{value}</div>
       {sub ? <div className="text-micro text-muted-foreground">{sub}</div> : null}
     </Card>
   );
@@ -47,9 +58,9 @@ export function ReferralsPage() {
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <Stat icon={<Users className="size-3.5" />} label="Referred" value={String(q.data.summary.counts.totalReferred)} sub={`${q.data.summary.counts.qualified} qualified`} />
-            <Stat icon={<Award className="size-3.5" />} label="Lifetime earned" value={rupees(q.data.summary.lifetimeEarnedPaise)} />
-            <Stat icon={<IndianRupee className="size-3.5" />} label="Withdrawable" value={rupees(q.data.summary.withdrawablePaise)} sub="Released earnings" />
+            <Stat accent="green"  icon={<Users className="size-3.5" />}        label="Referred"        value={String(q.data.summary.counts.totalReferred)} sub={`${q.data.summary.counts.qualified} qualified`} />
+            <Stat accent="blue"   icon={<Award className="size-3.5" />}        label="Lifetime earned" value={rupees(q.data.summary.lifetimeEarnedPaise)} />
+            <Stat accent="purple" icon={<IndianRupee className="size-3.5" />}  label="Withdrawable"    value={rupees(q.data.summary.withdrawablePaise)} sub="Released earnings" />
           </div>
 
           <EarningsTimelineChart />
