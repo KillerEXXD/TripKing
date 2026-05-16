@@ -105,7 +105,9 @@ function InviteRow({ tripId, invite, canWithdraw }: { tripId: string; invite: Tr
 
 function InvitePickerDialog({ trip, alreadyInvited, onClose }: { trip: Trip; alreadyInvited: string[]; onClose: () => void }) {
   const fromCityId = trip.fromCity?.id;
-  const drivers = useDrivers(fromCityId ? { currentCityId: fromCityId, kycStatus: 'approved', limit: 25 } : { kycStatus: 'approved', limit: 25 });
+  // Exclude the trip poster's own driver row — they wear both hats but can't invite themselves.
+  const base = { kycStatus: 'approved' as const, limit: 25, excludeUserId: trip.postedByUserId };
+  const drivers = useDrivers(fromCityId ? { ...base, currentCityId: fromCityId } : base);
   const invite = useInviteDrivers();
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const candidates = useMemo(() => (drivers.data ?? []).filter((d) => !alreadyInvited.includes(d.id)), [drivers.data, alreadyInvited]);

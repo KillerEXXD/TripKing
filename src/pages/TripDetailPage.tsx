@@ -617,12 +617,12 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
   );
 }
 
-function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
+function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; iPosted: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
   const badge = STATUS_BADGE[trip.status];
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
   const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
   const applyable = trip.status === 'open' || trip.status === 'has_applicants';
-  const showApplyBar = viewer.isDriver && !viewer.isPoster && applyable;
+  const showApplyBar = viewer.isDriver && !viewer.isPoster && !viewer.iPosted && applyable;
   const showAcceptedBar = viewer.isAssignedDriver && (trip.status === 'accepted' || trip.status === 'in_progress');
   const showTracking = viewer.isPoster || viewer.isAssignedDriver;
   const canCancel = viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants' || trip.status === 'accepted');
@@ -835,7 +835,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
         </Card>
       ) : null}
 
-      {!showApplyBar && viewer.isDriver && !viewer.isPoster && trip.applicantCount > 0 && applyable ? (
+      {!showApplyBar && viewer.isDriver && !viewer.isPoster && !viewer.iPosted && trip.applicantCount > 0 && applyable ? (
         <Card>
           <p className="text-sm text-secondary">🤝 {trip.applicantCount} driver{trip.applicantCount === 1 ? '' : 's'} applied — a sharp rate helps you stand out.</p>
         </Card>
@@ -918,6 +918,9 @@ export function TripDetailPage() {
             // An admin viewing-as-driver isn't a poster for this purpose, even if they posted
             // the trip under their agent identity (postedByUserId === user.id).
             isPoster: !isDriver && !!user && tripQuery.data.postedByUserId === user.id,
+            // iPosted is role-view-independent — used to suppress the Apply bar so a driver-user
+            // who also posted this trip can't apply to their own trip.
+            iPosted: !!user && tripQuery.data.postedByUserId === user.id,
             isAdmin: isAdminView,
             isAssignedDriver: !!myDriverQuery.data?.id && tripQuery.data.assignedDriverId === myDriverQuery.data.id,
             myDriverId: myDriverQuery.data?.id,
