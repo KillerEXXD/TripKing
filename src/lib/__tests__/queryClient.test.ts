@@ -72,11 +72,17 @@ describe('queryClient — global error funnel', () => {
     expect(captureDataError).not.toHaveBeenCalled();
   });
 
-  it('does not report expected 401 / 404 / 409 user errors', async () => {
+  it('does not report expected user errors (401 / 403 / 404 / 409 / 422 / 429)', async () => {
     await queryClient.fetchQuery({ queryKey: ['driver', 'me'], queryFn: () => Promise.reject(new ApiError('not found', 404)), retry: false }).catch(() => undefined);
     await queryClient.fetchQuery({ queryKey: ['me'], queryFn: () => Promise.reject(new ApiError('expired', 401)), retry: false }).catch(() => undefined);
+    // 403: e.g. driver opens /trips/:id/applicants for a trip they didn't post — UI gating issue, not a bug.
+    await queryClient.fetchQuery({ queryKey: ['applicants'], queryFn: () => Promise.reject(new ApiError('Only the trip poster can see applicants', 403)), retry: false }).catch(() => undefined);
     // 409: e.g. "You already have a video call scheduled" / "vacancy limit reached" — user-correctable, not a bug.
     await queryClient.fetchQuery({ queryKey: ['video-call'], queryFn: () => Promise.reject(new ApiError('already scheduled', 409)), retry: false }).catch(() => undefined);
+    // 422: server-side validation rejected the body — user input issue, surface to user via toast, not Sentry.
+    await queryClient.fetchQuery({ queryKey: ['post-trip'], queryFn: () => Promise.reject(new ApiError('validation failed', 422)), retry: false }).catch(() => undefined);
+    // 429: rate-limited — the user is going too fast, not a bug.
+    await queryClient.fetchQuery({ queryKey: ['otp'], queryFn: () => Promise.reject(new ApiError('slow down', 429)), retry: false }).catch(() => undefined);
     await flush();
     expect(captureDataError).not.toHaveBeenCalled();
   });
@@ -85,10 +91,11 @@ describe('queryClient — global error funnel', () => {
     const mc = queryClient.getMutationCache();
     const mutation = mc.build<unknown, ApiError, void, unknown>(queryClient, {
       mutationKey: ['postTrip'],
-      mutationFn: () => Promise.reject(new ApiError('rejected', 422)),
+      // 500 (not 422) so it falls outside the user-error filter and reaches Sentry.
+      mutationFn: () => Promise.reject(new ApiError('rejected', 500)),
     });
     await mutation.execute(undefined).catch(() => undefined);
     await flush();
-    expect(captureDataError).toHaveBeenCalledWith('mutation:postTrip', expect.any(ApiError), { status: 422 });
+    expect(captureDataError).toHaveBeenCalledWith('mutation:postTrip', expect.any(ApiError), { status: 500 });
   });
 });

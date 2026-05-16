@@ -275,11 +275,10 @@ class ApiClient {
     // 401 (bad creds / expired), 404 (stale link) and 409 (semantic conflict —
     // e.g. "you already have a video call scheduled" / "vacancy limit reached" /
     // "already applied") are user-correctable, not bugs.
-    // 401 / 403 / 404 / 409 are user-or-permission errors, not bugs — skip both Sentry
-    // and the PostHog api_error event to keep telemetry signal-to-noise high
-    // (e.g. /drivers/me 404 for users without a driver profile was generating ~120
-    // events per day before this filter).
-    const isUserError = response.status === 401 || response.status === 403 || response.status === 404 || response.status === 409;
+    // 401 / 403 / 404 / 409 / 422 / 429 are user-or-permission errors, not bugs —
+    // skip both Sentry and the PostHog api_error event to keep telemetry signal-to-noise
+    // high. (Kept in sync with the React-Query funnel filter in src/lib/queryClient.ts.)
+    const isUserError = response.status === 401 || response.status === 403 || response.status === 404 || response.status === 409 || response.status === 422 || response.status === 429;
     if (!isUserError) {
       this.reportError(apiError, endpoint, method, durationMs, body, attempt);
       captureEvent('api_error', { endpoint, method, status: response.status, duration_ms: durationMs, message: message.slice(0, 200) });
