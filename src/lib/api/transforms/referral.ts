@@ -175,6 +175,37 @@ function transformEarningsBucket(api: Api): ReferralEarningsBucket {
   return { date: str(api.date) ?? '', trips: num(api.trips), paise: num(api.paise) };
 }
 
+const WITHDRAWAL_STATUSES = ['requested', 'approved', 'processing', 'paid', 'rejected', 'cancelled', 'failed'] as const;
+
+export function transformWithdrawal(api: Api): import('@/types').Withdrawal {
+  const id = reqStr(api.id, 'MISSING_LINK_ID', { api });
+  const status = (typeof api.status === 'string' && (WITHDRAWAL_STATUSES as readonly string[]).includes(api.status) ? api.status : 'requested') as import('@/types').WithdrawalStatus;
+  const userJoin = api.user && typeof api.user === 'object' ? (api.user as Api) : null;
+  return {
+    id,
+    userId: str(api.user_id),
+    amountPaise: num(api.amount_paise),
+    upiId: str(api.upi_id) ?? '',
+    status,
+    provider: str(api.provider),
+    providerPayoutId: str(api.provider_payout_id),
+    externalTxnRef: str(api.external_txn_ref),
+    rejectedReason: str(api.rejected_reason),
+    adminActorUserId: str(api.admin_actor_user_id),
+    requestedAt: str(api.requested_at) ?? '',
+    approvedAt: str(api.approved_at),
+    paidAt: str(api.paid_at),
+    failedAt: str(api.failed_at),
+    user: userJoin
+      ? {
+          displayName: str(userJoin.display_name),
+          phone: str(userJoin.phone),
+          role: (typeof userJoin.role === 'string' ? userJoin.role : undefined) as 'driver' | 'trip_manager' | 'admin' | undefined,
+        }
+      : undefined,
+  };
+}
+
 export function transformReferralEarnings(api: Api): ReferralEarningsSeries {
   return {
     from: str(api.from) ?? '',

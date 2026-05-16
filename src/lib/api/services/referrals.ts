@@ -4,8 +4,9 @@ import {
   transformReferralDashboard,
   transformReferralEarnings,
   transformReferralLink,
+  transformWithdrawal,
 } from '@/lib/api/transforms/referral';
-import type { ReferralDashboard, ReferralEarningsSeries, ReferralLink } from '@/types';
+import type { ReferralDashboard, ReferralEarningsSeries, ReferralLink, Withdrawal, WithdrawalStatus } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -53,4 +54,54 @@ export function transferReferralToCashWallet(amountPaise: number): Promise<Trans
       netReferralPaise: Number(row.net_referral_paise ?? row.net_paise ?? 0),
     };
   });
+}
+
+// ── Stage 7 — withdrawals ───────────────────────────────────────────────────
+
+export interface RequestWithdrawalResult {
+  withdrawalId: string;
+  amountPaise: number;
+  status: WithdrawalStatus;
+  withdrawableRemainingPaise: number;
+}
+
+export function requestReferralWithdrawal(amountPaise: number, upiId: string): Promise<RequestWithdrawalResult> {
+  return apiClient.post<Api>('/referrals/me/withdraw', { amount_paise: amountPaise, upi_id: upiId }).then((r) => {
+    const row = unwrap(r.data);
+    return {
+      withdrawalId: String(row.withdrawal_id ?? ''),
+      amountPaise: Number(row.amount_paise ?? 0),
+      status: (typeof row.status === 'string' ? row.status : 'requested') as WithdrawalStatus,
+      withdrawableRemainingPaise: Number(row.withdrawable_remaining_paise ?? 0),
+    };
+  });
+}
+
+export function getMyWithdrawals(): Promise<Withdrawal[]> {
+  return apiClient.get<Api[]>('/referrals/me/withdrawals').then((r) => (r.data ?? []).map(transformWithdrawal));
+}
+
+// ── Admin queue ─────────────────────────────────────────────────────────────
+
+export function getAdminWithdrawals(params?: { status?: WithdrawalStatus; userId?: string; limit?: number }): Promise<Withdrawal[]> {
+  const q: Record<string, unknown> = {};
+  if (params?.status) q.status = params.status;
+  if (params?.userId) q.user_id = params.userId;
+  if (params?.limit) q.limit = params.limit;
+  return apiClient.get<Api[]>('/admin/withdrawals', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformWithdrawal));
+}
+
+export interface AdminWithdrawalPatch {
+  outcome: 'approved' | 'processing' | 'paid' | 'rejected' | 'cancelled' | 'failed';
+  providerPayoutId?: string;
+  externalTxnRef?: string;
+  rejectedReason?: string;
+}
+
+export function patchAdminWithdrawal(id: string, patch: AdminWithdrawalPatch): Promise<Withdrawal> {
+  const body: Record<string, unknown> = { outcome: patch.outcome };
+  if (patch.providerPayoutId) body.provider_payout_id = patch.providerPayoutId;
+  if (patch.externalTxnRef) body.external_txn_ref = patch.externalTxnRef;
+  if (patch.rejectedReason) body.rejected_reason = patch.rejectedReason;
+  return apiClient.patch<Api>(`/admin/withdrawals/${id}`, body).then((r) => transformWithdrawal(unwrap(r.data)));
 }

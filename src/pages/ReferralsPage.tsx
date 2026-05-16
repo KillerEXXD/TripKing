@@ -4,6 +4,7 @@ import { Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { useReferralDashboard } from '@/hooks/useReferral';
 import { TransferToWalletPanel } from '@/components/referral/TransferToWalletPanel';
+import { WithdrawalCard } from '@/components/referral/WithdrawalCard';
 import { formatINR } from '@/lib/utils';
 
 function rupees(paise: number): string {
@@ -49,6 +50,7 @@ export function ReferralsPage() {
           </div>
 
           <TransferToWalletPanel />
+          <WithdrawalCard />
         </>
       )}
     </main>

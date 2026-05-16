@@ -1,9 +1,19 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { getMyAgent, getMyDriver } from '@/lib/api/services/drivers';
-import { getMyReferralDashboard, getMyReferralEarnings, getMyReferred, transferReferralToCashWallet } from '@/lib/api/services/referrals';
+import {
+  getAdminWithdrawals,
+  getMyReferralDashboard,
+  getMyReferralEarnings,
+  getMyReferred,
+  getMyWithdrawals,
+  patchAdminWithdrawal,
+  requestReferralWithdrawal,
+  transferReferralToCashWallet,
+  type AdminWithdrawalPatch,
+} from '@/lib/api/services/referrals';
 import { buildReferralLink, buildReferralShareMessage, buildWhatsAppShareUrl } from '@/lib/referral';
-import type { Agent, Driver, ReferralSummary } from '@/types';
+import type { Agent, Driver, ReferralSummary, WithdrawalStatus } from '@/types';
 
 export type ReferralRole = 'driver' | 'agent';
 
@@ -74,6 +84,49 @@ export function useTransferReferralToCashWallet() {
       void qc.invalidateQueries({ queryKey: ['wallet'] });
       void qc.invalidateQueries({ queryKey: ['driver', 'me'] });
       void qc.invalidateQueries({ queryKey: ['agent', 'me'] });
+    },
+    meta: { toastOnError: true },
+  });
+}
+
+// ── Stage 7 — withdrawals ───────────────────────────────────────────────────
+
+export function useMyWithdrawals(enabled = true) {
+  return useQuery({
+    queryKey: ['referrals', 'me', 'withdrawals'],
+    queryFn: getMyWithdrawals,
+    enabled,
+    staleTime: STALE.profile,
+  });
+}
+
+export function useRequestWithdrawal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ amountPaise, upiId }: { amountPaise: number; upiId: string }) => requestReferralWithdrawal(amountPaise, upiId),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['referrals'] });
+    },
+    meta: { toastOnError: true },
+  });
+}
+
+// ── Admin withdrawals queue ─────────────────────────────────────────────────
+
+export function useAdminWithdrawals(params?: { status?: WithdrawalStatus; userId?: string; limit?: number }) {
+  return useQuery({
+    queryKey: ['admin', 'withdrawals', params ?? {}],
+    queryFn: () => getAdminWithdrawals(params),
+    staleTime: STALE.profile,
+  });
+}
+
+export function usePatchAdminWithdrawal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: AdminWithdrawalPatch }) => patchAdminWithdrawal(id, patch),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'withdrawals'] });
     },
     meta: { toastOnError: true },
   });
