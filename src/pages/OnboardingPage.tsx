@@ -29,6 +29,7 @@ const DRIVER_CARDS: IntroCard[] = [
     body: 'Browse straight away — but to apply you’ll need to verify: upload your Aadhaar, licence and a selfie, add your car (with photos, RC & insurance), and do a quick video call. There’s a checklist on your profile that walks you through it.',
   },
   { emoji: '📤', title: "Got a trip you can't take?", body: 'Post it for another driver — we pre-fill the route, time and fare. You become the agent for that one ride.' },
+  { emoji: '🎁', title: 'Earn ₹50 per trip when you invite drivers', body: 'Share your referral code from the home screen — once a driver you invite gets verified and starts running paid trips, you earn ₹50 per eligible trip until you hit your tier cap.' },
 ];
 
 // An agent only posts and shepherds trips — they never drive.
@@ -37,6 +38,7 @@ const AGENT_CARDS: IntroCard[] = [
   { emoji: '🛡️', title: 'Get verified to start posting', body: 'To post trips you’ll first verify your account — upload your Aadhaar and a selfie, then do a quick video call. Your profile has a checklist for it.' },
   { emoji: '👥', title: 'Drivers come to you', body: 'Applicants land with their rating, recent trips and any counter-quote. Pick the one you trust — no group chasing.' },
   { emoji: '🔑', title: 'Track it to the finish', body: 'Assign a driver and an OTP is generated for the passenger. Watch the trip move open → assigned → in progress → done.' },
+  { emoji: '🎁', title: 'Earn ₹50 per trip when you invite agents & drivers', body: 'Share your referral code from the home screen — once they get verified and start running paid trips, you earn ₹50 per eligible trip until you hit your tier cap.' },
 ];
 
 function pickRole(role: string | undefined): ProfileRole | null {

@@ -7,6 +7,7 @@ import { TransferToWalletPanel } from '@/components/referral/TransferToWalletPan
 import { WithdrawalCard } from '@/components/referral/WithdrawalCard';
 import { EarningsTimelineChart } from '@/components/referral/EarningsTimelineChart';
 import { ReferredUserTable } from '@/components/referral/ReferredUserTable';
+import { ReferralTermsAndFAQ } from '@/components/referral/ReferralTermsAndFAQ';
 import { formatINR } from '@/lib/utils';
 
 function rupees(paise: number): string {
@@ -37,7 +38,10 @@ export function ReferralsPage() {
       <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
-      <h1 className="text-2xl font-bold">Your referrals</h1>
+      <h1 className="text-2xl font-bold">Earn by referring verified drivers and agents</h1>
+      <p className="text-sm text-secondary">
+        Invite trusted drivers and agents to TripKing. Once they become verified, finish their launch credits, and start completing eligible paid trips, you earn ₹50 per trip until your referral cap is reached.
+      </p>
 
       {q.isPending ? (
         <LoadingSkeleton rows={5} />
@@ -55,6 +59,7 @@ export function ReferralsPage() {
           <ReferredUserTable />
           <TransferToWalletPanel />
           <WithdrawalCard />
+          <ReferralTermsAndFAQ />
         </>
       )}
     </main>
