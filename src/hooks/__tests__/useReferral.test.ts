@@ -25,7 +25,7 @@ describe('useReferral', () => {
   });
 
   it('driver: fetches getMyDriver and projects code/link/share fields', async () => {
-    vi.mocked(svc.getMyDriver).mockResolvedValue({ referralCode: 'ABC12345', referralSummary: { totalReferred: 0, totalEarningsPaise: 0 } } as never);
+    vi.mocked(svc.getMyDriver).mockResolvedValue({ referralCode: 'ABC12345', referralSummary: { totalReferred: 0, verifiedReferrals: 0, qualifiedReferrals: 0, earningActive: 0, capReached: 0, lifetimeEarnedPaise: 0, pendingPaise: 0, releasedPaise: 0, withdrawablePaise: 0 } } as never);
     const { wrapper } = setup();
     const { result } = renderHook(() => useReferral('driver'), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));

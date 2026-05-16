@@ -5,7 +5,7 @@
 import { ApiTransformError } from '@/lib/api/transforms/base';
 import { transformCity } from '@/lib/api/transforms/adminConfig';
 import { maybePlace } from '@/lib/api/transforms/place';
-import { transformReferralSummary } from '@/lib/api/transforms/referral';
+import { transformReferralBlock } from '@/lib/api/transforms/referral';
 import type {
   Agent, AgentPublic, CreateAgentProfileInput, CreateDriverProfileInput, Driver, DriverPublic,
   KycDocs, KycStatus, SubmitAgentKycDocsInput, SubmitDriverKycDocsInput, UploadUrlResponse,
@@ -177,8 +177,8 @@ export function transformDriver(api: Api): Driver {
     aadhaarMasked: str(api.aadhaar_number_masked),
     drivingLicenseNumber: str(api.driver_license_number),
     drivingLicenseExpiry: str(api.driver_license_expiry),
-    referralCode: str(api.referral_code),
-    referralSummary: transformReferralSummary(api.referral_summary),
+    referralCode: transformReferralBlock(api.referral)?.code ?? str(api.referral_code),
+    referralSummary: transformReferralBlock(api.referral)?.summary,
   };
 }
 
@@ -209,8 +209,8 @@ export function transformAgent(api: Api): Agent {
     profilePhotoUrl: str(api.profile_photo_url) ?? '',
     verification: transformVerification(api.verification),
     aadhaarMasked: str(api.aadhaar_number_masked),
-    referralCode: str(api.referral_code),
-    referralSummary: transformReferralSummary(api.referral_summary),
+    referralCode: transformReferralBlock(api.referral)?.code ?? str(api.referral_code),
+    referralSummary: transformReferralBlock(api.referral)?.summary,
   };
 }
 

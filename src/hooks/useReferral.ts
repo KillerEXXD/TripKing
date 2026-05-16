@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { getMyAgent, getMyDriver } from '@/lib/api/services/drivers';
+import { getMyReferralDashboard, getMyReferralEarnings, getMyReferred } from '@/lib/api/services/referrals';
 import { buildReferralLink, buildReferralShareMessage, buildWhatsAppShareUrl } from '@/lib/referral';
 import type { Agent, Driver, ReferralSummary } from '@/types';
 
@@ -15,7 +16,7 @@ export interface ReferralView {
 }
 
 /**
- * Stage 1 referral hook — reads `referralCode` + `referralSummary` off the
+ * Stage 1+ referral hook — reads `referralCode` + `referralSummary` off the
  * existing `/drivers/me` or `/agents/me` payloads (no new endpoint). Returns
  * `data: undefined` until the backend Stage 1 PR is deployed.
  */
@@ -33,5 +34,32 @@ export function useReferral(role: ReferralRole | undefined) {
       const shareMessage = buildReferralShareMessage(code);
       return { code, link, shareMessage, whatsappUrl: buildWhatsAppShareUrl(shareMessage), summary: me.referralSummary };
     },
+  });
+}
+
+// ── Stage 4 dashboard hooks ──────────────────────────────────────────────────
+
+export function useReferralDashboard(enabled = true) {
+  return useQuery({
+    queryKey: ['referrals', 'me'],
+    queryFn: getMyReferralDashboard,
+    enabled,
+    staleTime: STALE.profile,
+  });
+}
+
+export function useReferred(params?: { status?: string; role?: 'driver' | 'trip_manager' }) {
+  return useQuery({
+    queryKey: ['referrals', 'me', 'referred', params ?? {}],
+    queryFn: () => getMyReferred(params),
+    staleTime: STALE.profile,
+  });
+}
+
+export function useReferralEarnings(params?: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: ['referrals', 'me', 'earnings', params ?? {}],
+    queryFn: () => getMyReferralEarnings(params),
+    staleTime: STALE.profile,
   });
 }

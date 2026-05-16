@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { Button, Card } from '@/components/ui';
 import { LoadingSkeleton } from '@/components/feedback/LoadingSkeleton';
 import { useReferral, type ReferralRole } from '@/hooks/useReferral';
+import { formatINR } from '@/lib/utils';
 
 interface Props {
   role: ReferralRole;
@@ -54,6 +55,23 @@ export function ReferralCodeCard({ role }: Props) {
           </a>
         </Button>
       </div>
+
+      {data.summary && data.summary.totalReferred > 0 ? (
+        <div className="grid grid-cols-3 gap-2 border-t pt-2 text-center text-xs">
+          <div>
+            <div className="text-base font-bold tabular-nums">{data.summary.totalReferred}</div>
+            <div className="text-secondary">Referred</div>
+          </div>
+          <div>
+            <div className="text-base font-bold tabular-nums">{data.summary.qualifiedReferrals}</div>
+            <div className="text-secondary">Qualified</div>
+          </div>
+          <div>
+            <div className="text-base font-bold tabular-nums">{formatINR(Math.round(data.summary.lifetimeEarnedPaise / 100))}</div>
+            <div className="text-secondary">Earned</div>
+          </div>
+        </div>
+      ) : null}
     </Card>
   );
 }
