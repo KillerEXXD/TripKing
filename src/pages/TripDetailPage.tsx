@@ -72,7 +72,7 @@ function Line({ label, value, muted, strong }: { label: string; value: string; m
 }
 
 /** Driver-only bottom CTA: pick a vehicle, optionally counter-quote, apply / withdraw. */
-function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycApproved }: { trip: Trip; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; kycApproved: boolean }) {
+function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycApproved, returnTo }: { trip: Trip; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; kycApproved: boolean; returnTo: string }) {
   const navigate = useNavigate();
   const vehiclesQuery = useDriverVehicles(myDriverId);
   const applyMutation = useApplyToTrip();
@@ -102,6 +102,9 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
       const acc = await applyMutation.mutateAsync({ tripId: trip.id, input: { vehicleId: chosenVehicleId, quotedRatePerKm: Number.isFinite(rate) && rate > 0 ? Math.round(rate) : undefined, message: quoteNote.trim() || undefined } });
       recordApplication({ tripId: trip.id, acceptanceId: acc.id, appliedAt: acc.appliedAt, quotedRatePerKm: acc.applicantQuotedRatePerKm, message: acc.applicantMessage });
       toast.success('Applied — the trip manager has been notified.');
+      // Briefly show the "Applied" pill so the driver sees their action
+      // registered, then return them to where they came from (Open Trips).
+      setTimeout(() => navigate(returnTo), 900);
     } catch {
       toast.error("Couldn't apply — please try again.");
     }
@@ -631,7 +634,7 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
   );
 }
 
-function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; iPosted: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
+function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; iPosted: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean; returnTo: string }) {
   // Defensive fallback: trip.status comes from the server; an unrecognised value would
   // otherwise crash render with "Cannot read properties of undefined (reading 'variant')".
   const badge = STATUS_BADGE[trip.status] ?? { label: String(trip.status), variant: 'muted' as const };
@@ -876,7 +879,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
       {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
-      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} /> : showAcceptedBar ? <AcceptedDriverBar trip={trip} /> : null}
+      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} returnTo={returnTo} /> : showAcceptedBar ? <AcceptedDriverBar trip={trip} /> : null}
       {showShareLink && trip.passengerOtp ? <PassengerLinkModal trip={trip} otp={trip.passengerOtp} onClose={() => setShowShareLink(false)} /> : null}
       {detailsEditable ? <EditTripDialog trip={trip} open={showEditDialog} onClose={() => setShowEditDialog(false)} /> : null}
     </div>
@@ -943,6 +946,7 @@ export function TripDetailPage() {
         <TripDetail
           trip={tripQuery.data}
           fillPassenger={fillPassenger}
+          returnTo={from || '/trips'}
           viewer={{
             isDriver,
             // An admin viewing-as-driver isn't a poster for this purpose, even if they posted
