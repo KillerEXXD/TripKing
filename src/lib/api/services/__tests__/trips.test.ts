@@ -14,6 +14,7 @@ import {
   postTrip,
   rejectApplicant,
   startTrip,
+  updateTripDetails,
   updateTripPassenger,
   withdrawApplication,
 } from '@/lib/api/services/trips';
@@ -129,5 +130,47 @@ describe('trips service', () => {
     expect(patch).toHaveBeenCalledWith('/trips/t1', { passenger_name: 'Sam', passenger_count: 3 });
     await updateTripPassenger('t1', { hidePassengerPhone: true });
     expect(patch).toHaveBeenLastCalledWith('/trips/t1', { hide_passenger_phone: true });
+  });
+
+  it('updateTripDetails → PATCH /trips/:id maps every supported camelCase field to snake_case', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 't1' }) as never);
+    await updateTripDetails('t1', {
+      ratePerKm: 22,
+      driverBata: 400,
+      commissionPct: 12.5,
+      gstAmount: 110,
+      pickupAt: '2026-05-20T08:30:00.000Z',
+      carTypeId: 'ct-suv',
+      acRequired: false,
+      seatsRequired: 6,
+      driverInstructions: 'Call before arrival',
+      extrasPaidByPassenger: false,
+      showFareToPassenger: false,
+    });
+    expect(patch).toHaveBeenLastCalledWith('/trips/t1', {
+      rate_per_km: 22,
+      driver_bata: 400,
+      commission_pct: 12.5,
+      gst_amount: 110,
+      pickup_at: '2026-05-20T08:30:00.000Z',
+      car_type_id: 'ct-suv',
+      ac_required: false,
+      seats_required: 6,
+      driver_instructions: 'Call before arrival',
+      extras_paid_by_passenger: false,
+      show_fare_to_passenger: false,
+    });
+  });
+
+  it('updateTripDetails → omits keys that were not provided (sparse PATCH body)', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 't1' }) as never);
+    await updateTripDetails('t1', { ratePerKm: 25 });
+    expect(patch).toHaveBeenLastCalledWith('/trips/t1', { rate_per_km: 25 });
+  });
+
+  it('updateTripDetails → forwards null driverInstructions (clearing the field)', async () => {
+    const patch = vi.spyOn(apiClient, 'patch').mockReturnValue(ok({ id: 't1' }) as never);
+    await updateTripDetails('t1', { driverInstructions: null });
+    expect(patch).toHaveBeenLastCalledWith('/trips/t1', { driver_instructions: null });
   });
 });

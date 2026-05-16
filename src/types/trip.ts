@@ -270,6 +270,26 @@ export interface TripMatchPreview {
   willInvite: number;
   maxInvites: number;
 }
+/**
+ * Edit a trip's commercial / scheduling / vehicle fields. Server enforces
+ * `status === 'open'` — once a driver has applied / been invited / been
+ * selected, the trip is locked and the PATCH returns 409. Route (cities,
+ * waypoints, distance) is intentionally NOT editable here — changing the
+ * route is effectively a new trip.
+ */
+export interface UpdateTripDetailsInput {
+  ratePerKm?: number;
+  driverBata?: number;
+  commissionPct?: number;
+  gstAmount?: number;
+  pickupAt?: string;
+  carTypeId?: string;
+  acRequired?: boolean;
+  seatsRequired?: number;
+  driverInstructions?: string | null;
+  extrasPaidByPassenger?: boolean;
+  showFareToPassenger?: boolean;
+}
 export interface UpdateTripPassengerInput {
   passengerName?: string;
   passengerPhone?: string;
