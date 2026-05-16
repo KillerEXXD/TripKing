@@ -5,6 +5,8 @@ import { Card } from '@/components/ui';
 import { LookupListEditor } from '@/components/admin/LookupListEditor';
 import { AppSettingsForm } from '@/components/admin/AppSettingsForm';
 import { CancelReasonsEditor, CitiesEditor, LanguagesEditor, MakesModelsEditor, ReviewTagsEditor, SeatOptionsEditor } from '@/components/admin/extraEditors';
+import { SingletonSettingsForm } from '@/components/admin/SingletonSettingsForm';
+import { AdminListEditor } from '@/components/admin/AdminListEditor';
 import { carTypeHooks, fuelTypeHooks } from '@/hooks/useAdminConfig';
 
 type SectionId =
@@ -16,7 +18,13 @@ type SectionId =
   | 'cities'
   | 'languages'
   | 'review-tags'
-  | 'cancel-reasons';
+  | 'cancel-reasons'
+  | 'wallet-settings'
+  | 'referral-settings'
+  | 'fraud-settings'
+  | 'referral-tiers'
+  | 'fraud-action-rules'
+  | 'notification-templates';
 
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'general', label: 'General settings' },
@@ -28,7 +36,21 @@ const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'languages', label: 'Languages' },
   { id: 'review-tags', label: 'Review tags' },
   { id: 'cancel-reasons', label: 'Cancellation reasons' },
+  { id: 'wallet-settings', label: 'Wallet settings' },
+  { id: 'referral-settings', label: 'Referral settings' },
+  { id: 'fraud-settings', label: 'Fraud settings' },
+  { id: 'referral-tiers', label: 'Referral tiers' },
+  { id: 'fraud-action-rules', label: 'Fraud action rules' },
+  { id: 'notification-templates', label: 'Notification templates' },
 ];
+
+const WALLET_PINNED = ['driver_platform_fee_paise', 'agent_platform_fee_paise', 'driver_signup_promo_credit_paise', 'agent_signup_promo_credit_paise'];
+const WALLET_LABELS: Record<string, string> = {
+  driver_platform_fee_paise: 'Driver platform fee (paise)',
+  agent_platform_fee_paise: 'Agent platform fee (paise)',
+  driver_signup_promo_credit_paise: 'Driver onboarding credit (paise)',
+  agent_signup_promo_credit_paise: 'Agent onboarding credit (paise)',
+};
 
 /** A label-list section — calls the resource's 6 hooks and feeds them to the generic editor. */
 function LabelListSection({ hooks, title, itemNoun }: { hooks: typeof carTypeHooks; title: string; itemNoun: string }) {
@@ -78,6 +100,18 @@ export function AdminConfigPage() {
         {section === 'languages' && <LanguagesEditor />}
         {section === 'review-tags' && <ReviewTagsEditor />}
         {section === 'cancel-reasons' && <CancelReasonsEditor />}
+        {section === 'wallet-settings' && <SingletonSettingsForm settingsKey="wallet-settings" pinnedFields={WALLET_PINNED} labels={WALLET_LABELS} />}
+        {section === 'referral-settings' && <SingletonSettingsForm settingsKey="referral-settings" />}
+        {section === 'fraud-settings' && <SingletonSettingsForm settingsKey="fraud-settings" />}
+        {section === 'referral-tiers' && (
+          <AdminListEditor listKey="referral-tiers" itemNoun="tier" columns={['name', 'applies_to_role', 'min_referrals', 'max_referrals', 'cap_paise', 'payout_per_trip_paise', 'sort_order']} />
+        )}
+        {section === 'fraud-action-rules' && (
+          <AdminListEditor listKey="fraud-action-rules" itemNoun="rule" columns={['flag_type', 'severity', 'action', 'auto_resolve_after_days', 'sort_order']} />
+        )}
+        {section === 'notification-templates' && (
+          <AdminListEditor listKey="notification-templates" itemNoun="template" columns={['type', 'locale', 'channel', 'title', 'body', 'sort_order']} />
+        )}
       </Card>
     </main>
   );
