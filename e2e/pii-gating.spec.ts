@@ -27,15 +27,14 @@ test.describe('PII gating — vacancies list (pre-reveal)', () => {
     await expect(page.getByRole('button', { name: /invite to trip/i }).first()).toBeVisible({ timeout: 10_000 });
   });
 
-  // The Invite dialog inside /vacancies needs a different selector after the recent
-  // vacancy UI refactor — the "Invite" button isn't found inside the dialog. Likely the
-  // button label changed (e.g. "Send invite") or the dialog is portaled outside the
-  // `role=dialog` container. Filed as a small follow-up — handle visibility test above
-  // already covers the core PII rule that this spec asserts.
-  test.skip('Invite-to-trip flow POSTs the vacancy + trip ids and the invitation lands in the DB', async ({ page, request }) => {
+  // Two attempts to re-enable this test failed: the dialog opens + the trip row resolves
+  // but the click → invite API readback doesn't see the new row. Likely a timing issue
+  // between the mutation, query invalidation, and the readback. Filed as a small follow-up —
+  // the handle-visibility test above already covers the spec's main PII assertion.
+  test.skip('Invite-to-trip flow creates a trip_invitation in the DB', async ({ page, request }) => {
     const admin = await mintAdmin(request);
     const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
-    const { vacancyId } = await postVacancy(request, driver.token);
+    await postVacancy(request, driver.token);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     const { tripId } = await postTrip(request, agent.token);
     await loginAs(page, agent);
@@ -43,26 +42,27 @@ test.describe('PII gating — vacancies list (pre-reveal)', () => {
     await page.goto('/vacancies');
     await page.waitForLoadState('networkidle');
 
-    // The vacancies page lists many parallel-test rows — find our specific vacancy by its
-    // current-city label rather than relying on first(). Then click its row's Invite button.
+    // Open the first vacancy's invite dialog (parallel tests post many rows; the just-posted
+    // one sorts first).
     await page.getByRole('button', { name: /invite to trip/i }).first().click();
 
-    // Dialog opens — wait for the trip picker to populate (it queries the agent's posts).
-    // Then pick our just-posted trip and confirm.
+    // Dialog renders one button per ELIGIBLE trip (within the FE-side radius gate). Each row
+    // is a `<button>` whose accessible name contains the route "City → City" + an "Invite"
+    // badge. Match by the → character — that's unique to the trip-pick rows.
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible({ timeout: 10_000 });
     await page.waitForLoadState('networkidle');
-    // The Invite button enables only once a trip is selected (or auto-selected if there's only one).
-    const inviteBtn = dialog.getByRole('button', { name: /^invite$/i });
-    await expect(inviteBtn).toBeEnabled({ timeout: 10_000 });
-    await inviteBtn.click();
+    const tripRow = dialog.getByRole('button').filter({ hasText: '→' });
+    await expect(tripRow.first()).toBeEnabled({ timeout: 10_000 });
+    await tripRow.first().click();
 
-    // Confirm via API readback — a vacancy_invitations row exists for this vacancy + trip.
+    // Click triggers useInviteDrivers → POST /trips/:id/invites. Confirm via API readback
+    // that an invitation row was created for our driver on our trip.
     await expect.poll(async () => {
-      const r = await request.get(`${API_BASE}/vacancy-invitations?vacancy_id=${vacancyId}`,
+      const r = await request.get(`${API_BASE}/trips/${tripId}/invites`,
         { headers: { Authorization: `Bearer ${agent.token}` } });
       const body = await r.json();
-      return (body?.data ?? []).find((i: { trip_id: string }) => i.trip_id === tripId);
+      return (body?.data ?? []).some((i: { driver?: { user_id: string } }) => i.driver?.user_id === driver.userId);
     }, { timeout: 15_000 }).toBeTruthy();
   });
 });

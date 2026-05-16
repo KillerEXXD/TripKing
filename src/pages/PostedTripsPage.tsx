@@ -180,7 +180,7 @@ export function PostedTripsPage() {
         }
       />
 
-      <FilterBar ariaLabel="Filter trips by status" className="mb-3">
+      <FilterBar ariaLabel="Filter trips by status" wrap className="mb-3">
         {FILTERS.map((f) => (
           <FilterPill
             key={f}

@@ -47,18 +47,28 @@ export interface FilterBarProps {
   children: ReactNode;
   className?: string;
   ariaLabel?: string;
+  /**
+   * Wrap pills onto multiple lines instead of horizontal-scroll. Use when there are 6+ pills
+   * (single-line scroll hides them off-screen on narrow phones — PostedTripsPage has 9 filter
+   * pills). Default: false (preserves the single-line scroll for shorter lists).
+   */
+  wrap?: boolean;
 }
 
 /**
- * Horizontal scrollable strip of `<FilterPill>`s. Used by VacanciesPage,
- * future filtered lists. Hides the scrollbar on touch surfaces.
+ * Strip of `<FilterPill>`s. Default = single-line horizontal scroll. Pass `wrap` for lists
+ * with many pills that should flow onto 2-3 lines on narrow viewports.
  */
-export function FilterBar({ children, className, ariaLabel = 'Filter' }: FilterBarProps) {
+export function FilterBar({ children, className, ariaLabel = 'Filter', wrap = false }: FilterBarProps) {
   return (
     <div
       role="toolbar"
       aria-label={ariaLabel}
-      className={cn('-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', className)}
+      className={cn(
+        '-mx-4 flex gap-2 px-4 pb-1',
+        wrap ? 'flex-wrap gap-y-2' : 'overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+        className,
+      )}
     >
       {children}
     </div>
