@@ -7,7 +7,11 @@ import { LoadingSkeleton } from '@/components/feedback';
 import { useInviteDrivers, useTripInvites, useWithdrawTripInvite } from '@/hooks/useTrips';
 import { useDrivers } from '@/hooks/useDrivers';
 import { ApiError } from '@/lib/api/client';
+import { useDismissedRowsStore } from '@/stores/dismissedRowsStore';
 import type { Trip, TripInvitation } from '@/types';
+
+/** Terminal "negative" invite states — get the soft-red treatment + a Remove action. */
+const NEGATIVE_INVITE: ReadonlySet<TripInvitation['status']> = new Set(['declined', 'withdrawn', 'expired']);
 
 const INVITE_BADGE: Record<TripInvitation['status'], { label: string; variant: 'info' | 'success' | 'muted' | 'warning' }> = {
   pending: { label: 'Awaiting driver', variant: 'info' },
@@ -27,8 +31,10 @@ export function InviteDriversCard({ trip }: { trip: Trip }) {
   const [picking, setPicking] = useState(false);
   const isOpen = trip.status === 'open' || trip.status === 'has_applicants';
 
+  const dismissed = useDismissedRowsStore((s) => s.ids);
   if (invites.isPending) return <LoadingSkeleton rows={2} />;
-  const items = invites.data ?? [];
+  const allItems = invites.data ?? [];
+  const items = allItems.filter((i) => !dismissed[i.id]);
   const pendingCount = items.filter((i) => i.status === 'pending').length;
   const declinedCount = items.filter((i) => i.status === 'declined').length;
   const hasAnyInvite = items.length > 0;
@@ -72,9 +78,15 @@ export function InviteDriversCard({ trip }: { trip: Trip }) {
 
 function InviteRow({ tripId, invite, canWithdraw }: { tripId: string; invite: TripInvitation; canWithdraw: boolean }) {
   const withdraw = useWithdrawTripInvite();
+  const dismiss = useDismissedRowsStore((s) => s.dismiss);
   const badge = INVITE_BADGE[invite.status];
+  const isNegative = NEGATIVE_INVITE.has(invite.status);
   return (
-    <li className="flex items-center gap-2 rounded-lg border bg-white p-2">
+    <li
+      className={`flex items-center gap-2 rounded-lg border p-2 ${
+        isNegative ? 'border-red-200 bg-red-50/70' : 'border-border bg-white'
+      }`}
+    >
       <div className="min-w-0 flex-1">
         <DriverIdentity driver={invite.driver} size="sm" />
       </div>
@@ -95,6 +107,16 @@ function InviteRow({ tripId, invite, canWithdraw }: { tripId: string; invite: Tr
               },
             );
           }}
+        >
+          <X className="size-4" aria-hidden />
+        </Button>
+      ) : isNegative ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="size-7 p-0 shrink-0 text-red-700 hover:bg-red-100 hover:text-red-800"
+          aria-label="Remove from list"
+          onClick={() => dismiss(invite.id)}
         >
           <X className="size-4" aria-hidden />
         </Button>

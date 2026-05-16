@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Car, CheckCircle2, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Car, CheckCircle2, ChevronDown, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAssignDriver, useRejectApplicant, useTrip, useTripApplicants } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,8 +8,12 @@ import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
 import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
+import { useDismissedRowsStore } from '@/stores/dismissedRowsStore';
 import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
 import type { AcceptanceStatus, Trip, TripAcceptance } from '@/types';
+
+/** Terminal "negative" applicant states — soft-red row + Remove action. */
+const NEGATIVE_ACCEPTANCE: ReadonlySet<AcceptanceStatus> = new Set(['rejected', 'withdrawn', 'expired']);
 
 const STATUS_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
   applied: { label: 'Applied', variant: 'warning' },
@@ -49,9 +53,10 @@ function ApplicantCard({
   const d = acceptance.driver;
   const veh = vehicleLabel(acceptance);
   const meta = STATUS_BADGE[acceptance.status] ?? { label: String(acceptance.status), variant: 'muted' as const };
-  const dim = acceptance.status === 'rejected' || acceptance.status === 'withdrawn' || acceptance.status === 'expired';
+  const isNegative = NEGATIVE_ACCEPTANCE.has(acceptance.status);
+  const dismiss = useDismissedRowsStore((s) => s.dismiss);
   return (
-    <Card className={`gap-3 ${acceptance.status === 'accepted' || acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : dim ? 'opacity-70' : ''}`}>
+    <Card className={`gap-3 ${acceptance.status === 'accepted' || acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : isNegative ? 'border-red-200 bg-red-50/70' : ''}`}>
       <div className="flex items-start gap-3">
         <Link to={`/drivers/${acceptance.driverId}`} aria-label={`${d?.fullName || 'driver'} profile`}>
           <Avatar className="size-11">
@@ -84,6 +89,17 @@ function ApplicantCard({
         <Badge variant={meta.variant} className="shrink-0">
           {acceptance.status === 'accepted' || acceptance.status === 'selected' ? <CheckCircle2 className="size-3" aria-hidden /> : null} {meta.label}
         </Badge>
+        {isNegative ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="size-7 p-0 shrink-0 text-red-700 hover:bg-red-100 hover:text-red-800"
+            aria-label="Remove from list"
+            onClick={() => dismiss(acceptance.id)}
+          >
+            <X className="size-4" aria-hidden />
+          </Button>
+        ) : null}
       </div>
       {d && d.topTags.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
@@ -192,7 +208,8 @@ function Applicants({ trip, isPoster, from }: { trip: Trip; isPoster: boolean; f
   const navigate = useNavigate();
   const assignable = trip.status === 'open' || trip.status === 'has_applicants';
   const canAct = isPoster && assignable;
-  const applicants = applicantsQuery.data ?? [];
+  const dismissed = useDismissedRowsStore((s) => s.ids);
+  const applicants = (applicantsQuery.data ?? []).filter((a) => !dismissed[a.id]);
   const [assignedTrip, setAssignedTrip] = useState<Trip | null>(null);
 
   function onAssign(acceptanceId: string) {

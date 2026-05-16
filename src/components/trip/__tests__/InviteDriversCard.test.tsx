@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
+import { useDismissedRowsStore } from '@/stores/dismissedRowsStore';
 import type { Driver, Trip, TripInvitation } from '@/types';
 
 vi.mock('@/hooks/useTrips', () => ({
@@ -73,6 +74,7 @@ describe('InviteDriversCard', () => {
     vi.mocked(useInviteDrivers).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     vi.mocked(useWithdrawTripInvite).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
     vi.mocked(useDrivers).mockReturnValue({ isPending: false, data: [] } as never);
+    useDismissedRowsStore.getState().reset();
   });
 
   it('shows existing invitations with their status badge', () => {
@@ -95,6 +97,22 @@ describe('InviteDriversCard', () => {
     vi.mocked(useTripInvites).mockReturnValue({ isPending: false, data: [] } as never);
     render(<InviteDriversCard trip={makeTrip()} />);
     expect(screen.getByText(/no invites yet/i)).toBeInTheDocument();
+  });
+
+  it('shows a Remove button on negative-status rows that dismisses them from the list', () => {
+    vi.mocked(useTripInvites).mockReturnValue({
+      isPending: false,
+      data: [
+        makeInvite({ id: 'iv-w', status: 'withdrawn', driver: { ...makeInvite().driver!, fullName: 'Withdrawn Driver' } }),
+        makeInvite({ id: 'iv-p', status: 'pending', driver: { ...makeInvite().driver!, fullName: 'Pending Driver' } }),
+      ],
+    } as never);
+    render(<InviteDriversCard trip={makeTrip()} />);
+    expect(screen.getByText('Withdrawn Driver')).toBeInTheDocument();
+    // Remove button on the withdrawn row dismisses it; pending row stays.
+    fireEvent.click(screen.getByRole('button', { name: /remove from list/i }));
+    expect(screen.queryByText('Withdrawn Driver')).toBeNull();
+    expect(screen.getByText('Pending Driver')).toBeInTheDocument();
   });
 
   it('lets the poster pick drivers from the picker dialog and send invites', () => {

@@ -102,7 +102,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
           {badge.label}
         </Badge>
       </div>
-      <div className="text-xs text-secondary">
+      <div className="truncate text-xs text-secondary">
         Pickup: {formatPickupTime(t.pickupAt)}
         {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
         {' · trip is '}
