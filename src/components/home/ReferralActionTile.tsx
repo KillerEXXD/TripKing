@@ -15,46 +15,49 @@ async function copyText(text: string, label: string): Promise<void> {
 }
 
 /**
- * Compact home-tab tile that bundles: tap-to-/referrals + the referral code +
- * Copy + WhatsApp actions inline. Sits in the home tile row beside the
- * Earnings/Analytics tile. Hidden while the code is loading or unavailable.
+ * Compact home-tab tile, sized to match the small HomeTile (h-20). Bundles:
+ * - tap-to-/referrals (full surface)
+ * - the referral code
+ * - Copy + WhatsApp action buttons (small, inline)
+ * Designed to sit in a `grid-cols-2` row alongside the Earnings/Analytics tile.
  */
 export function ReferralActionTile({ role }: Props) {
   const { data, isLoading, isError } = useReferral(role);
   if (isLoading || isError || !data) return null;
 
   return (
-    <div className="relative flex h-20 items-center gap-2 overflow-hidden rounded-xl border border-emerald-200 bg-white px-2 py-2 transition hover:border-emerald-300 hover:shadow-sm">
-      {/* Tap target — full surface navigates to /referrals; action buttons stop propagation */}
+    <div className="relative flex h-20 flex-col items-stretch gap-1 overflow-hidden rounded-xl border border-emerald-200 bg-white px-2 py-2 transition hover:border-emerald-300 hover:shadow-sm">
+      {/* Tap target — full surface navigates; action buttons stopPropagation */}
       <Link to="/referrals" aria-label="View referrals" className="absolute inset-0" />
 
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-        <Gift className="size-4" aria-hidden />
+      <div className="z-10 flex items-center gap-1">
+        <div className="flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <Gift className="size-3" aria-hidden />
+        </div>
+        <div className="flex-1 truncate text-[10px] font-bold uppercase tracking-wide text-emerald-700">Referrals</div>
       </div>
 
-      <div className="z-10 flex min-w-0 flex-1 flex-col items-start gap-0.5">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">Referrals</div>
-        <code className="block max-w-full truncate font-mono text-xs font-bold tracking-wider text-slate-900">{data.code}</code>
+      <div className="z-10 flex flex-1 items-center justify-between gap-1">
+        <code className="block min-w-0 flex-1 truncate font-mono text-xs font-bold tracking-wider text-slate-900">{data.code}</code>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); e.preventDefault(); void copyText(data.code, 'Code'); }}
+          aria-label="Copy referral code"
+          className="z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:scale-95"
+        >
+          <Copy className="size-3" aria-hidden />
+        </button>
+        <a
+          href={data.whatsappUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Share via WhatsApp"
+          className="z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+        >
+          <MessageCircle className="size-3" aria-hidden />
+        </a>
       </div>
-
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); e.preventDefault(); void copyText(data.code, 'Code'); }}
-        aria-label="Copy referral code"
-        className="z-10 inline-flex size-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:scale-95"
-      >
-        <Copy className="size-4" aria-hidden />
-      </button>
-      <a
-        href={data.whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => e.stopPropagation()}
-        aria-label="Share via WhatsApp"
-        className="z-10 inline-flex size-8 items-center justify-center rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
-      >
-        <MessageCircle className="size-4" aria-hidden />
-      </a>
     </div>
   );
 }
