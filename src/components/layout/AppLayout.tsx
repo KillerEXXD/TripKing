@@ -15,7 +15,7 @@ import { BugReportFAB } from '@/components/bug/BugReportFAB';
  */
 export function AppLayout() {
   return (
-    <div className="min-h-dvh bg-page pb-28">
+    <div className="min-h-dvh bg-page pb-[calc(7rem+env(safe-area-inset-bottom))]">
       <main id="main">
         <RouteErrorBoundary>
           <Outlet />
