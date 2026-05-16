@@ -215,6 +215,8 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('POST /trips/:id/complete (assigned driver) → 200, completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} ${JSON.stringify(complete.json?.error || '')}`);
   const afterComplete = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
   check('completed trip no longer carries distance_to_destination_km', afterComplete.distance_to_destination_km === undefined || afterComplete.distance_to_destination_km === null, `got ${afterComplete.distance_to_destination_km}`);
+  const posterNotifs = await j('GET', '/notifications', { token });
+  check('completing a trip fires trip_completed notification to the agent', posterNotifs.status === 200 && (posterNotifs.json?.data || []).some((n) => n && n.type === 'trip_completed' && n.payload_json && n.payload_json.trip_id === tid), `notifs=${JSON.stringify((posterNotifs.json?.data || []).slice(0, 3).map((n) => ({ t: n?.type, p: n?.payload_json })))}`);
 
   // ── hide_passenger_phone: true ⇒ even the assigned driver does NOT see the passenger phone ──
   if (drvId) {
