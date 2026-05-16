@@ -57,6 +57,7 @@ function renderPost() {
   return render(
     <MemoryRouter initialEntries={['/vacancies/new']}>
       <Routes>
+        <Route path="/" element={<div>home page</div>} />
         <Route path="/vacancies/new" element={<PostVacancyPage />} />
         <Route path="/vacancies" element={<div>vacancy feed</div>} />
       </Routes>
@@ -209,6 +210,20 @@ describe('PostVacancyPage', () => {
     renderPost();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(screen.getByText('vacancy feed')).toBeInTheDocument();
+  });
+
+  it('the header Back arrow returns to home (not to the vacant-drivers list)', () => {
+    renderPost();
+    fireEvent.click(screen.getByRole('link', { name: /back/i }));
+    expect(screen.getByText('home page')).toBeInTheDocument();
+    expect(screen.queryByText('vacancy feed')).toBeNull();
+  });
+
+  it('the Back arrow on the KYC gate also returns to home', () => {
+    setMyDriver('docs_submitted');
+    renderPost();
+    fireEvent.click(screen.getByRole('link', { name: /back/i }));
+    expect(screen.getByText('home page')).toBeInTheDocument();
   });
 
   it('shows the verification gate instead of the form when the driver is not approved', () => {
