@@ -64,6 +64,7 @@ const PHASES = [
   { code: 'P6', title: 'P6 · Start & in-progress',        description: 'OTP handshake, brute-force lockout, live tracking, offline, mid-progress cancel.' },
   { code: 'P7', title: 'P7 · Completion & reviews',       description: 'Complete, complete-without-start blocked, reviews both directions, one-sided, review-on-cancelled blocked.' },
   { code: 'P8', title: 'P8 · Notifications & inbox',      description: 'Bell badge, deep-link per type, mark-read.' },
+  { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on start or window close.' },
 ];
 
 // Each scenario: { phase, id, title, preconditions?, steps[{action, expected}] }
@@ -192,6 +193,33 @@ const SCENARIOS = [
     { action: 'Restore Tester B to approved but no active vacancy.', expected: 'Still excluded — vacancy is required.' },
     { action: 'Add active vacancy in radius for Tester B. Re-post.', expected: 'Now appears in match count and gets invite.' },
   ]},
+  { phase: 'P3', id: 'P3.15', title: 'Manual invite radius gate — now enforced (regression check)',
+    preconditions: 'Regression context: before this release, POST /trips/:id/invites had a silently broken radius gate — it queried vacancies.status=\'open\' but migration 039 had renamed it to active/matched/on_trip/expired/cancelled, AND it compared numeric coords using typeof===number which never matched (supabase-js returns them as strings). Net result: every manually-invited driver was created regardless of distance. The gate now actually enforces app_settings.invite_max_radius_km. Testers who memorised the old behaviour will notice the difference — file as "regression fixed", not a regression.',
+    steps: [
+    { action: 'Admin: seed 3 KYC-approved drivers, each with an active vacancy. Two have current_city within 15 km of the trip\'s pickup; one has it >15 km away.', expected: 'All 3 drivers visible in the Invite picker (UI doesn\'t pre-filter by radius — that\'s the server\'s job). Vacancy status must be \'active\' (not the historical \'open\').' },
+    { action: 'Agent: POST /trips/{id}/invites with all 3 driver ids in driver_ids.', expected: '{ created: [2 ids], skipped: [1 id of the out-of-radius driver] }. trip_invitations has exactly 2 rows. Out-of-radius driver gets NO notification.' },
+    { action: 'Now invite a driver with NO active vacancy at all (expired or never posted).', expected: '200 with that driver in created, not skipped. Drivers without a vacancy bypass the radius gate by design — agent picks them from the pickup-city directory. (Manual invite is permissive; auto-invite is strict — that\'s the asymmetry.)' },
+  ]},
+  { phase: 'P3', id: 'P3.16', title: 'Auto-invited driver applies — invitation flips to applied',
+    preconditions: 'Parity with P3.5 but for the auto-invite path. Pre-state: through P3.10 (auto-invite created at least one pending row).',
+    steps: [
+    { action: 'Auto-invited driver: /my-trips?tab=invited → Apply. Pick vehicle. Confirm.', expected: 'Trip status flips to Has applicants. Driver\'s existing trip_invitations row updated to status=applied (NOT a new row — sync_trip_invitation_on_apply trigger updates in place).' },
+    { action: 'Agent: open Invite-drivers card.', expected: 'Driver row shows applied, name/phone revealed (actor-reveals rule — they reciprocated).' },
+    { action: 'Agent (dev tools): POST /trips/{id}/invites with the already-applied driver\'s id again.', expected: '200. Existing row stays at applied — helper preserves prior acceptance, does NOT flip back to pending. No duplicate bell. "Invitation waiting" home card does NOT reappear.' },
+  ]},
+  { phase: 'P3', id: 'P3.17', title: 'Alert-match + trip_invitation can coexist on the same trip',
+    preconditions: 'By design: alert_match means "matches your saved filter"; trip_invitation means "the agent specifically picked you". Different intent, both fire.',
+    steps: [
+    { action: 'Tester B driver: (a) post an active vacancy in the pickup city (qualifies for auto-invite), AND (b) save an alert from pickup city → destination city.', expected: 'Both rows visible: 1 active vacancy + 1 active alert.' },
+    { action: 'Agent: post a fresh trip pickup→destination with Auto-invite ON.', expected: 'Toast "Trip posted — N drivers invited" (N includes Tester B).' },
+    { action: 'Tester B driver: check bell.', expected: 'Bell rings TWICE for the same trip id: once with alert_match, once with trip_invitation. The trip appears in /my-trips?tab=invited (driven by the invitation row, not the alert).' },
+  ]},
+  { phase: 'P3', id: 'P3.18', title: 'Match-preview rate limit (30/min/user)',
+    preconditions: 'Devtools-only test — not exercised by the normal form flow.',
+    steps: [
+    { action: 'From a logged-in session, hammer GET /trips/match-preview?from_city_id=<a city uuid> 35 times in under 60s (browser console for loop).', expected: 'First ~30 calls → 200 with { total_matches, will_invite, max_invites: 5 }. Around the 31st → 429 RATE_LIMITED. Within a minute the limit resets and 200s resume.' },
+    { action: 'Verify the limit is per-user.', expected: 'Limit key is match-preview:<user_id>. One user\'s loop does not block another\'s form. Real agents normally fire this only a handful of times per session — should never see the 429 organically.' },
+  ]},
 
   // ── P4 ────────────────────────────────────────────────────────────────
   { phase: 'P4', id: 'P4.1', title: 'Select from multiple applicants', preconditions: 'Have ≥2 applicants on the same trip (combine P2.2 + P3.5).', steps: [
@@ -302,6 +330,47 @@ const SCENARIOS = [
   ]},
   { phase: 'P8', id: 'P8.3', title: 'Mark-read behaviour', steps: [
     { action: 'Open /notifications. Tap a notification (or Mark all read).', expected: 'Bell badge clears. Re-opening shows the row as read. read_at stamped on row.' },
+  ]},
+
+  // ── V (Vacancy lifecycle — PR #167) ──────────────────────────────────
+  { phase: 'V', id: 'V1', title: 'Multi-day trip flips short-window vacancy → on_trip',
+    preconditions: 'Before PR #167 only pickup_at was checked; a vacancy whose window ended mid-trip stayed visible to agents. Now overlap honours expected_end_at too.',
+    steps: [
+    { action: 'Driver: post a vacancy available 9 AM – 9 PM today, current city = Vellore, destinations = Chennai.', expected: 'Vacancy shows status active on /vacancies.' },
+    { action: 'Agent: post a multi-day trip pickup today 11 AM, expected end the day after tomorrow 6 PM (ends well after the vacancy\'s 9 PM cutoff). Driver applies → agent assigns → driver accepts (P3–P4.5).', expected: 'Driver accepts. Trip → accepted.' },
+    { action: 'Driver: open /vacancies. Agent: open Vacant drivers for Vellore.', expected: 'Driver: vacancy still appears with amber "On Trip" banner + linked trip route + pickup date; edit pencil greyed, Remove still active. Agent: that driver\'s row is NOT present (pre-#167 it would have leaked through). vacancies.status=\'on_trip\', linked_trip_id = the accepted trip.' },
+  ]},
+  { phase: 'V', id: 'V2', title: 'Single-day trip inside vacancy window (regression check)',
+    preconditions: 'Confirms the multi-day fix didn\'t break the existing single-day happy path.',
+    steps: [
+    { action: 'Driver: post a vacancy 9 AM – 9 PM today.', expected: 'Status active.' },
+    { action: 'Agent: post a trip pickup 11 AM today, end 5 PM today (entirely inside the vacancy window). Driver accepts.', expected: 'Same as V1: vacancy flips to on_trip, hidden from agent search.' },
+  ]},
+  { phase: 'V', id: 'V3', title: 'Yesterday\'s vacancies hidden from agent search',
+    steps: [
+    { action: 'Agent: open Vacant drivers. Scroll the full list.', expected: 'NO row whose "When" line is in the past. Every visible vacancy\'s available_until is in the future (or open-ended).' },
+    { action: 'As a driver who posted a vacancy yesterday: open /vacancies.', expected: 'Yesterday\'s row shows status expired (not counted toward the 2-active quota — driver can post again).' },
+  ]},
+  { phase: 'V', id: 'V4', title: 'Cron auto-expires a vacancy when its window closes',
+    preconditions: 'pg_cron expire_stale_vacancies runs every 5 minutes.',
+    steps: [
+    { action: 'Driver: post a vacancy with available_until set 6 minutes from now (smallest window the UI allows; or admin sets it directly).', expected: 'Status active.' },
+    { action: 'Wait 6 minutes.', expected: 'Status flips to expired automatically. Agent search no longer shows it. Driver\'s quota count drops by 1.' },
+  ]},
+  { phase: 'V', id: 'V5', title: 'Trip cancel reverts on_trip → active',
+    steps: [
+    { action: 'Driver: post a vacancy whose window is fully in the future (e.g. tomorrow 9 AM – 9 PM).', expected: 'Status active.' },
+    { action: 'Agent: post a trip inside that window. Driver applies + accepts. Agent then cancels the trip before it starts.', expected: 'Driver\'s vacancy reverts from on_trip → active (banner gone, agents see it again). linked_trip_id cleared.' },
+  ]},
+  { phase: 'V', id: 'V6', title: 'Trip start consumes on_trip → expired',
+    preconditions: 'Symmetric to V5 but with a real start instead of a cancel.',
+    steps: [
+    { action: 'As V5, but driver starts the trip (passenger OTP) instead of the agent cancelling.', expected: 'Vacancy moves on_trip → expired (slot consumed). Does NOT revert when the trip later completes.' },
+  ]},
+  { phase: 'V', id: 'V7', title: 'Negative — vacancy outside trip window must NOT flip',
+    preconditions: 'Sanity check that the overlap check isn\'t over-eager.',
+    steps: [
+    { action: 'Driver: post a vacancy starting tomorrow. Agent: post a trip with pickup today and let this driver accept it.', expected: 'That vacancy stays active — its window doesn\'t cover the trip\'s pickup. (No flip.)' },
   ]},
 ];
 
