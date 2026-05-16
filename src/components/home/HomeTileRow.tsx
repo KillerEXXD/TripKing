@@ -179,28 +179,32 @@ function ReferralTile({ code, link }: { code?: string; link?: string }) {
     }
   }
 
-  const copyButton = hasCode ? (
-    <button
-      type="button"
-      onClick={onCopy}
-      aria-label={copied ? 'Referral link copied' : 'Copy referral link'}
-      className="inline-flex size-6 items-center justify-center rounded-full bg-surface text-purple-accent hover:brightness-95 [&_svg]:size-3.5"
-    >
-      {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
-    </button>
-  ) : null;
+  // Copy button sits inline next to the code so the referral tile reads as
+  // {code} {Copy} on one row — easier to scan than a top-corner action.
+  const primary = (
+    <span className="flex items-center gap-1.5">
+      <code className="truncate font-mono tracking-wider">{code ?? '—'}</code>
+      {hasCode ? (
+        <button
+          type="button"
+          onClick={onCopy}
+          aria-label={copied ? 'Referral link copied' : 'Copy referral link'}
+          className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-surface text-purple-accent hover:brightness-95 [&_svg]:size-3"
+        >
+          {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+        </button>
+      ) : null}
+    </span>
+  );
 
   return (
     <TileFrame
       accent="purple"
       to="/referrals"
       icon={<Gift />}
-      action={copyButton}
       label="Refer & earn"
-      primary={
-        <code className="font-mono tracking-wider">{code ?? '—'}</code>
-      }
-      sub={hasCode ? 'Tap to share' : 'Code generating…'}
+      primary={primary}
+      sub={hasCode ? undefined : 'Code generating…'}
       ariaLabel="Refer and earn"
     />
   );
