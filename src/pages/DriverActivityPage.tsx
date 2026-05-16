@@ -32,12 +32,12 @@ function isTab(v: string | null): v is Tab {
   return !!v && (TAB_IDS as string[]).includes(v);
 }
 
-const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
+const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' | 'danger' }> = {
   applied: { label: 'Awaiting decision', variant: 'info' },
   selected: { label: 'Selected — accept it!', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'success' },
   rejected: { label: 'Not selected', variant: 'muted' },
-  withdrawn: { label: 'Withdrawn', variant: 'muted' },
+  withdrawn: { label: 'Withdrawn', variant: 'danger' },
   expired: { label: 'Expired', variant: 'muted' },
 };
 
