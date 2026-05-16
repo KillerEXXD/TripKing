@@ -445,6 +445,9 @@ verify_jwt = false
 [functions.webhook-qase]
 verify_jwt = false
 
+[functions.cron-qase-poll]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

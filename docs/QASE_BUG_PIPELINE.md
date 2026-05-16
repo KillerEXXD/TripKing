@@ -33,7 +33,13 @@ End-to-end: a failing Playwright test → Qase Defect → internal `bug_reports`
                                                 └──────────────────────┘
 ```
 
-## One-time Qase project setup
+## Two intake paths
+
+Pick **one** — whichever your Qase plan supports.
+
+### Path A — Webhooks (Qase Business+ plan)
+
+Real-time, pushed by Qase. Requires the Webhooks feature in your Qase project.
 
 1. **Generate a webhook secret.** `openssl rand -hex 32` (or any 32+ byte random string).
 2. **Set it on the edge function:** `npx supabase secrets set QASE_WEBHOOK_SECRET=<value> --project-ref saxcbebqxgatiktsebxw`.
@@ -42,6 +48,30 @@ End-to-end: a failing Playwright test → Qase Defect → internal `bug_reports`
    - URL: `https://saxcbebqxgatiktsebxw.supabase.co/functions/v1/webhook-qase`
    - Secret: paste the same value from step 1.
    - Events: tick **Defect created**, **Defect updated**, **Defect resolved**. (Other events are ignored by the function.)
+4. **Save.** From now on, every Qase defect mirrors into `bug_reports` within seconds.
+
+### Path B — Polling (works on every Qase plan, including Free)
+
+The `cron-qase-poll` edge function pulls the latest Qase defects on a 5-minute cron and runs them through the same `_shared/qaseDefectIngest.ts` helper the webhook uses. Result is identical — just up-to-5-minutes-delayed.
+
+1. **Generate a cron key.** `openssl rand -hex 32`.
+2. **Set the function secrets** (one-time):
+   ```
+   npx supabase secrets set \
+     CRON_QASE_KEY=<the-key> \
+     QASE_API_TOKEN=<from app.qase.io Profile → API tokens> \
+     QASE_PROJECT_CODE=TRIPKINGAP \
+     --project-ref saxcbebqxgatiktsebxw
+   ```
+3. **Schedule the poll.** Free option — [cron-job.org](https://cron-job.org):
+   - Sign up. Create a new cron job.
+   - URL: `https://saxcbebqxgatiktsebxw.supabase.co/functions/v1/cron-qase-poll`
+   - Method: `GET`
+   - Headers: `X-Cron-Key: <the-key from step 1>`
+   - Schedule: every 5 minutes
+4. Verify by running the smoke once: `CRON_QASE_POLL_API_BASE=… CRON_QASE_KEY=… node scripts/test-cron-qase-poll.cjs`.
+
+Both paths are idempotent (upsert on `qase_defect_id`); you can run them concurrently and the second one becomes a no-op.
    - Click **Test webhook** — the Qase UI sends a sample POST; check the function logs for a 200.
 4. **Save.** From now on, every Qase defect mirrors into `bug_reports`.
 
