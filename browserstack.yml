@@ -1,0 +1,52 @@
+# BrowserStack — real-device E2E config.
+#
+# The `@browserstack/node-sdk` wrapper reads this file and:
+#   1. Starts the BrowserStack Local tunnel (so the local dev server on :4399 is
+#      reachable from the BrowserStack cloud devices).
+#   2. Boots a Playwright session per `platforms[]` entry, in parallel.
+#   3. Runs the Playwright command you pass in: `npx browserstack-node-sdk
+#      playwright test ...`.
+#   4. Streams each test's video / network log / console errors to the
+#      BrowserStack Automate dashboard (a URL is printed at the start of the
+#      run — QA opens that and watches live).
+#
+# Credentials come from env (set via .env.development locally, GH repo secrets
+# in CI): BROWSERSTACK_USERNAME + BROWSERSTACK_ACCESS_KEY. Never commit them.
+
+userName: ${BROWSERSTACK_USERNAME}
+accessKey: ${BROWSERSTACK_ACCESS_KEY}
+
+# Required when tests target localhost (our Vite dev server on :4399). The SDK
+# auto-starts/stops the Local binary inside the wrapper command.
+browserstackLocal: true
+browserstackLocalOptions:
+  localIdentifier: tripking-${BROWSERSTACK_BUILD_NAME}
+
+# One project + Test Observability tab (free, gives the dashboard + run history).
+projectName: TripKing
+buildName: ${BROWSERSTACK_BUILD_NAME}
+testObservability: true
+
+# A modest device matrix — adjust as the suite grows. Tests run in parallel
+# across each platform, capped at `parallelsPerPlatform` per row.
+platforms:
+  - os: ios
+    osVersion: '17'
+    deviceName: 'iPhone 15 Pro'
+    browserName: playwright-webkit
+  - os: android
+    osVersion: '14.0'
+    deviceName: 'Google Pixel 8'
+    browserName: playwright-chromium
+  - os: OS X
+    osVersion: Sonoma
+    browserName: playwright-chromium
+    browserVersion: latest
+
+parallelsPerPlatform: 1
+
+# Where the artifacts live in the BrowserStack dashboard. Each test session
+# gets a video + network log + console log automatically.
+debug: true
+networkLogs: true
+consoleLogs: errors
