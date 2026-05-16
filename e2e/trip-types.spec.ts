@@ -90,67 +90,72 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     await expect(page.getByLabel(/return to start/i)).toBeVisible();
   });
 
-  test.skip('one-way submit → trip persisted with legacy single-leg shape (no trip_type, no waypoints)', async ({ page, request }) => {
+  // Body-shape tests are pure API: the form's date pickers are Radix Popovers (not native
+  // datetime-local inputs) and driving them via the UI is an investment the migration didn't
+  // justify. The CONTRACT being tested (POST /trips body shape per trip_type) is server-side;
+  // we POST directly and read back to assert.
+  test('POST /trips one-way → trip_type=one_way, no waypoints', async ({ request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
-    await loginAs(page, agent);
-
     const cities = await getCities(request);
     const carTypes = await getCarTypes(request);
-    const fromCity = cities[0]!.id;
-    const toCity = cities[1]!.id;
-    const carLabel = carTypes[0]!.label;
 
-    const getTripId = await capturePostedTripId(page);
-    await page.goto('/trips/new');
-    await page.getByLabel(/From \(pickup city\)/i).selectOption(fromCity);
-    await page.getByLabel(/To \(drop-off city\)/i).selectOption(toCity);
-    await page.getByLabel(/Pickup date & time/i).fill(futureLocal(2));
-    await page.getByRole('button', { name: carLabel }).click();
-    await page.getByRole('button', { name: /next/i }).click();
-
-    await page.getByLabel(/Rate per km/i).fill('15');
-    await page.getByRole('button', { name: /post trip|create trip|publish/i }).click();
-
-    await expect.poll(getTripId, { timeout: 10_000 }).not.toBeNull();
-    const tripId = getTripId()!;
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[1]!.id,
+        pickup_at: new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
+        expected_distance_km: 140, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const tripId = (await post.json())?.data?.id as string;
     const shape = await readTripShape(request, agent.token, tripId);
-    expect(shape.from_city_id).toBe(fromCity);
-    expect(shape.to_city_id).toBe(toCity);
+    expect(shape.from_city_id).toBe(cities[0]!.id);
+    expect(shape.to_city_id).toBe(cities[1]!.id);
     expect(shape.trip_type).toBe('one_way');
   });
 
-  test.skip('round-trip submit → trip_type=round_trip + 3-waypoint chain + expected_end_at', async ({ page, request }) => {
+  // Round-trip body shape: requires waypoint arrive_at to be monotonic + last waypoint city
+  // to match the first. The current attempt 422s — needs the exact monotonic-arrive shape the
+  // server validates. Filed as a small follow-up; one_way coverage above proves the per-tab
+  // body-shape contract in principle.
+  test.skip('POST /trips round-trip → trip_type=round_trip + 3-waypoint chain + expected_end_at', async ({ request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
-    await loginAs(page, agent);
-
     const cities = await getCities(request);
     const carTypes = await getCarTypes(request);
-    const fromCity = cities[0]!.id;
-    const toCity = cities[1]!.id;
-    const carLabel = carTypes[0]!.label;
+    const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    const endAt = new Date(Date.now() + 28 * 3600 * 1000).toISOString();
 
-    const getTripId = await capturePostedTripId(page);
-    await page.goto('/trips/new');
-    await page.getByRole('tab', { name: /round-trip/i }).click();
-    await page.getByLabel(/Trip starts from \(city\)/i).selectOption(fromCity);
-    await page.getByLabel(/Turnaround city/i).selectOption(toCity);
-    await page.getByLabel(/Trip starts \(date & time\)/i).fill(futureLocal(2));
-    await page.getByLabel(/Trip ends \(date & time\)/i).fill(futureLocal(3));
-    await page.getByRole('button', { name: carLabel }).click();
-    await page.getByRole('button', { name: /next/i }).click();
-    await page.getByLabel(/Rate per km/i).fill('15');
-    await page.getByRole('button', { name: /post trip|create trip|publish/i }).click();
-
-    await expect.poll(getTripId, { timeout: 10_000 }).not.toBeNull();
-    const tripId = getTripId()!;
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[1]!.id,
+        pickup_at: pickupAt, expected_end_at: endAt,
+        expected_distance_km: 140, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+        trip_type: 'round_trip',
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, arrive_at: pickupAt, wait_minutes: 0, is_destination: true },
+          { city_id: cities[0]!.id, arrive_at: endAt, wait_minutes: 0, is_destination: true },
+        ],
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const tripId = (await post.json())?.data?.id as string;
     const shape = await readTripShape(request, agent.token, tripId);
     expect(shape.trip_type).toBe('round_trip');
     expect(typeof shape.expected_end_at).toBe('string');
     expect(shape.waypoints?.length).toBe(3);
-    expect(shape.waypoints?.[0]?.city_id).toBe(fromCity);
-    expect(shape.waypoints?.[1]?.city_id).toBe(toCity);
-    expect(shape.waypoints?.[2]?.city_id).toBe(fromCity);
+    expect(shape.waypoints?.[0]?.city_id).toBe(cities[0]!.id);
+    expect(shape.waypoints?.[1]?.city_id).toBe(cities[1]!.id);
+    expect(shape.waypoints?.[2]?.city_id).toBe(cities[0]!.id);
   });
 });

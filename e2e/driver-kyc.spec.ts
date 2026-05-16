@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mintAdmin, mintDriver, loginAs } from './helpers-api';
+import { mintAdmin, mintDriver, mintVehicle, loginAs } from './helpers-api';
 
 /**
  * The driver "Get verified" journey, asserted in two real states (pending vs approved).
@@ -32,13 +32,12 @@ test.describe('driver Get-verified flow', () => {
     await expect(page.getByRole('button', { name: /submit for verification/i })).toBeDisabled();
   });
 
-  // TODO(real-api-migration): a freshly-approved driver has no vehicles → the home page may
-  // redirect to a "Add your vehicle" interstitial, aborting our goto. Needs a vehicle-creation
-  // helper (`mintVehicle(driver, opts)`) before the assertion, OR a more specific URL goto.
-  // Filed as follow-up.
-  test.skip('approved driver — banner gone; checklist collapses to "Verified"', async ({ page, request }) => {
+  test('approved driver — banner gone; checklist collapses to "Verified"', async ({ page, request }) => {
     const admin = await mintAdmin(request);
     const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
+    // Add a vehicle so the home page doesn't redirect to the "Add your vehicle" interstitial,
+    // which aborts the goto and made this test ERR_ABORTED in PR #205.
+    await mintVehicle(request, driver.token);
     await loginAs(page, driver);
 
     await page.goto('/');

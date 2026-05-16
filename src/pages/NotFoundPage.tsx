@@ -8,7 +8,7 @@ export function NotFoundPage() {
         title="404 — page not found"
         message="That page doesn't exist."
         action={
-          <Link to="/" className="text-primary underline">
+          <Link to="/" className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800">
             Go home
           </Link>
         }
