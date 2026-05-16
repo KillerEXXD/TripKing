@@ -54,8 +54,14 @@ function handleCacheError(error: unknown, opts: { meta: TripKingQueryMeta; featu
     return;
   }
   addDataBreadcrumb(`${kind} error`, { feature, status });
-  // ApiErrors are already captured (with rich request context) by the API client; 401/404/409 are expected user-correctable errors.
-  if (!isReported(error) && status !== 401 && status !== 404 && status !== 409) {
+  // ApiErrors are already captured (with rich request context) by the API client;
+  // 401/403/404/409/422/429 are expected user-correctable errors — not bugs. Keep this
+  // list in sync with the apiClient's `isUserError` filter (src/lib/api/client.ts).
+  // (403 was missing → Sentry collected 31 events / 3 users in 24h from drivers
+  // opening /trips/:id/applicants for trips they didn't post — a UI gating issue,
+  // not a code bug worth a Sentry alert.)
+  const isUserError = status === 401 || status === 403 || status === 404 || status === 409 || status === 422 || status === 429;
+  if (!isReported(error) && !isUserError) {
     captureDataError(meta.feature ?? feature, error, { status });
   }
   if (meta.toastOnError) toast.error(messageForError(error));
