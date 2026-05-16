@@ -117,18 +117,22 @@ async function syncVacanciesForTrip(
   db: Db,
   action: 'accept' | 'start' | 'revert',
   tripId: string,
-  opts: { driverId?: string | null; pickupAt?: string | null } = {},
+  opts: { driverId?: string | null; pickupAt?: string | null; expectedEndAt?: string | null } = {},
 ): Promise<void> {
   try {
     if (action === 'accept') {
       if (!opts.driverId || !opts.pickupAt) return;
+      // Full-interval overlap: vacancy must cover the trip's [pickup_at, expected_end_at].
+      // Falls back to pickup_at if expectedEndAt is missing (defensive — trips.expected_end_at
+      // has been NOT NULL since migration 024).
+      const endIso = opts.expectedEndAt ?? opts.pickupAt;
       await db
         .from('vacancies')
         .update({ status: 'on_trip', linked_trip_id: tripId, updated_at: new Date().toISOString() })
         .eq('driver_id', opts.driverId)
         .eq('status', 'active')
         .lte('available_from', opts.pickupAt)
-        .or(`available_until.is.null,available_until.gte.${opts.pickupAt}`);
+        .or(`available_until.is.null,available_until.gte.${endIso}`);
       return;
     }
     if (action === 'start') {
@@ -1377,7 +1381,11 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
     // Migration 039: any active vacancy whose window covers this trip's pickup is now
     // 'on_trip' (hidden from agent search, banner on the driver's IAmAvailableCard).
-    await syncVacanciesForTrip(db, 'accept', tripId, { driverId: did, pickupAt: trip.pickup_at });
+    await syncVacanciesForTrip(db, 'accept', tripId, {
+      driverId: did,
+      pickupAt: trip.pickup_at,
+      expectedEndAt: trip.expected_end_at,
+    });
     // Phase 3: notify the agent that the driver accepted (the OTP is now in play).
     await db.from('notifications').insert({
       user_id: trip.posted_by_user_id,
