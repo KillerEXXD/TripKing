@@ -83,7 +83,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Primary"
-      className="bottom-nav fixed inset-x-0 bottom-0 z-40 flex items-center justify-between overflow-visible pb-[env(safe-area-inset-bottom,0px)]"
+      className="bottom-nav fixed inset-x-0 bottom-0 z-40 flex items-center justify-between overflow-visible"
     >
       {items.map((it) => {
         const isActive = it.id === activeId;

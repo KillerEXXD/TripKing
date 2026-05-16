@@ -16,7 +16,13 @@
   box-shadow:
     0 -1px 0 rgba(0, 0, 0, 0.05),
     0 -6px 20px rgba(0, 0, 0, 0.05);
-  padding: 10px 20px;
+  /* Equal-ish top + bottom padding for vertical centering of the stacked
+   * icon + label pair, plus iOS safe-area inset on top of the bottom 10px.
+   * Was a `padding: 10px 20px` shorthand + a Tailwind pb-[env(...)] class on
+   * the JSX; the Tailwind class overrode the shorthand's padding-bottom, so
+   * on desktop (where env() resolves to 0) the bottom 10px disappeared and
+   * the labels rendered flush against the viewport edge. */
+  padding: 10px 20px calc(10px + env(safe-area-inset-bottom, 0px));
 }
 
 .bottom-nav-button {

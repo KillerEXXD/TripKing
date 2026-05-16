@@ -24,7 +24,7 @@ export interface PageShellProps {
  */
 export function PageShell({ children, className }: PageShellProps) {
   return (
-    <div className={cn('mx-auto w-full max-w-md px-4 pb-24 pt-3', className)}>
+    <div className={cn('mx-auto w-full max-w-md px-4 pb-28 pt-3', className)}>
       {children}
     </div>
   );
