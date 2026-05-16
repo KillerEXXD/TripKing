@@ -156,6 +156,59 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/${segments[0]}`, 405);
   }
 
+  // ── /admin/withdrawals (Stage 7; admin-only — list + transition queue) ──
+  if (segments[0] === 'withdrawals') {
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
+
+    // GET /admin/withdrawals?status=&user_id=
+    if (segments.length === 1 && req.method === 'GET') {
+      let q = db.from('withdrawals')
+        .select('id, user_id, amount_paise, upi_id, status, provider, provider_payout_id, external_txn_ref, rejected_reason, admin_actor_user_id, requested_at, approved_at, paid_at, failed_at, user:users!user_id(display_name, phone, role)')
+        .order('requested_at', { ascending: false });
+      const status = url.searchParams.get('status');
+      if (status) q = q.eq('status', status);
+      const userId = url.searchParams.get('user_id');
+      if (userId) q = q.eq('user_id', userId);
+      const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') ?? '100')));
+      const { data, error } = await q.limit(limit);
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data ?? []);
+    }
+
+    // PATCH /admin/withdrawals/<id>  body = { outcome, provider_payout_id?, external_txn_ref?, rejected_reason? }
+    if (segments.length === 2 && (req.method === 'PATCH' || req.method === 'PUT')) {
+      const id = decodeURIComponent(segments[1]);
+      const body = await readBody(req);
+      const outcome = typeof body.outcome === 'string' ? body.outcome.trim() : '';
+      if (!outcome) return fail('VALIDATION', 'outcome required (approved|processing|paid|rejected|cancelled|failed)', 422);
+
+      const { data: before } = await db.from('withdrawals').select('*').eq('id', id).maybeSingle();
+      if (!before) return fail('NOT_FOUND', `withdrawal ${id} not found`, 404);
+
+      const { data, error } = await db.rpc('complete_referral_withdrawal', {
+        _withdrawal_id: id,
+        _outcome: outcome,
+        _admin_actor_user_id: a.id,
+        _provider_payout_id: typeof body.provider_payout_id === 'string' ? body.provider_payout_id : null,
+        _external_txn_ref:   typeof body.external_txn_ref   === 'string' ? body.external_txn_ref   : null,
+        _rejected_reason:    typeof body.rejected_reason    === 'string' ? body.rejected_reason    : null,
+      });
+      if (error) {
+        const msg = error.message || '';
+        if (msg.includes('NOT_FOUND'))        return fail('NOT_FOUND', msg, 404);
+        if (msg.includes('TERMINAL_STATUS'))  return fail('TERMINAL_STATUS', msg, 409);
+        if (msg.includes('INVALID_OUTCOME'))  return fail('VALIDATION', msg, 422);
+        return fail('DB_ERROR', msg, 500);
+      }
+      const row = Array.isArray(data) ? data[0] : data;
+      await audit(db, a.id, `withdrawal_${outcome}`, 'withdrawals', id, before, row);
+      return ok(row);
+    }
+
+    return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/withdrawals`, 405);
+  }
+
   // ── /admin/app-wallet (Stage 5; admin-only read of platform's accounts receivable) ──
   if (segments[0] === 'app-wallet') {
     const a = await requireAdmin(db, req);

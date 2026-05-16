@@ -31,7 +31,9 @@ const LINK_SELECT = `
 `;
 
 async function fetchSummary(db: Db, userId: string): Promise<Row> {
-  const { data: bal } = await db.from('referral_balances').select('*').eq('user_id', userId).maybeSingle();
+  const { data: bal }  = await db.from('referral_balances').select('*').eq('user_id', userId).maybeSingle();
+  // Stage 7: hold-aware withdrawable
+  const { data: wbal } = await db.from('referral_withdrawable_summary').select('*').eq('user_id', userId).maybeSingle();
   // counts per link status
   const { data: links } = await db.from('referral_links').select('status').eq('referrer_user_id', userId);
   const counts: Record<string, number> = {};
@@ -45,10 +47,10 @@ async function fetchSummary(db: Db, userId: string): Promise<Row> {
     transferred_paise:     Math.abs(Number(bal?.transferred_paise ?? 0)),
     withdrawn_paise:       Math.abs(Number(bal?.withdrawn_paise ?? 0)),
     net_paise:             Number(bal?.net_paise ?? 0),
-    // Stage 7 will tighten "withdrawable" with a hold-period filter; for now
-    // it equals the net (lifetime − transfers − withdrawals − reversals).
-    withdrawable_paise:    Math.max(0, Number(bal?.net_paise ?? 0)),
-    pending_paise:         0,                                    // Stage 7
+    // Stage 7: withdrawable = mature accruals (older than wallet_settings.withdrawal_hold_days)
+    // + reversals − withdrawals − transfers, floored at 0
+    withdrawable_paise:    Number(wbal?.withdrawable_paise ?? 0),
+    pending_paise:         Number(wbal?.pending_accruals_paise ?? 0),
     counts: {
       total_referred:       Number(bal?.total_referred_count ?? 0),
       earning_active:       Number(bal?.earning_active_count ?? 0),
@@ -73,6 +75,56 @@ const handler = withTiming('referrals', async (req: Request): Promise<Response> 
   const url = new URL(req.url);
   const segs = url.pathname.split('/').filter(Boolean);
   const after = segs.slice(segs.indexOf('referrals') + 1);
+
+  // ── POST /me/withdraw { amount_paise, upi_id } — Stage 7 ─────────────────
+  if (req.method === 'POST' && after.join('/') === 'me/withdraw') {
+    const db = serviceClient();
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to request a withdrawal', 401);
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* empty */ }
+    const amount = Number(body.amount_paise);
+    const upiId = typeof body.upi_id === 'string' ? body.upi_id.trim() : '';
+    if (!Number.isFinite(amount) || amount <= 0) return fail('VALIDATION', 'amount_paise must be > 0', 422);
+    if (!upiId) return fail('VALIDATION', 'upi_id required', 422);
+    const { data, error } = await db.rpc('request_referral_withdrawal', { _user_id: u.id, _amount_paise: amount, _upi_id: upiId });
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('BELOW_MIN_WITHDRAWAL'))      return fail('BELOW_MIN_WITHDRAWAL', msg, 422);
+      if (msg.includes('NEW_USER_WITHDRAWAL_DELAY')) return fail('NEW_USER_WITHDRAWAL_DELAY', msg, 403);
+      if (msg.includes('DAILY_CAP_EXCEEDED'))        return fail('DAILY_CAP_EXCEEDED', msg, 429);
+      if (msg.includes('MONTHLY_CAP_EXCEEDED'))      return fail('MONTHLY_CAP_EXCEEDED', msg, 429);
+      if (msg.includes('NO_REFERRALS'))              return fail('NO_REFERRALS', msg, 404);
+      if (msg.includes('INSUFFICIENT_WITHDRAWABLE')) return fail('INSUFFICIENT_WITHDRAWABLE', msg, 402);
+      if (msg.includes('INVALID_AMOUNT'))            return fail('VALIDATION', msg, 422);
+      if (msg.includes('INVALID_UPI_ID'))            return fail('VALIDATION', msg, 422);
+      if (msg.includes('withdrawals_one_pending_per_user'))
+        return fail('PENDING_WITHDRAWAL_EXISTS', 'You already have a pending withdrawal — wait for it to complete', 409);
+      return fail('DB_ERROR', msg, 500);
+    }
+    const row = Array.isArray(data) ? data[0] : data;
+    // Strip the out_ prefix the stored proc uses to avoid PG column-name ambiguity
+    return ok({
+      withdrawal_id: row?.out_withdrawal_id,
+      amount_paise: row?.out_amount_paise,
+      status: row?.out_status,
+      withdrawable_remaining_paise: row?.out_withdrawable_remaining_paise,
+    });
+  }
+
+  // ── GET /me/withdrawals — Stage 7 ────────────────────────────────────────
+  if (req.method === 'GET' && after.join('/') === 'me/withdrawals') {
+    const db = serviceClient();
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to view your withdrawals', 401);
+    const { data, error } = await db.from('withdrawals')
+      .select('id, amount_paise, upi_id, status, provider, provider_payout_id, external_txn_ref, rejected_reason, requested_at, approved_at, paid_at, failed_at')
+      .eq('user_id', u.id)
+      .order('requested_at', { ascending: false })
+      .limit(100);
+    if (error) return fail('DB_ERROR', error.message, 500);
+    return ok(data ?? []);
+  }
 
   // ── POST /me/transfer-to-wallet { amount_paise } — Stage 6 ────────────────
   if (req.method === 'POST' && after.join('/') === 'me/transfer-to-wallet') {
