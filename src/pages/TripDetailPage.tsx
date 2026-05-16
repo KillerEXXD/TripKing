@@ -17,6 +17,7 @@ import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
 import { AcceptTripDialog } from '@/components/trip/AcceptTripDialog';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
+import { InsufficientBalanceModal, type InsufficientBalanceSide } from '@/components/wallet/InsufficientBalanceModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
@@ -184,6 +185,7 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
   const [showStartForm, setShowStartForm] = useState(false);
   const [otp, setOtp] = useState('');
   const [startOdo, setStartOdo] = useState('');
+  const [insufficient, setInsufficient] = useState<{ side: InsufficientBalanceSide; message?: string } | null>(null);
 
   async function onStart() {
     const code = otp.trim();
@@ -210,7 +212,11 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
     try {
       await completeMutation.mutateAsync({ tripId: trip.id });
       toast.success('Trip completed — your payout is queued.');
-    } catch {
+    } catch (err) {
+      if (err instanceof ApiError && (err.code === 'INSUFFICIENT_WALLET_BALANCE_DRIVER' || err.code === 'INSUFFICIENT_WALLET_BALANCE_AGENT')) {
+        setInsufficient({ side: err.code === 'INSUFFICIENT_WALLET_BALANCE_DRIVER' ? 'driver' : 'agent', message: err.message });
+        return;
+      }
       toast.error("Couldn't complete the trip — please try again.");
     }
   }
@@ -257,6 +263,9 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
           {completeMutation.isPending ? 'Completing…' : 'Complete the trip'}
         </Button>
       )}
+      {insufficient ? (
+        <InsufficientBalanceModal side={insufficient.side} message={insufficient.message} onClose={() => setInsufficient(null)} />
+      ) : null}
     </div>
   );
 }

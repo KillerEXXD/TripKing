@@ -119,7 +119,10 @@ export function WalletPage() {
           <BalanceCard b={q.data.balance} onAdd={() => setShowAdd(true)} />
 
           <Card className="gap-2">
-            <div className="text-sm font-semibold">Recent activity</div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-semibold">Recent activity</div>
+              <Link to="/wallet/charges" className="text-xs font-medium text-primary hover:underline">Platform-fee charges →</Link>
+            </div>
             {q.data.recentLedger.length === 0 ? (
               <p className="text-sm text-secondary">No activity yet.</p>
             ) : (

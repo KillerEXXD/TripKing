@@ -117,6 +117,20 @@ export interface Trip {
   passengerOtp?: string;
   /** Straight-line km from the `?near_*` centre to the pickup point — present only on a radius-filtered list. */
   distanceKm?: number;
+  /**
+   * Stage 3 of the referral program — server-computed dual-side platform-fee charges,
+   * present on completed trips. Empty `{}` until the trip completes (or no rows in `platform_fee_charges`).
+   */
+  platformFeeBreakdown?: Partial<Record<'driver' | 'agent', PlatformFeeChargeSummary>>;
+}
+
+export type PlatformFeeChargeStatus = 'pending' | 'charged' | 'failed' | 'refunded';
+
+export interface PlatformFeeChargeSummary {
+  amountPaise: number;
+  /** Which sub-balance / source paid (e.g. `cash_wallet`, `direct_upi`, `promo_credit`). */
+  paymentSource: string;
+  status: PlatformFeeChargeStatus;
 }
 
 /**

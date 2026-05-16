@@ -162,7 +162,29 @@ export function transformTrip(api: Api): Trip {
     driverAcceptanceStatus: typeof api.driver_acceptance_status === 'string'
       ? (api.driver_acceptance_status as Trip['driverAcceptanceStatus'])
       : undefined,
+    platformFeeBreakdown: platformFeeBreakdownOf(api.platform_fee_breakdown),
   };
+}
+
+function platformFeeChargeOf(v: unknown): { amountPaise: number; paymentSource: string; status: 'pending' | 'charged' | 'failed' | 'refunded' } | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Api;
+  const status = typeof o.status === 'string' ? o.status : 'pending';
+  return {
+    amountPaise: num(o.amount_paise, 0),
+    paymentSource: typeof o.payment_source === 'string' ? o.payment_source : '',
+    status: (['pending', 'charged', 'failed', 'refunded'].includes(status) ? status : 'pending') as 'pending' | 'charged' | 'failed' | 'refunded',
+  };
+}
+function platformFeeBreakdownOf(v: unknown): Trip['platformFeeBreakdown'] {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Api;
+  const out: Trip['platformFeeBreakdown'] = {};
+  const driver = platformFeeChargeOf(o.driver);
+  const agent = platformFeeChargeOf(o.agent);
+  if (driver) out.driver = driver;
+  if (agent) out.agent = agent;
+  return Object.keys(out).length === 0 ? undefined : out;
 }
 
 /**
