@@ -67,7 +67,10 @@ function TileFrame({ accent, to, icon, action, label, primary, sub, ariaLabel }:
       to={to}
       aria-label={ariaLabel ?? label}
       className={cn(
-        'flex min-w-0 flex-col gap-1 rounded-card border-l-4 p-3 transition-shadow hover:shadow-card',
+        // shadow-card gives the tile real "rectangle on page" depth — the
+        // tinted bg alone blends into the page surface and the tile reads as
+        // just a left-edge accent curve.
+        'flex min-w-0 flex-col gap-1 rounded-card border border-l-4 border-black/5 p-3 shadow-card transition-shadow hover:shadow-md',
         tone.border,
         tone.bg,
       )}
