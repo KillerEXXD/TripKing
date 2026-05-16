@@ -12,7 +12,7 @@ import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useSubmitAgentKycDocs, useSubmitDriverKycDocs } from '@/hooks/useDrivers';
 import { getAgentKycDocUploadUrl, getDriverKycDocUploadUrl } from '@/lib/api/services/drivers';
 import { PageHeader, PageShell } from '@/components/layout';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, StatusBanner } from '@/components/ui';
 import { FileUpload } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { AgentKycDocType, DriverKycDocType } from '@/types';
@@ -29,9 +29,7 @@ function PageWrap({ children }: { children: React.ReactNode }) {
 function AlreadySubmittedNote({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-      <ShieldCheck className="size-4" aria-hidden /> You've already submitted your documents. You can re-upload below if asked.
-    </div>
+    <StatusBanner tone="success" icon={<ShieldCheck />} title="You've already submitted your documents. You can re-upload below if asked." />
   );
 }
 
@@ -90,10 +88,9 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
     <PageWrap>
       <div className="space-y-4">
         {tripId ? (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
-            <p className="mt-0.5 text-xs text-blue-700">Complete your identity verification below. Once approved, you can apply for trips right away.</p>
-          </div>
+          <StatusBanner tone="info" title="One step away from applying">
+            Complete your identity verification below. Once approved, you can apply for trips right away.
+          </StatusBanner>
         ) : null}
         <AlreadySubmittedNote show={driver.verification?.steps.documents === 'done'} />
         <p className="text-sm text-secondary">
@@ -181,10 +178,9 @@ function AgentDocsForm({ tripId }: { tripId: string | null }) {
     <PageWrap>
       <div className="space-y-4">
         {tripId ? (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
-            <p className="mt-0.5 text-xs text-blue-700">Complete your identity verification below. Once approved, you can apply for trips right away.</p>
-          </div>
+          <StatusBanner tone="info" title="One step away from applying">
+            Complete your identity verification below. Once approved, you can apply for trips right away.
+          </StatusBanner>
         ) : null}
         <AlreadySubmittedNote show={agent.verification?.steps.documents === 'done'} />
         <p className="text-sm text-secondary">

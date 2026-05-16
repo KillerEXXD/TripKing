@@ -9,7 +9,7 @@ import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
 import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
 import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
-import { Badge, Button, Card } from '@/components/ui';
+import { Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatClockTime, formatINR, formatKm, formatPickupTime, formatShortDate } from '@/lib/utils';
 import type { AcceptanceStatus, MyApplication, Trip, TripStatus, Vacancy } from '@/types';
@@ -150,9 +150,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
       </button>
       {expanded ? (
         <div id={`applied-${app.acceptanceId}-body`} className="space-y-3 border-t px-4 py-3">
-          {banner ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{banner}</div>
-          ) : null}
+          {banner ? <StatusBanner tone="warning">{banner}</StatusBanner> : null}
           <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
             <dt className="text-secondary">Route</dt>
             <dd className="text-right font-medium">{t.fromCity.name} → {t.toCity.name}</dd>

@@ -13,7 +13,7 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
-import { Button, Card, Input, ProgressBar } from '@/components/ui';
+import { Button, Card, Input, ProgressBar, StatusBanner } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
@@ -618,10 +618,9 @@ export function PostTripPage() {
 
                   {/* Visibility note when user chooses to show passenger details */}
                   {!hidePassengerPhoneWatch ? (
-                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
-                      <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                      <span>Passenger details are shared with the driver only after the trip is assigned.</span>
-                    </div>
+                    <StatusBanner tone="info" icon={<Info />}>
+                      Passenger details are shared with the driver only after the trip is assigned.
+                    </StatusBanner>
                   ) : null}
 
                   <label className="flex items-center gap-2 text-sm font-medium">

@@ -10,7 +10,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateVehicle, useVehicle } from '@/hooks/useVehicles';
 import { getVehiclePhotoUploadUrl } from '@/lib/api/services/vehicles';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, StatusBanner } from '@/components/ui';
 import { FileUpload } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { Vehicle, VehicleInput, VehiclePhotoSlot } from '@/types';
@@ -98,9 +98,7 @@ export function VehiclePhotosPage() {
         </Card>
 
         {allRequiredDone ? (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <CheckCircle2 className="size-4" aria-hidden /> All required photos & papers are in. You can move on.
-          </div>
+          <StatusBanner tone="success" icon={<CheckCircle2 />} title="All required photos & papers are in. You can move on." />
         ) : (
           <p className="text-xs text-secondary">Still needed: {missing.map((s) => s).join(', ')}.</p>
         )}

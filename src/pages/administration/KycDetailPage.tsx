@@ -16,7 +16,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAgent, useDriver, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
-import { Badge, Button, Card, Input } from '@/components/ui';
+import { Badge, Button, Card, Input, StatusBanner } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { AdminKycChecklist, type AdminKycKind } from '@/components/admin/kyc/AdminKycChecklist';
 import { KYC_LABEL, KYC_VARIANT } from './kycConstants';
@@ -163,10 +163,7 @@ export function KycDetailPage() {
       <AdminKycChecklist subject={subject} kind={kind} />
 
       {subject.kycStatus === 'approved' ? (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-          <ShieldCheck className="size-5 text-emerald-600" aria-hidden />
-          <span className="text-sm font-semibold text-emerald-800">Approved — the applicant can apply to and post trips.</span>
-        </div>
+        <StatusBanner tone="success" icon={<ShieldCheck />} title="Approved — the applicant can apply to and post trips." />
       ) : null}
 
       <Link to={kind === 'driver' ? `/drivers/${subject.id}` : `/agents/${subject.id}`} className="block text-xs font-medium text-primary hover:underline">

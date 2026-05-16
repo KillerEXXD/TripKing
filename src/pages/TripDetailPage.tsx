@@ -22,7 +22,7 @@ import { InsufficientBalanceModal, type InsufficientBalanceSide } from '@/compon
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
-import { Badge, Button, Card, PriorityCard } from '@/components/ui';
+import { Badge, Button, Card, PriorityCard, StatusBanner } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -467,9 +467,7 @@ function PassengerEditForm({ trip, onSaved }: { trip: Trip; onSaved?: () => void
         {errors.passengerName ? <span className="block text-xs text-red-700">{errors.passengerName.message}</span> : null}
       </label>
       {phoneLookupable && knownPassenger ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800">
-          ✓ Existing passenger — {knownPassenger.name}
-        </div>
+        <StatusBanner tone="success" title={`✓ Existing passenger — ${knownPassenger.name}`} />
       ) : null}
       <div className="grid grid-cols-2 gap-3">
         <label className="block space-y-1">
@@ -817,10 +815,9 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
           {/* Prompt banner when redirected from assign flow */}
           {fillPassenger && !editingPassenger && passengerMissing ? (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span>Almost done — enter the passenger details so the driver knows who to pick up.</span>
-            </div>
+            <StatusBanner tone="warning" icon={<Info />}>
+              Almost done — enter the passenger details so the driver knows who to pick up.
+            </StatusBanner>
           ) : null}
 
           {editingPassenger ? (
