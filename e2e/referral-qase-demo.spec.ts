@@ -27,10 +27,10 @@ test.describe('Referral program — Qase mapping demo', () => {
     await loginAs(page, driver);
     await page.goto('/referrals');
 
-    // The /referrals page was refactored — the H1 is now "Refer & earn" with a shorter
-    // sub-line. (When the spec §22 verbatim copy comes back, restore the longer regex.)
+    // The /referrals page was rebuilt to match the tour prototype — H1 is "Refer & earn" with
+    // a short subtitle. When the spec §22 verbatim copy is restored, tighten the regex.
     await expect(page.getByRole('heading', { level: 1, name: /refer & earn/i })).toBeVisible();
-    await expect(page.getByText(/₹50 per qualifying trip from each verified driver or agent/i)).toBeVisible();
+    await expect(page.getByText(/invite drivers and agents.*every eligible paid trip/i)).toBeVisible();
   });
 
   /** R1.1 — Each driver gets a referral code on signup. (Replaces the previous R6.1/R6.3

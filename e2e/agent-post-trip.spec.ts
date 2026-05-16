@@ -7,11 +7,10 @@ import { mintAdmin, mintAgent, loginAs } from './helpers-api';
  * (Submitting the form itself touches form-by-form state we cover at the component level in
  * `PostTripPage.test.tsx`; this E2E is the cross-page wiring.)
  *
- * NOTE: the a11y scan revealed a real WCAG violation on the agent home — the "Go home" link
- * uses `text-primary` (#10b981 emerald) on white with 2.53:1 contrast, below the AA 4.5:1
- * target. Filed as a follow-up; the spec is currently lenient on minor/moderate impacts so
- * it doesn't gate every test run on that one fix. When the contrast is fixed, drop the impact
- * filter from this assertion.
+ * History: PR #205's stubbed version navigated to `/post-trip` which silently 404'd onto
+ * NotFoundPage (no error because the stub didn't validate the route). The real-API migration
+ * caught that as an a11y violation on the 404 page's link. Fixed: correct route is `/trips/new`
+ * AND the NotFoundPage link's contrast was bumped to AA-compliant emerald-700 in the same PR.
  */
 test.describe('agent post-trip flow', () => {
   test('approved agent reaches the post-trip page from the agent home', async ({ page, request }) => {
@@ -19,16 +18,15 @@ test.describe('agent post-trip flow', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
 
-    await page.goto('/post-trip');
-    await expect(page).toHaveURL(/\/post-trip$/);
+    await page.goto('/trips/new');
+    await expect(page).toHaveURL(/\/trips\/new$/);
     // Verified agent reaches the form (unverified ones would be intercepted by the KYC gate).
     await expect(page.locator('body').first()).toBeVisible();
 
-    // a11y scan — currently lenient on the known "Go home" link contrast violation. The
-    // assertion only fires on `critical` impacts until that link's color is fixed (TODO).
+    // a11y scan — strict on serious/critical now that the NotFoundPage contrast is fixed.
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa'])
       .analyze();
-    expect(results.violations.filter((v) => v.impact === 'critical')).toEqual([]);
+    expect(results.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')).toEqual([]);
   });
 });

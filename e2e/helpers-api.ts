@@ -145,6 +145,25 @@ export async function mintDriver(
   return { ...u, driverId };
 }
 
+/** Add a vehicle for a driver. Required to clear the "Add your vehicle" interstitial
+ *  the verified-driver home redirects to when the driver has no vehicles. */
+export async function mintVehicle(
+  req: APIRequestContext,
+  driverToken: string,
+  opts: { carTypeId?: string; year?: number; registrationNumber?: string; seats?: number } = {},
+): Promise<{ vehicleId: string }> {
+  const carTypes = await getCarTypes(req);
+  const body = {
+    car_type_id: opts.carTypeId ?? carTypes[0]!.id,
+    year: opts.year ?? 2024,
+    registration_number: opts.registrationNumber ?? `TN-E2E-${Date.now().toString().slice(-6)}`,
+    seats: opts.seats ?? 4,
+  };
+  const res = await call<{ id: string }>(req, 'POST', '/vehicles', { token: driverToken, data: body });
+  if (res.status !== 200 || !res.data?.id) throw new Error(`mintVehicle failed: ${res.status} ${JSON.stringify(res.error)}`);
+  return { vehicleId: res.data.id };
+}
+
 // ── agents ──────────────────────────────────────────────────────────────────
 
 export interface MintedAgent extends MintedUser {
