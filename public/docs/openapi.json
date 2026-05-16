@@ -1721,6 +1721,38 @@
         }
       }
     },
+    "/cron-qase-poll": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Polling fallback for Qase plans without webhooks (Free, Team). Auth: X-Cron-Key header matching CRON_QASE_KEY env. Fetches the latest 100 defects from Qase REST API (using QASE_API_TOKEN + QASE_PROJECT_CODE envs), filters to ids > cron_state.last_seen_id watermark, calls the same shared upsert path as /webhook-qase so rows land identically. Returns a summary `{ fetched, fresh, created, updated, resolved, failed, watermark_from, watermark_to, polled_at }` and persists it in cron_state.last_run_summary. Schedule every ~5 min via cron-job.org or any HTTP-cron service.",
+        "parameters": [
+          {
+            "name": "X-Cron-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "500": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "502": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/bug-reports": {
       "get": {
         "tags": [
