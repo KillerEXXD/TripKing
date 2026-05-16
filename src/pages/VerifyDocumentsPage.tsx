@@ -6,24 +6,23 @@
  */
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useSubmitAgentKycDocs, useSubmitDriverKycDocs } from '@/hooks/useDrivers';
 import { getAgentKycDocUploadUrl, getDriverKycDocUploadUrl } from '@/lib/api/services/drivers';
+import { PageHeader, PageShell } from '@/components/layout';
 import { Button, Card, Input } from '@/components/ui';
 import { FileUpload } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { AgentKycDocType, DriverKycDocType } from '@/types';
 
-function Header({ onBack }: { onBack: () => void }) {
+function PageWrap({ children }: { children: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">Identity documents</h1>
-    </header>
+    <PageShell>
+      <PageHeader title="Identity documents" backTo="/profile" />
+      {children}
+    </PageShell>
   );
 }
 
@@ -88,9 +87,8 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
   }
 
   return (
-    <div>
-      <Header onBack={() => navigate(-1)} />
-      <div className="space-y-4 px-4 py-4">
+    <PageWrap>
+      <div className="space-y-4">
         {tripId ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
             <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
@@ -138,7 +136,7 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
           {submit.isPending ? 'Submitting…' : 'Submit for verification'}
         </Button>
       </div>
-    </div>
+    </PageWrap>
   );
 }
 
@@ -180,9 +178,8 @@ function AgentDocsForm({ tripId }: { tripId: string | null }) {
   }
 
   return (
-    <div>
-      <Header onBack={() => navigate(-1)} />
-      <div className="space-y-4 px-4 py-4">
+    <PageWrap>
+      <div className="space-y-4">
         {tripId ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
             <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
@@ -216,7 +213,7 @@ function AgentDocsForm({ tripId }: { tripId: string | null }) {
           {submit.isPending ? 'Submitting…' : 'Submit for verification'}
         </Button>
       </div>
-    </div>
+    </PageWrap>
   );
 }
 
