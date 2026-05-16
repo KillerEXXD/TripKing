@@ -4,14 +4,19 @@ import {
   transformReferralDashboard,
   transformReferralEarnings,
   transformReferralLink,
+  transformReferralTier,
   transformWithdrawal,
 } from '@/lib/api/transforms/referral';
-import type { ReferralDashboard, ReferralEarningsSeries, ReferralLink, Withdrawal, WithdrawalStatus } from '@/types';
+import type { ReferralDashboard, ReferralEarningsSeries, ReferralLink, ReferralTier, Withdrawal, WithdrawalStatus } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
   if (d === null || d === undefined) throw new EmptyResponseError('referrals');
   return d;
+}
+
+export function getReferralTiers(): Promise<ReferralTier[]> {
+  return apiClient.get<Api[]>('/referrals/tiers').then((r) => (r.data ?? []).map(transformReferralTier));
 }
 
 export function getMyReferralDashboard(): Promise<ReferralDashboard> {

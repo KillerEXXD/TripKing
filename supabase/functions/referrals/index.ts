@@ -160,20 +160,44 @@ const handler = withTiming('referrals', async (req: Request): Promise<Response> 
   const u = await authUser(db, req);
   if (!u) return fail('UNAUTHORIZED', 'Sign in to view your referrals', 401);
 
+  // ── GET /tiers (public; for the tier-progress widget on /referrals) ─────
+  if (req.method === 'GET' && route === 'tiers') {
+    const { data, error } = await db
+      .from('referral_tiers')
+      .select('id, slot_name, min_qualified_referrals, max_qualified_referrals, cap_paise, payout_per_trip_paise, applies_to_role, sort_order, is_active')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+    if (error) return fail('DB_ERROR', error.message, 500);
+    return ok(data ?? []);
+  }
+
   // ── GET /me ─────────────────────────────────────────────────────────────
   if (route === 'me') {
     const summary = await fetchSummary(db, u.id);
-    // recent ledger across all my links (last 30)
-    const { data: links } = await db.from('referral_links').select('id').eq('referrer_user_id', u.id);
+    // recent ledger across all my links (last 30) — joined with trip route +
+    // platform_fee_charges.payment_source + the referred user's name so the
+    // /referrals "Earnings ledger" can render per-trip rows end-to-end.
+    const { data: links } = await db.from('referral_links').select('id, referred_user_id, referred_user:users!referred_user_id(display_name, phone)').eq('referrer_user_id', u.id);
     const linkIds = ((links ?? []) as Row[]).map((r) => r.id as string);
     let recentLedger: Row[] = [];
     if (linkIds.length > 0) {
       const { data } = await db.from('referral_ledger')
-        .select('id, referral_link_id, entry_type, amount_paise, trip_id, platform_fee_charge_id, note, created_at')
+        .select(`
+          id, referral_link_id, entry_type, amount_paise, trip_id, platform_fee_charge_id, note, created_at,
+          trip:trips!trip_id(id, from_city:cities!from_city_id(name), to_city:cities!to_city_id(name)),
+          fee:platform_fee_charges!platform_fee_charge_id(id, side, payment_source)
+        `)
         .in('referral_link_id', linkIds)
         .order('created_at', { ascending: false })
         .limit(30);
-      recentLedger = (data ?? []) as Row[];
+      // attach the referred user's display_name from the link
+      const linkMap = new Map<string, Row>();
+      for (const l of (links ?? []) as Row[]) linkMap.set(l.id as string, l);
+      recentLedger = ((data ?? []) as Row[]).map((row) => {
+        const link = linkMap.get(String(row.referral_link_id));
+        const ru = link?.referred_user as Row | undefined;
+        return { ...row, referred_user_name: ru?.display_name ?? null };
+      });
     }
     return ok({
       user_id: u.id,
@@ -191,7 +215,23 @@ const handler = withTiming('referrals', async (req: Request): Promise<Response> 
     if (role)   q = q.eq('referred_user_role', role);
     const { data, error } = await q;
     if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    const links = (data ?? []) as Row[];
+    // attach last_trip_date per link from most-recent accrual
+    const ids = links.map((l) => l.id as string);
+    const lastByLink = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: led } = await db.from('referral_ledger')
+        .select('referral_link_id, created_at')
+        .in('referral_link_id', ids)
+        .eq('entry_type', 'accrual')
+        .order('created_at', { ascending: false });
+      for (const row of (led ?? []) as Row[]) {
+        const lid = String(row.referral_link_id);
+        if (!lastByLink.has(lid)) lastByLink.set(lid, String(row.created_at));
+      }
+    }
+    const enriched = links.map((l) => ({ ...l, last_trip_at: lastByLink.get(l.id as string) ?? null }));
+    return ok(enriched);
   }
 
   // ── GET /me/earnings?from=&to= ──────────────────────────────────────────

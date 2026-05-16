@@ -55,6 +55,14 @@ export interface ReferralLedgerEntry {
   platformFeeChargeId?: string;
   note?: string;
   createdAt: string;
+  /** Enriched on `GET /referrals/me` — joined from `trips`. */
+  tripRoute?: { from: string; to: string } | null;
+  /** Enriched on `GET /referrals/me` — from `platform_fee_charges.payment_source`. */
+  paymentSource?: string | null;
+  /** Enriched on `GET /referrals/me` — from `platform_fee_charges.side`. */
+  feeSide?: 'driver' | 'agent' | null;
+  /** Enriched on `GET /referrals/me` — the referred user's display name. */
+  referredUserName?: string | null;
 }
 
 /** `GET /referrals/me` summary block (per-status counts + accrual totals). */
@@ -112,6 +120,25 @@ export interface ReferralLink {
   createdAt: string;
   updatedAt: string;
   referredUser?: ReferredUser;
+  /** Most-recent accrual timestamp for this link — enriched server-side. */
+  lastTripAt?: string | null;
+}
+
+// ── Stage 5 — referral_tiers lookup (admin-configurable cap ladder) ─────────
+
+export interface ReferralTier {
+  id: string;
+  slotName: string;
+  minQualifiedReferrals: number;
+  /** Null = open-ended top slot ("51+"). */
+  maxQualifiedReferrals: number | null;
+  /** Null = configurable cap (top slot). */
+  capPaise: number | null;
+  /** Null = configurable payout (top slot). */
+  payoutPerTripPaise: number | null;
+  appliesToRole: 'driver' | 'trip_manager' | 'both';
+  sortOrder: number;
+  isActive: boolean;
 }
 
 // ── Stage 7 — withdrawals ────────────────────────────────────────────────────

@@ -16,6 +16,7 @@ import type {
   ReferralLink,
   ReferralLinkStatus,
   ReferralSummary,
+  ReferralTier,
   ReferredUser,
 } from '@/types';
 
@@ -87,6 +88,20 @@ export function transformReferralBlock(v: unknown): ReferralBlock | undefined {
 
 export function transformReferralLedgerEntry(api: Api): ReferralLedgerEntry {
   const id = reqStr(api.id, 'MISSING_LINK_ID', { api });
+  // Optional enrichments: `trip` (with `from_city.name` / `to_city.name`), `fee`
+  // (with `side` + `payment_source`), and `referred_user_name`.
+  const trip = api.trip && typeof api.trip === 'object' ? (api.trip as Api) : null;
+  const fromCity = trip?.from_city && typeof trip.from_city === 'object' ? (trip.from_city as Api) : null;
+  const toCity = trip?.to_city && typeof trip.to_city === 'object' ? (trip.to_city as Api) : null;
+  const fee = api.fee && typeof api.fee === 'object' ? (api.fee as Api) : null;
+  let tripRoute: { from: string; to: string } | null = null;
+  if (fromCity || toCity) {
+    const from = str(fromCity?.name) ?? '';
+    const to = str(toCity?.name) ?? '';
+    if (from || to) tripRoute = { from, to };
+  }
+  const feeSideRaw = str(fee?.side);
+  const feeSide = feeSideRaw === 'driver' || feeSideRaw === 'agent' ? feeSideRaw : null;
   return {
     id,
     referralLinkId: str(api.referral_link_id),
@@ -96,6 +111,10 @@ export function transformReferralLedgerEntry(api: Api): ReferralLedgerEntry {
     platformFeeChargeId: str(api.platform_fee_charge_id),
     note: str(api.note),
     createdAt: str(api.created_at) ?? '',
+    tripRoute,
+    paymentSource: str(fee?.payment_source) ?? null,
+    feeSide,
+    referredUserName: str(api.referred_user_name) ?? null,
   };
 }
 
@@ -168,6 +187,29 @@ export function transformReferralLink(api: Api): ReferralLink {
     createdAt: str(api.created_at) ?? '',
     updatedAt: str(api.updated_at) ?? '',
     referredUser: transformReferredUser(api.referred_user),
+    lastTripAt: str(api.last_trip_at) ?? null,
+  };
+}
+
+export function transformReferralTier(api: Api): ReferralTier {
+  const id = reqStr(api.id, 'MISSING_LINK_ID', { api });
+  const slotName = reqStr(api.slot_name, 'MISSING_CODE', { id });
+  const appliesRaw = str(api.applies_to_role);
+  const appliesToRole: ReferralTier['appliesToRole'] =
+    appliesRaw === 'driver' || appliesRaw === 'trip_manager' ? appliesRaw : 'both';
+  const maxRaw = api.max_qualified_referrals;
+  const capRaw = api.cap_paise;
+  const payoutRaw = api.payout_per_trip_paise;
+  return {
+    id,
+    slotName,
+    minQualifiedReferrals: num(api.min_qualified_referrals),
+    maxQualifiedReferrals: maxRaw === null || maxRaw === undefined ? null : num(maxRaw),
+    capPaise: capRaw === null || capRaw === undefined ? null : num(capRaw),
+    payoutPerTripPaise: payoutRaw === null || payoutRaw === undefined ? null : num(payoutRaw),
+    appliesToRole,
+    sortOrder: num(api.sort_order),
+    isActive: api.is_active !== false,
   };
 }
 

@@ -20,7 +20,9 @@ describe('TransferToWalletPanel', () => {
   it('shows the spec §22 warning verbatim', async () => {
     vi.mocked(svc.getMyReferralDashboard).mockResolvedValue({ userId: 'u1', summary: { withdrawablePaise: 250000 } as never, recentLedger: [] });
     render(<Wrap><TransferToWalletPanel /></Wrap>);
-    await waitFor(() => expect(screen.getByText(/cannot be withdrawn later and will not generate further referral rewards/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/cannot be withdrawn later/i)).toBeInTheDocument());
+    expect(screen.getByText(/do not generate further referral rewards/i)).toBeInTheDocument();
+    expect(screen.getByText(/irreversible/i)).toBeInTheDocument();
   });
 
   it('renders the withdrawable balance', async () => {

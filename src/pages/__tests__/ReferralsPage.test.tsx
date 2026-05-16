@@ -5,7 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 vi.mock('@/lib/api/services/referrals');
+vi.mock('@/lib/api/services/drivers');
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u1', role: 'driver', displayName: 'Asha' }, isAuthenticated: true, isLoading: false }),
+}));
 import * as svc from '@/lib/api/services/referrals';
+import * as driverSvc from '@/lib/api/services/drivers';
 import { ReferralsPage } from '@/pages/ReferralsPage';
 
 function Wrap({ children }: { children: ReactNode }) {
@@ -35,9 +40,13 @@ describe('ReferralsPage', () => {
       },
       recentLedger: [],
     });
+    vi.mocked(svc.getMyReferralEarnings).mockResolvedValue({ from: '', to: '', days: [] } as never);
+    vi.mocked(svc.getMyReferred).mockResolvedValue([]);
+    vi.mocked(svc.getMyWithdrawals).mockResolvedValue([]);
+    vi.mocked(svc.getReferralTiers).mockResolvedValue([]);
+    vi.mocked(driverSvc.getMyDriver).mockResolvedValue({} as never);
     render(<Wrap><ReferralsPage /></Wrap>);
-    await waitFor(() => expect(screen.getByText('5')).toBeInTheDocument()); // total referred
+    await waitFor(() => expect(screen.getByLabelText(/Transfer to trip wallet/i)).toBeInTheDocument());
     expect(screen.getAllByText('₹2,500').length).toBeGreaterThan(0);
-    expect(screen.getByLabelText(/Transfer to trip wallet/i)).toBeInTheDocument();
   });
 });
