@@ -1,0 +1,96 @@
+name: Playwright E2E (Qase-reported)
+
+# Click-to-run from the GitHub Actions tab — designed for QA who don't have Node/Playwright
+# locally. Posts every result into the Qase TRIPKINGAP project; on failure auto-creates a Qase
+# Defect which the /webhook-qase (or /cron-qase-poll) pipeline mirrors into /administration/bugs.
+#
+# Trigger options:
+#   - "Run workflow" button (workflow_dispatch) → pick a branch + an optional grep pattern
+#   - Schedule (nightly at 02:30 UTC) → runs everything in /e2e
+on:
+  workflow_dispatch:
+    inputs:
+      grep:
+        description: 'Test name filter (substring). Empty = run all specs. Try "referral-qase-demo".'
+        required: false
+        default: 'referral-qase-demo'
+      project:
+        description: 'Playwright project to run.'
+        required: true
+        default: 'mobile'
+        type: choice
+        options: [chromium, mobile]
+      post_to_qase:
+        description: 'Post results to Qase + auto-create defects on failure.'
+        required: true
+        default: true
+        type: boolean
+  schedule:
+    - cron: '30 2 * * *'  # 02:30 UTC daily
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (${{ inputs.project || 'mobile' }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # When this token is present, the playwright-qase-reporter posts results.
+      # Set the secret once: Settings → Secrets and variables → Actions → New repository secret
+      #   name = QASE_TESTOPS_API_TOKEN, value = the same token in .env.development as QASE_API_TOKEN
+      QASE_TESTOPS_API_TOKEN: ${{ (inputs.post_to_qase != false) && secrets.QASE_TESTOPS_API_TOKEN || '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ inputs.project == 'mobile' && 'webkit' || 'chromium' }}
+
+      - name: Run Playwright (headless)
+        run: |
+          npx playwright test \
+            ${{ inputs.grep && format('--grep "{0}"', inputs.grep) || '' }} \
+            --project=${{ inputs.project || 'mobile' }} \
+            --reporter=list,html
+        env:
+          # Vite dev server boots inside the job; the config already handles port + strictPort.
+          CI: 'true'
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.run_id }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload trace + screenshots (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trace-${{ github.run_id }}
+          path: test-results/
+          retention-days: 14
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "### Playwright E2E run" >> $GITHUB_STEP_SUMMARY
+          echo "- Project: \`${{ inputs.project || 'mobile' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Filter:  \`${{ inputs.grep || '(all)' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Qase posting: \`${{ (inputs.post_to_qase != false) && 'enabled' || 'skipped' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 [Playwright HTML report (artifact above)](#)" >> $GITHUB_STEP_SUMMARY
+          if [ -n "$QASE_TESTOPS_API_TOKEN" ]; then
+            echo "🎯 [Qase run dashboard](https://app.qase.io/run/TRIPKINGAP)" >> $GITHUB_STEP_SUMMARY
+            echo "🐞 Failed tests auto-create Qase Defects → mirror into /administration/bugs within 5 min." >> $GITHUB_STEP_SUMMARY
+          fi
