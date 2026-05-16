@@ -73,7 +73,7 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   const vehiclesQuery = useDriverVehicles(myDriverId);
   const applyMutation = useApplyToTrip();
   const withdrawMutation = useWithdrawApplication();
-  const { byTrip, recordApplication, clearApplication } = useMyApplicationsStore();
+  const { byTrip, recordApplication, markWithdrawn } = useMyApplicationsStore();
   const myApplication: MyApplication | undefined = byTrip[trip.id];
 
   const activeVehicles = (vehiclesQuery.data ?? []).filter((v) => v.isActive);
@@ -83,7 +83,10 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   const [quoteNote, setQuoteNote] = useState('');
   const chosenVehicleId = vehicleId || activeVehicles[0]?.id;
   const busy = applyMutation.isPending || withdrawMutation.isPending;
-  const isApplied = !!myApplication;
+  // `withdrawn` means the driver pulled out (the store keeps the row instead of dropping it);
+  // `isApplied` is the active "I have an outstanding application" state.
+  const withdrawn = !!myApplication?.withdrawnAt;
+  const isApplied = !!myApplication && !withdrawn;
 
   async function onApply() {
     if (!chosenVehicleId) {
@@ -103,7 +106,9 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
     if (!myApplication) return;
     try {
       await withdrawMutation.mutateAsync({ tripId: trip.id, acceptanceId: myApplication.acceptanceId });
-      clearApplication(trip.id);
+      // Mark withdrawn (don't delete) so the trip card keeps showing the status
+      // in light red — reminds the driver they pulled out and prevents a stale re-apply.
+      markWithdrawn(trip.id);
       toast.success('Application withdrawn.');
     } catch {
       toast.error("Couldn't withdraw — please try again.");
@@ -112,7 +117,14 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md space-y-2 border-t bg-white px-4 py-3">
-      {isApplied ? (
+      {withdrawn ? (
+        <>
+          <div className="flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-3 text-sm font-bold text-red-800">
+            <XCircle className="size-4" aria-hidden /> Application withdrawn
+          </div>
+          <p className="px-2 text-center text-xs text-red-700/80">You withdrew {myApplication?.withdrawnAt ? timeAgo(myApplication.withdrawnAt) : ''}. Re-apply below if you change your mind.</p>
+        </>
+      ) : isApplied ? (
         <>
           <div className="flex items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-900">
             <CheckCircle2 className="size-4" aria-hidden /> Applied
@@ -653,20 +665,35 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
       {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
       {showApplyBar && myApplication ? (
-        <Card className="border-emerald-200 bg-emerald-50">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-emerald-900">
-                You&apos;ve applied — waiting for the trip manager
-                {trip.applicantCount > 0 ? (
-                  <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
-                ) : null}
+        myApplication.withdrawnAt ? (
+          // Withdrawn — soft red wash so the driver remembers they pulled out.
+          <Card className="border-red-200 bg-red-50">
+            <div className="flex items-start gap-2">
+              <XCircle className="mt-0.5 size-5 shrink-0 text-red-700" aria-hidden />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-red-900">
+                  Application withdrawn
+                </div>
+                <div className="text-xs text-red-700">You withdrew {timeAgo(myApplication.withdrawnAt)}. Re-apply below if you change your mind.</div>
               </div>
-              <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card className="border-emerald-200 bg-emerald-50">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-emerald-900">
+                  You&apos;ve applied — waiting for the trip manager
+                  {trip.applicantCount > 0 ? (
+                    <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
+                  ) : null}
+                </div>
+                <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
+              </div>
+            </div>
+          </Card>
+        )
       ) : null}
       <Card className="gap-3">
         <div className="flex items-start justify-between gap-3">

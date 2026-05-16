@@ -16,11 +16,26 @@ export interface MyApplication {
   appliedAt: string;
   quotedRatePerKm?: number;
   message?: string;
+  /**
+   * If the driver withdrew this application, the timestamp it was withdrawn
+   * at. Kept in the store (instead of dropping the row) so the trip card
+   * still surfaces the "Withdrawn" state — reminds the driver they pulled
+   * out so they don't accidentally re-apply. Re-applying via the apply
+   * flow overwrites the row and clears this field.
+   */
+  withdrawnAt?: string;
 }
 
 interface MyApplicationsStore {
   byTrip: Record<string, MyApplication>;
   recordApplication: (app: MyApplication) => void;
+  markWithdrawn: (tripId: string) => void;
+  /**
+   * Hard-remove a stored application. Use this for stale data (the trip
+   * itself was cancelled / completed, etc.) — for the driver-initiated
+   * withdraw flow, prefer `markWithdrawn` so the card can reflect the
+   * status.
+   */
   clearApplication: (tripId: string) => void;
   reset: () => void;
 }
@@ -30,6 +45,11 @@ export const useMyApplicationsStore = create<MyApplicationsStore>()(
     (set, get) => ({
       byTrip: {},
       recordApplication: (app) => set({ byTrip: { ...get().byTrip, [app.tripId]: app } }),
+      markWithdrawn: (tripId) => {
+        const existing = get().byTrip[tripId];
+        if (!existing) return;
+        set({ byTrip: { ...get().byTrip, [tripId]: { ...existing, withdrawnAt: new Date().toISOString() } } });
+      },
       clearApplication: (tripId) => {
         const next = { ...get().byTrip };
         delete next[tripId];

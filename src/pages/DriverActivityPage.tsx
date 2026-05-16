@@ -37,7 +37,10 @@ const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'suc
   selected: { label: 'Selected — accept it!', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'success' },
   rejected: { label: 'Not selected', variant: 'muted' },
-  withdrawn: { label: 'Withdrawn', variant: 'muted' },
+  // Withdrawn: use the destructive (light-red) variant so the driver
+  // immediately spots a card they pulled out of and doesn't confuse it
+  // with a rejection.
+  withdrawn: { label: 'Withdrawn', variant: 'destructive' },
   expired: { label: 'Expired', variant: 'muted' },
 };
 
@@ -124,8 +127,12 @@ function ApplicationRow({ app }: { app: MyApplication }) {
   carBits.push(`${t.seatsRequired} seats`);
   carBits.push(t.acRequired ? 'AC' : 'Non-AC');
 
+  // Withdrawn cards get a light-red wash so the driver's eye lands on the
+  // status they need to know about. The badge alone is too small for that
+  // signalling on a busy "My applications" list.
+  const isWithdrawn = app.status === 'withdrawn';
   return (
-    <Card className="gap-0 p-0">
+    <Card className={cn('gap-0 p-0', isWithdrawn && 'border border-red-200 bg-red-50/60')}>
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
