@@ -1,21 +1,19 @@
-import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Clock, MapPin, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, TrendingUp, Users, Gift } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
-import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useCompleteTrip, useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
-import { Badge, Button, Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
+import { HomeTile } from '@/components/home/HomeTile';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -60,31 +58,6 @@ function ReputationCard({ driver }: { driver: Driver }) {
         </div>
       </div>
     </PriorityCard>
-  );
-}
-
-function NearbyTripCard({ trip }: { trip: Trip }) {
-  return (
-    <Link to={`/trips/${trip.id}`} className="block">
-      <Card className="gap-2 transition-colors hover:border-primary/40">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
-            <div className="text-xs text-secondary">{Math.round(trip.expectedDistanceKm)} km · {formatPickupTime(trip.pickupAt)}</div>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="font-bold">{formatINR(trip.driverPayout)}</div>
-            <div className="text-[10px] text-secondary">incl. {formatINR(trip.driverBata)} bata</div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          {trip.carTypeLabel ? <Badge variant="outline">{trip.carTypeLabel}</Badge> : null}
-          {trip.acRequired ? <Badge variant="outline">AC</Badge> : null}
-          <Badge variant={trip.postedByRole === 'driver' ? 'muted' : 'info'}>{trip.postedByRole === 'driver' ? 'Posted by a driver' : 'Posted by an agent'}</Badge>
-          {trip.applicantCount > 0 ? <Badge variant="warning"><Sparkles className="size-3" aria-hidden /> {trip.applicantCount} applied</Badge> : null}
-        </div>
-      </Card>
-    </Link>
   );
 }
 
@@ -197,17 +170,12 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
 function DriverHome({ driver }: { driver: Driver }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
-  const cities = cityHooks.useList().data ?? [];
-  const [nearCityId, setNearCityId] = useState<string>(driver.currentCity?.id ?? driver.homeCity?.id ?? '');
-  const nearCity = cities.find((c) => c.id === nearCityId) ?? driver.currentCity ?? driver.homeCity;
 
-  const nearbyQuery = useTrips({ status: ['open', 'has_applicants'], fromCityId: nearCityId || undefined });
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
   const invitedToDriveQuery = useTrips({ invited: 'me' });
 
-  const nearby = nearbyQuery.data ?? [];
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
   // Belt-and-braces: also exclude trips the driver has already applied to. The backend trigger
@@ -234,7 +202,6 @@ function DriverHome({ driver }: { driver: Driver }) {
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
             <span aria-label="Driver" title="Driver" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">D</span>
-            {cities.length > 0 ? <NearCityPicker cities={cities} value={nearCityId} onChange={setNearCityId} /> : null}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -259,15 +226,13 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        <PriorityCard
-          to="/my-earnings"
-          tone="teal"
-          icon={<TrendingUp className="size-3.5" aria-hidden />}
-          label="Your earnings"
-          title="Trips, payouts & monthly trend"
-          subtitle="See what you've earned and where you're trending."
-          cta={{ label: 'View earnings' }}
-        />
+        {/* Quick-access tile row: square, rounded, colour-coded per concern.
+            Earnings (teal) + Referrals (emerald). The full ReferralCodeCard
+            with share buttons + share targets still renders below. */}
+        <div className="grid grid-cols-2 gap-2">
+          <HomeTile to="/my-earnings" icon={TrendingUp} label="Earnings" sub="Payouts & trend" tone="teal"    ariaLabel="View earnings" />
+          <HomeTile to="/referrals"   icon={Gift}       label="Referrals" sub="Refer & earn"   tone="emerald" ariaLabel="View referrals" />
+        </div>
       </div>
 
       <div className="px-4 pb-4">
@@ -291,33 +256,6 @@ function DriverHome({ driver }: { driver: Driver }) {
           />
         ) : null}
         <InvitesSentCard trips={myPosts} />
-      </div>
-
-      <div className="px-4 pt-3">
-        <div className="mb-2 flex items-center justify-between px-1">
-          <h2 className="text-sm font-semibold">Open trips {nearCity ? `near ${nearCity.name}` : 'near you'}</h2>
-          {nearbyQuery.isSuccess ? <Badge variant="muted">{nearby.length}</Badge> : null}
-        </div>
-        {nearbyQuery.isPending ? (
-          <LoadingSkeleton rows={3} />
-        ) : nearbyQuery.isError ? (
-          <ErrorState title="Couldn't load trips" message="Check your connection and try again." onRetry={() => void nearbyQuery.refetch()} />
-        ) : nearby.length === 0 ? (
-          <Card className="items-center text-center">
-            <MapPin className="size-6 opacity-30" aria-hidden />
-            <div className="text-sm font-medium">No open trips {nearCity ? `from ${nearCity.name}` : ''} right now</div>
-            <div className="text-xs text-secondary">Try another area, or tap “I&apos;m vacant” so agents can find you.</div>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {nearby.slice(0, 3).map((t) => (
-              <NearbyTripCard key={t.id} trip={t} />
-            ))}
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/trips">{nearby.length > 3 ? `See all ${nearby.length} trips` : 'Browse all open trips'} →</Link>
-            </Button>
-          </div>
-        )}
       </div>
     </div>
   );

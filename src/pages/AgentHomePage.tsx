@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { BarChart3, Bell, Clock, Gift, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -9,6 +9,7 @@ import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
+import { HomeTile } from '@/components/home/HomeTile';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -204,15 +205,13 @@ function AgentHome({ agent }: { agent: Agent }) {
           cta={{ label: 'View / edit profile' }}
         />
 
-        <PriorityCard
-          to="/analytics"
-          tone="blue"
-          icon={<BarChart3 className="size-3.5" aria-hidden />}
-          label="Your analytics"
-          title="Trips posted, applicants, fares"
-          subtitle="See how your trips are performing month over month."
-          cta={{ label: 'View analytics' }}
-        />
+        {/* Quick-access tile row: square, rounded, colour-coded.
+            Analytics (blue) + Referrals (emerald). The full ReferralCodeCard
+            with share buttons + share targets still renders below. */}
+        <div className="grid grid-cols-2 gap-2">
+          <HomeTile to="/analytics" icon={BarChart3} label="Analytics" sub="Trips & fare trend" tone="blue"    ariaLabel="View analytics" />
+          <HomeTile to="/referrals" icon={Gift}      label="Referrals" sub="Refer & earn"      tone="emerald" ariaLabel="View referrals" />
+        </div>
       </div>
 
       <div className="px-4 pb-4">
