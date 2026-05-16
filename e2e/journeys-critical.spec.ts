@@ -20,8 +20,10 @@ const qase = (id: string) => [{ type: 'qase', description: id }];
 
 // Each journey is a multi-step API lifecycle (~3-9 calls to the deployed Supabase). Default
 // 30s timeout is too tight for the longest journeys (assign → accept → start → complete).
-// 60s covers everything with margin.
+// 60s covers everything with margin. One automatic retry absorbs the occasional Supabase
+// auth rate-limit flake when many `mintUser` calls land in parallel across workers.
 test.setTimeout(60_000);
+test.describe.configure({ retries: 1 });
 
 /** Set up a (driver, agent) pair both KYC-approved with a driver vehicle ready to go. */
 async function pair(req: APIRequestContext) {
@@ -43,25 +45,28 @@ test.describe('Critical journey suite (P0 marketplace)', () => {
     expect(true).toBe(true);
   });
 
-  // TODO: J2 intermittently fails at postTrip with a network-level fetch error — the test
-  // mints admin + 2 drivers + agent in close succession and one of those requests sometimes
-  // hits a Supabase auth rate limit. Skipping for the per-PR gate until the test-shaped
-  // RPC + an isolated admin fixture lands. Covered today by scripts/test-auto-invite.cjs.
-  test.skip('J2 — Agent posts a trip with auto-invite ON; matching drivers receive invitations', {
+  // J2 occasionally flaked on a fetch-level error from the parallel admin+driver+agent mints
+  // hitting a Supabase auth rate limit. One automatic retry absorbs it without re-architecting.
+  test('J2 — Agent posts a trip with auto-invite ON; matching drivers receive invitations', {
     annotation: qase('J2'),
-  }, async ({ request }) => {
+  }, async ({ request }, testInfo) => {
+    testInfo.annotations.push({ type: 'note', description: 'See scripts/test-auto-invite.cjs for the full API-level coverage.' });
     const { admin, agent } = await pair(request);
-    // Mint a candidate driver with an open vacancy in the pickup city so they're eligible.
-    const candidate = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
-    await mintVehicle(request, candidate.token);
     const { postVacancy, getCities } = await import('./helpers-api');
     const cities = await getCities(request);
-    await postVacancy(request, candidate.token, { currentCityId: cities[0]!.id, destinationCityIds: [cities[1]!.id] });
+    // Most e2e drivers post vacancies at cities[0] (the default). Auto-invite caps at the 5
+    // nearest, so the candidate's vacancy must be in a city that wins on distance. Pick a
+    // less-trafficked pair (cities[2] → cities[3]) so the candidate is the only one at distance
+    // 0 from the pickup and is guaranteed to land in the top-5 invite window.
+    const pickupCityId = cities[2]?.id ?? cities[0]!.id;
+    const destCityId = cities[3]?.id ?? cities[1]!.id;
 
-    // Post the trip with auto-invite ON (pickup = cities[0] → same city as the vacancy = radius 0).
-    const { tripId } = await postTrip(request, agent.token, { autoInviteMatches: true });
+    const candidate = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
+    await mintVehicle(request, candidate.token);
+    await postVacancy(request, candidate.token, { currentCityId: pickupCityId, destinationCityIds: [destCityId] });
 
-    // Confirm an invitation was created for the candidate driver.
+    const { tripId } = await postTrip(request, agent.token, { autoInviteMatches: true, fromCityId: pickupCityId, toCityId: destCityId });
+
     await expect.poll(async () => {
       const r = await request.get(`${API_BASE}/trips/${tripId}/invites`,
         { headers: { Authorization: `Bearer ${agent.token}` } });
@@ -145,16 +150,25 @@ test.describe('Critical journey suite (P0 marketplace)', () => {
   test('J8 — Insufficient wallet blocks completion → 402 INSUFFICIENT_WALLET_BALANCE_DRIVER', {
     annotation: qase('J8'),
   }, async ({ request }) => {
-    // Run ~20 promo-funded trips on the driver to deplete their ₹1000 launch credit, then the
-    // 21st trip's completion should fail with 402. That's a lot of setup — for this PR we hit
-    // the contract via a different angle: mint a driver, drain their wallet via SQL (via the
-    // admin), attempt completion. Since we don't yet have an admin wallet-debit endpoint, we
-    // skip the explicit balance-drain and assert the validation path via the structural
-    // expectation: when the driver has ₹0 (no promo + no cash) completion must 402.
-    //
-    // For now this is a TODO — covered conceptually by scripts/test-platform-fee.cjs which
-    // exercises the 402 path directly.
-    test.skip(true, 'Needs admin wallet-debit endpoint to drain promo balance — covered today by scripts/test-platform-fee.cjs');
+    const { admin, driver, agent } = await pair(request);
+    const { tripId } = await postTrip(request, agent.token);
+    const { acceptanceId } = await applyToTrip(request, driver.token, tripId);
+    await assignDriver(request, agent.token, tripId, acceptanceId);
+    const { passengerOtp } = await acceptTrip(request, driver.token, tripId);
+    await startTrip(request, driver.token, tripId, passengerOtp);
+
+    // Drain BOTH the driver's promo + cash sub-balances to ₹0 via the new admin endpoint.
+    // Completion now has nothing to charge the driver-side ₹50 fee against → 402 expected.
+    const { drainWallet } = await import('./helpers-api');
+    await drainWallet(request, admin.token, driver.userId);
+
+    const completeResult = await completeTrip(request, driver.token, tripId);
+    expect(completeResult.status).toBe(402);
+    expect(completeResult.error?.code).toBe('INSUFFICIENT_WALLET_BALANCE_DRIVER');
+
+    // Atomicity check — the trip should NOT have flipped to completed.
+    const trip = await getTrip(request, agent.token, tripId);
+    expect(trip?.status).toBe('in_progress');
   });
 });
 
@@ -162,18 +176,20 @@ test.describe('Critical journey suite (P1 money + referral)', () => {
   test('J9 — Cash-funded completion accrues ₹50 pending referral to the referrer', {
     annotation: qase('J9'),
   }, async () => {
-    // Requires: a referrer signs up, referee signs up via the referrer's code, referee runs
-    // 20 promo-funded trips to exhaust the launch credit, then a 21st cash-funded trip
-    // accrues the first ₹50 pending earning. That's ~30s of API calls per test — bigger than
-    // we want for the per-PR gate. Covered by scripts/test-referral-accrual.cjs at the API
-    // level; this E2E placeholder is a JOURNEY marker for the Qase dashboard.
-    test.skip(true, 'Requires a full 20-trip promo-exhaust loop — covered by scripts/test-referral-accrual.cjs');
+    // Decision (see PR for context): the full setup is now possible (drainWallet drops promo
+    // → setWalletBalance(cash=500) → run paid trip), but a useful J9 needs a referrer + a
+    // referee linked via referral_link + a referee-as-driver running the full lifecycle. Total
+    // setup is ~15 sequential API calls — ~45s per test, marginal value over what
+    // scripts/test-referral-accrual.cjs already exercises at the API level. Leaving as a
+    // Qase-mapped journey marker; not worth the per-PR gate cost. Re-enable when we add a
+    // referral-link mint helper + an "exhaust promo via N trips" shortcut.
+    test.skip(true, 'API-level coverage is in scripts/test-referral-accrual.cjs — see code comment for the re-enable plan');
   });
 
   test('J10 — Promo-funded completion accrues ₹0 to the referrer (anti-abuse §7.3)', {
     annotation: qase('J10'),
   }, async () => {
-    test.skip(true, 'Same as J9 — needs referee + referral_link setup; covered by scripts/test-referral-accrual.cjs');
+    test.skip(true, 'Same as J9 — needs referee + referral_link mint helper; covered by scripts/test-referral-accrual.cjs');
   });
 
   test('J11 — Transfer-to-wallet for a fresh driver (no referral activity) is blocked', {
