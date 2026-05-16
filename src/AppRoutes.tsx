@@ -39,6 +39,7 @@ const NotificationsPage = lazyWithRetry(() => import('@/pages/NotificationsPage'
 const WalletPage = lazyWithRetry(() => import('@/pages/WalletPage'));
 const WalletChargesPage = lazyWithRetry(() => import('@/pages/WalletChargesPage'));
 const ReferralsPage = lazyWithRetry(() => import('@/pages/ReferralsPage'));
+const ReferralLinkDetailPage = lazyWithRetry(() => import('@/pages/ReferralLinkDetailPage'));
 const NotFoundPage = lazyWithRetry(() => import('@/pages/NotFoundPage'));
 const AdministrationPage = lazyWithRetry(() => import('@/pages/administration/AdministrationPage'));
 const AdminConfigPage = lazyWithRetry(() => import('@/pages/administration/AdminConfigPage'));
@@ -119,6 +120,7 @@ export function AppRoutes() {
             <Route path="/wallet" element={<WalletPage />} />
             <Route path="/wallet/charges" element={<WalletChargesPage />} />
             <Route path="/referrals" element={<ReferralsPage />} />
+            <Route path="/referrals/:linkId" element={<ReferralLinkDetailPage />} />
             <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
             <Route path="/administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
             <Route path="/administration/app-wallet" element={<AdminRoute><AdminAppWalletPage /></AdminRoute>} />

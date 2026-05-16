@@ -5,6 +5,8 @@ import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { useReferralDashboard } from '@/hooks/useReferral';
 import { TransferToWalletPanel } from '@/components/referral/TransferToWalletPanel';
 import { WithdrawalCard } from '@/components/referral/WithdrawalCard';
+import { EarningsTimelineChart } from '@/components/referral/EarningsTimelineChart';
+import { ReferredUserTable } from '@/components/referral/ReferredUserTable';
 import { formatINR } from '@/lib/utils';
 
 function rupees(paise: number): string {
@@ -49,6 +51,8 @@ export function ReferralsPage() {
             <Stat icon={<IndianRupee className="size-3.5" />} label="Withdrawable" value={rupees(q.data.summary.withdrawablePaise)} sub="Released earnings" />
           </div>
 
+          <EarningsTimelineChart />
+          <ReferredUserTable />
           <TransferToWalletPanel />
           <WithdrawalCard />
         </>

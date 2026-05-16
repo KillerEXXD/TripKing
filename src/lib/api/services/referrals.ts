@@ -56,6 +56,57 @@ export function transferReferralToCashWallet(amountPaise: number): Promise<Trans
   });
 }
 
+// ── Stage 8 — link drilldown ────────────────────────────────────────────────
+
+export interface ReferralLinkDrilldown {
+  link: ReferralLink;
+  ledger: Array<{
+    id: string;
+    entryType: string;
+    amountPaise: number;
+    createdAt: string;
+    note?: string;
+    trip?: { id?: string; fromCityName?: string; toCityName?: string };
+    fee?: { id?: string; side?: string; paymentSource?: string };
+  }>;
+}
+
+export function getReferralLink(linkId: string): Promise<ReferralLinkDrilldown> {
+  return apiClient.get<Api>(`/referrals/${linkId}`).then((r) => {
+    const row = unwrap(r.data);
+    const link = transformReferralLink((row.link ?? {}) as Api);
+    const ledgerRaw = Array.isArray(row.ledger) ? (row.ledger as Api[]) : [];
+    const ledger = ledgerRaw.map((e) => {
+      const trip = e.trip && typeof e.trip === 'object' ? (e.trip as Api) : null;
+      const fee = e.fee && typeof e.fee === 'object' ? (e.fee as Api) : null;
+      const fromCity = trip?.from_city && typeof trip.from_city === 'object' ? (trip.from_city as Api) : null;
+      const toCity = trip?.to_city && typeof trip.to_city === 'object' ? (trip.to_city as Api) : null;
+      return {
+        id: String(e.id ?? ''),
+        entryType: String(e.entry_type ?? ''),
+        amountPaise: Number(e.amount_paise ?? 0),
+        createdAt: String(e.created_at ?? ''),
+        note: typeof e.note === 'string' ? e.note : undefined,
+        trip: trip
+          ? {
+              id: typeof trip.id === 'string' ? trip.id : undefined,
+              fromCityName: typeof fromCity?.name === 'string' ? fromCity.name : undefined,
+              toCityName: typeof toCity?.name === 'string' ? toCity.name : undefined,
+            }
+          : undefined,
+        fee: fee
+          ? {
+              id: typeof fee.id === 'string' ? fee.id : undefined,
+              side: typeof fee.side === 'string' ? fee.side : undefined,
+              paymentSource: typeof fee.payment_source === 'string' ? fee.payment_source : undefined,
+            }
+          : undefined,
+      };
+    });
+    return { link, ledger };
+  });
+}
+
 // ── Stage 7 — withdrawals ───────────────────────────────────────────────────
 
 export interface RequestWithdrawalResult {
