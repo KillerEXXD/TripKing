@@ -62,6 +62,11 @@ function applicantBanner(status: AcceptanceStatus, tripStatus: TripStatus): stri
 function ApplicationRow({ app }: { app: MyApplication }) {
   const t = app.trip;
   const badge = APPLICATION_BADGE[app.status] ?? APPLICATION_BADGE.applied;
+  // Defensive: STATUS_META is keyed by TripStatus, but the API has historically grown
+  // its enum (selected/accepted/in_progress landed across separate releases). A trip
+  // returned with an unrecognised status would crash with "Cannot read properties of
+  // undefined (reading 'variant'|'label')" — surfaced 3 events / 1 user in Sentry.
+  const tripMeta = STATUS_META[t.status] ?? { variant: 'muted' as const, label: String(t.status) };
   const picked = isPickedStatus(app.status);
   const [expanded, setExpanded] = useState(false);
   const withdrawMutation = useWithdrawApplication();
@@ -97,7 +102,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
         Pickup: {formatPickupTime(t.pickupAt)}
         {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
         {' · trip is '}
-        {STATUS_META[t.status].label.toLowerCase()}
+        {tripMeta.label.toLowerCase()}
       </div>
     </div>
   );
