@@ -26,7 +26,11 @@
   padding-right: 20px;
   padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   padding-left: 20px;
-  min-height: 72px;
+  /* Hard floor for the nav frame, EXCLUDING the safe-area inset which the
+   * padding-bottom accounts for. Using `height` (not min-height) so any
+   * single failed rule above can't collapse the nav. 84px = 28 icon + 4
+   * gap + 12 label-block + 20 top/bottom padding floor. */
+  height: calc(84px + env(safe-area-inset-bottom, 0px));
 }
 
 .bottom-nav-button {
