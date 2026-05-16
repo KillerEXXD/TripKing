@@ -17,7 +17,7 @@ import type { APIRequestContext, Page } from '@playwright/test';
  * comment). See `referral-qase-demo.spec.ts` R6.3 for the canonical example.
  */
 
-// Default = the deployed dev Supabase. CI / BrowserStack workflows can override.
+// Default = the deployed dev Supabase. CI workflows can override.
 export const API_BASE = (
   process.env.PLAYWRIGHT_API_BASE ?? 'https://saxcbebqxgatiktsebxw.supabase.co/functions/v1'
 ).replace(/\/+$/, '');
