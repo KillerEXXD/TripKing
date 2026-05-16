@@ -19,6 +19,7 @@
     "test:edge": "deno test --no-check --allow-read --allow-env --allow-net supabase/functions/_shared/__tests__/",
     "test:load": "k6 run tests/load/scenario.js",
     "sim:marketplace": "node scripts/simulate-marketplace.cjs",
+    "deploy:purge": "node scripts/deploy-purge.cjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "prepare": "husky"
