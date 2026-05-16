@@ -5,7 +5,7 @@
  */
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiPostTrip, transformMyApplication, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
-import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripsQueryParams, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripMatchPreview, TripsQueryParams, UpdateTripPassengerInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -60,6 +60,18 @@ export function getTripApplicants(tripId: string): Promise<TripAcceptance[]> {
 
 export function postTrip(input: PostTripInput): Promise<Trip> {
   return apiClient.post<Api>('/trips', toApiPostTrip(input)).then((r) => transformTrip(unwrap(r.data)));
+}
+
+/** Counts-only preview for the trip-post form's auto-invite section. Returns 0/0/5 if the city is unset. */
+export function getTripMatchPreview(fromCityId: string): Promise<TripMatchPreview> {
+  return apiClient.get<Api>('/trips/match-preview', { from_city_id: fromCityId }).then((r) => {
+    const d = (r.data ?? {}) as Api;
+    return {
+      totalMatches: typeof d.total_matches === 'number' ? d.total_matches : 0,
+      willInvite: typeof d.will_invite === 'number' ? d.will_invite : 0,
+      maxInvites: typeof d.max_invites === 'number' ? d.max_invites : 5,
+    };
+  });
 }
 
 export function applyToTrip(tripId: string, input: ApplyToTripInput): Promise<TripAcceptance> {

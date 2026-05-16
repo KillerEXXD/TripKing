@@ -561,6 +561,126 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return (data?.id as string | undefined) ?? null;
   }
   /**
+   * Find drivers eligible for an auto-invite to a trip from `fromCityId`:
+   * active + KYC-approved drivers who have an open vacancy whose `current_city` is
+   * within `app_settings.invite_max_radius_km` of the pickup city. Sorted by distance
+   * ascending; caller decides whether to slice. Excludes `excludeDriverId` (used to
+   * skip the driver who is posting the trip themselves).
+   */
+  async function findMatchingDrivers(
+    fromCityId: string,
+    excludeDriverId: string | null,
+  ): Promise<Array<{ driverId: string; userId: string; distanceKm: number }>> {
+    if (!fromCityId) return [];
+    const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
+    const maxKm = typeof settings?.invite_max_radius_km === 'number' ? settings.invite_max_radius_km : 15;
+    const { data: pickupCity } = await db.from('cities').select('lat, lng').eq('id', fromCityId).maybeSingle();
+    // cities.lat/lng are numeric(9,6) → supabase-js returns them as STRINGS to preserve precision.
+    // Coerce explicitly; bail out only on NaN.
+    const pLat = Number(pickupCity?.lat), pLng = Number(pickupCity?.lng);
+    if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) return [];
+    const { data: vacRows } = await db
+      .from('vacancies')
+      .select('driver_id, current_city:cities!current_city_id(lat, lng), driver:drivers!driver_id(id, user_id, is_active, kyc_status)')
+      .eq('status', 'active');
+    type VacRow = {
+      driver_id: string;
+      current_city: { lat: number | string | null; lng: number | string | null } | null;
+      driver: { id: string; user_id: string; is_active: boolean; kyc_status: string } | null;
+    };
+    const out: Array<{ driverId: string; userId: string; distanceKm: number }> = [];
+    const seen = new Set<string>();
+    for (const r of (vacRows as VacRow[] | null) ?? []) {
+      if (!r.driver || r.driver.is_active === false || r.driver.kyc_status !== 'approved') continue;
+      if (excludeDriverId && r.driver_id === excludeDriverId) continue;
+      if (seen.has(r.driver_id)) continue;
+      const lat = Number(r.current_city?.lat), lng = Number(r.current_city?.lng);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      const km = distanceKm(pLat, pLng, lat, lng);
+      if (km > maxKm) continue;
+      seen.add(r.driver_id);
+      out.push({ driverId: r.driver_id, userId: r.driver.user_id, distanceKm: km });
+    }
+    out.sort((a, b) => a.distanceKm - b.distanceKm);
+    return out;
+  }
+  /**
+   * Shared implementation for both manual `POST /trips/:id/invites` and the auto-invite
+   * branch on `POST /trips`. Filters to active + KYC-approved drivers; gates by
+   * `app_settings.invite_max_radius_km` against any open vacancy; preserves a prior
+   * 'applied' acceptance status; upserts `trip_invitations`; sends a `trip_invitation`
+   * notification to each invitee. Returns the created rows + the skipped driver ids.
+   */
+  async function inviteDrivers(
+    trip: { id: string; from_city_id: string | null },
+    inviterUserId: string,
+    driverIds: string[],
+  ): Promise<{ created: { id: string; driver_id: string }[]; skipped: string[] }> {
+    if (driverIds.length === 0) return { created: [], skipped: [] };
+    const { data: eligible } = await db.from('drivers').select('id, user_id').in('id', driverIds).eq('is_active', true).eq('kyc_status', 'approved');
+    let eligibleRows = (eligible ?? []) as { id: string; user_id: string }[];
+    const skipped = driverIds.filter((id) => !eligibleRows.some((r) => r.id === id));
+    if (eligibleRows.length > 0 && trip.from_city_id) {
+      const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
+      const maxKm = typeof settings?.invite_max_radius_km === 'number' ? settings.invite_max_radius_km : 15;
+      const { data: pickupCity } = await db.from('cities').select('lat, lng').eq('id', trip.from_city_id).maybeSingle();
+      const pLat = Number(pickupCity?.lat), pLng = Number(pickupCity?.lng);
+      if (Number.isFinite(pLat) && Number.isFinite(pLng)) {
+        const { data: vacRows } = await db
+          .from('vacancies')
+          .select('driver_id, current_city:cities!current_city_id(lat, lng)')
+          .in('driver_id', eligibleRows.map((r) => r.id))
+          .eq('status', 'active');
+        type VacRow = { driver_id: string; current_city: { lat: number | string | null; lng: number | string | null } | null };
+        const outOfRadius: string[] = [];
+        for (const r of eligibleRows) {
+          const v = (vacRows as VacRow[] | null)?.find((x) => x.driver_id === r.id);
+          const lat = Number(v?.current_city?.lat), lng = Number(v?.current_city?.lng);
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            const km = distanceKm(pLat, pLng, lat, lng);
+            if (km > maxKm) outOfRadius.push(r.id);
+          }
+        }
+        if (outOfRadius.length > 0) {
+          eligibleRows = eligibleRows.filter((r) => !outOfRadius.includes(r.id));
+          skipped.push(...outOfRadius);
+        }
+      }
+    }
+    const now = new Date().toISOString();
+    const { data: existingAcc } = await db
+      .from('trip_acceptances')
+      .select('driver_id, status')
+      .eq('trip_id', trip.id)
+      .in('driver_id', eligibleRows.map((r) => r.id))
+      .in('status', ['applied', 'selected', 'accepted']);
+    const appliedSet = new Set(((existingAcc ?? []) as { driver_id: string }[]).map((r) => r.driver_id));
+    const rows = eligibleRows.map((r) => ({
+      trip_id: trip.id,
+      driver_id: r.id,
+      invited_by_user_id: inviterUserId,
+      status: (appliedSet.has(r.id) ? 'applied' : 'pending') as 'applied' | 'pending',
+      declined_reason: null,
+      updated_at: now,
+    }));
+    let created: { id: string; driver_id: string }[] = [];
+    if (rows.length > 0) {
+      const { data, error } = await db.from('trip_invitations').upsert(rows, { onConflict: 'trip_id,driver_id' }).select('id, driver_id, status');
+      if (error) throw error;
+      created = (data ?? []) as { id: string; driver_id: string }[];
+      for (const r of eligibleRows) {
+        await db.from('notifications').insert({
+          user_id: r.user_id,
+          type: 'trip_invitation',
+          title: 'You\'ve been invited to a trip',
+          body: 'A trip manager picked you to view a trip. Tap to see details and apply.',
+          payload_json: { trip_id: trip.id },
+        });
+      }
+    }
+    return { created, skipped };
+  }
+  /**
    * Adds `posted_by_kyc_status` to each row by batch-fetching kyc_status from
    * drivers / trip_managers keyed on the poster's user_id (split by
    * posted_by_role: driver → drivers, anything else → trip_managers). Two
@@ -919,6 +1039,25 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     }
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_trip', { p_trip_id: created.id }); } catch { /* ignore */ }
+    // Auto-invite the top 5 nearest available drivers (toggle defaults ON; OFF skips this).
+    // Best-effort — invite failures must never break trip creation. The same eligibility +
+    // radius rules as the manual invite path apply (shared `inviteDrivers` helper).
+    let autoInvitedCount = 0;
+    if (b.auto_invite_matches !== false) {
+      try {
+        const excludeDriverId = posterRole === 'driver' ? await driverIdFor(u.id) : null;
+        const matches = await findMatchingDrivers(plan.from_city_id ?? '', excludeDriverId);
+        const top5 = matches.slice(0, 5).map((m) => m.driverId);
+        if (top5.length > 0) {
+          const { created: inv } = await inviteDrivers(
+            { id: created.id as string, from_city_id: plan.from_city_id ?? null },
+            u.id,
+            top5,
+          );
+          autoInvitedCount = inv.length;
+        }
+      } catch { /* ignore — never fail the trip post */ }
+    }
     // upsert into the passengers directory — first poster wins (name + referrer never overwritten);
     // a different name on a later trip is appended to `aliases`. Best-effort; never fails the POST.
     const passengerPhone = (insert as Record<string, unknown>).passenger_phone as string;
@@ -932,10 +1071,29 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }); } catch { /* ignore */ }
     }
     await invalidateTripsList();
-    return ok(await fullTrip(created.id as string, u));
+    const tripResp = await fullTrip(created.id as string, u);
+    return ok({ ...tripResp, auto_invited_count: autoInvitedCount });
   }
 
   if (!tripId) return fail('NOT_FOUND', 'No such route', 404);
+
+  // ── GET /trips/match-preview ?from_city_id=... ──
+  // Counts only (no driver PII). Authed (any signed-in user). Drives the form preview.
+  if (tripId === 'match-preview' && !sub && req.method === 'GET') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in', 401);
+    if (!(await rateLimitOk(db, `match-preview:${u.id}`, 30, 60))) {
+      return fail('RATE_LIMITED', 'Too many preview requests — try again shortly', 429);
+    }
+    const fromCityId = url.searchParams.get('from_city_id') ?? '';
+    if (!fromCityId) return fail('VALIDATION', 'from_city_id is required', 422);
+    const { data: usr } = await db.from('users').select('role').eq('id', u.id).maybeSingle();
+    const excludeDriverId = (usr?.role === 'driver') ? await driverIdFor(u.id) : null;
+    const matches = await findMatchingDrivers(fromCityId, excludeDriverId);
+    const total = matches.length;
+    const cap = 5;
+    return ok({ total_matches: total, will_invite: Math.min(total, cap), max_invites: cap });
+  }
 
   // ── GET /trips/by-otp/:otp (the passenger portal — public; the OTP IS the credential) ──
   if (tripId === 'by-otp' && sub && req.method === 'GET') {
@@ -1519,80 +1677,17 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         ? (b.driver_ids as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0)
         : [];
       if (ids.length === 0) return fail('VALIDATION', 'driver_ids must be a non-empty array of driver UUIDs', 422);
-      // Filter to active, KYC-approved drivers (otherwise the invite leads nowhere).
-      const { data: eligible } = await db.from('drivers').select('id, user_id').in('id', ids).eq('is_active', true).eq('kyc_status', 'approved');
-      let eligibleRows = (eligible ?? []) as { id: string; user_id: string }[];
-      const skipped = ids.filter((id) => !eligibleRows.some((r) => r.id === id));
-
-      // Radius gate — when a candidate driver has an active vacancy, the trip's pickup must
-      // be within `app_settings.invite_max_radius_km` of that vacancy's announced city.
-      // Drivers without an active vacancy are not radius-checked (preserves the trip-side
-      // "agent picks from the pickup-city directory" flow on InviteDriversCard).
-      if (eligibleRows.length > 0 && trip.from_city_id) {
-        const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
-        const maxKm = typeof settings?.invite_max_radius_km === 'number' ? settings.invite_max_radius_km : 15;
-        const { data: pickupCity } = await db.from('cities').select('lat, lng').eq('id', trip.from_city_id).maybeSingle();
-        if (pickupCity?.lat != null && pickupCity?.lng != null) {
-          const { data: vacRows } = await db
-            .from('vacancies')
-            .select('driver_id, current_city:cities!current_city_id(lat, lng)')
-            .in('driver_id', eligibleRows.map((r) => r.id))
-            .eq('status', 'open');
-          type VacRow = { driver_id: string; current_city: { lat: number | null; lng: number | null } | null };
-          const outOfRadius: string[] = [];
-          for (const r of eligibleRows) {
-            const v = (vacRows as VacRow[] | null)?.find((x) => x.driver_id === r.id);
-            const lat = v?.current_city?.lat;
-            const lng = v?.current_city?.lng;
-            if (typeof lat === 'number' && typeof lng === 'number') {
-              const km = distanceKm(pickupCity.lat, pickupCity.lng, lat, lng);
-              if (km > maxKm) outOfRadius.push(r.id);
-            }
-          }
-          if (outOfRadius.length > 0) {
-            eligibleRows = eligibleRows.filter((r) => !outOfRadius.includes(r.id));
-            skipped.push(...outOfRadius);
-          }
-        }
+      try {
+        const { created, skipped } = await inviteDrivers(
+          { id: tripId, from_city_id: trip.from_city_id ?? null },
+          u.id,
+          ids,
+        );
+        return ok({ created, skipped });
+      } catch (e) {
+        const err = e as { code?: string; message?: string };
+        return pgFail({ code: err.code, message: err.message ?? 'Failed to create invitations' });
       }
-      // Upsert — re-inviting a previously-declined/withdrawn driver bumps status back to 'pending'.
-      // BUT if the driver has already applied/been-selected/accepted on this trip, keep the
-      // invitation at 'applied' so the driver's "Invitation waiting" home card doesn't reappear
-      // (the apply-side trigger sync_trip_invitation_on_apply only handles the other direction).
-      const now = new Date().toISOString();
-      const { data: existingAcc } = await db
-        .from('trip_acceptances')
-        .select('driver_id, status')
-        .eq('trip_id', tripId)
-        .in('driver_id', eligibleRows.map((r) => r.id))
-        .in('status', ['applied', 'selected', 'accepted']);
-      const appliedSet = new Set(((existingAcc ?? []) as { driver_id: string }[]).map((r) => r.driver_id));
-      const rows = eligibleRows.map((r) => ({
-        trip_id: tripId,
-        driver_id: r.id,
-        invited_by_user_id: u.id,
-        status: (appliedSet.has(r.id) ? 'applied' : 'pending') as 'applied' | 'pending',
-        declined_reason: null,
-        updated_at: now,
-      }));
-      let created: { id: string; driver_id: string }[] = [];
-      if (rows.length > 0) {
-        const { data, error } = await db.from('trip_invitations').upsert(rows, { onConflict: 'trip_id,driver_id' }).select('id, driver_id, status');
-        if (error) return pgFail(error);
-        created = (data ?? []) as { id: string; driver_id: string }[];
-        // Notify each invited driver. Best-effort — failures don't break the response.
-        const trip_label = tripId;
-        for (const r of eligibleRows) {
-          await db.from('notifications').insert({
-            user_id: r.user_id,
-            type: 'trip_invitation',
-            title: 'You\'ve been invited to a trip',
-            body: 'A trip manager picked you to view a trip. Tap to see details and apply.',
-            payload_json: { trip_id: trip_label },
-          });
-        }
-      }
-      return ok({ created, skipped });
     }
     // GET /trips/:id/invites — list
     if (!acceptanceId && req.method === 'GET') {

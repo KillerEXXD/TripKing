@@ -4,8 +4,8 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { PostTripPage } from '@/pages/PostTripPage';
 
-vi.mock('@/hooks/useTrips', () => ({ usePostTrip: vi.fn() }));
-import { usePostTrip } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ usePostTrip: vi.fn(), useTripMatchPreview: vi.fn() }));
+import { usePostTrip, useTripMatchPreview } from '@/hooks/useTrips';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useMyAgent: vi.fn() }));
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(), isLookupablePhone: (p?: string) => (p ?? '').replace(/\D/g, '').length >= 10 }));
@@ -118,6 +118,11 @@ async function completeStep1(container: HTMLElement) {
 describe('PostTripPage', () => {
   beforeEach(() => {
     vi.mocked(usePostTrip).mockReset();
+    vi.mocked(useTripMatchPreview).mockReset().mockReturnValue({
+      data: { totalMatches: 0, willInvite: 0, maxInvites: 5 },
+      isFetching: false, isPending: false, isSuccess: true, isError: false,
+      refetch: vi.fn(),
+    } as never);
     vi.mocked(cityHooks.useList).mockReset();
     vi.mocked(carTypeHooks.useList).mockReset();
     vi.mocked(useAppSettings).mockReset().mockReturnValue({ data: undefined } as never);
@@ -239,6 +244,29 @@ describe('PostTripPage', () => {
     await waitFor(() => expect(screen.getByText(/existing passenger — jane sharma/i)).toBeInTheDocument());
     expect(container.querySelector<HTMLInputElement>('[name="passengerName"]')!.value).toBe('Jane Sharma');
   });
+
+  it('auto-invite toggle defaults ON, label flips when toggled OFF, value flows into the post payload', async () => {
+    vi.mocked(useTripMatchPreview).mockReturnValue({
+      data: { totalMatches: 8, willInvite: 5, maxInvites: 5 },
+      isFetching: false, isPending: false, isSuccess: true, isError: false, refetch: vi.fn(),
+    } as never);
+    const mutateAsync = setPostTrip();
+    const { container } = renderPost();
+    await completeStep1(container);
+    set(container, 'ratePerKm', '15');
+    // ON by default — label + count text both visible.
+    expect(screen.getByText(/send automatic invites to matching drivers/i)).toBeInTheDocument();
+    expect(screen.getByText(/8 matching drivers available — top 5 will be invited/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ autoInviteMatches: true })));
+    // Toggle OFF — label flips.
+    const toggle = container.querySelector<HTMLInputElement>('input[name="autoInviteMatches"]')!;
+    fireEvent.click(toggle);
+    expect(screen.getByText(/i'll manually invite drivers/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
+    await waitFor(() => expect(mutateAsync).toHaveBeenLastCalledWith(expect.objectContaining({ autoInviteMatches: false })));
+  });
+
 
   it('a11y: step 1 wizard has no axe violations', async () => {
     const { container } = renderPost();

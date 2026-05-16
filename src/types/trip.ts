@@ -108,6 +108,8 @@ export interface Trip {
   applicantCount: number;
   /** Number of `trip_invitations` rows in status='pending' for this trip — drives the "Invited" chip on `/posted-trips`. Always present (server defaults to 0). */
   pendingInvitationCount: number;
+  /** Only present on the response from POST /trips when auto-invite ran. Drives the success toast. */
+  autoInvitedCount?: number;
   /** Only present on `GET /trips?invited=me` rows — the `trip_invitations.id` matching the caller. Drives the "Unavailable" decline action on the driver's Invited tab. */
   invitationId?: string;
   /** Only present on `GET /trips?invited=me` rows — the caller's invitation status (`pending` | `applied` — declined invites are filtered out of the list). */
@@ -254,6 +256,19 @@ export interface PostTripInput {
   specialRequests?: string;
   showFareToPassenger: boolean;
   hidePassengerPhone: boolean;
+  /**
+   * When true (the default on the form), the server auto-invites the up-to-5 nearest
+   * KYC-approved drivers whose open vacancy is within app_settings.invite_max_radius_km
+   * of the pickup city. Same eligibility/radius rules as a manual invite. Omit to inherit
+   * the server default (true).
+   */
+  autoInviteMatches?: boolean;
+}
+/** Counts-only response from `GET /trips/match-preview` — drives the form preview + the Post-button gate. */
+export interface TripMatchPreview {
+  totalMatches: number;
+  willInvite: number;
+  maxInvites: number;
 }
 export interface UpdateTripPassengerInput {
   passengerName?: string;

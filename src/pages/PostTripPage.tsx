@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { usePostTrip } from '@/hooks/useTrips';
+import { usePostTrip, useTripMatchPreview } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
@@ -41,6 +41,7 @@ interface PostTripForm {
   driverInstructions: string;
   showFareToPassenger: boolean;
   hidePassengerPhone: boolean;
+  autoInviteMatches: boolean;
 }
 
 const DEFAULTS: PostTripForm = {
@@ -64,6 +65,7 @@ const DEFAULTS: PostTripForm = {
   driverInstructions: '',
   showFareToPassenger: true,
   hidePassengerPhone: true,
+  autoInviteMatches: true,
 };
 
 const STEP1_FIELDS = ['fromCityId', 'toCityId', 'pickupAt', 'expectedDistanceKm', 'carTypeId', 'seatsRequired', 'acRequired'] as const;
@@ -129,7 +131,12 @@ export function PostTripPage() {
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
-  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata']);
+  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch, autoInviteWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata', 'autoInviteMatches']);
+  // Auto-invite preview — re-runs whenever the pickup city changes. Only meaningful in step 2,
+  // but enabling it as soon as fromCityId is set means the result is usually warm by the time
+  // the agent gets to step 2. The Post button is gated on this query having settled (see submitting).
+  const matchPreview = useTripMatchPreview(fromCityId || undefined, !!fromCityId);
+  const previewSettled = !matchPreview.isFetching && (matchPreview.isSuccess || matchPreview.isError);
   const distance = Number(distanceWatch) || 0;
   const rate = Number(rateWatch) || 0;
   // Multi-day pricing preview — driver_bata is per-day; total = bata × ceil((end − start) / 1 day).
@@ -298,10 +305,12 @@ export function PostTripPage() {
       specialRequests: passengerSectionOpen ? (values.specialRequests.trim() || undefined) : undefined,
       showFareToPassenger: values.showFareToPassenger,
       hidePassengerPhone: values.hidePassengerPhone,
+      autoInviteMatches: values.autoInviteMatches,
     };
     try {
       const trip = await postTrip.mutateAsync(input);
-      toast.success('Trip posted — share it with drivers');
+      const invited = trip.autoInvitedCount ?? 0;
+      toast.success(invited > 0 ? `Trip posted — ${invited} driver${invited === 1 ? '' : 's'} invited` : 'Trip posted — share it with drivers');
       setPostedTrip(trip);
     } catch {
       toast.error("Couldn't post the trip — try again.");
@@ -625,6 +634,29 @@ export function PostTripPage() {
             </Card>
 
             <Card className="gap-3">
+              <div className={sectionLabel}>Driver invitations</div>
+              <label className="flex items-start gap-2 text-sm font-medium">
+                <input type="checkbox" className="mt-0.5" {...register('autoInviteMatches')} />
+                <span className="flex-1">
+                  {autoInviteWatch ? 'Send automatic invites to matching drivers' : "I'll manually invite drivers"}
+                  <span className="mt-0.5 block text-xs font-normal text-secondary">
+                    {autoInviteWatch
+                      ? (() => {
+                          if (matchPreview.isFetching) return 'Searching for available drivers near the pickup city…';
+                          if (matchPreview.isError) return 'Could not load preview — invites will still be sent on post (up to 5 closest).';
+                          const total = matchPreview.data?.totalMatches ?? 0;
+                          const willInvite = matchPreview.data?.willInvite ?? 0;
+                          if (total === 0) return 'No matching drivers right now. You can still post — drivers with alerts will be notified.';
+                          if (total <= 5) return `${total} matching driver${total === 1 ? '' : 's'} available — all ${total} will be invited.`;
+                          return `${total} matching drivers available — top ${willInvite} will be invited (closest first).`;
+                        })()
+                      : 'You can invite drivers from the trip detail page after posting.'}
+                  </span>
+                </span>
+              </label>
+            </Card>
+
+            <Card className="gap-3">
               <div className={sectionLabel}>More details</div>
               <Field label="Instructions for the driver (optional)">
                 <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('driverInstructions')} />
@@ -648,8 +680,14 @@ export function PostTripPage() {
             </Button>
           </>
         ) : (
-          <Button type="button" variant="full" disabled={submitting} onClick={() => void handleSubmit(onSubmit)()}>
-            {submitting ? 'Posting…' : 'Post trip'}
+          <Button
+            type="button"
+            variant="full"
+            disabled={submitting || !previewSettled}
+            onClick={() => void handleSubmit(onSubmit)()}
+            title={!previewSettled ? 'Checking for available drivers…' : undefined}
+          >
+            {submitting ? 'Posting…' : !previewSettled ? 'Checking drivers…' : 'Post trip'}
           </Button>
         )}
       </div>

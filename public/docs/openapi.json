@@ -1154,6 +1154,11 @@
                         }
                       }
                     }
+                  },
+                  "auto_invite_matches": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Default true. When true, server auto-invites the up-to-5 nearest active+KYC-approved drivers whose open vacancy is within app_settings.invite_max_radius_km of the pickup city, using the same eligibility/radius rules as POST /trips/{id}/invites. Driver-posted trips skip the poster. Response gains auto_invited_count."
                   }
                 }
               }
@@ -1168,6 +1173,38 @@
             "$ref": "#/components/responses/Envelope"
           },
           "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/trips/match-preview": {
+      "get": {
+        "tags": [
+          "trips"
+        ],
+        "summary": "Auto-invite preview (Bearer). Counts only — returns { total_matches, will_invite, max_invites: 5 }. Same matching rules as the auto-invite branch on POST /trips. Driver callers exclude themselves. Per-user rate-limited (30/min). Used by the trip-post form to show \"N drivers available — top 5 will be invited\" and gate the Post button.",
+        "parameters": [
+          {
+            "name": "from_city_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
             "$ref": "#/components/responses/Envelope"
           },
           "422": {
