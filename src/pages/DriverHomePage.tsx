@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, TrendingUp, Users, Gift } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,8 +12,8 @@ import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
 import { HomeTile } from '@/components/home/HomeTile';
+import { ReferralActionTile } from '@/components/home/ReferralActionTile';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -226,17 +226,14 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        {/* Quick-access tile row: square, rounded, colour-coded per concern.
-            Earnings (teal) + Referrals (emerald). The full ReferralCodeCard
-            with share buttons + share targets still renders below. */}
-        <div className="grid grid-cols-2 gap-2">
-          <HomeTile to="/my-earnings" icon={TrendingUp} label="Earnings" sub="Payouts & trend" tone="teal"    ariaLabel="View earnings" />
-          <HomeTile to="/referrals"   icon={Gift}       label="Referrals" sub="Refer & earn"   tone="emerald" ariaLabel="View referrals" />
+        {/* Quick-access tile row: compact 3-col grid. Earnings (1 col) + Referrals
+            tile (2 cols, with code + Copy + WhatsApp inline + tap-to-/referrals). */}
+        <div className="grid grid-cols-3 gap-2">
+          <HomeTile to="/my-earnings" icon={TrendingUp} label="Earnings" sub="Payouts" tone="teal" ariaLabel="View earnings" />
+          <div className="col-span-2">
+            <ReferralActionTile role="driver" />
+          </div>
         </div>
-      </div>
-
-      <div className="px-4 pb-4">
-        <ReferralCodeCard role="driver" />
       </div>
 
       <div className="px-4 pb-4">

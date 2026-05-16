@@ -15,7 +15,7 @@ vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
 import { useVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
-vi.mock('@/components/referral/ReferralCodeCard', () => ({ ReferralCodeCard: () => <div>referral card</div> }));
+vi.mock('@/components/home/ReferralActionTile', () => ({ ReferralActionTile: () => <a href="/referrals" aria-label="View referrals">View referrals</a> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
 const agentUser: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -84,7 +84,8 @@ describe('AgentHomePage', () => {
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /view analytics/i })).toHaveAttribute('href', '/analytics');
     expect(screen.getByRole('link', { name: /view referrals/i })).toHaveAttribute('href', '/referrals');
-    expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
+    // 'recent trips' section was removed from Agent Home (replaced by the tile row + InvitesSent + priority stack)
+    expect(screen.queryByText(/haven't posted a trip yet/i)).toBeNull();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
@@ -100,12 +101,11 @@ describe('AgentHomePage', () => {
     expect(screen.queryByText(/waiting for your decision/i)).toBeNull();
   });
 
-  it('lists the agent\'s recent posts and surfaces the Review card when a post has applicants', () => {
+  it('surfaces the Review card when a posted trip has applicants (recent-trips section removed)', () => {
     setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', status: 'has_applicants', applicantCount: 1, fromCity: city('c3', 'Bangalore') })] });
     renderHome();
-    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
-    // Bangalore → Chennai shows in both the rich "Waiting" card and the recent-posts row.
-    expect(screen.getAllByText('Bangalore → Chennai').length).toBeGreaterThan(0);
+    // The "recent trips" section was removed; only the Review priority card remains.
+    expect(screen.getByText('Bangalore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/1 driver applied/i)).toBeInTheDocument();
   });
 

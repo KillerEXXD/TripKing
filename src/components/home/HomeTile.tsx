@@ -21,9 +21,8 @@ const TONE: Record<NonNullable<Props['tone']>, { iconBg: string; iconFg: string;
 };
 
 /**
- * Square home-tab tile with rounded corners. Renders inside a 3-col grid (or any
- * column count). The container forces aspect-square so the layout stays clean
- * regardless of label length or whether `sub` is present.
+ * Compact home-tab tile with rounded corners. Designed for a single-row grid:
+ * fixed height (~h-20) keeps it small and balanced regardless of label length.
  */
 export function HomeTile({ to, icon: Icon, label, sub, tone = 'teal', ariaLabel }: Props) {
   const t = TONE[tone];
@@ -31,13 +30,13 @@ export function HomeTile({ to, icon: Icon, label, sub, tone = 'teal', ariaLabel 
     <Link
       to={to}
       aria-label={ariaLabel ?? label}
-      className={`group flex aspect-square flex-col items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white p-3 text-center transition active:scale-[0.98] ${t.ring} hover:shadow-sm`}
+      className={`group flex h-20 flex-col items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white px-2 py-2 text-center transition active:scale-[0.98] ${t.ring} hover:shadow-sm`}
     >
-      <div className={`flex size-10 items-center justify-center rounded-full ${t.iconBg} ${t.iconFg}`}>
-        <Icon className="size-5" aria-hidden />
+      <div className={`flex size-7 items-center justify-center rounded-full ${t.iconBg} ${t.iconFg}`}>
+        <Icon className="size-4" aria-hidden />
       </div>
-      <div className="text-sm font-semibold leading-tight text-slate-900">{label}</div>
-      {sub ? <div className="text-[11px] leading-tight text-slate-500">{sub}</div> : null}
+      <div className="text-xs font-semibold leading-tight text-slate-900">{label}</div>
+      {sub ? <div className="text-[10px] leading-tight text-slate-500">{sub}</div> : null}
     </Link>
   );
 }

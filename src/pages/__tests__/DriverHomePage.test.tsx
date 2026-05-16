@@ -26,7 +26,7 @@ vi.mock('@/hooks/useAdminConfig', () => ({
   useAppSettings: vi.fn(() => ({ isPending: false, data: { maxActiveVacanciesPerDriver: 2 } })),
 }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
-vi.mock('@/components/referral/ReferralCodeCard', () => ({ ReferralCodeCard: () => <div>referral card</div> }));
+vi.mock('@/components/home/ReferralActionTile', () => ({ ReferralActionTile: () => <a href="/referrals" aria-label="View referrals">View referrals</a> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
 const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
