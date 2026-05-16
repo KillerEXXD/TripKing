@@ -65,6 +65,7 @@ const PHASES = [
   { code: 'P7', title: 'P7 · Completion & reviews',       description: 'Complete, complete-without-start blocked, reviews both directions, one-sided, review-on-cancelled blocked.' },
   { code: 'P8', title: 'P8 · Notifications & inbox',      description: 'Bell badge, deep-link per type, mark-read.' },
   { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on start or window close.' },
+  { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
 ];
 
 // Each scenario: { phase, id, title, preconditions?, steps[{action, expected}] }
@@ -118,6 +119,15 @@ const SCENARIOS = [
   ]},
   { phase: 'P1', id: 'P1.5', title: 'Cancel an open trip (no applicants)', steps: [
     { action: 'Post a fresh trip. From menu → Cancel trip. Reason. Confirm.', expected: 'Cancelled. Trip leaves agent\'s open list. No driver notification (nobody attached).' },
+  ]},
+  { phase: 'P1', id: 'P1.6', title: 'Edit a posted trip before applicants (PR #173)',
+    preconditions: 'Pencil "Edit trip" link is visible only when status=open AND applicantCount===0. Route (cities/waypoints/distance) is NOT editable — changing the route is effectively a new trip.',
+    steps: [
+    { action: 'Through P1.1 (status=open, 0 applicants). On /trips/{id} tap the pencil "Edit trip" link.', expected: 'Edit dialog opens. Editable fields: rate/km, bata, commission %, GST, pickup time, car type / AC / seats, driver instructions, extras-paid-by-passenger flag, show-fare-to-passenger flag. Route fields are NOT in the dialog.' },
+    { action: 'Change rate ₹15 → ₹16/km. Live "new trip fare" preview updates. Save.', expected: '200. Trip detail shows ₹16/km. Server recomputes total_fare = round(distance × rate); the trips_compute_payout trigger re-derives driver_payout. PATCH /trips/{id}.' },
+    { action: 'Re-open the dialog. Change pickup_at by +1 hour. Save.', expected: 'expected_end_at shifts by the same +1h delta (duration preserved).' },
+    { action: 'Have a driver apply (P2.2 or P3.5) to bump applicantCount to 1. Refresh agent trip detail.', expected: 'Pencil "Edit trip" link is GONE (UI gate: status=open && applicantCount===0).' },
+    { action: 'Dev-tools: POST PATCH /trips/{id} on the has_applicants trip with any commercial field.', expected: '409 — trip is locked once it leaves status=open. Server is the source of truth, not the UI gate.' },
   ]},
 
   // ── P2 ────────────────────────────────────────────────────────────────
@@ -371,6 +381,94 @@ const SCENARIOS = [
     preconditions: 'Sanity check that the overlap check isn\'t over-eager.',
     steps: [
     { action: 'Driver: post a vacancy starting tomorrow. Agent: post a trip with pickup today and let this driver accept it.', expected: 'That vacancy stays active — its window doesn\'t cover the trip\'s pickup. (No flip.)' },
+  ]},
+
+  // ── R (Referral program — PRs #166/#168/#169/#171/#172) ──────────────
+  { phase: 'R', id: 'R1', title: 'View referral summary on /referrals',
+    preconditions: 'R has been a referrer at some point (at least one referral_links row exists). If needed, admin can seed via /admin/users PATCH to set referred_by_user_id on a test user.',
+    steps: [
+    { action: 'Open /referrals as the referrer (R).', expected: 'Three stat tiles: Lifetime earnings · Withdrawable · Referred users. Lifetime ≥ Withdrawable (hold-day math, see R3). ReferralCodeCard links here once user has ≥1 referral.' },
+    { action: 'Open /referrals as a user with NO referrals.', expected: 'All-zero tiles + a CTA prompting them to share their code. No timeline/table yet (Stage 8 surfaces those once data exists).' },
+  ]},
+  { phase: 'R', id: 'R2', title: 'Earnings accrual on referred trip completion',
+    preconditions: 'B is referred by R (users.referred_by_user_id=R). B is KYC-approved, R has an active referral_link for B.',
+    steps: [
+    { action: 'B applies → accepts → starts → completes a trip (P3–P7.1).', expected: 'On complete, charge_platform_fee_on_complete fires for both sides (migration 044). The accrual trigger inserts a referral_ledger row with entry_type=accrual, positive amount in paise, link_id = R↔B, trip_id = this trip.' },
+    { action: 'R checks bell.', expected: '🔔 referral_earning. Body rendered from notification_templates with {lifetime} substituted to R\'s running lifetime total. /referrals stats refresh.' },
+  ]},
+  { phase: 'R', id: 'R3', title: 'Hold-aware withdrawable balance',
+    preconditions: 'wallet_settings.withdrawal_hold_days set (default 3). The referral_withdrawable view filters by entry_at < now() - hold_days; the referral_withdrawable_summary view splits "withdrawable" vs "pending".',
+    steps: [
+    { action: 'Admin seeds two accruals for R: one dated -1 day, one dated -4 days (or wait for natural settlement). Refresh /referrals.', expected: 'Withdrawable tile shows only the -4 day row\'s amount. A separate "pending — clears in N days" hint shows the -1 day amount.' },
+    { action: 'GET /referrals/me/summary directly.', expected: 'Response body carries withdrawable_paise (floored) AND pending_paise as separate fields.' },
+  ]},
+  { phase: 'R', id: 'R4', title: 'Transfer referral earnings to cash wallet (one-way)',
+    preconditions: 'R has withdrawable > 0.',
+    steps: [
+    { action: '/referrals → TransferToWalletPanel. Verify the warning copy appears verbatim: "cannot be withdrawn later and will not generate further referral rewards" (spec §22).', expected: 'Warning visible inline above the amount field. Presets shown.' },
+    { action: 'Enter a partial amount → Transfer.', expected: '200. referral_withdrawable drops by the amount. Cash wallet balance up by the same. POST /referrals/me/transfer-to-wallet { amount_paise }. React Query invalidates referrals + wallet + me caches; tiles refresh.' },
+  ]},
+  { phase: 'R', id: 'R5', title: 'Request UPI withdrawal — happy path',
+    preconditions: 'R has withdrawable ≥ min withdrawal amount. R has not signed up within the new-user delay window.',
+    steps: [
+    { action: '/referrals WithdrawalCard → pick a preset → enter a valid UPI ID (e.g. test@upi) → Request.', expected: '200. Toast confirms. Withdrawable drops by amount. Row appears in "Recent withdrawals" with status=Requested. POST /referrals/me/withdraw.' },
+    { action: 'R checks bell.', expected: '🔔 withdrawal_requested.' },
+    { action: 'Server-side: query withdrawals table.', expected: 'New row with status=requested, amount, upi_id, provider=razorpay (or stubbed). Partial UNIQUE on (user_id) WHERE status IN (requested, approved, processing) means R cannot create a 2nd pending row.' },
+  ]},
+  { phase: 'R', id: 'R6', title: 'UPI withdrawal — validation errors',
+    preconditions: 'Devtools-friendly. Each sub-step is independent; reset withdrawable between if needed.',
+    steps: [
+    { action: 'POST /me/withdraw { amount_paise: 0 }.', expected: '422 with a "must be > 0" message.' },
+    { action: 'POST /me/withdraw without upi_id.', expected: '422 "UPI ID required".' },
+    { action: 'POST /me/withdraw with amount below wallet_settings.min_withdrawal_paise.', expected: '422 "Below minimum".' },
+    { action: 'POST /me/withdraw with amount > current withdrawable.', expected: '402 "Insufficient withdrawable balance".' },
+    { action: 'Submit a 2nd /withdraw while the 1st is still requested/approved/processing.', expected: '409 "A withdrawal is already pending". (Partial UNIQUE enforces this.)' },
+  ]},
+  { phase: 'R', id: 'R7', title: 'UPI withdrawal — daily / monthly cap exceeded',
+    steps: [
+    { action: 'Hit daily-cap or monthly-cap (per-role values from wallet_settings).', expected: '429 RATE_LIMITED with a clear "daily/monthly cap" reason in the body.' },
+  ]},
+  { phase: 'R', id: 'R8', title: 'Admin approves + marks paid',
+    preconditions: 'A withdrawal row exists in status=requested (e.g. from R5).',
+    steps: [
+    { action: 'Admin: /administration/withdrawals → filter by status=requested → row → Approve.', expected: '200. Status flips requested → approved. PATCH /admin/withdrawals/{id} { outcome: "approve" }.' },
+    { action: 'Same row → Mark paid → enter UTR (e.g. "UTR123456789").', expected: '200. Status flips approved → paid. external_txn_ref stored. Audit log entry.' },
+    { action: 'User R checks bell.', expected: '🔔 withdrawal_paid. Body contains {ref} substituted to the UTR.' },
+  ]},
+  { phase: 'R', id: 'R9', title: 'Admin rejects (reversal entry)',
+    preconditions: 'A withdrawal row exists in status=requested or approved.',
+    steps: [
+    { action: 'Admin: row → Reject with reason (e.g. "Wrong UPI ID").', expected: '200. Status flips → rejected. rejected_reason stored. PATCH /admin/withdrawals/{id} { outcome: "reject" }.' },
+    { action: 'Server-side: query referral_ledger for this user.', expected: 'A NEW positive reversal entry was inserted by complete_referral_withdrawal — withdrawable bounces back to the pre-withdraw balance.' },
+    { action: 'User R checks bell.', expected: '🔔 withdrawal_rejected with the reason in the body.' },
+  ]},
+  { phase: 'R', id: 'R10', title: 'Referrer dashboard — timeline + table + drilldown (PR #171)',
+    preconditions: 'R has ≥3 referrals across roles (driver + agent) and at least a week of accruals so the chart has data.',
+    steps: [
+    { action: '/referrals → EarningsTimelineChart. Switch the range picker: 7d → 30d → 90d.', expected: 'Recharts daily bars re-render from /referrals/me/earnings. Empty days show as 0-height bars.' },
+    { action: 'Same page → ReferredUserTable. Apply filters: status=earning_active, role=driver.', expected: 'Table narrows to matches. Pagination + sorting work.' },
+    { action: 'Click a row.', expected: 'Navigates to /referrals/:linkId. Drilldown shows per-trip ledger (route + fee source + your accrual) + a cap-remaining tile.' },
+  ]},
+  { phase: 'R', id: 'R11', title: 'Cap reached on a link',
+    preconditions: 'Set referral_links.cap_paise = 50000 (₹500) for the R↔B link; R already accrued ₹500 from B\'s prior trips.',
+    steps: [
+    { action: 'B completes another eligible trip.', expected: 'NO new accrual row for R (or row with amount=0 + a "capped" note). Drilldown cap-remaining = ₹0.' },
+    { action: 'R checks bell.', expected: '🔔 referral_cap_reached — fires once when the cap is first hit, not per subsequent trip.' },
+  ]},
+  { phase: 'R', id: 'R12', title: 'Fraud auto-detection on qualification (PR #172)',
+    preconditions: 'fraud_settings + fraud_action_rules seeded with: duplicate_aadhaar → severity=high → action=suspend_link; duplicate_upi → flag_only; same_pair_pattern → hold_earnings. Detection runs in the AFTER UPDATE OF status trigger on referral_links when status transitions to qualified or earning_active.',
+    steps: [
+    { action: 'Duplicate Aadhaar: plant the same Aadhaar number on 3 different users (admin SQL). Have R refer the 3rd. That 3rd user completes their first eligible trip.', expected: 'Qualification fires → detect_duplicate_aadhaar matches → referral_fraud_flags row inserted (flag_type=duplicate_aadhaar, severity=high, action_taken=suspend_link). R\'s link for that referred user → status=suspended.' },
+    { action: 'Duplicate UPI: same exercise with same UPI ID on multiple users.', expected: 'detect_duplicate_upi matches → flag inserted with flag_only action (no link suspension; surfaces in the admin queue).' },
+    { action: 'Same-pair pattern: same referrer ↔ same referred user completing many trips within the threshold window (per fraud_settings).', expected: 'detect_same_pair_pattern matches → flag inserted with hold_earnings action → accruals continue but become non-withdrawable until admin resolves.' },
+  ]},
+  { phase: 'R', id: 'R13', title: 'Admin operations — flag queue + manual flag + status + reverse-earnings + risk',
+    steps: [
+    { action: 'Admin: GET /admin/referrals/flags?resolved=false. View the auto-detected flags from R12.', expected: 'List endpoint returns the flags with severity + action_taken. UI shows them in a queue.' },
+    { action: 'POST /admin/referrals/flags { link_id, flag_type: "manual_review", severity: "medium", detail: { reason: "..." } }. Then PATCH /admin/referrals/flags/{id} { resolved_at: now, resolved_note: "..." }.', expected: 'Manual flag created → resolved. resolved_by stamped. admin_audit_log entries for both actions.' },
+    { action: 'PATCH /admin/referrals/{link_id}/status { status: "suspended" }.', expected: 'Link status manually flipped. Audit log entry.' },
+    { action: 'POST /admin/referrals/{link_id}/reverse-earnings { reason }.', expected: 'reverse_referral_earnings stored proc inserts a NEGATIVE ledger entry equal to the link\'s net positive accrued. Link status → suspended. R\'s withdrawable drops to 0; lifetime stays unchanged (reversal is its own row, not a delete).' },
+    { action: 'PATCH /admin/users/{id}/risk { is_high_risk: true, note: "..." }.', expected: 'users.is_high_risk=true. Audit log entry. (Withdrawal-hold extension per spec is future work but the flag is now set.)' },
   ]},
 ];
 
