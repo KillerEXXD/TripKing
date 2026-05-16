@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Badge, Card } from '@/components/ui';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { initials } from '@/lib/utils';
+import { getFirstName, initials } from '@/lib/utils';
 
 interface AdminTile {
   to: string;
@@ -88,7 +88,7 @@ export function HomePage() {
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{user?.displayName || user?.phone || 'Admin'}</span>
+            <span className="truncate font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || user?.phone || 'Admin'}</span>
             <Badge variant="info">Admin</Badge>
           </div>
         </div>
