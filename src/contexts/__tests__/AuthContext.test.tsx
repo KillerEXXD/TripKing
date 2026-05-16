@@ -11,6 +11,8 @@ vi.mock('@/lib/api/services/auth', () => ({
   logout: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/sentry', () => ({ setSentryUser: vi.fn(), clearSentryUser: vi.fn(), captureDataError: vi.fn() }));
+vi.mock('@/lib/queryClient', () => ({ queryClient: { clear: vi.fn() } }));
+import { queryClient } from '@/lib/queryClient';
 vi.mock('@/lib/posthog', () => ({ identifyUser: vi.fn(), resetUser: vi.fn(), captureEvent: vi.fn() }));
 import { getCurrentUser, verifyOtp, logout } from '@/lib/api/services/auth';
 import { setSentryUser, clearSentryUser } from '@/lib/sentry';
@@ -87,6 +89,53 @@ describe('AuthContext', () => {
 
     fireEvent.click(screen.getByText('logout'));
     await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('out'));
+  });
+
+  it('logout clears React Query cache + persisted per-user storage', async () => {
+    vi.spyOn(apiClient, 'getAccessToken').mockReturnValue(null);
+    vi.mocked(verifyOtp).mockResolvedValue(driver);
+    localStorage.setItem('tripking:my-applications', '{"state":{"byTrip":{"t1":{"x":1}}},"version":1}');
+    localStorage.setItem('tripking:view-as', '{"state":{"view":"agent"},"version":1}');
+    localStorage.setItem('unrelated-key', 'keep-me');
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('out'));
+
+    fireEvent.click(screen.getByText('verify'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('in:Ravi'));
+    fireEvent.click(screen.getByText('logout'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('out'));
+
+    expect(queryClient.clear).toHaveBeenCalled();
+    expect(localStorage.getItem('tripking:my-applications')).toBeNull();
+    expect(localStorage.getItem('tripking:view-as')).toBeNull();
+    // never blow away keys we don't own:
+    expect(localStorage.getItem('unrelated-key')).toBe('keep-me');
+  });
+
+  it('verifyOtp with a DIFFERENT user clears cached previous state', async () => {
+    vi.spyOn(apiClient, 'getAccessToken').mockReturnValue('tok');
+    vi.mocked(getCurrentUser).mockResolvedValue(driver);
+    const otherUser: User = { ...driver, id: 'u2', displayName: 'Asha', phone: '+918888888888' };
+    vi.mocked(verifyOtp).mockResolvedValue(otherUser);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('in:Ravi'));
+    vi.mocked(queryClient.clear).mockClear();
+
+    fireEvent.click(screen.getByText('verify'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('in:Asha'));
+    expect(queryClient.clear).toHaveBeenCalled();
+  });
+
+  it('verifyOtp with the SAME user does NOT clear the cache (no spurious flush)', async () => {
+    vi.spyOn(apiClient, 'getAccessToken').mockReturnValue('tok');
+    vi.mocked(getCurrentUser).mockResolvedValue(driver);
+    vi.mocked(verifyOtp).mockResolvedValue(driver);
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('in:Ravi'));
+    vi.mocked(queryClient.clear).mockClear();
+    fireEvent.click(screen.getByText('verify'));
+    await waitFor(() => expect(screen.getByTestId('state')).toHaveTextContent('in:Ravi'));
+    expect(queryClient.clear).not.toHaveBeenCalled();
   });
 
   it('wires Sentry + PostHog user context on login and clears it on logout', async () => {
