@@ -1083,6 +1083,17 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
 
   if (!tripId) return fail('NOT_FOUND', 'No such route', 404);
 
+  // Defensive shape check. tripId is either a UUID (real trip) or one of the route
+  // keywords below. Any other shape would cascade into a Postgres "invalid input
+  // syntax for type uuid" 5xx from .eq('id', tripId). Reject with a clean 404 so
+  // Sentry sees a routing miss instead of a UUID-cast crash (3 events / 2 users
+  // surfaced this on 2026-05-16 when a client racey-fired a stale path).
+  const TRIP_ROUTE_KEYWORDS = new Set(['match-preview', 'by-otp', 'applied']);
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!TRIP_ROUTE_KEYWORDS.has(tripId) && !UUID_RE.test(tripId)) {
+    return fail('NOT_FOUND', 'No such route', 404);
+  }
+
   // ── GET /trips/match-preview ?from_city_id=... ──
   // Counts only (no driver PII). Authed (any signed-in user). Drives the form preview.
   if (tripId === 'match-preview' && !sub && req.method === 'GET') {
