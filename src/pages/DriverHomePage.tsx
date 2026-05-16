@@ -226,13 +226,11 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        {/* Quick-access tile row: compact 3-col grid. Earnings (1 col) + Referrals
-            tile (2 cols, with code + Copy + WhatsApp inline + tap-to-/referrals). */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Quick-access tile row: equal-width 2-col grid. Earnings + Referrals
+            tile (code + Copy + WhatsApp inline + tap-to-/referrals). */}
+        <div className="grid grid-cols-2 gap-2">
           <HomeTile to="/my-earnings" icon={TrendingUp} label="Earnings" sub="Payouts" tone="teal" ariaLabel="View earnings" />
-          <div className="col-span-2">
-            <ReferralActionTile role="driver" />
-          </div>
+          <ReferralActionTile role="driver" />
         </div>
       </div>
 
