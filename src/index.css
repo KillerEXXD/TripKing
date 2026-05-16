@@ -61,6 +61,55 @@
   --color-driver: #10b981;
   --color-manager: #3b82f6;
   --color-admin: #8b5cf6;
+
+  /* ── UI redesign (docs/UI_REDESIGN_PLAN.md) — Layer 1 tokens ──────────────
+   * Single source of truth for the redesign. Pages MUST consume these via
+   * Tailwind utilities (bg-page, shadow-card, rounded-card, etc.) — no hex
+   * codes or arbitrary `rounded-[Npx]` values anywhere in pages after PR 7.
+   */
+
+  /* Surfaces — page background sits below cards; surface-priority is the
+     dark inverted hero used by Home's "Driving now" / "Get verified". */
+  --color-page: #f0f2f5;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f9fafb;
+  --color-surface-priority: #1a1a1a;
+
+  /* Accent palette — used by <SectionCard accent="…"> for the left-border
+     tinted tile pattern (Home dashboard). Each accent ships as a pair: the
+     stronger `-accent` for the border + label, the lighter `-accent-light`
+     for the tile background. Tokens (not Tailwind palette) so a single
+     re-theme retints every consumer at once. */
+  --color-green-accent: #10b981;
+  --color-green-accent-light: #ecfdf5;
+  --color-amber-accent: #f59e0b;
+  --color-amber-accent-light: #fffbeb;
+  --color-blue-accent: #3b82f6;
+  --color-blue-accent-light: #eff6ff;
+  --color-purple-accent: #8b5cf6;
+  --color-purple-accent-light: #f5f3ff;
+  --color-grey-accent: #6b7280;
+  --color-grey-accent-light: #f3f4f6;
+
+  /* Elevation — `shadow-card` is the redesign's everywhere-card depth;
+     header sits 1px high; FAB carries the brand-green glow; footer rises
+     up from the bottom edge over the page bg. */
+  --shadow-card: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --shadow-header: 0 1px 0 rgba(0, 0, 0, 0.06);
+  --shadow-fab: 0 4px 14px rgba(16, 185, 129, 0.4);
+  --shadow-footer: 0 -4px 16px rgba(0, 0, 0, 0.06);
+
+  /* Radius — card surfaces, controls (inputs/buttons), pill (badges/CTAs) */
+  --radius-card: 16px;
+  --radius-control: 12px;
+  --radius-pill: 20px;
+
+  /* Typography scale — recurring redesign sizes. The names match the design
+     system's own labels so spec ↔ code map 1:1. */
+  --text-header: 17px;
+  --text-section-label: 10px;
+  --text-body: 14px;
+  --text-micro: 11px;
 }
 
 * {

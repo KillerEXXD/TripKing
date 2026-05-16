@@ -8,7 +8,8 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<'input'>>(
         type={type}
         data-slot="input"
         className={cn(
-          'flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-base shadow-xs',
+          // UI redesign — rounded-control token (12px) replaces the per-instance rounded-lg.
+          'flex h-11 w-full rounded-control border border-input bg-background px-3 py-2 text-base shadow-xs',
           'placeholder:text-muted-foreground transition-[color,box-shadow] outline-none',
           'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
           'disabled:pointer-events-none disabled:opacity-50',
