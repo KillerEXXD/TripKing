@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { Bell, BarChart3, CheckCircle2, Clock, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -226,10 +226,10 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        {/* Quick-access tile row: equal-width 2-col grid. Earnings + Referrals
-            tile (code + Copy + WhatsApp inline + tap-to-/referrals). */}
-        <div className="grid grid-cols-2 gap-2">
-          <HomeTile to="/my-earnings" icon={TrendingUp} label="Earnings" sub="Payouts" tone="teal" ariaLabel="View earnings" />
+        {/* Quick-access tile row: 3 equal-width compact tiles in a single row. */}
+        <div className="grid grid-cols-3 gap-2">
+          <HomeTile to="/my-earnings"      icon={TrendingUp} label="Earnings"  sub="Payouts" tone="teal" ariaLabel="View earnings" />
+          <HomeTile to="/driver-analytics" icon={BarChart3}  label="Analytics" sub="Trends"  tone="blue" ariaLabel="View analytics" />
           <ReferralActionTile role="driver" />
         </div>
       </div>
