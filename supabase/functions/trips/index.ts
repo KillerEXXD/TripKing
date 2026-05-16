@@ -1857,17 +1857,25 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return ok(await fullTrip(tripId, u!));
   }
 
-  // ── PATCH /trips/:id — update passenger details (poster/admin; blocked once in_progress) ──
+  // ── PATCH /trips/:id — update trip details ─────────────────────────────────
+  // Passenger fields (name/phone/count, luggage, special_requests, hide_phone) editable until in_progress.
+  // Commercial + scheduling + vehicle fields (rate, bata, commission, gst, pickup_at, car_type, ac, seats,
+  // driver_instructions, extras_paid_by_passenger, show_fare_to_passenger) editable ONLY while status='open'
+  // — once anyone has applied/been invited/been selected, terms are locked. Route (cities, waypoints,
+  // distance) is never editable here — changing it is effectively a new trip.
   if (!sub && req.method === 'PATCH') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to update a trip', 401);
-    const trip = await loadTrip(tripId);
-    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
-    if (trip.posted_by_user_id !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'Only the trip poster can update passenger details', 403);
+    const { data: tripFull } = await db.from('trips').select('id, posted_by_user_id, status, pickup_at, expected_end_at, expected_distance_km, rate_per_km').eq('id', tripId).maybeSingle();
+    if (!tripFull) return fail('NOT_FOUND', 'Trip not found', 404);
+    const trip = tripFull as { id: string; posted_by_user_id: string; status: string; pickup_at: string | null; expected_end_at: string | null; expected_distance_km: number | null; rate_per_km: number | null };
+    if (trip.posted_by_user_id !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'Only the trip poster can update this trip', 403);
     const blockingStatuses = ['in_progress', 'completed', 'cancelled'];
-    if (blockingStatuses.includes(trip.status)) return fail('CONFLICT', 'Trip has started — passenger details can no longer be changed', 422);
+    if (blockingStatuses.includes(trip.status)) return fail('CONFLICT', 'Trip has started — it can no longer be edited', 422);
     const b = await readBody(req);
     const patch: Record<string, unknown> = {};
+
+    // ── passenger fields (allowed any time pre-start) ──
     if ('passenger_name' in b) patch.passenger_name = (typeof b.passenger_name === 'string' && b.passenger_name.trim()) ? b.passenger_name.trim() : '';
     if ('passenger_phone' in b) patch.passenger_phone = (typeof b.passenger_phone === 'string' && b.passenger_phone.trim()) ? b.passenger_phone.trim() : '';
     if ('passenger_count' in b) {
@@ -1878,6 +1886,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     try {
       if ('luggage_notes' in b) assertNoPhones(typeof b.luggage_notes === 'string' ? (b.luggage_notes as string) : null, 'luggage_notes');
       if ('special_requests' in b) assertNoPhones(typeof b.special_requests === 'string' ? (b.special_requests as string) : null, 'special_requests');
+      if ('driver_instructions' in b) assertNoPhones(typeof b.driver_instructions === 'string' ? (b.driver_instructions as string) : null, 'driver_instructions');
     } catch (e) {
       if (e instanceof PhoneInTextError) return fail('VALIDATION', e.message, 400);
       throw e;
@@ -1885,9 +1894,70 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if ('luggage_notes' in b) patch.luggage_notes = (b.luggage_notes as string | null) ?? null;
     if ('special_requests' in b) patch.special_requests = (b.special_requests as string | null) ?? null;
     if ('hide_passenger_phone' in b && typeof b.hide_passenger_phone === 'boolean') patch.hide_passenger_phone = b.hide_passenger_phone;
+
+    // ── commercial / scheduling / vehicle fields (status='open' only) ──
+    const COMMERCIAL_FIELDS = ['rate_per_km', 'driver_bata', 'commission_pct', 'gst_amount', 'pickup_at', 'car_type_id', 'ac_required', 'seats_required', 'driver_instructions', 'extras_paid_by_passenger', 'show_fare_to_passenger'] as const;
+    const touchingCommercial = COMMERCIAL_FIELDS.some((f) => f in b);
+    if (touchingCommercial && trip.status !== 'open') {
+      return fail('CONFLICT', 'Trip details can only be edited while no driver has been invited or applied', 409);
+    }
+    if ('rate_per_km' in b) {
+      const r = Number(b.rate_per_km);
+      if (!Number.isFinite(r) || r <= 0) return fail('VALIDATION', 'rate_per_km must be a positive number', 422);
+      patch.rate_per_km = r;
+      // Recompute total_fare from the unchanged distance. The `trips_compute_payout` trigger
+      // (migration 002 / re-defined in 024) then re-derives driver_payout from the new total_fare.
+      const distance = Number(trip.expected_distance_km);
+      if (Number.isFinite(distance)) patch.total_fare = Math.round(distance * r);
+    }
+    if ('driver_bata' in b) {
+      const v = Number(b.driver_bata);
+      if (!Number.isFinite(v) || v < 0) return fail('VALIDATION', 'driver_bata must be ≥ 0', 422);
+      patch.driver_bata = v;
+    }
+    if ('commission_pct' in b) {
+      const v = Number(b.commission_pct);
+      if (!Number.isFinite(v) || v < 0 || v > 30) return fail('VALIDATION', 'commission_pct must be between 0 and 30', 422);
+      patch.commission_pct = v;
+    }
+    if ('gst_amount' in b) {
+      const v = Number(b.gst_amount);
+      if (!Number.isFinite(v) || v < 0) return fail('VALIDATION', 'gst_amount must be ≥ 0', 422);
+      patch.gst_amount = v;
+    }
+    if ('pickup_at' in b) {
+      const iso = typeof b.pickup_at === 'string' ? b.pickup_at : '';
+      const next = new Date(iso);
+      if (!iso || Number.isNaN(next.getTime())) return fail('VALIDATION', 'pickup_at must be a valid ISO timestamp', 422);
+      patch.pickup_at = iso;
+      // Shift expected_end_at by the same delta so the trip duration is preserved.
+      if (trip.pickup_at && trip.expected_end_at) {
+        const oldStart = new Date(trip.pickup_at).getTime();
+        const oldEnd = new Date(trip.expected_end_at).getTime();
+        if (Number.isFinite(oldStart) && Number.isFinite(oldEnd) && oldEnd > oldStart) {
+          patch.expected_end_at = new Date(next.getTime() + (oldEnd - oldStart)).toISOString();
+        }
+      }
+    }
+    if ('car_type_id' in b) {
+      const v = typeof b.car_type_id === 'string' ? b.car_type_id : '';
+      if (!v) return fail('VALIDATION', 'car_type_id is required', 422);
+      patch.car_type_id = v;
+    }
+    if ('ac_required' in b && typeof b.ac_required === 'boolean') patch.ac_required = b.ac_required;
+    if ('seats_required' in b) {
+      const v = Number(b.seats_required);
+      if (!Number.isInteger(v) || v < 1) return fail('VALIDATION', 'seats_required must be a positive integer', 422);
+      patch.seats_required = v;
+    }
+    if ('driver_instructions' in b) patch.driver_instructions = (b.driver_instructions as string | null) ?? null;
+    if ('extras_paid_by_passenger' in b && typeof b.extras_paid_by_passenger === 'boolean') patch.extras_paid_by_passenger = b.extras_paid_by_passenger;
+    if ('show_fare_to_passenger' in b && typeof b.show_fare_to_passenger === 'boolean') patch.show_fare_to_passenger = b.show_fare_to_passenger;
+
     if (Object.keys(patch).length === 0) return ok(await fullTrip(tripId, u));
     const { error } = await db.from('trips').update(patch).eq('id', tripId);
     if (error) return pgFail(error);
+    await invalidateTripsList();
     return ok(await fullTrip(tripId, u));
   }
 

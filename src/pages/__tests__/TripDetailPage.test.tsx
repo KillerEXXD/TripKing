@@ -8,7 +8,7 @@ import type { Trip, User, Vehicle } from '@/types';
 vi.mock('@/components/trip/InviteDriversCard', () => ({ InviteDriversCard: () => null }));
 vi.mock('@/hooks/useTrips', () => {
   const noOverlap = Object.freeze({ isPending: false, isSuccess: true, data: Object.freeze([]) });
-  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
+  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
 });
 import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger, useAcceptTrip, useDeclineTrip, useCancelAssignment } from '@/hooks/useTrips';
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(() => ({ data: null, isFetching: false, isSuccess: false })), isLookupablePhone: vi.fn(() => false) }));
@@ -16,7 +16,11 @@ vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLoca
 import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
 vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
 import { useDriverVehicles } from '@/hooks/useVehicles';
-vi.mock('@/hooks/useAdminConfig', () => ({ cancelReasonHooks: { useList: vi.fn() } }));
+vi.mock('@/hooks/useAdminConfig', () => ({
+  cancelReasonHooks: { useList: vi.fn() },
+  // EditTripDialog (rendered on the poster's "Edit trip" path) reads the car-types list.
+  carTypeHooks: { useList: vi.fn(() => ({ isPending: false, isError: false, data: [{ id: 'ct-suv', label: 'SUV', sortOrder: 0, isActive: true }], refetch: vi.fn() })) },
+}));
 import { cancelReasonHooks } from '@/hooks/useAdminConfig';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';

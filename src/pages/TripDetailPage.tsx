@@ -13,6 +13,7 @@ import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/my
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
+import { EditTripDialog } from '@/components/trip/EditTripDialog';
 import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
 import { AcceptTripDialog } from '@/components/trip/AcceptTripDialog';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
@@ -632,6 +633,10 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
   const passengerCardRef = useRef<HTMLDivElement>(null);
   const myApplication: MyApplication | undefined = useMyApplicationsStore().byTrip[trip.id];
   const [showShareLink, setShowShareLink] = useState(false);
+  // Edit-trip dialog: only when no one has applied / been invited / been selected yet.
+  // Server enforces this too (returns 409 if the gate slips).
+  const detailsEditable = viewer.isPoster && trip.status === 'open' && trip.applicantCount === 0;
+  const [showEditDialog, setShowEditDialog] = useState(false);
 
   // Scroll to passenger card when auto-opened.
   useEffect(() => {
@@ -673,6 +678,17 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
             <Badge variant={badge.variant}>{badge.label}</Badge>
           </div>
         </div>
+        {detailsEditable ? (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setShowEditDialog(true)}
+              className="flex items-center gap-1 text-xs font-medium text-primary"
+            >
+              <Pencil className="size-3" aria-hidden /> Edit trip
+            </button>
+          </div>
+        ) : null}
         {(trip.waypoints?.length ?? 0) >= 3 ? (
           <ol className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
             {(trip.waypoints ?? []).map((w, i) => {
@@ -832,6 +848,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
       {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} /> : showAcceptedBar ? <AcceptedDriverBar trip={trip} /> : null}
       {showShareLink && trip.passengerOtp ? <PassengerLinkModal trip={trip} otp={trip.passengerOtp} onClose={() => setShowShareLink(false)} /> : null}
+      {detailsEditable ? <EditTripDialog trip={trip} open={showEditDialog} onClose={() => setShowEditDialog(false)} /> : null}
     </div>
   );
 }

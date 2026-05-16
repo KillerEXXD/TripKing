@@ -5,7 +5,7 @@
  */
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
 import { toApiPostTrip, transformMyApplication, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
-import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripMatchPreview, TripsQueryParams, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripMatchPreview, TripsQueryParams, UpdateTripDetailsInput, UpdateTripPassengerInput } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -156,6 +156,27 @@ export function updateTripPassenger(tripId: string, input: UpdateTripPassengerIn
   if (input.luggageNotes !== undefined) body.luggage_notes = input.luggageNotes;
   if (input.specialRequests !== undefined) body.special_requests = input.specialRequests;
   if (input.hidePassengerPhone !== undefined) body.hide_passenger_phone = input.hidePassengerPhone;
+  return apiClient.patch<Api>(`/trips/${tripId}`, body).then((r) => transformTrip(unwrap(r.data)));
+}
+
+/**
+ * Edit a trip's commercial / scheduling / vehicle fields. Server enforces
+ * `status === 'open'` — once a driver has applied / been invited / been
+ * selected, the trip is locked and the PATCH returns 409.
+ */
+export function updateTripDetails(tripId: string, input: UpdateTripDetailsInput): Promise<Trip> {
+  const body: Record<string, unknown> = {};
+  if (input.ratePerKm !== undefined) body.rate_per_km = input.ratePerKm;
+  if (input.driverBata !== undefined) body.driver_bata = input.driverBata;
+  if (input.commissionPct !== undefined) body.commission_pct = input.commissionPct;
+  if (input.gstAmount !== undefined) body.gst_amount = input.gstAmount;
+  if (input.pickupAt !== undefined) body.pickup_at = input.pickupAt;
+  if (input.carTypeId !== undefined) body.car_type_id = input.carTypeId;
+  if (input.acRequired !== undefined) body.ac_required = input.acRequired;
+  if (input.seatsRequired !== undefined) body.seats_required = input.seatsRequired;
+  if (input.driverInstructions !== undefined) body.driver_instructions = input.driverInstructions;
+  if (input.extrasPaidByPassenger !== undefined) body.extras_paid_by_passenger = input.extrasPaidByPassenger;
+  if (input.showFareToPassenger !== undefined) body.show_fare_to_passenger = input.showFareToPassenger;
   return apiClient.patch<Api>(`/trips/${tripId}`, body).then((r) => transformTrip(unwrap(r.data)));
 }
 
