@@ -106,9 +106,10 @@ describe('DriverHomePage', () => {
     setMyDriver({ data: makeDriver() });
     setTrips({ data: [] });
     renderHome();
-    // Greeting uses the first name from the loaded profile, not the role label.
-    expect(screen.getByText('Ravi')).toBeInTheDocument();
-    expect(screen.getByText('Driver')).toBeInTheDocument();
+    // Greeting uses getFirstName ("Ravi Kumar" -> "Ravi K") + a compact role
+    // badge circle ("D" with title="Driver").
+    expect(screen.getByText('Ravi K')).toBeInTheDocument();
+    expect(screen.getByLabelText('Driver')).toBeInTheDocument();
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');

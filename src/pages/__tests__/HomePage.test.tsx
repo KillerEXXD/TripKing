@@ -21,8 +21,11 @@ describe('HomePage (admin home)', () => {
 
   it('greets the admin', () => {
     renderHome();
-    expect(screen.getByText('Ravee Sundar')).toBeInTheDocument();
-    expect(screen.getByText(/^admin$/i)).toBeInTheDocument();
+    // Header uses getFirstName() ("Ravee Sundar" -> "Ravee S") and a compact
+    // role badge circle ("Ad" with title="Admin") to fit greeting + controls
+    // on one row at iPhone widths.
+    expect(screen.getByText('Ravee S')).toBeInTheDocument();
+    expect(screen.getByLabelText('Admin')).toBeInTheDocument();
   });
 
   it('shows a tile for every /administration area, linking to it (parity with AdministrationPage)', () => {

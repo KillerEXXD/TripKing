@@ -74,8 +74,10 @@ describe('AgentHomePage', () => {
     setMyAgent({ data: agent });
     setTrips({ data: [] });
     renderHome();
-    expect(screen.getByText('Agent', { selector: 'span.truncate' })).toBeInTheDocument();
-    expect(screen.getByText('Agent', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
+    // Header uses getFirstName() ("Agent A" -> "Agent A") + a compact role
+    // badge circle ("A" with title="Agent").
+    expect(screen.getByText('Agent A', { selector: 'span.truncate' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Agent')).toBeInTheDocument();
     // Empty Driving-now and Review placeholders are no longer rendered.
     expect(screen.queryByText(/no trips in progress/i)).toBeNull();
     expect(screen.queryByText(/no applicants waiting/i)).toBeNull();
