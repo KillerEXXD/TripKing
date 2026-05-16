@@ -53,8 +53,15 @@ async function derivedPassword(phone: string): Promise<string> {
 
 
 async function findAuthUserForPhone(db: Db, phone: string): Promise<{ id: string } | null> {
+  // `public.users.id` is the same UUID as `auth.users.id` (set by the handle_new_user trigger),
+  // and `public.users.phone` is indexed and uncapped. Look up the existing user here instead of
+  // paginating `auth.admin.listUsers`, which silently dropped users once auth.users crossed 1000
+  // rows — sending returning users into the createUser branch and triggering SIGNUP_FAILED.
+  // The auth.admin.listUsers fallback below covers any legacy auth-only row that somehow lacks
+  // a public.users twin (rare; defensive).
+  const { data: pub } = await db.from('users').select('id').eq('phone', phone).maybeSingle();
+  if (pub) return { id: pub.id as string };
   const email = syntheticEmail(phone);
-  // GoTrue admin listUsers — fine for this project's scale.
   const { data } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
   const u = data?.users?.find((x: { email?: string | null }) => (x.email ?? '').toLowerCase() === email);
   return u ? { id: u.id } : null;
