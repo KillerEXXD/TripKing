@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { apiClient } from '@/lib/api/client';
 import * as transforms from '@/lib/api/transforms/referral';
-import { getMyReferralDashboard, getMyReferralEarnings, getMyReferred } from '@/lib/api/services/referrals';
+import { getMyReferralDashboard, getMyReferralEarnings, getMyReferred, transferReferralToCashWallet } from '@/lib/api/services/referrals';
 
 function ok<T>(data: T) {
   return Promise.resolve({ success: true, data, error: null } as const);
@@ -38,5 +38,13 @@ describe('referrals service', () => {
     const get = vi.spyOn(apiClient, 'get').mockReturnValue(ok({ from: '2026-01-01', to: '2026-01-31', days: [] }) as never);
     await getMyReferralEarnings({ from: '2026-01-01', to: '2026-01-31' });
     expect(get).toHaveBeenCalledWith('/referrals/me/earnings', { from: '2026-01-01', to: '2026-01-31' });
+  });
+
+  it('transferReferralToCashWallet POSTs amount_paise + maps the balance row', async () => {
+    const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ promo_paise: 100000, transferred_paise: 50000, cash_paise: 0, total_paise: 150000, net_referral_paise: 200000 }) as never);
+    const r = await transferReferralToCashWallet(50000);
+    expect(post).toHaveBeenCalledWith('/referrals/me/transfer-to-wallet', { amount_paise: 50000 });
+    expect(r.transferredPaise).toBe(50000);
+    expect(r.netReferralPaise).toBe(200000);
   });
 });

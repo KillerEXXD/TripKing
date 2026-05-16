@@ -30,3 +30,27 @@ export function getMyReferralEarnings(params?: { from?: string; to?: string }): 
   if (params?.to) q.to = params.to;
   return apiClient.get<Api>('/referrals/me/earnings', Object.keys(q).length ? q : undefined).then((r) => transformReferralEarnings(unwrap(r.data)));
 }
+
+export interface TransferReferralResult {
+  /** New cash-wallet balances after the transfer (paise). */
+  promoPaise: number;
+  transferredPaise: number;
+  cashPaise: number;
+  totalPaise: number;
+  /** New net referral balance after the transfer (paise). */
+  netReferralPaise: number;
+}
+
+/** Stage 6 — moves released referral earnings into the cash wallet. */
+export function transferReferralToCashWallet(amountPaise: number): Promise<TransferReferralResult> {
+  return apiClient.post<Api>('/referrals/me/transfer-to-wallet', { amount_paise: amountPaise }).then((r) => {
+    const row = unwrap(r.data);
+    return {
+      promoPaise: Number(row.promo_paise ?? 0),
+      transferredPaise: Number(row.transferred_paise ?? 0),
+      cashPaise: Number(row.cash_paise ?? 0),
+      totalPaise: Number(row.total_paise ?? 0),
+      netReferralPaise: Number(row.net_referral_paise ?? row.net_paise ?? 0),
+    };
+  });
+}

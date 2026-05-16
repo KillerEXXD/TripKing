@@ -1,4 +1,5 @@
 import { Copy, Gift, Share2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Button, Card } from '@/components/ui';
 import { LoadingSkeleton } from '@/components/feedback/LoadingSkeleton';
@@ -57,20 +58,23 @@ export function ReferralCodeCard({ role }: Props) {
       </div>
 
       {data.summary && data.summary.totalReferred > 0 ? (
-        <div className="grid grid-cols-3 gap-2 border-t pt-2 text-center text-xs">
-          <div>
-            <div className="text-base font-bold tabular-nums">{data.summary.totalReferred}</div>
-            <div className="text-secondary">Referred</div>
+        <>
+          <div className="grid grid-cols-3 gap-2 border-t pt-2 text-center text-xs">
+            <div>
+              <div className="text-base font-bold tabular-nums">{data.summary.totalReferred}</div>
+              <div className="text-secondary">Referred</div>
+            </div>
+            <div>
+              <div className="text-base font-bold tabular-nums">{data.summary.qualifiedReferrals}</div>
+              <div className="text-secondary">Qualified</div>
+            </div>
+            <div>
+              <div className="text-base font-bold tabular-nums">{formatINR(Math.round(data.summary.lifetimeEarnedPaise / 100))}</div>
+              <div className="text-secondary">Earned</div>
+            </div>
           </div>
-          <div>
-            <div className="text-base font-bold tabular-nums">{data.summary.qualifiedReferrals}</div>
-            <div className="text-secondary">Qualified</div>
-          </div>
-          <div>
-            <div className="text-base font-bold tabular-nums">{formatINR(Math.round(data.summary.lifetimeEarnedPaise / 100))}</div>
-            <div className="text-secondary">Earned</div>
-          </div>
-        </div>
+          <Link to="/referrals" className="text-center text-xs font-medium text-primary hover:underline">View referral details →</Link>
+        </>
       ) : null}
     </Card>
   );
