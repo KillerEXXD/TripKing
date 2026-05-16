@@ -51,3 +51,6 @@ test-results
 
 # OS
 Thumbs.db
+
+# Local-only QA preview output
+qase-import-preview.json
