@@ -5,7 +5,8 @@
  * and the resulting object path is saved on the vehicle.
  */
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
+import { CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateVehicle, useVehicle } from '@/hooks/useVehicles';
 import { getVehiclePhotoUploadUrl } from '@/lib/api/services/vehicles';
@@ -25,14 +26,7 @@ const VEHICLE_URL: Record<VehiclePhotoSlot, keyof Vehicle> = {
 const REQUIRED: VehiclePhotoSlot[] = ['front', 'back', 'left', 'right', 'plate', 'rc', 'insurance'];
 
 function Header({ onBack }: { onBack: () => void }) {
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">Vehicle photos &amp; papers</h1>
-    </header>
-  );
+  return <PageHeader title="Vehicle photos & papers" onBack={onBack} />;
 }
 
 export function VehiclePhotosPage() {

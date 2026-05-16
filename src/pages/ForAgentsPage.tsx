@@ -149,7 +149,7 @@ export function ForAgentsPage() {
   return (
     <div className="min-h-screen bg-white text-gray-900">
       {/* ── sticky nav ── */}
-      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/80 backdrop-blur-md">
+      <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md shadow-header">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
             <img src="/logo-mark.svg" alt="" className="h-6 w-auto" />
@@ -229,7 +229,7 @@ export function ForAgentsPage() {
         </section>
 
         {/* ── keep WhatsApp ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <SectionHead h={t.keepWa.h} sub={t.keepWa.body} />
             <div className="mt-9">
@@ -245,7 +245,7 @@ export function ForAgentsPage() {
             {t.how.steps.map((s) => {
               const Icon = agentIcon(s.icon);
               return (
-                <div key={s.n} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div key={s.n} className="rounded-card bg-surface p-5 shadow-card">
                   <div className="flex items-center gap-2.5">
                     <span className="flex size-8 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
                       {s.n}
@@ -266,14 +266,14 @@ export function ForAgentsPage() {
         </Section>
 
         {/* ── pain points ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <SectionHead h={t.pains.h} sub={t.pains.sub} />
             <div className="mt-9 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {t.pains.cards.map((c, i) => {
                 const Icon = agentIcon(c.icon);
                 return (
-                  <div key={i} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                  <div key={i} className="rounded-card bg-surface p-5 shadow-card">
                     <span className="flex size-9 items-center justify-center rounded-lg bg-red-50">
                       <Icon className="size-4 text-red-500" />
                     </span>
@@ -293,7 +293,7 @@ export function ForAgentsPage() {
             {t.features.blocks.map((f, i) => {
               const Icon = agentIcon(f.icon);
               return (
-                <div key={i} className="flex flex-col rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div key={i} className="flex flex-col rounded-card bg-surface p-6 shadow-card">
                   <span className="flex size-11 items-center justify-center rounded-2xl bg-emerald-100">
                     <Icon className="size-5 text-emerald-600" />
                   </span>
@@ -316,7 +316,7 @@ export function ForAgentsPage() {
         </Section>
 
         {/* ── amount visibility control ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <SectionHead h={t.amounts.h} sub={t.amounts.body} />
             <div className="mt-9 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
@@ -345,7 +345,7 @@ export function ForAgentsPage() {
         </Section>
 
         {/* ── better than WhatsApp alone ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <SectionHead h={t.vsWa.h} sub={t.vsWa.body} />
             <div className="mt-9">
@@ -363,7 +363,7 @@ export function ForAgentsPage() {
         </Section>
 
         {/* ── analytics preview ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <SectionHead h={t.analytics.h} sub={t.analytics.body} />
             <div className="mt-9 grid gap-6 lg:grid-cols-3 lg:items-start">
@@ -398,7 +398,7 @@ export function ForAgentsPage() {
         </Section>
 
         {/* ── unions / WhatsApp groups ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <div className="rounded-3xl border border-gray-100 bg-white p-7 shadow-sm sm:p-10">
               <div className="flex items-start gap-4">
@@ -430,7 +430,7 @@ export function ForAgentsPage() {
             {t.benefits.cards.map((c, i) => {
               const Icon = agentIcon(c.icon);
               return (
-                <div key={i} className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+                <div key={i} className="rounded-card bg-surface p-5 shadow-card">
                   <span className="flex size-9 items-center justify-center rounded-lg bg-emerald-100">
                     <Icon className="size-4 text-emerald-600" />
                   </span>
@@ -443,7 +443,7 @@ export function ForAgentsPage() {
         </Section>
 
         {/* ── FAQ ── */}
-        <div className="bg-gray-50/60">
+        <div className="bg-page">
           <Section>
             <SectionHead h={t.faq.h} />
             <div className="mx-auto mt-9 max-w-3xl divide-y divide-gray-200 rounded-2xl border border-gray-100 bg-white shadow-sm">

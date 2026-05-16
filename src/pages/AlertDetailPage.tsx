@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Pause, Play, Trash2 } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
+import { Pause, Play, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAlert, useDeleteAlert, useSetAlertActive } from '@/hooks/useAlerts';
 import { Badge, Button, Card } from '@/components/ui';
@@ -79,18 +80,12 @@ function AlertDetail({ alert }: { alert: Alert }) {
 /** `/alerts/:id` — one saved-search alert: criteria, pause/resume, delete. */
 export function AlertDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const alertQuery = useAlert(id);
   const notFound = !id || (alertQuery.isError && alertQuery.error instanceof ApiError && alertQuery.error.status === 404);
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-        <button type="button" aria-label="Back" onClick={() => navigate('/alerts')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <div className="text-base font-semibold">Alert</div>
-      </header>
+      <PageHeader title="Alert" backTo="/alerts" />
 
       <div className="space-y-4 p-4">
         {notFound ? (

@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Car, MapPin, Phone, ShieldCheck } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
+import { Car, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useDriver } from '@/hooks/useDrivers';
 import { useDriverReviews } from '@/hooks/useReviews';
 import { useAuth } from '@/contexts/AuthContext';
@@ -227,12 +228,7 @@ export function DriverProfilePage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <div className="text-base font-semibold">Driver</div>
-      </header>
+      <PageHeader title="Driver" onBack={() => navigate(-1)} />
 
       <div className="space-y-4 p-4">
         {notFound ? (

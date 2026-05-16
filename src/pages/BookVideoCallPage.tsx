@@ -6,7 +6,8 @@
  */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CalendarClock, ShieldCheck, Video } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
+import { CalendarClock, ShieldCheck, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
@@ -16,14 +17,7 @@ import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatPickupTime } from '@/lib/utils';
 
 function Header({ onBack }: { onBack: () => void }) {
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">Video verification</h1>
-    </header>
-  );
+  return <PageHeader title="Video verification" onBack={onBack} />;
 }
 
 function SlotPicker({ onPick, disabled }: { onPick: (iso: string) => void; disabled: boolean }) {

@@ -11,9 +11,16 @@ export interface PageHeaderProps {
   /**
    * Back link target. When set, renders a `<ArrowLeft>` icon button on the
    * left and navigates to that route on click. Omit on top-level tabs
-   * (Home, Vacancies, etc.) — they have no back affordance.
+   * (Home, Vacancies, etc.) — they have no back affordance. Mutually
+   * exclusive with `onBack`: pass one or the other.
    */
   backTo?: string;
+  /**
+   * Custom back handler. Use this when the destination isn't a static route
+   * — history.back(), conditional routing, "pop the modal first" flows.
+   * Mutually exclusive with `backTo`.
+   */
+  onBack?: () => void;
   /**
    * Optional right-aligned slot — a notification bell, an avatar, a "+"
    * FAB-as-header-button. Pass whatever JSX makes sense; the header just
@@ -34,7 +41,8 @@ export interface PageHeaderProps {
  * sticky to the top of the scroll container so the page bg slides
  * underneath as the user scrolls.
  */
-export function PageHeader({ title, subtitle, backTo, right, className }: PageHeaderProps) {
+export function PageHeader({ title, subtitle, backTo, onBack, right, className }: PageHeaderProps) {
+  const backButtonClass = '-ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted';
   return (
     <header
       className={cn(
@@ -43,13 +51,13 @@ export function PageHeader({ title, subtitle, backTo, right, className }: PageHe
       )}
     >
       {backTo ? (
-        <Link
-          to={backTo}
-          aria-label="Back"
-          className="-ml-1 inline-flex size-9 shrink-0 items-center justify-center rounded-full text-foreground hover:bg-muted"
-        >
+        <Link to={backTo} aria-label="Back" className={backButtonClass}>
           <ArrowLeft className="size-5" aria-hidden />
         </Link>
+      ) : onBack ? (
+        <button type="button" onClick={onBack} aria-label="Back" className={backButtonClass}>
+          <ArrowLeft className="size-5" aria-hidden />
+        </button>
       ) : null}
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-header font-bold leading-tight">{title}</h1>

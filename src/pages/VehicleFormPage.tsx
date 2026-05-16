@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useAddVehicle, useUpdateVehicle, useVehicle } from '@/hooks/useVehicles';
 import { carTypeHooks, fuelTypeHooks, useAppSettings, useSeatOptions, useVehicleModelsForMake, vehicleMakeHooks } from '@/hooks/useAdminConfig';
@@ -17,14 +17,7 @@ import type { VehicleInput } from '@/types';
 const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
 
 function Header({ onBack, title }: { onBack: () => void; title: string }) {
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">{title}</h1>
-    </header>
-  );
+  return <PageHeader title={title} onBack={onBack} />;
 }
 
 export function VehicleFormPage() {
