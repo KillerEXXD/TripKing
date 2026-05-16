@@ -1344,11 +1344,64 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       const u = await authUser(db, req);
       if (!u) return fail('UNAUTHORIZED', '', 401);
       const did = await driverIdFor(u.id);
-      const { data: acc } = await db.from('trip_acceptances').select('id, driver_id').eq('id', acceptanceId).eq('trip_id', tripId).maybeSingle();
+      const { data: acc } = await db.from('trip_acceptances').select('id, driver_id, status').eq('id', acceptanceId).eq('trip_id', tripId).maybeSingle();
       if (!acc) return fail('NOT_FOUND', 'Application not found', 404);
       if (acc.driver_id !== did && !isAdmin(u)) return fail('FORBIDDEN', '', 403);
-      const { error } = await db.from('trip_acceptances').update({ status: 'withdrawn', decision_at: new Date().toISOString() }).eq('id', acceptanceId);
+      const prevStatus = String((acc as { status?: string }).status ?? '');
+      // Can't withdraw once the trip has actually started — that's a cancellation, a separate flow.
+      const { data: tripRow } = await db.from('trips').select('status, assigned_acceptance_id, posted_by_user_id').eq('id', tripId).maybeSingle();
+      const tripStatus = String((tripRow as { status?: string } | null)?.status ?? '');
+      if (tripStatus === 'in_progress' || tripStatus === 'completed') {
+        return fail('CONFLICT', `Trip is "${tripStatus}" — can't withdraw now.`, 409);
+      }
+      const now = new Date().toISOString();
+      const { error } = await db.from('trip_acceptances').update({ status: 'withdrawn', decision_at: now }).eq('id', acceptanceId);
       if (error) return pgFail(error);
+      // If the withdrawn row was the trip's assigned acceptance (status was 'selected' or
+      // 'accepted'), the trip is now orphaned — unassign it so a re-application can reach
+      // the agent properly. Mirrors POST /:id/decline. Without this, the user's bug was:
+      // "I accepted then withdrew, then re-applied — and the trip still showed as accepted
+      // pointing to my old (withdrawn) row, so the new application never reached the agent".
+      const assignedAccId = (tripRow as { assigned_acceptance_id?: string | null } | null)?.assigned_acceptance_id;
+      const wasAssigned = assignedAccId === acceptanceId && (prevStatus === 'selected' || prevStatus === 'accepted');
+      if (wasAssigned) {
+        const { data: stillApplied } = await db
+          .from('trip_acceptances')
+          .select('id')
+          .eq('trip_id', tripId)
+          .eq('status', 'applied')
+          .limit(1);
+        const fallbackStatus = (stillApplied && stillApplied.length > 0) ? 'has_applicants' : 'open';
+        const { error: updErr } = await db
+          .from('trips')
+          .update({
+            status: fallbackStatus,
+            assigned_driver_id: null,
+            assigned_vehicle_id: null,
+            assigned_acceptance_id: null,
+            assigned_at: null,
+            acceptance_deadline_at: null,
+            driver_acceptance_status: 'declined',
+            passenger_otp_hash: null,
+            passenger_otp: null,
+          })
+          .eq('id', tripId);
+        if (updErr) return pgFail(updErr);
+        // Migration 039: if this trip was 'accepted' the driver's vacancy was 'on_trip' —
+        // revert it (back to active if its window is still future, else expire).
+        await syncVacanciesForTrip(db, 'revert', tripId);
+        // Notify the agent — they need to pick another driver.
+        const posterUserId = (tripRow as { posted_by_user_id?: string } | null)?.posted_by_user_id;
+        if (posterUserId) {
+          await db.from('notifications').insert({
+            user_id: posterUserId,
+            type: 'driver_declined',
+            title: prevStatus === 'accepted' ? 'Driver withdrew after accepting' : 'Driver withdrew their selection',
+            body: 'They\'re no longer on the trip — pick another applicant.',
+            payload_json: { trip_id: tripId, reason: 'driver_withdrew', prev_status: prevStatus },
+          });
+        }
+      }
       await invalidateTripsList();
       return ok({ withdrawn: acceptanceId });
     }
