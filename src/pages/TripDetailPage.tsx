@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
@@ -917,7 +917,7 @@ export function TripDetailPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
         <button type="button" aria-label="Back" onClick={goBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>

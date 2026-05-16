@@ -85,7 +85,7 @@ export function AlertDetailPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
         <button type="button" aria-label="Back" onClick={() => navigate('/alerts')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>

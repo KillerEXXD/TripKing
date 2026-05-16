@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
@@ -359,7 +359,7 @@ export function PostTripPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-10 border-b bg-white">
+      <header className="sticky top-0 z-10 bg-surface shadow-header">
         <div className="flex items-center gap-2 px-4 py-3">
           <button type="button" aria-label="Back" onClick={() => (step === 1 ? navigate('/') : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
             <ArrowLeft className="size-5" aria-hidden />

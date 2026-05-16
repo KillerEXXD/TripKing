@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { Badge, Button, Card, PriorityCard } from '@/components/ui';
+import { Badge, Button, Card, PriorityCard, SectionLabel } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
@@ -158,7 +158,7 @@ function AgentHome({ agent }: { agent: Agent }) {
 
   return (
     <div>
-      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-2">
@@ -226,7 +226,7 @@ function AgentHome({ agent }: { agent: Agent }) {
       <div className="space-y-3 px-4">
         <div>
           <div className="mb-2 flex items-center justify-between px-1">
-            <h2 className="text-sm font-semibold">Your recent trips</h2>
+            <SectionLabel>Your recent trips</SectionLabel>
             {myPostsQuery.isSuccess ? <Badge variant="muted">{myPosts.length}</Badge> : null}
           </div>
           {myPostsQuery.isPending ? (
@@ -262,7 +262,7 @@ function AgentHome({ agent }: { agent: Agent }) {
 function AgentHomeChromeFallback() {
   return (
     <div>
-      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="text-base font-semibold">Loading your home…</div>

@@ -10,7 +10,7 @@ import { useCompleteTrip, useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
-import { Badge, Button, Card } from '@/components/ui';
+import { Badge, Button, Card, SectionLabel } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
@@ -228,7 +228,7 @@ function DriverHome({ driver }: { driver: Driver }) {
 
   return (
     <div>
-      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -295,7 +295,7 @@ function DriverHome({ driver }: { driver: Driver }) {
 
       <div className="px-4 pt-3">
         <div className="mb-2 flex items-center justify-between px-1">
-          <h2 className="text-sm font-semibold">Open trips {nearCity ? `near ${nearCity.name}` : 'near you'}</h2>
+          <SectionLabel>Open trips {nearCity ? `near ${nearCity.name}` : 'near you'}</SectionLabel>
           {nearbyQuery.isSuccess ? <Badge variant="muted">{nearby.length}</Badge> : null}
         </div>
         {nearbyQuery.isPending ? (
@@ -338,7 +338,7 @@ function HomeChromeFallback() {
   const { user } = useAuth();
   return (
     <div>
-      <header className="flex items-center justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">

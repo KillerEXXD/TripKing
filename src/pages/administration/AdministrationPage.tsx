@@ -54,7 +54,7 @@ const TONE: Record<AdminSectionTile['tone'], string> = {
 function SectionTile({ tile }: { tile: AdminSectionTile }) {
   const { Icon } = tile;
   return (
-    <Link to={tile.to} className="flex items-start gap-3 rounded-xl border bg-white p-3 transition-colors hover:border-primary/40">
+    <Link to={tile.to} className="flex items-start gap-3 rounded-card bg-surface shadow-card p-3 transition-colors hover:border-primary/40">
       <span className={`flex size-10 shrink-0 items-center justify-center rounded-full ${TONE[tile.tone]}`}>
         <Icon className="size-5" aria-hidden />
       </span>

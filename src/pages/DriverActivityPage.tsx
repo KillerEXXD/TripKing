@@ -352,7 +352,7 @@ export function DriverActivityPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="flex items-center gap-2 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3 shadow-header">
         <h1 className="flex-1 text-base font-semibold">My trips</h1>
         <Button asChild size="sm" className="gap-1.5">
           <Link to="/trips/new">

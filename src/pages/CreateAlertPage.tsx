@@ -19,7 +19,7 @@ const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px
 
 function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+    <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
       <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
         <ArrowLeft className="size-5" aria-hidden />
       </button>
