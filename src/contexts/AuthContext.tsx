@@ -1,10 +1,34 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { apiClient } from '@/lib/api/client';
 import { getCurrentUser, logout as logoutService, requestOtp as requestOtpService, verifyOtp as verifyOtpService } from '@/lib/api/services/auth';
 import { logger } from '@/lib/logger';
+import { queryClient } from '@/lib/queryClient';
 import { setSentryUser, clearSentryUser } from '@/lib/sentry';
 import { identifyUser, resetUser } from '@/lib/posthog';
 import type { User } from '@/types';
+
+/**
+ * Persisted-Zustand keys that belong to the signed-in user. These must be
+ * wiped on logout / user-switch — otherwise QA reports show the previous
+ * user's applications / role-view state after signing in with a different
+ * phone number.
+ */
+const PER_USER_STORAGE_KEYS = ['tripking:my-applications', 'tripking:view-as'];
+
+/**
+ * Drop every trace of the previous session that lives in the browser:
+ * - the React Query cache (driver/me, agent/me, wallet, referrals, …),
+ * - persisted Zustand stores keyed to that user.
+ *
+ * Called on logout and on a fresh verifyOtp — the auth token is the only
+ * server-side identity we keep; everything else must be flushed.
+ */
+function clearLocalUserState(): void {
+  queryClient.clear();
+  for (const key of PER_USER_STORAGE_KEYS) {
+    try { localStorage.removeItem(key); } catch { /* private-mode etc. */ }
+  }
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -33,12 +57,15 @@ function identifyObservability(user: User | null): void {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  /** Last user.id we surfaced — lets verifyOtp detect a user-switch and flush. */
+  const lastUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     // The API client tells us when a 401 + refresh failed (dead session).
     apiClient.onAuthFailure(() => {
       if (cancelled) return;
+      clearLocalUserState();
       setUser(null);
       identifyObservability(null);
     });
@@ -51,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await getCurrentUser();
         if (!cancelled) {
+          lastUserIdRef.current = me.id;
           setUser(me);
           identifyObservability(me);
         }
@@ -79,12 +107,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       requestOtp: requestOtpService,
       verifyOtp: async (phone, otp) => {
         const u = await verifyOtpService(phone, otp);
+        // Always flush the previous user's cached/persisted state before
+        // surfacing the new user — protects against "logged in as a different
+        // phone, still see the old account's data" (e.g. /me cached by
+        // queryKey, persisted Zustand stores).
+        if (lastUserIdRef.current !== u.id) clearLocalUserState();
+        lastUserIdRef.current = u.id;
         setUser(u);
         identifyObservability(u);
         return u;
       },
       logout: async () => {
-        await logoutService();
+        try { await logoutService(); } catch { /* network errors must not strand us */ }
+        clearLocalUserState();
+        lastUserIdRef.current = null;
         setUser(null);
         identifyObservability(null);
       },
