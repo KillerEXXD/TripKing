@@ -149,7 +149,9 @@ function PostedTripRow({ trip }: { trip: Trip }) {
 function AgentHome({ agent }: { agent: Agent }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
-  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  // Auth fix from main (PR #195): gate the user-scoped query with enabled so
+  // an in-flight poll doesn't fire against a freshly-nulled session.
+  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
 
   const myPosts = myPostsQuery.data ?? [];
   const inProgressTrips = myPosts.filter((t) => t.status === 'in_progress');

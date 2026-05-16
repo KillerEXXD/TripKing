@@ -302,7 +302,7 @@ export function DriverActivityPage() {
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
 
   const drivingQuery = useTrips({ assignedDriverId: 'me' });
-  const postedQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  const postedQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
   const appliedQuery = useMyApplications();
   const invitedQuery = useTrips({ invited: 'me' });
   const myDriverQuery = useMyDriver();

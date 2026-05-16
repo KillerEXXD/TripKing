@@ -69,7 +69,7 @@ describe('PostedTripsPage', () => {
   it('passes the caller id to useTrips', () => {
     setTrips({ data: [] });
     renderPosted();
-    expect(useTrips).toHaveBeenCalledWith({ postedByUserId: 'u1' });
+    expect(useTrips).toHaveBeenCalledWith({ postedByUserId: 'u1' }, { enabled: true });
   });
 
   it('renders a skeleton while loading', () => {

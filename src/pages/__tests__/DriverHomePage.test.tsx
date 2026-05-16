@@ -105,7 +105,7 @@ describe('DriverHomePage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders the driver home — greeting, reputation, empty feed', () => {
+  it('renders the driver home — greeting, reputation, tile row, nearby feed', () => {
     setMyDriver({ data: makeDriver() });
     setTrips({ data: [] });
     renderHome();
@@ -114,6 +114,9 @@ describe('DriverHomePage', () => {
     expect(screen.getByText('Ravi K')).toBeInTheDocument();
     expect(screen.getByLabelText('Driver')).toBeInTheDocument();
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
+    // The HomeTileRow renders the Earnings/Analytics/Referral tile trio (stubbed
+    // here as "home tile row"); its own coverage is in HomeTileRow.test.tsx.
+    expect(screen.getByText('home tile row')).toBeInTheDocument();
     expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
@@ -194,10 +197,9 @@ describe('DriverHomePage', () => {
     vi.mocked(useTripsMod.useMyApplications).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn() } as never);
   });
 
-  it('shows the open-trips-near-you feed and an applicants prompt for a posted trip', () => {
-    setTrips([{ data: [makeTrip({ id: 't1' })] }, { data: [makeTrip({ id: 'p1', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
+  it('shows an applicants prompt for a posted trip (the "open trips near you" feed is no longer on Home)', () => {
+    setTrips([{ data: [makeTrip({ id: 'p1', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
     renderHome();
-    expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/trip you posted has applicants/i)).toBeInTheDocument();
   });
 });

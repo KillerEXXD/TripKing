@@ -7,6 +7,10 @@ import { SignInPage } from '@/pages/SignInPage';
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/api/client', () => ({
+  apiClient: { getAccessToken: vi.fn(() => null), clearTokens: vi.fn() },
+}));
+import { apiClient } from '@/lib/api/client';
 
 const requestOtp = vi.fn().mockResolvedValue(undefined);
 const verifyOtp = vi.fn();
@@ -134,5 +138,36 @@ describe('SignInPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
     await screen.findByLabelText('OTP code');
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('clears stale tokens on mount when landing unauthenticated with a leftover access token (incident 2026-05-16)', () => {
+    mockAuth(false);
+    vi.mocked(apiClient.getAccessToken).mockReturnValue('eyJ...stale');
+    vi.mocked(apiClient.clearTokens).mockClear();
+    renderSignIn();
+    expect(apiClient.clearTokens).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT clear tokens on a clean signed-out visit (no leftover token to clean)', () => {
+    mockAuth(false);
+    vi.mocked(apiClient.getAccessToken).mockReturnValue(null);
+    vi.mocked(apiClient.clearTokens).mockClear();
+    renderSignIn();
+    expect(apiClient.clearTokens).not.toHaveBeenCalled();
+  });
+
+  it('does NOT clear tokens while auth is still bootstrapping (isLoading=true)', () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+      requestOtp,
+      verifyOtp,
+      logout: vi.fn(),
+    });
+    vi.mocked(apiClient.getAccessToken).mockReturnValue('eyJ...still-validating');
+    vi.mocked(apiClient.clearTokens).mockClear();
+    renderSignIn();
+    expect(apiClient.clearTokens).not.toHaveBeenCalled();
   });
 });

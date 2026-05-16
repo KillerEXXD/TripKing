@@ -19,13 +19,29 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // When QASE_TESTOPS_API_TOKEN is set, playwright-qase-reporter posts each test's result
+  // into a fresh Qase test run in project TRIPKINGAP, mapping scenario ids (e.g. "R10.4")
+  // to cases via their `automation_id`. Without the env, the terminal reporter alone is
+  // used so dev runs don't depend on Qase. See e2e/QASE-RUNNER.md.
+  reporter: process.env.QASE_TESTOPS_API_TOKEN
+    ? [['list'], ['playwright-qase-reporter']]
+    : process.env.CI
+      ? [['list'], ['html', { open: 'never' }]]
+      : 'list',
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',
     serviceWorkers: 'block',
+    // Slow-mo for demos: `PW_SLOWMO=2000 npm run test:e2e -- --headed --workers=1`
+    // pauses 2 s between every Playwright action so a human can follow along.
+    launchOptions: { slowMo: Number(process.env.PW_SLOWMO ?? 0) },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    // Mobile viewport for "what does this look like on a phone?" runs.
+    // Run with: `npm run test:e2e -- --project=mobile --headed --workers=1`
+    { name: 'mobile', use: { ...devices['iPhone 14 Pro Max'] } },
+  ],
   webServer: {
     command: `npm run dev -- --port ${PORT} --strictPort`,
     url: BASE_URL,

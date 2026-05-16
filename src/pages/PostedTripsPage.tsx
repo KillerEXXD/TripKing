@@ -148,7 +148,7 @@ export function PostedTripsPage() {
     setSearchParams(params, { replace: true });
   };
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
-  const tripsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  const tripsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
 
   const trips = tripsQuery.data ?? [];
   const shown = filter === 'all'

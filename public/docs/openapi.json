@@ -1572,6 +1572,187 @@
         }
       }
     },
+    "/webhook-qase": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Qase webhook ingest (HMAC-SHA256 via X-Qase-Signature header, secret = QASE_WEBHOOK_SECRET). Handles `defect.created` (creates bug_reports row + fans out admin notifications), `defect.updated` (updates the row), `defect.resolved` (sets bug_reports.status=resolved). Idempotent on qase_defect_id — re-deliveries don't duplicate. Unhandled events return 200 with { ignored: true }. See docs/QASE_BUG_PIPELINE.md.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "event",
+                  "data"
+                ],
+                "properties": {
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "defect.created",
+                      "defect.updated",
+                      "defect.resolved"
+                    ]
+                  },
+                  "data": {
+                    "type": "object",
+                    "required": [
+                      "id"
+                    ],
+                    "properties": {
+                      "id": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "actual_result": {
+                        "type": "string"
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "blocker",
+                          "critical",
+                          "major",
+                          "normal",
+                          "minor",
+                          "trivial"
+                        ]
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "case_id": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "run_id": {
+                        "oneOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "automation_id": {
+                        "type": "string"
+                      },
+                      "attachments": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            },
+                            "filename": {
+                              "type": "string"
+                            },
+                            "mime": {
+                              "type": "string"
+                            },
+                            "size": {
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "400": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "500": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/webhook-qase/health": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Health-check for the Qase project's \"test webhook\" button. Returns 200 unconditionally; no signature required.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/cron-qase-poll": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "summary": "Polling fallback for Qase plans without webhooks (Free, Team). Auth: X-Cron-Key header matching CRON_QASE_KEY env. Fetches the latest 100 defects from Qase REST API (using QASE_API_TOKEN + QASE_PROJECT_CODE envs), filters to ids > cron_state.last_seen_id watermark, calls the same shared upsert path as /webhook-qase so rows land identically. Returns a summary `{ fetched, fresh, created, updated, resolved, failed, watermark_from, watermark_to, polled_at }` and persists it in cron_state.last_run_summary. Schedule every ~5 min via cron-job.org or any HTTP-cron service.",
+        "parameters": [
+          {
+            "name": "X-Cron-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "500": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "502": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/bug-reports": {
       "get": {
         "tags": [

@@ -202,7 +202,9 @@ function DriverHome({ driver }: { driver: Driver }) {
   const nearCity = cities.find((c) => c.id === nearCityId) ?? driver.currentCity ?? driver.homeCity;
 
   const nearbyQuery = useTrips({ status: ['open', 'has_applicants'], fromCityId: nearCityId || undefined });
-  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  // Auth fix from main (PR #195): gate the user-scoped query with enabled so
+  // an in-flight poll doesn't fire against a freshly-nulled session.
+  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
   const invitedToDriveQuery = useTrips({ invited: 'me' });
