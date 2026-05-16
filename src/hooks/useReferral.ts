@@ -1,7 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { getMyAgent, getMyDriver } from '@/lib/api/services/drivers';
-import { getMyReferralDashboard, getMyReferralEarnings, getMyReferred } from '@/lib/api/services/referrals';
+import { getMyReferralDashboard, getMyReferralEarnings, getMyReferred, transferReferralToCashWallet } from '@/lib/api/services/referrals';
 import { buildReferralLink, buildReferralShareMessage, buildWhatsAppShareUrl } from '@/lib/referral';
 import type { Agent, Driver, ReferralSummary } from '@/types';
 
@@ -61,5 +61,20 @@ export function useReferralEarnings(params?: { from?: string; to?: string }) {
     queryKey: ['referrals', 'me', 'earnings', params ?? {}],
     queryFn: () => getMyReferralEarnings(params),
     staleTime: STALE.profile,
+  });
+}
+
+/** Stage 6 — transfer released referral earnings into the cash wallet. */
+export function useTransferReferralToCashWallet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (amountPaise: number) => transferReferralToCashWallet(amountPaise),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['referrals'] });
+      void qc.invalidateQueries({ queryKey: ['wallet'] });
+      void qc.invalidateQueries({ queryKey: ['driver', 'me'] });
+      void qc.invalidateQueries({ queryKey: ['agent', 'me'] });
+    },
+    meta: { toastOnError: true },
   });
 }
