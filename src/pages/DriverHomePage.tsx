@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Clock, MapPin, Navigation, Sparkles, Star, Users } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
@@ -10,7 +10,7 @@ import { useCompleteTrip, useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
-import { Badge, Button, Card, SectionLabel } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
@@ -60,31 +60,6 @@ function ReputationCard({ driver }: { driver: Driver }) {
         </div>
       </div>
     </PriorityCard>
-  );
-}
-
-function NearbyTripCard({ trip }: { trip: Trip }) {
-  return (
-    <Link to={`/trips/${trip.id}`} className="block">
-      <Card className="gap-2 transition-colors hover:border-primary/40">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
-            <div className="text-xs text-secondary">{Math.round(trip.expectedDistanceKm)} km · {formatPickupTime(trip.pickupAt)}</div>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="font-bold">{formatINR(trip.driverPayout)}</div>
-            <div className="text-[10px] text-secondary">incl. {formatINR(trip.driverBata)} bata</div>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs">
-          {trip.carTypeLabel ? <Badge variant="outline">{trip.carTypeLabel}</Badge> : null}
-          {trip.acRequired ? <Badge variant="outline">AC</Badge> : null}
-          <Badge variant={trip.postedByRole === 'driver' ? 'muted' : 'info'}>{trip.postedByRole === 'driver' ? 'Posted by a driver' : 'Posted by an agent'}</Badge>
-          {trip.applicantCount > 0 ? <Badge variant="warning"><Sparkles className="size-3" aria-hidden /> {trip.applicantCount} applied</Badge> : null}
-        </div>
-      </Card>
-    </Link>
   );
 }
 
@@ -199,9 +174,7 @@ function DriverHome({ driver }: { driver: Driver }) {
   const unread = useUnreadNotificationCount();
   const cities = cityHooks.useList().data ?? [];
   const [nearCityId, setNearCityId] = useState<string>(driver.currentCity?.id ?? driver.homeCity?.id ?? '');
-  const nearCity = cities.find((c) => c.id === nearCityId) ?? driver.currentCity ?? driver.homeCity;
 
-  const nearbyQuery = useTrips({ status: ['open', 'has_applicants'], fromCityId: nearCityId || undefined });
   // Auth fix from main (PR #195): gate the user-scoped query with enabled so
   // an in-flight poll doesn't fire against a freshly-nulled session.
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
@@ -209,7 +182,6 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myApplicationsQuery = useMyApplications();
   const invitedToDriveQuery = useTrips({ invited: 'me' });
 
-  const nearby = nearbyQuery.data ?? [];
   const myPosts = myPostsQuery.data ?? [];
   const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
   // Belt-and-braces: also exclude trips the driver has already applied to. The backend trigger
@@ -283,32 +255,6 @@ function DriverHome({ driver }: { driver: Driver }) {
         <InvitesSentCard trips={myPosts} />
       </div>
 
-      <div className="px-4 pt-3">
-        <div className="mb-2 flex items-center justify-between px-1">
-          <SectionLabel>Open trips {nearCity ? `near ${nearCity.name}` : 'near you'}</SectionLabel>
-          {nearbyQuery.isSuccess ? <Badge variant="muted">{nearby.length}</Badge> : null}
-        </div>
-        {nearbyQuery.isPending ? (
-          <LoadingSkeleton rows={3} />
-        ) : nearbyQuery.isError ? (
-          <ErrorState title="Couldn't load trips" message="Check your connection and try again." onRetry={() => void nearbyQuery.refetch()} />
-        ) : nearby.length === 0 ? (
-          <Card className="items-center text-center">
-            <MapPin className="size-6 opacity-30" aria-hidden />
-            <div className="text-sm font-medium">No open trips {nearCity ? `from ${nearCity.name}` : ''} right now</div>
-            <div className="text-xs text-secondary">Try another area, or tap “I&apos;m vacant” so agents can find you.</div>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {nearby.slice(0, 3).map((t) => (
-              <NearbyTripCard key={t.id} trip={t} />
-            ))}
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/trips">{nearby.length > 3 ? `See all ${nearby.length} trips` : 'Browse all open trips'} →</Link>
-            </Button>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

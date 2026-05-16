@@ -91,7 +91,10 @@ describe('AgentHomePage', () => {
     // here as "home tile row"); analytics still surface but inside the compact
     // 3-tile row instead of as a standalone card.
     expect(screen.getByText('home tile row')).toBeInTheDocument();
-    expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
+    // "Your recent trips" listing was removed (PR #192 on main) — agents now
+    // jump to /posted-trips via the bottom-nav "My Posts" tab. Don't expect
+    // the empty-state copy anymore.
+    expect(screen.queryByText(/haven't posted a trip yet/i)).toBeNull();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
@@ -107,12 +110,11 @@ describe('AgentHomePage', () => {
     expect(screen.queryByText(/waiting for your decision/i)).toBeNull();
   });
 
-  it('lists the agent\'s recent posts and surfaces the Review card when a post has applicants', () => {
+  it('surfaces the Review card when a posted trip has applicants (recent-trips section removed)', () => {
     setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', status: 'has_applicants', applicantCount: 1, fromCity: city('c3', 'Bangalore') })] });
     renderHome();
-    // Both surfaces show: the Review priority card AND the "Your recent trips" listing.
-    // The route label appears twice (once per surface) — assert both as a sanity check.
-    expect(screen.getAllByText('Bangalore → Chennai').length).toBeGreaterThanOrEqual(1);
+    // Recent-trips listing has been removed; only the Review priority card surfaces the trip route.
+    expect(screen.getByText('Bangalore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/1 driver applied/i)).toBeInTheDocument();
   });
 

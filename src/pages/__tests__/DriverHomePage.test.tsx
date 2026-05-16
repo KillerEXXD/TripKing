@@ -117,7 +117,10 @@ describe('DriverHomePage', () => {
     // The HomeTileRow renders the Earnings/Analytics/Referral tile trio (stubbed
     // here as "home tile row"); its own coverage is in HomeTileRow.test.tsx.
     expect(screen.getByText('home tile row')).toBeInTheDocument();
-    expect(screen.getByText(/no open trips/i)).toBeInTheDocument();
+    // "Open trips near you" feed was removed (PR #190 on main) — drivers now
+    // browse via the bottom-nav "Find Trips" tab instead. Don't expect the
+    // empty-state copy anymore.
+    expect(screen.queryByText(/no open trips/i)).toBeNull();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
