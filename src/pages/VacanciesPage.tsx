@@ -9,14 +9,14 @@ import { useTrips } from '@/hooks/useTrips';
 import { useInviteDrivers } from '@/hooks/useTrips';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffectiveRole } from '@/stores/roleViewStore';
-import { cityHooks } from '@/hooks/useAdminConfig';
+import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
+import { formatClockTime, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
 import type { NearRadius, Trip, Vacancy, VacancyInviteSummary } from '@/types';
 
 function availableLabel(v: Vacancy): string {
@@ -94,8 +94,24 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
   const myUserId = user?.id ?? '';
   // Only trips the caller owns + still accepting applicants are eligible.
   const trips = useTrips({ status: ['open', 'has_applicants'], postedByUserId: myUserId });
+  const appSettings = useAppSettings();
   const inviteDrivers = useInviteDrivers();
-  const eligible = (trips.data ?? []).filter((t) => t.status === 'open' || t.status === 'has_applicants');
+  // Pre-filter by the same radius gate the server applies on POST /invites — the
+  // driver's current point (precise place if pinned, else their `currentCity` centroid)
+  // must be within `invite_max_radius_km` of the trip's pickup city. Showing only
+  // eligible trips here avoids the "Driver is outside the invite radius" post-click
+  // error and lets the agent see the real shortlist up front.
+  const radiusKm = appSettings.data?.inviteMaxRadiusKm ?? 15;
+  const driverLat = vacancy.currentPlace?.lat ?? vacancy.currentCity.lat;
+  const driverLng = vacancy.currentPlace?.lng ?? vacancy.currentCity.lng;
+  const openTrips = (trips.data ?? []).filter((t) => t.status === 'open' || t.status === 'has_applicants');
+  const eligible = openTrips.filter((t) => {
+    const lat = t.fromCity?.lat;
+    const lng = t.fromCity?.lng;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+    return haversineKm(driverLat, driverLng, lat, lng) <= radiusKm;
+  });
+  const outOfRangeCount = openTrips.length - eligible.length;
   const alreadyInvitedTripIds = new Set((vacancy.myInvites ?? []).map((i) => i.tripId));
   const handle = vacancy.driver?.displayHandle ?? '';
   const driverId = vacancy.driver?.id ?? '';
@@ -117,9 +133,22 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
             {trips.isPending ? (
               <LoadingSkeleton rows={3} />
             ) : eligible.length === 0 ? (
-              <EmptyState title="No open trips" message="Post a trip first, then invite a driver to it." />
+              openTrips.length === 0 ? (
+                <EmptyState title="No open trips" message="Post a trip first, then invite a driver to it." />
+              ) : (
+                <EmptyState
+                  title="No trips in range"
+                  message={`This driver is more than ${radiusKm} km from any of your open trips' pickup cities — they can't be invited to those.`}
+                />
+              )
             ) : (
-              eligible.map((t) => (
+              <>
+                {outOfRangeCount > 0 ? (
+                  <p className="text-xs text-secondary">
+                    Showing {eligible.length} trip{eligible.length === 1 ? '' : 's'} within {radiusKm} km of the driver. {outOfRangeCount} other open trip{outOfRangeCount === 1 ? '' : 's'} hidden — too far for an invite.
+                  </p>
+                ) : null}
+                {eligible.map((t) => (
                 <TripPickRow
                   key={t.id}
                   trip={t}
@@ -149,7 +178,8 @@ function InviteToTripDialog({ vacancy, open, onClose }: { vacancy: Vacancy; open
                     );
                   }}
                 />
-              ))
+              ))}
+              </>
             )}
           </div>
         </Dialog.Content>
