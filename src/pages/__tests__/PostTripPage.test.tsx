@@ -256,7 +256,13 @@ describe('PostTripPage', () => {
     set(container, 'ratePerKm', '15');
     // ON by default — label + count text both visible.
     expect(screen.getByText(/send automatic invites to matching drivers/i)).toBeInTheDocument();
-    expect(screen.getByText(/8 matching drivers available — top 5 will be invited/i)).toBeInTheDocument();
+    // The "8" and "5" are emphasized via emerald <strong> spans (regression for "highlight the numbers" UX ask).
+    const emphasized = Array.from(container.querySelectorAll('strong.text-emerald-700')).map((el) => el.textContent);
+    expect(emphasized).toContain('8');
+    expect(emphasized).toContain('5');
+    // The full sentence is preserved (parent of the emphasized number contains the full subline).
+    const sublineParent = container.querySelector('strong.text-emerald-700')!.parentElement!;
+    expect(sublineParent.textContent?.replace(/\s+/g, ' ')).toContain('8 matching drivers available — top 5 will be invited');
     fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledWith(expect.objectContaining({ autoInviteMatches: true })));
     // Toggle OFF — label flips.

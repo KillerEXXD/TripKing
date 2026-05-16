@@ -630,7 +630,11 @@ export function PostTripPage() {
               ) : null}
             </Card>
 
-            <Card className="gap-3">
+            <Card
+              className={`gap-3 transition-colors ${
+                autoInviteWatch ? 'border-emerald-300 bg-emerald-50/60 ring-1 ring-emerald-200' : ''
+              }`}
+            >
               <div className={sectionLabel}>Driver invitations</div>
               <label className="flex items-start gap-2 text-sm font-medium">
                 <input type="checkbox" className="mt-0.5" {...register('autoInviteMatches')} />
@@ -639,13 +643,17 @@ export function PostTripPage() {
                   <span className="mt-0.5 block text-xs font-normal text-secondary">
                     {autoInviteWatch
                       ? (() => {
-                          if (matchPreview.isFetching) return 'Searching for available drivers near the pickup city…';
-                          if (matchPreview.isError) return 'Could not load preview — invites will still be sent on post (up to 5 closest).';
+                          if (matchPreview.isFetching) return <>Searching for available drivers near the pickup city…</>;
+                          if (matchPreview.isError) return <>Could not load preview — invites will still be sent on post (up to <strong className="font-semibold text-emerald-700">5</strong> closest).</>;
                           const total = matchPreview.data?.totalMatches ?? 0;
                           const willInvite = matchPreview.data?.willInvite ?? 0;
-                          if (total === 0) return 'No matching drivers right now. You can still post — drivers with alerts will be notified.';
-                          if (total <= 5) return `${total} matching driver${total === 1 ? '' : 's'} available — all ${total} will be invited.`;
-                          return `${total} matching drivers available — top ${willInvite} will be invited (closest first).`;
+                          if (total === 0) return <>No matching drivers right now. You can still post — drivers with alerts will be notified.</>;
+                          const totalNum = <strong className="font-bold text-emerald-700">{total}</strong>;
+                          const inviteNum = <strong className="font-bold text-emerald-700">{total <= 5 ? total : willInvite}</strong>;
+                          if (total <= 5) {
+                            return <>{totalNum} matching driver{total === 1 ? '' : 's'} available — all {inviteNum} will be invited.</>;
+                          }
+                          return <>{totalNum} matching drivers available — top {inviteNum} will be invited (closest first).</>;
                         })()
                       : 'You can invite drivers from the trip detail page after posting.'}
                   </span>
