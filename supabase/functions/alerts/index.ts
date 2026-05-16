@@ -32,7 +32,8 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 // LIVE tier — short TTL, shared cache (Postgres `api_cache`) keyed by the caller's user id.
 // The list is owner-scoped (RLS via `eq('user_id', u.id)`), so each user gets their own cache row.
 // Mutations invalidate by entityKind='alert', entityId=<the owner's user id>. Bump on shape changes.
-const CACHE_EPOCH = 'v1';
+// v2 (2026-05-16): bumped after QA-data reset wipe.
+const CACHE_EPOCH = 'v2';
 
 const ALERT_SELECT = '*, from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*)';
 const WRITABLE = [

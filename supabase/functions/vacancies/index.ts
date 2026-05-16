@@ -40,7 +40,8 @@ const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 // the vacancy id for items). Bump the epoch when the response shape of GET /vacancies changes —
 // v3 added `linked_trip` + `linked_trip_id` (migration 039 / on_trip); v4 forces a refresh after
 // migration 040 reconciled 3 vacancies that drifted across the 039 deploy boundary.
-const CACHE_EPOCH = 'v4';
+// v5 (2026-05-16): bumped after QA-data reset wipe.
+const CACHE_EPOCH = 'v5';
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
   for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
