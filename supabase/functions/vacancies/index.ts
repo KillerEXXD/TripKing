@@ -189,6 +189,10 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
           else if (arr.length > 1) q = q.in('status', arr);
         } else if (!driverId) {
           q = q.in('status', ['active', 'matched']);
+          // Also hide rows whose window has already closed — the expire-stale cron
+          // (migration 048) runs every 5 min, this filter covers the gap. Driver's
+          // own list (?driver_id=…) still sees stale rows so they can clean up.
+          q = q.or(`available_until.is.null,available_until.gt.${new Date().toISOString()}`);
         }
         if (driverId) q = q.eq('driver_id', driverId);
         // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
