@@ -114,6 +114,29 @@ export interface ReferralLink {
   referredUser?: ReferredUser;
 }
 
+// ── Stage 7 — withdrawals ────────────────────────────────────────────────────
+
+export type WithdrawalStatus = 'requested' | 'approved' | 'processing' | 'paid' | 'rejected' | 'cancelled' | 'failed';
+
+export interface Withdrawal {
+  id: string;
+  userId?: string;
+  amountPaise: number;
+  upiId: string;
+  status: WithdrawalStatus;
+  provider?: string;
+  providerPayoutId?: string;
+  externalTxnRef?: string;
+  rejectedReason?: string;
+  adminActorUserId?: string;
+  requestedAt: string;
+  approvedAt?: string;
+  paidAt?: string;
+  failedAt?: string;
+  /** Joined when called via /admin/withdrawals. */
+  user?: { displayName?: string; phone?: string; role?: 'driver' | 'trip_manager' | 'admin' };
+}
+
 /** `GET /referrals/me/earnings` — per-day rollup of accruals. */
 export interface ReferralEarningsBucket {
   date: string;
