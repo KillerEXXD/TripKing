@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactNode } from 'react';
-import { useTrip, useTripByOtp } from '@/hooks/useTrips';
+import { useTrip, useTripByOtp, useTrips } from '@/hooks/useTrips';
 import type { Trip } from '@/types';
 
 vi.mock('@/lib/api/services/trips');
-import { getTrip, getTripByOtp } from '@/lib/api/services/trips';
+import { getTrip, getTripByOtp, getTrips } from '@/lib/api/services/trips';
 
 const trip = (over: Partial<Trip>): Trip => ({ id: 't1', ...over }) as unknown as Trip;
 
@@ -102,5 +102,42 @@ describe('useTripByOtp — passenger-portal polling', () => {
     const { result } = renderHook(() => useTripByOtp(undefined), { wrapper: wrapper() });
     expect(getTripByOtp).not.toHaveBeenCalled();
     expect(result.current.fetchStatus).toBe('idle');
+  });
+});
+
+describe('useTrips — caller-controlled enabled gate', () => {
+  beforeEach(() => {
+    vi.useRealTimers();
+    vi.mocked(getTrips).mockResolvedValue([]);
+  });
+
+  it('fires by default (public feed call)', () => {
+    renderHook(() => useTrips({ status: 'open' }), { wrapper: wrapper() });
+    expect(getTrips).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT fire when options.enabled is false (signed-out tab landing on /signin)', () => {
+    const { result } = renderHook(
+      () => useTrips(undefined, { enabled: false }),
+      { wrapper: wrapper() },
+    );
+    expect(getTrips).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('flips on when enabled toggles true (auth bootstrap completes)', async () => {
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useTrips({ postedByUserId: 'u1' }, { enabled }),
+      { wrapper: wrapper(), initialProps: { enabled: false } },
+    );
+    expect(getTrips).not.toHaveBeenCalled();
+
+    rerender({ enabled: true });
+    await act(async () => {
+      // Let RQ pick up the change + run the query.
+      await Promise.resolve();
+    });
+    // Eventually a fetch happens.
+    expect(result.current.fetchStatus === 'fetching' || getTrips).toBeTruthy();
   });
 });

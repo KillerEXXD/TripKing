@@ -171,7 +171,7 @@ function DriverHome({ driver }: { driver: Driver }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
 
-  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
   const invitedToDriveQuery = useTrips({ invited: 'me' });

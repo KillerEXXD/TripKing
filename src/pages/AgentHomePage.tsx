@@ -128,7 +128,7 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
 function AgentHome({ agent }: { agent: Agent }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
-  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined);
+  const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
 
   const myPosts = myPostsQuery.data ?? [];
   const inProgressTrips = myPosts.filter((t) => t.status === 'in_progress');
