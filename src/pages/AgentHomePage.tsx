@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -8,7 +8,7 @@ import { Badge, Button, Card, PriorityCard, SectionLabel } from '@/components/ui
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
+import { HomeTileRow } from '@/components/home/HomeTileRow';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -204,19 +204,7 @@ function AgentHome({ agent }: { agent: Agent }) {
           cta={{ label: 'View / edit profile' }}
         />
 
-        <PriorityCard
-          to="/analytics"
-          tone="blue"
-          icon={<BarChart3 className="size-3.5" aria-hidden />}
-          label="Your analytics"
-          title="Trips posted, applicants, fares"
-          subtitle="See how your trips are performing month over month."
-          cta={{ label: 'View analytics' }}
-        />
-      </div>
-
-      <div className="px-4 pb-4">
-        <ReferralCodeCard role="agent" />
+        <HomeTileRow role="agent" />
       </div>
 
       <div className="px-4 pb-4">

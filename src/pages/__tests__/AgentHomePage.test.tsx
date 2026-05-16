@@ -14,8 +14,11 @@ import { useTrips } from '@/hooks/useTrips';
 vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
 import { useVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
+// The home page now embeds <HomeTileRow>, which fans out to useAnalytics +
+// useReferral. Stub the whole component for these tests — its own coverage
+// lives in src/components/home/__tests__/HomeTileRow.test.tsx.
+vi.mock('@/components/home/HomeTileRow', () => ({ HomeTileRow: () => <div>home tile row</div> }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
-vi.mock('@/components/referral/ReferralCodeCard', () => ({ ReferralCodeCard: () => <div>referral card</div> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
 const agentUser: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -84,7 +87,10 @@ describe('AgentHomePage', () => {
     // The agent CTA — equivalent to the driver's "I'm vacant" — is always visible.
     expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
-    expect(screen.getByText(/your analytics/i)).toBeInTheDocument();
+    // The "Your analytics" PriorityCard was replaced by <HomeTileRow> (stubbed
+    // here as "home tile row"); analytics still surface but inside the compact
+    // 3-tile row instead of as a standalone card.
+    expect(screen.getByText('home tile row')).toBeInTheDocument();
     expect(screen.getByText(/haven't posted a trip yet/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });

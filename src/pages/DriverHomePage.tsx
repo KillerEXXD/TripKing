@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, CheckCircle2, Clock, MapPin, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, MapPin, Navigation, Sparkles, Star, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
@@ -14,8 +14,8 @@ import { Badge, Button, Card, SectionLabel } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
+import { HomeTileRow } from '@/components/home/HomeTileRow';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { ReferralCodeCard } from '@/components/referral/ReferralCodeCard';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -259,19 +259,7 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        <PriorityCard
-          to="/my-earnings"
-          tone="teal"
-          icon={<TrendingUp className="size-3.5" aria-hidden />}
-          label="Your earnings"
-          title="Trips, payouts & monthly trend"
-          subtitle="See what you've earned and where you're trending."
-          cta={{ label: 'View earnings' }}
-        />
-      </div>
-
-      <div className="px-4 pb-4">
-        <ReferralCodeCard role="driver" />
+        <HomeTileRow role="driver" />
       </div>
 
       <div className="px-4 pb-4">

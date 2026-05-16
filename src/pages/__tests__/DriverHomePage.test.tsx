@@ -25,8 +25,11 @@ vi.mock('@/hooks/useAdminConfig', () => ({
   cityHooks: { useList: vi.fn(() => ({ data: [] })) },
   useAppSettings: vi.fn(() => ({ isPending: false, data: { maxActiveVacanciesPerDriver: 2 } })),
 }));
+// The home page now embeds <HomeTileRow>, which fans out to useAnalytics +
+// useReferral. Stub the whole component for these tests — its own coverage
+// lives in src/components/home/__tests__/HomeTileRow.test.tsx.
+vi.mock('@/components/home/HomeTileRow', () => ({ HomeTileRow: () => <div>home tile row</div> }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
-vi.mock('@/components/referral/ReferralCodeCard', () => ({ ReferralCodeCard: () => <div>referral card</div> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
 const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
