@@ -16,21 +16,22 @@
   box-shadow:
     0 -1px 0 rgba(0, 0, 0, 0.05),
     0 -6px 20px rgba(0, 0, 0, 0.05);
-  /* Use longhand properties (not the shorthand) — the calc(env(...)) form
-   * in `padding: 10px 20px calc(...)` was unreliable through the build
-   * pipeline on some targets and the bottom 10px collapsed, clipping the
-   * stacked labels. Longhand splits + an explicit min-height guarantees
-   * the icon + label stack always has room (icon ~28 + gap 4 + label 10
-   * + 10/10 top/bottom = 62px floor). */
-  padding-top: 10px;
+  /* Longhand padding properties (not shorthand) so build-pipeline shorthand
+   * collapsing can't drop a side. !important on padding-bottom + height
+   * because the user reported the labels still clipped even after prior
+   * fixes — at this point we're defending against anything that might
+   * shrink the nav frame including conflicting Tailwind utilities. */
+  padding-top: 10px !important;
   padding-right: 20px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
   padding-left: 20px;
-  /* Hard floor for the nav frame, EXCLUDING the safe-area inset which the
-   * padding-bottom accounts for. Using `height` (not min-height) so any
-   * single failed rule above can't collapse the nav. 84px = 28 icon + 4
-   * gap + 12 label-block + 20 top/bottom padding floor. */
-  height: calc(84px + env(safe-area-inset-bottom, 0px));
+  /* Hard floor for the nav frame. 92px = 28 icon + 4 gap + 12 label + 24
+   * vertical padding + 24 breathing room. The active pill (52px content)
+   * + 10/12 padding = 74. Adding a generous buffer so the label sits well
+   * above the bottom edge regardless of zoom level. */
+  height: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+  min-height: 92px;
+  box-sizing: border-box;
 }
 
 .bottom-nav-button {

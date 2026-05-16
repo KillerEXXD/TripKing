@@ -181,15 +181,17 @@ function ReferralTile({ code, link }: { code?: string; link?: string }) {
 
   // Copy button sits inline next to the code so the referral tile reads as
   // {code} {Copy} on one row — easier to scan than a top-corner action.
+  // The code is shrunk to text-sm + no extra tracking so 8-char codes like
+  // "TKEJFZAB" fit in the 1/3-width tile without ellipsis truncation.
   const primary = (
-    <span className="flex items-center gap-1.5">
-      <code className="truncate font-mono tracking-wider">{code ?? '—'}</code>
+    <span className="flex items-center gap-1">
+      <code className="min-w-0 truncate font-mono text-sm leading-none">{code ?? '—'}</code>
       {hasCode ? (
         <button
           type="button"
           onClick={onCopy}
           aria-label={copied ? 'Referral link copied' : 'Copy referral link'}
-          className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-surface text-purple-accent hover:brightness-95 [&_svg]:size-3"
+          className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-surface text-purple-accent hover:brightness-95 [&_svg]:size-3"
         >
           {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
         </button>
