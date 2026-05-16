@@ -141,9 +141,9 @@ const CANCEL_REASONS = [
 function setCancelReasons(over: { isPending?: boolean; isError?: boolean; data?: unknown[]; refetch?: () => void } = {}) {
   vi.mocked(cancelReasonHooks.useList).mockReturnValue({ isPending: false, isError: false, data: CANCEL_REASONS, refetch: vi.fn(), ...over } as never);
 }
-let storeState: { byTrip: Record<string, unknown>; recordApplication: ReturnType<typeof vi.fn>; clearApplication: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn> };
+let storeState: { byTrip: Record<string, unknown>; recordApplication: ReturnType<typeof vi.fn>; clearApplication: ReturnType<typeof vi.fn>; markWithdrawn: ReturnType<typeof vi.fn>; reset: ReturnType<typeof vi.fn> };
 function setStore(byTrip: Record<string, unknown> = {}) {
-  storeState = { byTrip, recordApplication: vi.fn(), clearApplication: vi.fn(), reset: vi.fn() };
+  storeState = { byTrip, recordApplication: vi.fn(), clearApplication: vi.fn(), markWithdrawn: vi.fn(), reset: vi.fn() };
   vi.mocked(useMyApplicationsStore).mockImplementation(((selector?: (s: typeof storeState) => unknown) => (selector ? selector(storeState) : storeState)) as never);
 }
 
@@ -255,7 +255,9 @@ describe('TripDetailPage', () => {
     expect(screen.queryByRole('button', { name: /apply for this trip/i })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /withdraw application/i }));
     await waitFor(() => expect(withdrawMutateAsync).toHaveBeenCalledWith({ tripId: 't1', acceptanceId: 'a1' }));
-    await waitFor(() => expect(storeState.clearApplication).toHaveBeenCalledWith('t1'));
+    // The withdraw flow now marks the row instead of dropping it so the card can
+    // surface the "withdrawn" state in light red - matches the production UX.
+    await waitFor(() => expect(storeState.markWithdrawn).toHaveBeenCalledWith('t1'));
   });
 
   it('nudges the driver to add a vehicle when they have none', () => {

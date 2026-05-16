@@ -14,8 +14,11 @@ import { useTrips } from '@/hooks/useTrips';
 vi.mock('@/hooks/useVacancies', () => ({ useVacancies: vi.fn() }));
 import { useVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
+// The home page now embeds <HomeTileRow>, which fans out to useAnalytics +
+// useReferral. Stub the whole component for these tests — its own coverage
+// lives in src/components/home/__tests__/HomeTileRow.test.tsx.
+vi.mock('@/components/home/HomeTileRow', () => ({ HomeTileRow: () => <div>home tile row</div> }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
-vi.mock('@/components/home/ReferralActionTile', () => ({ ReferralActionTile: () => <a href="/referrals" aria-label="View referrals">View referrals</a> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
 const agentUser: User = { id: 'u1', role: 'trip_manager', phone: '+91', displayName: 'Agent A', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -74,17 +77,23 @@ describe('AgentHomePage', () => {
     setMyAgent({ data: agent });
     setTrips({ data: [] });
     renderHome();
-    expect(screen.getByText('Agent', { selector: 'span.truncate' })).toBeInTheDocument();
-    expect(screen.getByText('Agent', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
+    // Header uses getFirstName() ("Agent A" -> "Agent A") + a compact role
+    // badge circle ("A" with title="Agent").
+    expect(screen.getByText('Agent A', { selector: 'span.truncate' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Agent')).toBeInTheDocument();
     // Empty Driving-now and Review placeholders are no longer rendered.
     expect(screen.queryByText(/no trips in progress/i)).toBeNull();
     expect(screen.queryByText(/no applicants waiting/i)).toBeNull();
     // The agent CTA — equivalent to the driver's "I'm vacant" — is always visible.
     expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /view analytics/i })).toHaveAttribute('href', '/analytics');
-    expect(screen.getByRole('link', { name: /view referrals/i })).toHaveAttribute('href', '/referrals');
-    // 'recent trips' section was removed from Agent Home (replaced by the tile row + InvitesSent + priority stack)
+    // The "Your analytics" PriorityCard was replaced by <HomeTileRow> (stubbed
+    // here as "home tile row"); analytics still surface but inside the compact
+    // 3-tile row instead of as a standalone card.
+    expect(screen.getByText('home tile row')).toBeInTheDocument();
+    // "Your recent trips" listing was removed (PR #192 on main) — agents now
+    // jump to /posted-trips via the bottom-nav "My Posts" tab. Don't expect
+    // the empty-state copy anymore.
     expect(screen.queryByText(/haven't posted a trip yet/i)).toBeNull();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
@@ -104,7 +113,7 @@ describe('AgentHomePage', () => {
   it('surfaces the Review card when a posted trip has applicants (recent-trips section removed)', () => {
     setTrips({ data: [makeTrip({ id: 't1' }), makeTrip({ id: 't2', status: 'has_applicants', applicantCount: 1, fromCity: city('c3', 'Bangalore') })] });
     renderHome();
-    // The "recent trips" section was removed; only the Review priority card remains.
+    // Recent-trips listing has been removed; only the Review priority card surfaces the trip route.
     expect(screen.getByText('Bangalore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/1 driver applied/i)).toBeInTheDocument();
   });

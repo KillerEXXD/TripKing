@@ -5,6 +5,7 @@
  */
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ChevronRight, Circle, Clock3, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { StatusBanner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import type { VerificationStepStatus, VerificationSummary } from '@/types';
 import { DRIVER_VERIFICATION_STEPS, type VerificationStepMeta } from './verificationSteps';
@@ -30,10 +31,7 @@ export function VerificationChecklist({ verification, steps = DRIVER_VERIFICATIO
 
   if (kycStatus === 'approved') {
     return (
-      <div className={cn('flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3', className)}>
-        <ShieldCheck className="size-5 text-emerald-600" aria-hidden />
-        <span className="text-sm font-semibold text-emerald-800">Verified — you can apply to and post trips.</span>
-      </div>
+      <StatusBanner tone="success" icon={<ShieldCheck />} title="Verified — you can apply to and post trips." className={className} />
     );
   }
 

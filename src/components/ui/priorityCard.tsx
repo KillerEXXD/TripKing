@@ -22,27 +22,34 @@ interface ToneClasses {
   pill: string;
 }
 
+// Redesign retint (docs/UI_REDESIGN_PLAN.md): each tone now resolves through
+// the --color-*-accent / --color-*-accent-light token pairs from src/index.css
+// instead of hard-coded Tailwind palettes. Visual API is unchanged (same 6 tone
+// keys, same general look) so every consumer keeps working; a future re-theme
+// only has to retint the tokens. Teal keeps the Tailwind teal palette because
+// the redesign system has no teal slot — the "money / outcomes" semantic is
+// distinct enough from green/blue that collapsing it would lose meaning.
 const TONE: Record<PriorityCardTone, ToneClasses> = {
   emerald: {
-    outer: 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100',
-    label: 'text-emerald-700',
+    outer: 'border-green-accent bg-green-accent-light hover:brightness-95',
+    label: 'text-green-accent',
     title: 'text-emerald-950',
     subtitle: 'text-emerald-800',
-    pill: 'bg-emerald-700',
+    pill: 'bg-green-accent',
   },
   indigo: {
-    outer: 'border-indigo-300 bg-indigo-50 hover:bg-indigo-100',
-    label: 'text-indigo-700',
+    outer: 'border-purple-accent bg-purple-accent-light hover:brightness-95',
+    label: 'text-purple-accent',
     title: 'text-indigo-950',
     subtitle: 'text-indigo-800',
-    pill: 'bg-indigo-700',
+    pill: 'bg-purple-accent',
   },
   amber: {
-    outer: 'border-amber-300 bg-amber-50 hover:bg-amber-100',
-    label: 'text-amber-700',
+    outer: 'border-amber-accent bg-amber-accent-light hover:brightness-95',
+    label: 'text-amber-accent',
     title: 'text-amber-950',
     subtitle: 'text-amber-800',
-    pill: 'bg-amber-700',
+    pill: 'bg-amber-accent',
   },
   teal: {
     outer: 'border-teal-300 bg-teal-50 hover:bg-teal-100',
@@ -52,18 +59,18 @@ const TONE: Record<PriorityCardTone, ToneClasses> = {
     pill: 'bg-teal-700',
   },
   blue: {
-    outer: 'border-blue-300 bg-blue-50 hover:bg-blue-100',
-    label: 'text-blue-700',
+    outer: 'border-blue-accent bg-blue-accent-light hover:brightness-95',
+    label: 'text-blue-accent',
     title: 'text-blue-950',
     subtitle: 'text-blue-800',
-    pill: 'bg-blue-700',
+    pill: 'bg-blue-accent',
   },
   slate: {
-    outer: 'border-slate-200 bg-slate-50',
-    label: 'text-slate-500',
+    outer: 'border-grey-accent bg-grey-accent-light',
+    label: 'text-grey-accent',
     title: 'text-slate-700',
     subtitle: 'text-slate-500',
-    pill: 'bg-slate-700',
+    pill: 'bg-grey-accent',
   },
 };
 

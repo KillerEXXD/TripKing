@@ -21,6 +21,29 @@ describe('useMyApplicationsStore', () => {
     useMyApplicationsStore.getState().reset();
     expect(Object.keys(useMyApplicationsStore.getState().byTrip)).toHaveLength(0);
   });
+
+  it('markWithdrawn stamps withdrawnAt on the row but keeps the row in the store', () => {
+    useMyApplicationsStore.getState().recordApplication({ tripId: 't1', acceptanceId: 'a1', appliedAt: '2026-05-01T00:00:00Z' });
+    useMyApplicationsStore.getState().markWithdrawn('t1');
+    const row = useMyApplicationsStore.getState().byTrip.t1;
+    expect(row).toBeDefined();
+    expect(row?.withdrawnAt).toBeTruthy();
+    expect(typeof row?.withdrawnAt).toBe('string');
+  });
+
+  it('markWithdrawn is a no-op when the row does not exist (safe to call from a stale UI)', () => {
+    useMyApplicationsStore.getState().markWithdrawn('does-not-exist');
+    expect(useMyApplicationsStore.getState().byTrip['does-not-exist']).toBeUndefined();
+  });
+
+  it('recordApplication overwrites a previously-withdrawn row (re-apply clears withdrawnAt)', () => {
+    useMyApplicationsStore.getState().recordApplication({ tripId: 't1', acceptanceId: 'a1', appliedAt: '2026-05-01T00:00:00Z' });
+    useMyApplicationsStore.getState().markWithdrawn('t1');
+    expect(useMyApplicationsStore.getState().byTrip.t1?.withdrawnAt).toBeTruthy();
+    useMyApplicationsStore.getState().recordApplication({ tripId: 't1', acceptanceId: 'a2', appliedAt: '2026-05-02T00:00:00Z' });
+    expect(useMyApplicationsStore.getState().byTrip.t1?.withdrawnAt).toBeUndefined();
+    expect(useMyApplicationsStore.getState().byTrip.t1?.acceptanceId).toBe('a2');
+  });
 });
 
 describe('timeAgo', () => {

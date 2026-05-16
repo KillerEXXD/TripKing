@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -8,13 +8,13 @@ import { Button, Card, PriorityCard } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { HomeTile } from '@/components/home/HomeTile';
-import { ReferralActionTile } from '@/components/home/ReferralActionTile';
+import { HomeTileRow } from '@/components/home/HomeTileRow';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
 import type { Agent, Trip } from '@/types';
+
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
@@ -128,6 +128,8 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
 function AgentHome({ agent }: { agent: Agent }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
+  // Auth fix from main (PR #195): gate the user-scoped query with enabled so
+  // an in-flight poll doesn't fire against a freshly-nulled session.
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
 
   const myPosts = myPostsQuery.data ?? [];
@@ -137,7 +139,7 @@ function AgentHome({ agent }: { agent: Agent }) {
 
   return (
     <div>
-      <header className="flex items-end justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-1.5">
@@ -183,12 +185,7 @@ function AgentHome({ agent }: { agent: Agent }) {
           cta={{ label: 'View / edit profile' }}
         />
 
-        {/* Quick-access tile row: 3 equal-width compact tiles in a single row. */}
-        <div className="grid grid-cols-3 gap-2">
-          <HomeTile to="/wallet"    icon={Wallet}    label="Wallet"    sub="Top up"  tone="teal" ariaLabel="View wallet" />
-          <HomeTile to="/analytics" icon={BarChart3} label="Analytics" sub="Trends"  tone="blue" ariaLabel="View analytics" />
-          <ReferralActionTile role="agent" />
-        </div>
+        <HomeTileRow role="agent" />
       </div>
 
       <div className="px-4 pb-4">
@@ -203,7 +200,7 @@ function AgentHome({ agent }: { agent: Agent }) {
 function AgentHomeChromeFallback() {
   return (
     <div>
-      <header className="flex items-end justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="text-base font-semibold">Loading your home…</div>

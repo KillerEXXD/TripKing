@@ -1,35 +1,25 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, MapPin, X } from 'lucide-react';
+import { MapPin, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
 import { PlacePinField } from '@/components/location/PlacePinField';
-import { Badge, Button, Card, Input } from '@/components/ui';
+import { PageHeader, PageShell } from '@/components/layout';
+import { Badge, Button, Card, Input, SectionLabel, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { KycGateNotice } from '@/components/driver';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatShortDate } from '@/lib/utils';
 import type { Place, PostVacancyInput } from '@/types';
 
-const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
+const selectClass = 'h-11 w-full rounded-control border border-input bg-background px-3 text-base';
 const HOUR_MS = 3_600_000;
 const MIN_HOURS = 0.5;
 const MAX_HOURS = 24;
 const DEFAULT_HOURS = 4;
-
-function FlowHeader({ onBack, title }: { onBack: () => void; title: string }) {
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">{title}</h1>
-    </header>
-  );
-}
 
 /** A `Date` → the value an `<input type="datetime-local">` expects: `YYYY-MM-DDTHH:mm` in local time. */
 function toDatetimeLocalValue(d: Date): string {
@@ -142,55 +132,47 @@ export function PostVacancyPage() {
     }
   }
 
+  const pageTitle = isEdit ? 'Edit your availability' : 'Post your availability';
+
   if (citiesQuery.isPending) {
     return (
-      <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
-        <div className="p-4">
-          <LoadingSkeleton rows={5} />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader title={pageTitle} backTo="/vacancies" />
+        <LoadingSkeleton rows={5} />
+      </PageShell>
     );
   }
   if (isEdit && vacancyQuery.isPending) {
     return (
-      <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} title="Edit your availability" />
-        <div className="p-4">
-          <LoadingSkeleton rows={5} />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader title="Edit your availability" backTo="/vacancies" />
+        <LoadingSkeleton rows={5} />
+      </PageShell>
     );
   }
   if (isEdit && vacancyQuery.isError) {
     return (
-      <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} title="Edit your availability" />
-        <div className="p-4">
-          <ErrorState title="Couldn't load this vacancy" message="We couldn't fetch the details — try again." onRetry={() => void vacancyQuery.refetch()} />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader title="Edit your availability" backTo="/vacancies" />
+        <ErrorState title="Couldn't load this vacancy" message="We couldn't fetch the details — try again." onRetry={() => void vacancyQuery.refetch()} />
+      </PageShell>
     );
   }
   if (citiesQuery.isError) {
     return (
-      <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
-        <div className="p-4">
-          <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader title={pageTitle} backTo="/vacancies" />
+        <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
+      </PageShell>
     );
   }
 
   if (myDriverQuery.data && myDriverQuery.data.kycStatus !== 'approved') {
     return (
-      <div className="mx-auto max-w-md">
-        <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
-        <div className="p-4">
-          <KycGateNotice heading="Get verified to post your availability" body="Once your account is verified — documents, your vehicle, and a quick video call — you can show as available so agents can find you." />
-        </div>
-      </div>
+      <PageShell>
+        <PageHeader title={pageTitle} backTo="/vacancies" />
+        <KycGateNotice heading="Get verified to post your availability" body="Once your account is verified — documents, your vehicle, and a quick video call — you can show as available so agents can find you." />
+      </PageShell>
     );
   }
 
@@ -199,9 +181,9 @@ export function PostVacancyPage() {
   const shownCities = cities.filter((c) => (q === '' || c.name.toLowerCase().includes(q)) || destinationCityIds.includes(c.id));
 
   return (
-    <div className="mx-auto max-w-md">
-      <FlowHeader onBack={() => navigate('/vacancies')} title={isEdit ? 'Edit your availability' : 'Post your availability'} />
-      <div className="space-y-3 p-4">
+    <PageShell className="pb-32">
+      <PageHeader title={pageTitle} backTo="/vacancies" />
+      <div className="space-y-3">
       <Card className="gap-3">
         <div className="space-y-1.5">
           <label className="block space-y-1">
@@ -270,7 +252,7 @@ export function PostVacancyPage() {
       </Card>
 
       <Card className="gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Willing to drive to</div>
+        <SectionLabel>Willing to drive to</SectionLabel>
         <Input
           type="search"
           value={destQuery}
@@ -287,7 +269,7 @@ export function PostVacancyPage() {
                 <button
                   key={c.id}
                   type="button"
-                  aria-pressed={active ? 'true' : 'false'}
+                  aria-pressed={active}
                   onClick={() => toggleDestination(c.id)}
                   className={`rounded-full border px-3 py-1 text-xs font-semibold ${active ? 'border-primary bg-primary/15 text-primary' : 'border-input bg-background hover:border-primary/40'}`}
                 >
@@ -336,20 +318,23 @@ export function PostVacancyPage() {
       </Card>
 
       {postVacancy.isError || updateVacancy.isError ? <p className="text-sm text-red-700">{isEdit ? "Couldn't save your changes — please try again." : "Couldn't post your availability — please try again."}</p> : null}
-      <div className="flex gap-2">
-        <Button type="button" variant="outline" className="shrink-0" onClick={() => navigate('/vacancies')} disabled={pending}>
-          Cancel
-        </Button>
-        <Button type="button" variant="full" className="min-w-0 flex-1" onClick={() => void onSubmit()} disabled={!canSubmit}>
-          {pending ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save changes' : 'Post vacant'}
-        </Button>
       </div>
-      </div>
+
+      <StickyFooterCTA>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="shrink-0" onClick={() => navigate('/vacancies')} disabled={pending}>
+            Cancel
+          </Button>
+          <Button type="button" variant="full" className="min-w-0 flex-1" onClick={() => void onSubmit()} disabled={!canSubmit}>
+            {pending ? (isEdit ? 'Saving…' : 'Posting…') : isEdit ? 'Save changes' : 'Post vacant'}
+          </Button>
+        </div>
+      </StickyFooterCTA>
 
       {destPlacePickerOpen ? (
         <LocationSearchPanel title="Add a destination" placeholder="Search a town, area, or landmark…" onPick={addDestPlace} onClose={() => setDestPlacePickerOpen(false)} />
       ) : null}
-    </div>
+    </PageShell>
   );
 }
 

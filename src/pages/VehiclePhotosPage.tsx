@@ -5,11 +5,12 @@
  * and the resulting object path is saved on the vehicle.
  */
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
+import { CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateVehicle, useVehicle } from '@/hooks/useVehicles';
 import { getVehiclePhotoUploadUrl } from '@/lib/api/services/vehicles';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, StatusBanner } from '@/components/ui';
 import { FileUpload } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { Vehicle, VehicleInput, VehiclePhotoSlot } from '@/types';
@@ -25,14 +26,7 @@ const VEHICLE_URL: Record<VehiclePhotoSlot, keyof Vehicle> = {
 const REQUIRED: VehiclePhotoSlot[] = ['front', 'back', 'left', 'right', 'plate', 'rc', 'insurance'];
 
 function Header({ onBack }: { onBack: () => void }) {
-  return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">Vehicle photos &amp; papers</h1>
-    </header>
-  );
+  return <PageHeader title="Vehicle photos & papers" onBack={onBack} />;
 }
 
 export function VehiclePhotosPage() {
@@ -104,9 +98,7 @@ export function VehiclePhotosPage() {
         </Card>
 
         {allRequiredDone ? (
-          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-            <CheckCircle2 className="size-4" aria-hidden /> All required photos & papers are in. You can move on.
-          </div>
+          <StatusBanner tone="success" icon={<CheckCircle2 />} title="All required photos & papers are in. You can move on." />
         ) : (
           <p className="text-xs text-secondary">Still needed: {missing.map((s) => s).join(', ')}.</p>
         )}

@@ -6,6 +6,7 @@
  * someone else's steps) and without exposing any document URLs.
  */
 import { CheckCircle2, Circle, Clock3, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { StatusBanner } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import type { VerificationStepStatus, VerificationSummary } from '@/types';
 import type { VerificationStepMeta } from './verificationSteps';
@@ -30,10 +31,7 @@ export function CounterpartyChecklist({ verification, steps = DRIVER_VERIFICATIO
 
   if (kycStatus === 'approved') {
     return (
-      <div className={cn('flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800', className)}>
-        <ShieldCheck className="size-4 text-emerald-600" aria-hidden />
-        Verified — all checks complete.
-      </div>
+      <StatusBanner tone="success" icon={<ShieldCheck />} title="Verified — all checks complete." className={className} />
     );
   }
 

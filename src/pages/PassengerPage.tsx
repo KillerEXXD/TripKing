@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Car, KeyRound, MapPin, MessageCircle, Phone, ShieldCheck, Wallet } from 'lucide-react';
 import { useTripByOtp } from '@/hooks/useTrips';
 import { TripTracking } from '@/components/trip/TripTracking';
-import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
+import { Avatar, AvatarFallback, Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
@@ -126,9 +126,9 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
           <p className="text-[11px] italic text-secondary">Share your OTP with the driver only when they arrive — it confirms you&apos;re the right passenger.</p>
         </Card>
       ) : (
-        <Card className="border-amber-200 bg-amber-50">
-          <p className="text-sm text-amber-900">A driver hasn&apos;t been assigned to this trip yet. Their details will show up here as soon as the trip manager picks one.</p>
-        </Card>
+        <StatusBanner tone="warning">
+          A driver hasn&apos;t been assigned to this trip yet. Their details will show up here as soon as the trip manager picks one.
+        </StatusBanner>
       )}
 
       <ContactCard title="Trip manager" name={trip.postedByName ?? trip.postedByHandle} sub={trip.postedByRole === 'driver' ? 'A driver who passed on this trip' : 'Trip Manager'} phone={trip.postedByPhone} callLabel={`Call ${trip.postedByName ?? trip.postedByHandle}`} />
@@ -224,7 +224,7 @@ export function PassengerPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col bg-gray-50">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
         <button type="button" aria-label="Back" onClick={() => (otp ? navigate('/passenger', { replace: true }) : navigate('/'))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>

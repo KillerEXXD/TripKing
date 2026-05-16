@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Bell, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard, ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { Card } from '@/components/ui';
+import { Card, SectionLabel } from '@/components/ui';
+import { PageShell } from '@/components/layout';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { getFirstName, initials } from '@/lib/utils';
 
@@ -62,12 +63,12 @@ function ProfileAvatar({ name }: { name: string }) {
 
 function AdminTileCard({ tile }: { tile: AdminTile }) {
   return (
-    <Link to={tile.to} className="flex flex-col gap-2 rounded-2xl border bg-white p-3.5 transition-colors hover:border-primary/40">
+    <Link to={tile.to} className="flex flex-col gap-2 rounded-card bg-surface p-3.5 shadow-card transition-shadow hover:shadow-md">
       <span className={`flex size-9 items-center justify-center rounded-full ${TONE[tile.tone]}`}>
         <tile.Icon className="size-5" aria-hidden />
       </span>
       <div className="text-sm font-semibold leading-tight">{tile.title}</div>
-      <div className="text-[11px] leading-snug text-secondary">{tile.desc}</div>
+      <div className="text-micro leading-snug text-muted-foreground">{tile.desc}</div>
     </Link>
   );
 }
@@ -82,25 +83,29 @@ function AdminTileCard({ tile }: { tile: AdminTile }) {
 export function HomePage() {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
+  const name = user?.displayName || user?.phone || 'Admin';
+  // The admin home gets a bespoke greeting header (badge + bell + avatar) — too custom for the
+  // generic <PageHeader>; lay it out as a sticky band that mirrors the redesign surface + shadow
+  // so it visually matches the other pages.
   return (
-    <div>
-      <header className="flex items-end justify-between gap-3 border-b bg-white px-4 py-3">
+    <PageShell>
+      <header className="sticky top-0 z-10 -mx-4 mb-3 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
-          <div className="text-xs text-secondary">Welcome back</div>
+          <div className="text-micro text-muted-foreground">Welcome back</div>
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || user?.phone || 'Admin'}</span>
-            <span aria-label="Admin" title="Admin" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-violet-600 text-[10px] font-bold text-white">Ad</span>
+            <span aria-label="Admin" title="Admin" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-purple-accent text-[10px] font-bold text-white">Ad</span>
           </div>
         </div>
         <div className="flex items-center gap-1">
           <Bellish count={unread} />
-          <ProfileAvatar name={user?.displayName || user?.phone || 'Admin'} />
+          <ProfileAvatar name={name} />
         </div>
       </header>
 
-      <div className="space-y-4 px-4 pb-4 pt-3">
+      <div className="space-y-4">
         <section className="space-y-2">
-          <h2 className="px-1 text-sm font-semibold">Administration</h2>
+          <SectionLabel className="px-1">Administration</SectionLabel>
           <div className="grid grid-cols-2 gap-2.5">
             {ADMIN_TILES.map((t) => (
               <AdminTileCard key={t.to} tile={t} />
@@ -109,8 +114,8 @@ export function HomePage() {
         </section>
 
         <Card className="gap-2">
-          <h2 className="text-sm font-semibold">Marketplace</h2>
-          <p className="text-xs text-secondary">Browse the live marketplace, or use the switcher above to act as a driver or an agent.</p>
+          <SectionLabel>Marketplace</SectionLabel>
+          <p className="text-xs text-muted-foreground">Browse the live marketplace, or use the switcher above to act as a driver or an agent.</p>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <Link to="/trips" className="text-primary underline">Browse trips</Link>
             <Link to="/vacancies" className="text-primary underline">Vacant drivers</Link>
@@ -119,13 +124,13 @@ export function HomePage() {
           </div>
         </Card>
 
-        <Link to="/administration" className="flex items-center gap-1 px-1 text-xs text-secondary hover:text-foreground">
+        <Link to="/administration" className="flex items-center gap-1 px-1 text-xs text-muted-foreground hover:text-foreground">
           Full administration page <ChevronRight className="size-3.5" aria-hidden />
         </Link>
 
         <InstallAppCard dismissable />
       </div>
-    </div>
+    </PageShell>
   );
 }
 

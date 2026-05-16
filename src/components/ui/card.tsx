@@ -6,7 +6,12 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        'bg-card text-card-foreground flex flex-col gap-4 rounded-2xl border p-4 shadow-sm',
+        // UI redesign tokens (docs/UI_REDESIGN_PLAN.md Layer 1):
+        // - bg-surface + text-card-foreground (was bg-card — surface token now drives every card)
+        // - rounded-card (16px token) — replaces rounded-2xl
+        // - shadow-card token — replaces the lighter shadow-sm
+        // - no border by default — the redesign uses depth, not borders, to separate cards from page bg
+        'bg-surface text-card-foreground flex flex-col gap-4 rounded-card p-4 shadow-card',
         className,
       )}
       {...props}

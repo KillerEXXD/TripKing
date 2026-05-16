@@ -70,14 +70,18 @@ describe('PriorityCard', () => {
   });
 
   it('applies the right tone-tinted classes (smoke test for the palette map)', () => {
+    // Post-redesign palette: emerald/blue/etc. resolve through the
+    // --color-*-accent + --color-*-accent-light tokens (see TONE in
+    // priorityCard.tsx). Teal keeps Tailwind teal because the redesign
+    // system has no teal slot.
     const { container, rerender } = render(
       withRouter(<PriorityCard to="/" tone="emerald" icon={null} label="x" title="x" />),
     );
-    expect(container.firstChild).toHaveClass('border-emerald-300', 'bg-emerald-50');
+    expect(container.firstChild).toHaveClass('border-green-accent', 'bg-green-accent-light');
     rerender(withRouter(<PriorityCard to="/" tone="teal" icon={null} label="x" title="x" />));
     expect(container.firstChild).toHaveClass('border-teal-300', 'bg-teal-50');
     rerender(withRouter(<PriorityCard to="/" tone="blue" icon={null} label="x" title="x" />));
-    expect(container.firstChild).toHaveClass('border-blue-300', 'bg-blue-50');
+    expect(container.firstChild).toHaveClass('border-blue-accent', 'bg-blue-accent-light');
   });
 
   it('renders rightAction on the right of the header row', () => {

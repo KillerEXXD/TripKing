@@ -25,8 +25,11 @@ vi.mock('@/hooks/useAdminConfig', () => ({
   cityHooks: { useList: vi.fn(() => ({ data: [] })) },
   useAppSettings: vi.fn(() => ({ isPending: false, data: { maxActiveVacanciesPerDriver: 2 } })),
 }));
+// The home page now embeds <HomeTileRow>, which fans out to useAnalytics +
+// useReferral. Stub the whole component for these tests — its own coverage
+// lives in src/components/home/__tests__/HomeTileRow.test.tsx.
+vi.mock('@/components/home/HomeTileRow', () => ({ HomeTileRow: () => <div>home tile row</div> }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
-vi.mock('@/components/home/ReferralActionTile', () => ({ ReferralActionTile: () => <a href="/referrals" aria-label="View referrals">View referrals</a> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
 const driverUser: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi Kumar', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -102,17 +105,22 @@ describe('DriverHomePage', () => {
     expect(refetch).toHaveBeenCalled();
   });
 
-  it('renders the driver home — greeting, reputation, tile row', () => {
+  it('renders the driver home — greeting, reputation, tile row, nearby feed', () => {
     setMyDriver({ data: makeDriver() });
     setTrips({ data: [] });
     renderHome();
-    // Greeting uses the first name from the loaded profile, not the role label.
+    // Greeting uses getFirstName ("Ravi Kumar" -> "Ravi K") + a compact role
+    // badge circle ("D" with title="Driver").
     expect(screen.getByText('Ravi K')).toBeInTheDocument();
     expect(screen.getByLabelText('Driver')).toBeInTheDocument();
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
-    // Quick-access tile row replaces the old Earnings priority card + nearby feed.
-    expect(screen.getByRole('link', { name: /view earnings/i })).toHaveAttribute('href', '/my-earnings');
-    expect(screen.getByRole('link', { name: /view referrals/i })).toHaveAttribute('href', '/referrals');
+    // The HomeTileRow renders the Earnings/Analytics/Referral tile trio (stubbed
+    // here as "home tile row"); its own coverage is in HomeTileRow.test.tsx.
+    expect(screen.getByText('home tile row')).toBeInTheDocument();
+    // "Open trips near you" feed was removed (PR #190 on main) — drivers now
+    // browse via the bottom-nav "Find Trips" tab instead. Don't expect the
+    // empty-state copy anymore.
+    expect(screen.queryByText(/no open trips/i)).toBeNull();
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 

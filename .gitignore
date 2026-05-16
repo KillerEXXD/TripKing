@@ -54,3 +54,5 @@ Thumbs.db
 
 # Local-only QA preview output
 qase-import-preview.json
+
+COMMIT_MSG.tmp

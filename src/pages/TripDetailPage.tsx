@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
@@ -22,7 +22,7 @@ import { InsufficientBalanceModal, type InsufficientBalanceSide } from '@/compon
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
-import { Badge, Button, Card, PriorityCard } from '@/components/ui';
+import { Badge, Button, Card, PriorityCard, StatusBanner } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -31,15 +31,19 @@ import { toast } from 'sonner';
 import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { Trip, TripStatus, Vehicle } from '@/types';
 
+// Redesign: prefer the new semantic Badge variants (open / invited / live /
+// completed) where they fit the status; fall back to legacy info / warning /
+// destructive for the in-between lifecycle states the design system spec
+// doesn't name. Matches the STATUS_META map in PostedTripsPage.tsx.
 const STATUS_BADGE = {
-  open: { label: 'Open', variant: 'success' },
+  open: { label: 'Open', variant: 'open' },
   has_applicants: { label: 'Has applicants', variant: 'warning' },
   selected: { label: 'Awaiting acceptance', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'info' },
-  in_progress: { label: 'In progress', variant: 'info' },
-  completed: { label: 'Completed', variant: 'muted' },
+  in_progress: { label: 'In progress', variant: 'live' },
+  completed: { label: 'Completed', variant: 'completed' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
-} as const satisfies Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }>;
+} as const satisfies Record<TripStatus, { label: string; variant: 'open' | 'invited' | 'live' | 'completed' | 'warning' | 'info' | 'destructive' }>;
 
 function vehicleLabel(v: Vehicle): string {
   return [v.makeLabel, v.modelName].filter(Boolean).join(' ') || v.carTypeLabel || v.registrationNumber || 'Vehicle';
@@ -68,12 +72,12 @@ function Line({ label, value, muted, strong }: { label: string; value: string; m
 }
 
 /** Driver-only bottom CTA: pick a vehicle, optionally counter-quote, apply / withdraw. */
-function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycApproved }: { trip: Trip; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; kycApproved: boolean }) {
+function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycApproved, returnTo }: { trip: Trip; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; kycApproved: boolean; returnTo: string }) {
   const navigate = useNavigate();
   const vehiclesQuery = useDriverVehicles(myDriverId);
   const applyMutation = useApplyToTrip();
   const withdrawMutation = useWithdrawApplication();
-  const { byTrip, recordApplication, clearApplication } = useMyApplicationsStore();
+  const { byTrip, recordApplication, markWithdrawn } = useMyApplicationsStore();
   const myApplication: MyApplication | undefined = byTrip[trip.id];
 
   const activeVehicles = (vehiclesQuery.data ?? []).filter((v) => v.isActive);
@@ -83,7 +87,10 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   const [quoteNote, setQuoteNote] = useState('');
   const chosenVehicleId = vehicleId || activeVehicles[0]?.id;
   const busy = applyMutation.isPending || withdrawMutation.isPending;
-  const isApplied = !!myApplication;
+  // `withdrawn` means the driver pulled out (the store keeps the row instead of dropping it);
+  // `isApplied` is the active "I have an outstanding application" state.
+  const withdrawn = !!myApplication?.withdrawnAt;
+  const isApplied = !!myApplication && !withdrawn;
 
   async function onApply() {
     if (!chosenVehicleId) {
@@ -95,6 +102,9 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
       const acc = await applyMutation.mutateAsync({ tripId: trip.id, input: { vehicleId: chosenVehicleId, quotedRatePerKm: Number.isFinite(rate) && rate > 0 ? Math.round(rate) : undefined, message: quoteNote.trim() || undefined } });
       recordApplication({ tripId: trip.id, acceptanceId: acc.id, appliedAt: acc.appliedAt, quotedRatePerKm: acc.applicantQuotedRatePerKm, message: acc.applicantMessage });
       toast.success('Applied — the trip manager has been notified.');
+      // Briefly show the "Applied" pill so the driver sees their action
+      // registered, then return them to where they came from (Open Trips).
+      setTimeout(() => navigate(returnTo), 900);
     } catch {
       toast.error("Couldn't apply — please try again.");
     }
@@ -103,7 +113,9 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
     if (!myApplication) return;
     try {
       await withdrawMutation.mutateAsync({ tripId: trip.id, acceptanceId: myApplication.acceptanceId });
-      clearApplication(trip.id);
+      // Mark withdrawn (don't delete) so the trip card keeps showing the status
+      // in light red — reminds the driver they pulled out and prevents a stale re-apply.
+      markWithdrawn(trip.id);
       toast.success('Application withdrawn.');
     } catch {
       toast.error("Couldn't withdraw — please try again.");
@@ -112,7 +124,14 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md space-y-2 border-t bg-white px-4 py-3">
-      {isApplied ? (
+      {withdrawn ? (
+        <>
+          <div className="flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-3 text-sm font-bold text-red-800">
+            <XCircle className="size-4" aria-hidden /> Application withdrawn
+          </div>
+          <p className="px-2 text-center text-xs text-red-700/80">You withdrew {myApplication?.withdrawnAt ? timeAgo(myApplication.withdrawnAt) : ''}. Re-apply below if you change your mind.</p>
+        </>
+      ) : isApplied ? (
         <>
           <div className="flex items-center justify-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm font-bold text-emerald-900">
             <CheckCircle2 className="size-4" aria-hidden /> Applied
@@ -451,9 +470,7 @@ function PassengerEditForm({ trip, onSaved }: { trip: Trip; onSaved?: () => void
         {errors.passengerName ? <span className="block text-xs text-red-700">{errors.passengerName.message}</span> : null}
       </label>
       {phoneLookupable && knownPassenger ? (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-800">
-          ✓ Existing passenger — {knownPassenger.name}
-        </div>
+        <StatusBanner tone="success" title={`✓ Existing passenger — ${knownPassenger.name}`} />
       ) : null}
       <div className="grid grid-cols-2 gap-3">
         <label className="block space-y-1">
@@ -617,7 +634,7 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
   );
 }
 
-function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; iPosted: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
+function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; iPosted: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean; returnTo: string }) {
   // Defensive fallback: trip.status comes from the server; an unrecognised value would
   // otherwise crash render with "Cannot read properties of undefined (reading 'variant')".
   const badge = STATUS_BADGE[trip.status] ?? { label: String(trip.status), variant: 'muted' as const };
@@ -655,20 +672,35 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
       {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
       {showApplyBar && myApplication ? (
-        <Card className="border-emerald-200 bg-emerald-50">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-emerald-900">
-                You&apos;ve applied — waiting for the trip manager
-                {trip.applicantCount > 0 ? (
-                  <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
-                ) : null}
+        myApplication.withdrawnAt ? (
+          // Withdrawn — soft red wash so the driver remembers they pulled out.
+          <Card className="border-red-200 bg-red-50">
+            <div className="flex items-start gap-2">
+              <XCircle className="mt-0.5 size-5 shrink-0 text-red-700" aria-hidden />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-red-900">
+                  Application withdrawn
+                </div>
+                <div className="text-xs text-red-700">You withdrew {timeAgo(myApplication.withdrawnAt)}. Re-apply below if you change your mind.</div>
               </div>
-              <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        ) : (
+          <Card className="border-emerald-200 bg-emerald-50">
+            <div className="flex items-start gap-2">
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-emerald-900">
+                  You&apos;ve applied — waiting for the trip manager
+                  {trip.applicantCount > 0 ? (
+                    <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
+                  ) : null}
+                </div>
+                <div className="text-xs text-emerald-700">Submitted {timeAgo(myApplication.appliedAt)} · we&apos;ll notify you with their decision.</div>
+              </div>
+            </div>
+          </Card>
+        )
       ) : null}
       <Card className="gap-3">
         <div className="flex items-start justify-between gap-3">
@@ -786,10 +818,9 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
 
           {/* Prompt banner when redirected from assign flow */}
           {fillPassenger && !editingPassenger && passengerMissing ? (
-            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900">
-              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-              <span>Almost done — enter the passenger details so the driver knows who to pick up.</span>
-            </div>
+            <StatusBanner tone="warning" icon={<Info />}>
+              Almost done — enter the passenger details so the driver knows who to pick up.
+            </StatusBanner>
           ) : null}
 
           {editingPassenger ? (
@@ -848,7 +879,7 @@ function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isD
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
       {viewer.isAssignedDriver ? <DriverLocationReporter driverId={viewer.myDriverId} active={trip.status === 'in_progress'} /> : null}
-      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} /> : showAcceptedBar ? <AcceptedDriverBar trip={trip} /> : null}
+      {showApplyBar ? <ApplyBar trip={trip} myDriverId={viewer.myDriverId} myDriverPending={viewer.myDriverPending} myDriverMissing={viewer.myDriverMissing} kycApproved={viewer.myDriverKycApproved} returnTo={returnTo} /> : showAcceptedBar ? <AcceptedDriverBar trip={trip} /> : null}
       {showShareLink && trip.passengerOtp ? <PassengerLinkModal trip={trip} otp={trip.passengerOtp} onClose={() => setShowShareLink(false)} /> : null}
       {detailsEditable ? <EditTripDialog trip={trip} open={showEditDialog} onClose={() => setShowEditDialog(false)} /> : null}
     </div>
@@ -892,7 +923,7 @@ export function TripDetailPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
         <button type="button" aria-label="Back" onClick={goBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>
@@ -915,6 +946,7 @@ export function TripDetailPage() {
         <TripDetail
           trip={tripQuery.data}
           fillPassenger={fillPassenger}
+          returnTo={from || '/trips'}
           viewer={{
             isDriver,
             // An admin viewing-as-driver isn't a poster for this purpose, even if they posted

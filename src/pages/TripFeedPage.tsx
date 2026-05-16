@@ -16,7 +16,7 @@ const FEED_STATUSES: TripStatus[] = ['open', 'has_applicants'];
 
 function TripCard({ trip }: { trip: Trip }) {
   return (
-    <Link to={`/trips/${trip.id}`} className="block">
+    <Link to={`/trips/${trip.id}?from=/trips`} className="block">
       <Card className="gap-2 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -52,7 +52,7 @@ function TripCard({ trip }: { trip: Trip }) {
   );
 }
 
-const chipClass = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
+const chipClass = 'h-8 shrink-0 rounded-pill border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-muted';
 
 /**
  * `/trips` — the open-trip feed. Drivers browse trips that are still `open` or
@@ -100,7 +100,7 @@ export function TripFeedPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="flex items-center gap-3 border-b bg-white px-4 py-3">
+      <header className="flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
         <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>
@@ -112,7 +112,7 @@ export function TripFeedPage() {
         </div>
       </header>
 
-      <div className="flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <label className="sr-only" htmlFor="feed-city">
           Filter by pickup city
         </label>

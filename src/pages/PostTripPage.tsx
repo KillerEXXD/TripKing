@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
@@ -13,7 +13,7 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, ProgressBar, StatusBanner } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
@@ -359,7 +359,7 @@ export function PostTripPage() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
-      <header className="sticky top-0 z-10 border-b bg-white">
+      <header className="sticky top-0 z-10 bg-surface shadow-header">
         <div className="flex items-center gap-2 px-4 py-3">
           <button type="button" aria-label="Back" onClick={() => (step === 1 ? navigate('/') : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
             <ArrowLeft className="size-5" aria-hidden />
@@ -369,9 +369,7 @@ export function PostTripPage() {
             <div className="text-xs text-secondary">Step {step} of 2</div>
           </div>
         </div>
-        <div className="h-1 bg-muted">
-          <div className="h-full bg-primary transition-all" style={{ width: step === 1 ? '50%' : '100%' }} />
-        </div>
+        <ProgressBar value={step} max={2} ariaLabel={`Step ${step} of 2`} className="rounded-none h-1" />
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-3 p-4 pb-28">
@@ -620,10 +618,9 @@ export function PostTripPage() {
 
                   {/* Visibility note when user chooses to show passenger details */}
                   {!hidePassengerPhoneWatch ? (
-                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5 text-xs text-blue-800">
-                      <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
-                      <span>Passenger details are shared with the driver only after the trip is assigned.</span>
-                    </div>
+                    <StatusBanner tone="info" icon={<Info />}>
+                      Passenger details are shared with the driver only after the trip is assigned.
+                    </StatusBanner>
                   ) : null}
 
                   <label className="flex items-center gap-2 text-sm font-medium">

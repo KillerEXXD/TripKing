@@ -1,19 +1,21 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, BarChart3, CheckCircle2, Clock, Navigation, Sparkles, Star, TrendingUp, Users } from 'lucide-react';
+import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
 import { toast } from 'sonner';
+import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useCompleteTrip, useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
+import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
 import { InvitesReceivedCard } from '@/components/home/InvitesReceivedCard';
+import { HomeTileRow } from '@/components/home/HomeTileRow';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { HomeTile } from '@/components/home/HomeTile';
-import { ReferralActionTile } from '@/components/home/ReferralActionTile';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -170,7 +172,11 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
 function DriverHome({ driver }: { driver: Driver }) {
   const { user } = useAuth();
   const unread = useUnreadNotificationCount();
+  const cities = cityHooks.useList().data ?? [];
+  const [nearCityId, setNearCityId] = useState<string>(driver.currentCity?.id ?? driver.homeCity?.id ?? '');
 
+  // Auth fix from main (PR #195): gate the user-scoped query with enabled so
+  // an in-flight poll doesn't fire against a freshly-nulled session.
   const myPostsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
@@ -196,12 +202,13 @@ function DriverHome({ driver }: { driver: Driver }) {
 
   return (
     <div>
-      <header className="flex items-end justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold">{getFirstName(driver.fullName) || user?.displayName || 'Driver'}</span>
             <span aria-label="Driver" title="Driver" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-[10px] font-bold text-white">D</span>
+            {cities.length > 0 ? <NearCityPicker cities={cities} value={nearCityId} onChange={setNearCityId} /> : null}
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -226,12 +233,7 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         <ReputationCard driver={driver} />
 
-        {/* Quick-access tile row: 3 equal-width compact tiles in a single row. */}
-        <div className="grid grid-cols-3 gap-2">
-          <HomeTile to="/my-earnings"      icon={TrendingUp} label="Earnings"  sub="Payouts" tone="teal" ariaLabel="View earnings" />
-          <HomeTile to="/driver-analytics" icon={BarChart3}  label="Analytics" sub="Trends"  tone="blue" ariaLabel="View analytics" />
-          <ReferralActionTile role="driver" />
-        </div>
+        <HomeTileRow role="driver" />
       </div>
 
       <div className="px-4 pb-4">
@@ -252,6 +254,7 @@ function DriverHome({ driver }: { driver: Driver }) {
         ) : null}
         <InvitesSentCard trips={myPosts} />
       </div>
+
     </div>
   );
 }
@@ -271,7 +274,7 @@ function HomeChromeFallback() {
   const { user } = useAuth();
   return (
     <div>
-      <header className="flex items-end justify-between gap-3 border-b bg-white px-4 py-3">
+      <header className="sticky top-0 z-10 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="flex items-center gap-1.5">

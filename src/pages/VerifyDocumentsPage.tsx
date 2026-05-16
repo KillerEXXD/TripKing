@@ -6,33 +6,30 @@
  */
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useSubmitAgentKycDocs, useSubmitDriverKycDocs } from '@/hooks/useDrivers';
 import { getAgentKycDocUploadUrl, getDriverKycDocUploadUrl } from '@/lib/api/services/drivers';
-import { Button, Card, Input } from '@/components/ui';
+import { PageHeader, PageShell } from '@/components/layout';
+import { Button, Card, Input, StatusBanner } from '@/components/ui';
 import { FileUpload } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { AgentKycDocType, DriverKycDocType } from '@/types';
 
-function Header({ onBack }: { onBack: () => void }) {
+function PageWrap({ children }: { children: React.ReactNode }) {
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
-      <button type="button" aria-label="Back" onClick={onBack} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-        <ArrowLeft className="size-5" aria-hidden />
-      </button>
-      <h1 className="text-base font-semibold">Identity documents</h1>
-    </header>
+    <PageShell>
+      <PageHeader title="Identity documents" backTo="/profile" />
+      {children}
+    </PageShell>
   );
 }
 
 function AlreadySubmittedNote({ show }: { show: boolean }) {
   if (!show) return null;
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-      <ShieldCheck className="size-4" aria-hidden /> You've already submitted your documents. You can re-upload below if asked.
-    </div>
+    <StatusBanner tone="success" icon={<ShieldCheck />} title="You've already submitted your documents. You can re-upload below if asked." />
   );
 }
 
@@ -88,14 +85,12 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
   }
 
   return (
-    <div>
-      <Header onBack={() => navigate(-1)} />
-      <div className="space-y-4 px-4 py-4">
+    <PageWrap>
+      <div className="space-y-4">
         {tripId ? (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
-            <p className="mt-0.5 text-xs text-blue-700">Complete your identity verification below. Once approved, you can apply for trips right away.</p>
-          </div>
+          <StatusBanner tone="info" title="One step away from applying">
+            Complete your identity verification below. Once approved, you can apply for trips right away.
+          </StatusBanner>
         ) : null}
         <AlreadySubmittedNote show={driver.verification?.steps.documents === 'done'} />
         <p className="text-sm text-secondary">
@@ -138,7 +133,7 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
           {submit.isPending ? 'Submitting…' : 'Submit for verification'}
         </Button>
       </div>
-    </div>
+    </PageWrap>
   );
 }
 
@@ -180,14 +175,12 @@ function AgentDocsForm({ tripId }: { tripId: string | null }) {
   }
 
   return (
-    <div>
-      <Header onBack={() => navigate(-1)} />
-      <div className="space-y-4 px-4 py-4">
+    <PageWrap>
+      <div className="space-y-4">
         {tripId ? (
-          <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
-            <p className="text-sm font-semibold text-blue-900">One step away from applying</p>
-            <p className="mt-0.5 text-xs text-blue-700">Complete your identity verification below. Once approved, you can apply for trips right away.</p>
-          </div>
+          <StatusBanner tone="info" title="One step away from applying">
+            Complete your identity verification below. Once approved, you can apply for trips right away.
+          </StatusBanner>
         ) : null}
         <AlreadySubmittedNote show={agent.verification?.steps.documents === 'done'} />
         <p className="text-sm text-secondary">
@@ -216,7 +209,7 @@ function AgentDocsForm({ tripId }: { tripId: string | null }) {
           {submit.isPending ? 'Submitting…' : 'Submit for verification'}
         </Button>
       </div>
-    </div>
+    </PageWrap>
   );
 }
 

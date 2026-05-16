@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Building2, MapPin, Phone, ShieldCheck } from 'lucide-react';
+import { PageHeader } from '@/components/layout';
+import { Building2, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useAgent } from '@/hooks/useDrivers';
 import { useDriverReviews } from '@/hooks/useReviews';
 import { useAuth } from '@/contexts/AuthContext';
@@ -141,12 +142,7 @@ export function AgentProfilePage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="sticky top-0 z-10 flex items-center gap-3 border-b bg-white px-4 py-3">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <div className="text-base font-semibold">Agent</div>
-      </header>
+      <PageHeader title="Agent" onBack={() => navigate(-1)} />
 
       <div className="space-y-4 p-4">
         {notFound ? (
