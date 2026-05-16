@@ -37,7 +37,7 @@ Setting this on a feature/bugfix is a policy violation — the reviewer will rej
 ## Quality bar (not just quantity)
 
 - **No mocked databases in integration tests** — burned us before; mocked tests passed while prod migrations failed.
-- **Don't assert on transformed-card content in E2E** — the strict transforms throw on incomplete stub rows. Assert on headings + URL transitions + visible buttons. The `openTripRow()` helper is the reference for a fully-shaped stub.
+- **E2E preconditions are real, not stubbed.** Playwright specs in `e2e/` create their setup state via real API calls (`mintDriver()`, `mintAgent()`, `postTrip()` from `e2e/helpers-api.ts`) — never by stubbing `GET /trips/:id/applicants` to return canned rows. Stubs lie; we've shipped bugs to prod where the API drifted but the stub stayed green. **Permitted carve-out:** stubbing a specific HTTP **error response** (4xx / 5xx) to verify the UI's error path — tag the test with a `@stub-error` block comment and keep the rationale next to it. Forcing the real error from the backend (e.g. drain the wallet to ₹0 to get a real `402`) is preferred when feasible. This rule does **not** apply to vitest unit / component tests — those SHOULD mock their service layer. Test data hygiene: all minted accounts use `display_name` prefix `e2e-…`; migration 054 runs nightly `pg_cron` to purge rows >7 days old.
 - **a11y is a test requirement, not a polish phase** — every new page test gets `expect(await axe(container)).toHaveNoViolations()`. Fix violations at the source; don't disable rules.
 - **A test that exercises code without asserting outcomes doesn't count.** Mocks set up + render + zero assertions = bad test. Reviewers check this carefully.
 

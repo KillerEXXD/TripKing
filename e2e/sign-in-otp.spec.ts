@@ -1,14 +1,19 @@
 import { test, expect } from '@playwright/test';
-import { driverRow, stubApi, VERIFICATION_APPROVED } from './helpers';
+import { mintAdmin, mintDriver } from './helpers-api';
 
 /**
- * The phone → OTP → onboarding sign-in flow. The dev `/auth` accepts any 4–6 digit code,
- * so we drive the form visibly and assert the stage transitions and the post-verify
- * redirect. (Real SMS / `auth_otps` lands later — see CLAUDE.md §6.)
+ * The phone → OTP → onboarding sign-in flow. Mints a real KYC-approved driver via the API
+ * first so we know the phone exists in the backend — then drives the sign-in UI against it,
+ * end-to-end through the dev OTP `12345` and the post-verify redirect.
+ *
+ * No precondition stubs (see docs/TEST_POLICY.md §"E2E preconditions are real").
  */
 test.describe('sign-in OTP flow', () => {
-  test('phone form → OTP form → onboarding (then home for an approved driver)', async ({ page }) => {
-    await stubApi(page, { paths: { '/drivers/me': () => driverRow(VERIFICATION_APPROVED) } });
+  test('phone form → OTP form → onboarding (then home for an approved driver)', async ({ page, request }) => {
+    // Setup: mint a real driver so the post-verify redirect lands on a real driver-home.
+    const admin = await mintAdmin(request);
+    const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
+    const localPhone = driver.phone.replace(/^\+91/, ''); // form takes the 10-digit local part
 
     await page.goto('/signin');
 
@@ -17,11 +22,12 @@ test.describe('sign-in OTP flow', () => {
     await expect(phone).toBeVisible();
     const sendBtn = page.getByRole('button', { name: /send otp/i });
     await expect(sendBtn).toBeDisabled();
-    await phone.fill('9876500000');
+    await phone.fill(localPhone);
     await expect(sendBtn).toBeEnabled();
     await sendBtn.click();
 
-    // Stage 2 — OTP form
+    // Stage 2 — OTP form. The FE requires 6 chars; the dev backend accepts any 4–6 digit
+    // (so 123456 works as the "demo" code shown to the user in the help text).
     const otp = page.getByLabel('OTP code');
     await expect(otp).toBeVisible();
     const verifyBtn = page.getByRole('button', { name: /verify & continue/i });

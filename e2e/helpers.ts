@@ -1,10 +1,15 @@
 import type { Page, Route } from '@playwright/test';
 
 /**
- * Shared helpers for the E2E specs. The REST API is stubbed at the network layer
- * (`page.route('**\/api\/**', …)`) — the specs never touch the deployed Supabase functions —
- * and the dev server's `/api` proxy never gets a request. Per-path overrides let each test
- * tailor the responses for the screens it touches.
+ * Legacy shared helpers for the E2E specs. Most of these (DRIVER_USER / driverRow / agentRow /
+ * openTripRow / stubApi) are deprecated for new tests — see `docs/TEST_POLICY.md` §"E2E
+ * preconditions are real". Instead use `e2e/helpers-api.ts` to mint real users + trips + state
+ * against the deployed Supabase.
+ *
+ * What stays:
+ *   • `stubApi` — keep, but ONLY for forced-error responses (4xx/5xx) the real backend can't
+ *     easily produce. Tag the call site with a `@stub-error` block comment and explain why.
+ *     Precondition stubs ("this trip exists with these applicants") are NOT allowed.
  */
 
 export const DRIVER_USER = {
@@ -166,9 +171,15 @@ export interface StubConfig {
 }
 
 /**
- * Stub every REST call (the dev `/api/*` proxy paths). The auth endpoints are mocked from
- * `config.user`; everything else takes per-path overrides, falling through to an empty list
- * for the long tail of list endpoints the home/profile pages also hit.
+ * @deprecated for **precondition** stubbing. Use `e2e/helpers-api.ts` to mint real state.
+ *
+ * Still valid for forced-error responses ONLY. Tag the call site with `@stub-error`
+ * and explain why the real backend can't produce the error you need. See:
+ *   - `docs/TEST_POLICY.md` §"E2E preconditions are real"
+ *   - `e2e/referral-qase-demo.spec.ts` R6.3 (canonical example)
+ *
+ * (For now the legacy shape parameters remain so the in-flight spec migrations compile
+ * one-at-a-time; remove once all 9 specs have moved off it.)
  */
 export async function stubApi(page: Page, config: StubConfig = {}): Promise<void> {
   const user = config.user ?? DRIVER_USER;
