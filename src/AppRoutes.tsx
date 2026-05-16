@@ -52,6 +52,8 @@ const TranslationManagerPage = lazyWithRetry(() => import('@/pages/administratio
 const AdminDashboardPage = lazyWithRetry(() => import('@/pages/administration/AdminDashboardPage'));
 const AdminAppWalletPage = lazyWithRetry(() => import('@/pages/administration/AdminAppWalletPage'));
 const AdminWithdrawalsPage = lazyWithRetry(() => import('@/pages/administration/AdminWithdrawalsPage'));
+const AdminReferralsPage = lazyWithRetry(() => import('@/pages/administration/AdminReferralsPage'));
+const AdminReferralFlagsPage = lazyWithRetry(() => import('@/pages/administration/AdminReferralFlagsPage'));
 const AdminDriversPage = lazyWithRetry(() => import('@/pages/administration/AdminDriversPage'));
 const BugsPage = lazyWithRetry(() => import('@/pages/administration/BugsPage'));
 const AdminAgentsPage = lazyWithRetry(() => import('@/pages/administration/AdminAgentsPage'));
@@ -125,6 +127,8 @@ export function AppRoutes() {
             <Route path="/administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
             <Route path="/administration/app-wallet" element={<AdminRoute><AdminAppWalletPage /></AdminRoute>} />
             <Route path="/administration/withdrawals" element={<AdminRoute><AdminWithdrawalsPage /></AdminRoute>} />
+            <Route path="/administration/referrals" element={<AdminRoute><AdminReferralsPage /></AdminRoute>} />
+            <Route path="/administration/referrals/flags" element={<AdminRoute><AdminReferralFlagsPage /></AdminRoute>} />
             <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
             <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
             <Route path="/administration/kyc/:kind/:id" element={<AdminRoute><KycDetailPage /></AdminRoute>} />
