@@ -69,6 +69,11 @@ function check(name, cond, detail) {
   const a1 = await post('/verify-otp', { phone: adminPhone, otp: '12345', display_name: 'Role Keeper', role: 'admin' });
   const a2 = await post('/verify-otp', { phone: adminPhone, otp: '12345' }); // no role on the body — a returning sign-in
   check('verify-otp: re-signing-in preserves the existing role (admin stays admin)', a1.json?.data?.user?.role === 'admin' && a2.status === 200 && a2.json?.data?.user?.role === 'admin', `first=${a1.json?.data?.user?.role} second=${a2.json?.data?.user?.role}`);
+  // Regression: BUG fix — when auth.users count crosses the listUsers page cap, returning
+  // sign-ins were falling into the createUser branch and 400'ing with SIGNUP_FAILED ("email
+  // already registered"). The lookup now keys off public.users.phone (uncapped, indexed), so
+  // a second verify-otp for the same phone MUST return a session with the same user id.
+  check('verify-otp: second sign-in returns SAME user id + a fresh access_token (no SIGNUP_FAILED)', a1.json?.data?.user?.id && a2.json?.data?.user?.id === a1.json.data.user.id && !!a2.json?.data?.access_token && a2.json?.error == null, `a1.id=${a1.json?.data?.user?.id} a2.id=${a2.json?.data?.user?.id} a2.err=${JSON.stringify(a2.json?.error)}`);
 
   if (accessToken) {
     const out = await post('/logout', {}, accessToken);
