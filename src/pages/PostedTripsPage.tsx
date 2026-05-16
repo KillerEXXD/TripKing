@@ -5,19 +5,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { AgentInProgressTripCard } from '@/components/trip/AgentInProgressTripCard';
-import { Badge, Button, Card } from '@/components/ui';
+import { PageHeader, PageShell } from '@/components/layout';
+import { Badge, Button, Card, FilterBar, FilterPill } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
+import type { BadgeProps } from '@/components/ui';
 import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
-export const STATUS_META: Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
-  open: { label: 'Open', variant: 'success' },
+type StatusBadgeVariant = NonNullable<BadgeProps['variant']>;
+
+// Redesign: prefer the new semantic Badge variants (open / invited / completed / live) where they
+// fit the status; fall back to the legacy info / warning / destructive for the in-between
+// lifecycle states the system spec doesn't name.
+export const STATUS_META: Record<TripStatus, { label: string; variant: StatusBadgeVariant }> = {
+  open: { label: 'Open', variant: 'open' },
   has_applicants: { label: 'Has applicants', variant: 'warning' },
   selected: { label: 'Selected', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'info' },
-  in_progress: { label: 'In progress', variant: 'info' },
-  completed: { label: 'Completed', variant: 'muted' },
+  in_progress: { label: 'In progress', variant: 'live' },
+  completed: { label: 'Completed', variant: 'completed' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
 };
 
@@ -50,7 +57,6 @@ const FILTER_PRIORITY: Record<Filter, number> = {
   all: 99, in_progress: 0, open: 1, invited: 2, has_applicants: 3, selected: 4, accepted: 5, completed: 6, cancelled: 7,
 };
 
-const chip = (active: boolean) => cn('inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors', active ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-secondary hover:bg-gray-200');
 function isFilter(v: string | null): v is Filter {
   return !!v && (FILTERS as string[]).includes(v);
 }
@@ -156,33 +162,38 @@ export function PostedTripsPage() {
     : trips.filter((t) => bucketFor(t) === filter);
   const countFor = (f: Filter) => (f === 'all' ? trips.length : trips.filter((t) => bucketFor(t) === f).length);
 
+  const subtitle = tripsQuery.isSuccess
+    ? `${trips.length} trip${trips.length === 1 ? '' : 's'}`
+    : 'Trips you have posted';
+
   return (
-    <div className="mx-auto max-w-md">
-      <header className="flex items-center gap-2 border-b bg-white px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold">My posts</h1>
-            <LiveDot />
-          </div>
-          <p className="text-xs text-secondary">{tripsQuery.isSuccess ? `${trips.length} trip${trips.length === 1 ? '' : 's'}` : 'Trips you have posted'}</p>
-        </div>
-        <Button asChild size="sm" className="gap-1.5">
-          <Link to="/trips/new">
-            <Plus className="size-4" aria-hidden /> Post a trip
-          </Link>
-        </Button>
-      </header>
+    <PageShell>
+      <PageHeader
+        title={<span className="inline-flex items-center gap-2">My posts <LiveDot /></span>}
+        subtitle={subtitle}
+        right={
+          <Button asChild size="sm" className="gap-1.5">
+            <Link to="/trips/new">
+              <Plus className="size-4" aria-hidden /> Post
+            </Link>
+          </Button>
+        }
+      />
 
-      <div className="flex flex-wrap gap-1.5 border-b bg-white px-3 py-2">
+      <FilterBar ariaLabel="Filter trips by status" className="mb-3">
         {FILTERS.map((f) => (
-          <button key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f} className={chip(filter === f)}>
+          <FilterPill
+            key={f}
+            active={filter === f}
+            onClick={() => setFilter(f)}
+            count={tripsQuery.isSuccess ? countFor(f) : undefined}
+          >
             {FILTER_LABEL[f]}
-            {tripsQuery.isSuccess ? <span className="opacity-70"> · {countFor(f)}</span> : null}
-          </button>
+          </FilterPill>
         ))}
-      </div>
+      </FilterBar>
 
-      <div className="space-y-3 p-4">
+      <div className="space-y-3">
         {tripsQuery.isPending ? (
           <LoadingSkeleton rows={4} />
         ) : tripsQuery.isError ? (
@@ -209,7 +220,7 @@ export function PostedTripsPage() {
       </div>
 
       {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
-    </div>
+    </PageShell>
   );
 }
 
