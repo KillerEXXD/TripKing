@@ -1,0 +1,66 @@
+/*
+ * BottomNav — scoped styling for the redesign spec. We keep these styles
+ * here (not in src/index.css and not in tokens) because the values are
+ * tied 1:1 to this single component:
+ *   - the exact #b0b8c4 / #10b981 hex pair only appears in the nav,
+ *   - the 0 -1px / 0 -6px shadow stack is bespoke to the nav,
+ *   - the linear-gradient + 32×32 FAB box is bespoke to the nav.
+ * If any of these turn out to be reused elsewhere, promote them to
+ * src/index.css @theme tokens at that point.
+ */
+
+.bottom-nav {
+  background: rgba(255, 255, 255, 0.98);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  box-shadow:
+    0 -1px 0 rgba(0, 0, 0, 0.05),
+    0 -6px 20px rgba(0, 0, 0, 0.05);
+  padding: 10px 20px;
+}
+
+.bottom-nav-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bottom-nav-button--inactive {
+  border-radius: 12px;
+  padding: 6px 4px;
+  flex: 1 1 0;
+}
+
+.bottom-nav-button--active {
+  background: #ecfdf5;
+  border-radius: 14px;
+  padding: 8px 14px;
+  flex: 0 0 auto;
+}
+
+.bottom-nav-fab {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);
+}
+
+.bottom-nav-label {
+  font-size: 10px;
+  white-space: nowrap;
+  letter-spacing: -0.1px;
+  line-height: 1;
+}
+
+.bottom-nav-label--inactive { font-weight: 500; color: #b0b8c4; }
+.bottom-nav-label--active   { font-weight: 700; color: #10b981; }
+.bottom-nav-label--fab      { font-weight: 600; color: #10b981; }
+
+/* Icon colors — applied via class on the SVG so size + stroke-width stay
+ * inline (they need to be SVG attributes, not CSS) but the colour lives
+ * in CSS-land per the lint rule. */
+.bottom-nav-icon--inactive { color: #b0b8c4; }
+.bottom-nav-icon--active   { color: #10b981; }
+.bottom-nav-icon--fab      { color: #ffffff; }
