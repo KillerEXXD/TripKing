@@ -37,13 +37,14 @@ export function ReferralActionTile({ role }: Props) {
         <div className="flex-1 truncate text-[10px] font-bold uppercase tracking-wide text-emerald-700">Referrals</div>
       </div>
 
-      <div className="z-10 flex flex-1 items-center justify-between gap-1">
-        <code className="block min-w-0 flex-1 truncate font-mono text-xs font-bold tracking-wider text-slate-900">{data.code}</code>
+      {/* Code + actions hugged together (no justify-between → buttons sit next to code) */}
+      <div className="z-10 flex flex-1 items-center gap-1">
+        <code className="shrink min-w-0 truncate font-mono text-xs font-bold tracking-wider text-slate-900">{data.code}</code>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); void copyText(data.code, 'Code'); }}
           aria-label="Copy referral code"
-          className="z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:scale-95"
+          className="z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:scale-95"
         >
           <Copy className="size-3" aria-hidden />
         </button>
@@ -53,7 +54,7 @@ export function ReferralActionTile({ role }: Props) {
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
           aria-label="Share via WhatsApp"
-          className="z-10 inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
+          className="z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95"
         >
           <MessageCircle className="size-3" aria-hidden />
         </a>

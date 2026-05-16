@@ -183,10 +183,10 @@ function AgentHome({ agent }: { agent: Agent }) {
           cta={{ label: 'View / edit profile' }}
         />
 
-        {/* Quick-access tile row: equal-width 2-col grid. Analytics +
-            Referrals tile (code + Copy + WhatsApp inline). */}
-        <div className="grid grid-cols-2 gap-2">
-          <HomeTile to="/analytics" icon={BarChart3} label="Analytics" sub="Trends" tone="blue" ariaLabel="View analytics" />
+        {/* Quick-access tile row: 3 equal-width compact tiles in a single row. */}
+        <div className="grid grid-cols-3 gap-2">
+          <HomeTile to="/wallet"    icon={Wallet}    label="Wallet"    sub="Top up"  tone="teal" ariaLabel="View wallet" />
+          <HomeTile to="/analytics" icon={BarChart3} label="Analytics" sub="Trends"  tone="blue" ariaLabel="View analytics" />
           <ReferralActionTile role="agent" />
         </div>
       </div>
