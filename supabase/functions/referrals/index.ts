@@ -70,11 +70,33 @@ const handler = withTiming('referrals', async (req: Request): Promise<Response> 
   const pre = corsPreflight(req);
   if (pre) return pre;
 
-  if (req.method !== 'GET') return fail('METHOD_NOT_ALLOWED', '', 405);
-
   const url = new URL(req.url);
   const segs = url.pathname.split('/').filter(Boolean);
   const after = segs.slice(segs.indexOf('referrals') + 1);
+
+  // ── POST /me/transfer-to-wallet { amount_paise } — Stage 6 ────────────────
+  if (req.method === 'POST' && after.join('/') === 'me/transfer-to-wallet') {
+    const db = serviceClient();
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', 'Sign in to transfer your earnings', 401);
+    let body: Record<string, unknown> = {};
+    try { body = await req.json(); } catch { /* empty body */ }
+    const amount = Number(body.amount_paise);
+    if (!Number.isFinite(amount) || amount <= 0) return fail('VALIDATION', 'amount_paise must be > 0', 422);
+    const { data, error } = await db.rpc('transfer_referral_to_cash_wallet', { _user_id: u.id, _amount_paise: amount });
+    if (error) {
+      const msg = error.message || '';
+      if (msg.includes('INSUFFICIENT_REFERRAL_BALANCE')) return fail('INSUFFICIENT_REFERRAL_BALANCE', msg, 402);
+      if (msg.includes('NO_REFERRALS')) return fail('NO_REFERRALS', 'You have no referral earnings to transfer', 404);
+      if (msg.includes('INVALID_AMOUNT')) return fail('VALIDATION', msg, 422);
+      return fail('DB_ERROR', msg, 500);
+    }
+    // .rpc on a TABLE-returning function returns an array of rows
+    const row = Array.isArray(data) ? data[0] : data;
+    return ok(row);
+  }
+
+  if (req.method !== 'GET') return fail('METHOD_NOT_ALLOWED', '', 405);
   // routes:
   //   /me              → ['me']
   //   /me/referred     → ['me', 'referred']
