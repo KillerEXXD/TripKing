@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/qase-tms/qase-javascript/main/qase.config.schema.json",
+  "mode": "testops",
+  "fallback": "off",
+  "debug": false,
+  "captureLogs": true,
+  "environment": "dev",
+  "testops": {
+    "project": "TRIPKINGAP",
+    "uploadAttachments": true,
+    "run": {
+      "title": "Playwright run",
+      "description": "Auto-mapped via test annotation { type: 'qase', description: '<automation_id>' }. Cases live under suite \"Referral Program\". Failed cases auto-create Qase Defects (defect=true); a project webhook then forwards each defect to our /webhook-qase edge fn which mirrors it into the internal /administration/bugs queue. See docs/QASE_BUG_PIPELINE.md.",
+      "complete": true
+    },
+    "defect": true
+  }
+}
