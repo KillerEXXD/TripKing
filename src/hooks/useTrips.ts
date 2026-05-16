@@ -65,12 +65,23 @@ export function isTripLive(status: TripStatus | undefined): boolean {
   return pollIntervalFor(status) !== false;
 }
 
-export function useTrips(params?: TripsQueryParams) {
+/**
+ * @param options.enabled  Caller-controlled gate. Default `true`. Pass `!!user` for
+ *   queries with user-scoped filters (e.g. `postedByUserId: user.id`) so they don't
+ *   fire on the public `/signin` route during the auth-bootstrap window — that
+ *   produced the noisy "401 GET /trips → 401 POST /auth/refresh" pair we saw
+ *   on signed-out tabs (incident 2026-05-16). RQ also cancels in-flight requests
+ *   when `enabled` flips false, which kills the residue from a poll that started
+ *   just before the auth-failure handler nulled `user`.
+ */
+export function useTrips(params?: TripsQueryParams, options?: { enabled?: boolean }) {
+  const enabled = options?.enabled ?? true;
   return useQuery({
     queryKey: ['trips', params ?? {}],
     queryFn: () => getTrips(params),
     placeholderData: keepPreviousData,
     staleTime: staleForStatus(params?.status),
+    enabled,
     // Lists: poll while any row could still change. We pick the tightest interval that
     // matches the filter — selected/in_progress lists tick at 5s, others at 15s. If the
     // caller filtered to terminal states only (completed/cancelled), polling is off.

@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input } from '@/components/ui';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
+import { apiClient } from '@/lib/api/client';
 import { OTP_LENGTH } from '@/lib/constants';
 
 /** Crown mark (matches the PWA icon / `public/logo-mark.svg`). */
@@ -47,7 +48,7 @@ const onlyDigits = (s: string) => s.replace(/\D/g, '');
  * if they were bounced here from a protected page, we honour that `from` instead.
  */
 export function SignInPage() {
-  const { isAuthenticated, requestOtp, verifyOtp } = useAuth();
+  const { isAuthenticated, isLoading, requestOtp, verifyOtp } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [stage, setStage] = useState<'phone' | 'otp'>('phone');
@@ -55,6 +56,17 @@ export function SignInPage() {
   const [localPhone, setLocalPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Stale-token cleanup. Once auth has finished bootstrapping and the user landed here
+  // unauthenticated, any leftover tokens in localStorage are dead (the session restore
+  // already 401'd). Clear them eagerly so the next request doesn't trigger another
+  // round-trip refresh-attempt-then-fail — the noise we saw on the /signin console
+  // screenshot in incident 2026-05-16. Safe to run on a clean visit (no-op when no token).
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated && apiClient.getAccessToken()) {
+      apiClient.clearTokens();
+    }
+  }, [isLoading, isAuthenticated]);
 
   if (isAuthenticated) return <Navigate to={fromOf(location.state)} replace />;
 
