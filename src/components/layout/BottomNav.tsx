@@ -4,8 +4,6 @@ import { Bell, ClipboardList, Home, Plus } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { FindDriverIcon } from '@/components/icons/FindDriverIcon';
 import { BrowseTripsIcon } from '@/components/icons/BrowseTripsIcon';
-import { cn } from '@/lib/utils';
-import './BottomNav.css';
 
 type NavIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -80,15 +78,39 @@ export function BottomNav() {
   const items = role === 'admin' ? ADMIN_NAV : role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
   const activeId = items.find((it) => it.match(pathname))?.id;
 
+  // Critical styles go INLINE rather than via CSS classes. We've burned through
+  // 4 attempts at fixing label-clipping via .bottom-nav rules and something in
+  // the Tailwind v4 + workbox + Vercel chain keeps interfering. Inline styles
+  // bypass ALL of that — they win every specificity battle and can't be cached
+  // separately from the JSX. Visual + layout intent stays identical.
+  const navStyle = {
+    background: 'rgba(255, 255, 255, 0.98)',
+    backdropFilter: 'blur(24px)',
+    WebkitBackdropFilter: 'blur(24px)',
+    boxShadow: '0 -1px 0 rgba(0,0,0,0.05), 0 -6px 20px rgba(0,0,0,0.05)',
+    paddingTop: '10px',
+    paddingRight: '20px',
+    paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+    paddingLeft: '20px',
+    height: 'calc(92px + env(safe-area-inset-bottom, 0px))',
+    boxSizing: 'border-box' as const,
+  };
+  const labelBase = {
+    fontSize: '11px',
+    lineHeight: 1.1,
+    whiteSpace: 'nowrap' as const,
+    letterSpacing: '-0.1px',
+  };
+
   return (
     <nav
       aria-label="Primary"
-      className="bottom-nav fixed inset-x-0 bottom-0 z-40 flex items-center justify-between overflow-visible"
+      className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between overflow-visible"
+      style={navStyle}
     >
       {items.map((it) => {
         const isActive = it.id === activeId;
         if (it.primary) {
-          // Centre FAB-as-button: gradient green square + "Post Trip" label.
           return (
             <button
               key={it.id}
@@ -96,41 +118,51 @@ export function BottomNav() {
               onClick={() => navigate(it.to)}
               aria-label={it.ariaLabel ?? it.label}
               aria-current={isActive ? 'page' : undefined}
-              className="bottom-nav-button flex flex-1 flex-col items-center justify-center gap-1 p-0"
+              className="flex flex-1 cursor-pointer flex-col items-center justify-center gap-1 border-0 bg-transparent p-0"
             >
-              <span className="bottom-nav-fab flex items-center justify-center">
-                <it.Icon className="bottom-nav-icon--fab" width={16} height={16} strokeWidth={2} aria-hidden />
+              <span
+                className="flex items-center justify-center"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  boxShadow: '0 4px 14px rgba(16,185,129,0.4)',
+                }}
+              >
+                <it.Icon width={16} height={16} strokeWidth={2} style={{ color: '#ffffff' }} aria-hidden />
               </span>
-              <span className="bottom-nav-label bottom-nav-label--fab">{it.label}</span>
+              <span style={{ ...labelBase, fontWeight: 600, color: '#10b981' }}>{it.label}</span>
             </button>
           );
         }
-        // Inactive (flex-1) and active (auto-width green pill) share the same
-        // stacked icon + label structure — only the wrapper-modifier class differs.
         return (
           <button
             key={it.id}
             type="button"
             onClick={() => navigate(it.to)}
-            aria-label={it.label}
+            aria-label={it.ariaLabel ?? it.label}
             aria-current={isActive ? 'page' : undefined}
-            className={cn(
-              'bottom-nav-button flex flex-col items-center justify-center gap-1',
-              isActive ? 'bottom-nav-button--active' : 'bottom-nav-button--inactive',
-            )}
+            className="flex cursor-pointer flex-col items-center justify-center gap-1 border-0 bg-transparent"
+            style={
+              isActive
+                ? { background: '#ecfdf5', borderRadius: '14px', padding: '8px 14px', flex: '0 0 auto' }
+                : { borderRadius: '12px', padding: '6px 4px', flex: '1 1 0' }
+            }
           >
             <it.Icon
-              className={isActive ? 'bottom-nav-icon--active' : 'bottom-nav-icon--inactive'}
               width={isActive ? 22 : it.iconSize.width}
               height={isActive ? 22 : it.iconSize.height}
               strokeWidth={isActive ? 2 : it.iconSize.strokeWidth}
+              style={{ color: isActive ? '#10b981' : '#94a3b8' }}
               aria-hidden
             />
             <span
-              className={cn(
-                'bottom-nav-label',
-                isActive ? 'bottom-nav-label--active' : 'bottom-nav-label--inactive',
-              )}
+              style={{
+                ...labelBase,
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? '#10b981' : '#64748b',
+              }}
             >
               {it.label}
             </span>
