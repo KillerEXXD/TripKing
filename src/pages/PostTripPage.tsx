@@ -13,7 +13,7 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
-import { Button, Card, Input } from '@/components/ui';
+import { Button, Card, Input, ProgressBar } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
@@ -369,9 +369,7 @@ export function PostTripPage() {
             <div className="text-xs text-secondary">Step {step} of 2</div>
           </div>
         </div>
-        <div className="h-1 bg-muted">
-          <div className="h-full bg-primary transition-all" style={{ width: step === 1 ? '50%' : '100%' }} />
-        </div>
+        <ProgressBar value={step} max={2} ariaLabel={`Step ${step} of 2`} className="rounded-none h-1" />
       </header>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-3 p-4 pb-28">

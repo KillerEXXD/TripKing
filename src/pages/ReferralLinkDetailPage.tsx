@@ -1,5 +1,6 @@
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight } from 'lucide-react';
+import { PageHeader, PageShell } from '@/components/layout';
 import { Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { useReferralLink } from '@/hooks/useReferral';
@@ -17,20 +18,18 @@ export function ReferralLinkDetailPage() {
   const { linkId } = useParams();
   const q = useReferralLink(linkId);
 
+  const referredName = q.data?.link.referredUser?.displayName ?? 'Referred user';
   return (
-    <main className="mx-auto max-w-3xl space-y-4 p-6">
-      <Link to="/referrals" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Referrals
-      </Link>
+    <PageShell>
+      <PageHeader title={referredName} backTo="/referrals" />
 
       {q.isPending ? (
         <LoadingSkeleton rows={5} />
       ) : q.isError ? (
         <ErrorState title="Couldn't load referral" message="Try again." onRetry={() => void q.refetch()} />
       ) : (
-        <>
-          <h1 className="text-2xl font-bold">{q.data.link.referredUser?.displayName ?? 'Referred user'}</h1>
-          <p className="text-xs text-secondary">{q.data.link.referredUserRole === 'trip_manager' ? 'Agent' : 'Driver'} · {q.data.link.referredUser?.phone ?? ''}</p>
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">{q.data.link.referredUserRole === 'trip_manager' ? 'Agent' : 'Driver'} · {q.data.link.referredUser?.phone ?? ''}</p>
 
           <div className="grid grid-cols-3 gap-2 text-center text-xs">
             <Card className="gap-1 p-3">
@@ -89,9 +88,9 @@ export function ReferralLinkDetailPage() {
               </div>
             )}
           </Card>
-        </>
+        </div>
       )}
-    </main>
+    </PageShell>
   );
 }
 

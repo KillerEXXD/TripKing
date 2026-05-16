@@ -31,15 +31,19 @@ import { toast } from 'sonner';
 import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
 import type { Trip, TripStatus, Vehicle } from '@/types';
 
+// Redesign: prefer the new semantic Badge variants (open / invited / live /
+// completed) where they fit the status; fall back to legacy info / warning /
+// destructive for the in-between lifecycle states the design system spec
+// doesn't name. Matches the STATUS_META map in PostedTripsPage.tsx.
 const STATUS_BADGE = {
-  open: { label: 'Open', variant: 'success' },
+  open: { label: 'Open', variant: 'open' },
   has_applicants: { label: 'Has applicants', variant: 'warning' },
   selected: { label: 'Awaiting acceptance', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'info' },
-  in_progress: { label: 'In progress', variant: 'info' },
-  completed: { label: 'Completed', variant: 'muted' },
+  in_progress: { label: 'In progress', variant: 'live' },
+  completed: { label: 'Completed', variant: 'completed' },
   cancelled: { label: 'Cancelled', variant: 'destructive' },
-} as const satisfies Record<TripStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }>;
+} as const satisfies Record<TripStatus, { label: string; variant: 'open' | 'invited' | 'live' | 'completed' | 'warning' | 'info' | 'destructive' }>;
 
 function vehicleLabel(v: Vehicle): string {
   return [v.makeLabel, v.modelName].filter(Boolean).join(' ') || v.carTypeLabel || v.registrationNumber || 'Vehicle';

@@ -22,9 +22,7 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigateSpy };
 });
 
-describe('back button', () => {
-  beforeEach(() => navigateSpy.mockReset());
-
+describe('back link', () => {
   function mountWithMutations() {
     setNotifs({ data: [] });
     vi.mocked(useMarkNotificationRead).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
@@ -32,23 +30,15 @@ describe('back button', () => {
     render(<MemoryRouter><NotificationsPage /></MemoryRouter>);
   }
 
-  it('renders a Back button at the top of the page', () => {
+  // The redesign moved the back affordance from a history-driven button onto
+  // <PageHeader backTo="/">, which renders a <Link> with aria-label="Back" that
+  // always navigates to /. We lose the "history.length" branching but gain a
+  // predictable destination + consistent visuals with every other page.
+  it('renders a Back link at the top of the page that points home', () => {
     mountWithMutations();
-    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
-  });
-
-  it('navigates back one entry when history is non-empty', () => {
-    Object.defineProperty(window.history, 'length', { configurable: true, value: 5 });
-    mountWithMutations();
-    fireEvent.click(screen.getByRole('button', { name: /back/i }));
-    expect(navigateSpy).toHaveBeenCalledWith(-1);
-  });
-
-  it('falls back to / when the history stack is empty', () => {
-    Object.defineProperty(window.history, 'length', { configurable: true, value: 1 });
-    mountWithMutations();
-    fireEvent.click(screen.getByRole('button', { name: /back/i }));
-    expect(navigateSpy).toHaveBeenCalledWith('/');
+    const back = screen.getByRole('link', { name: /back/i });
+    expect(back).toBeInTheDocument();
+    expect(back).toHaveAttribute('href', '/');
   });
 });
 

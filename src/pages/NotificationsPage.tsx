@@ -1,6 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { AlarmClock, ArrowLeft, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlarmClock, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
+import { PageHeader, PageShell } from '@/components/layout';
 import { Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { Notification, NotificationType } from '@/types';
@@ -86,31 +87,25 @@ export function NotificationsPage() {
   const notifsQuery = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
-  const navigate = useNavigate();
 
   const notifs = notifsQuery.data ?? [];
   const unread = notifs.filter((n) => !n.isRead).length;
 
   // Returns to the previous page; falls back to / if history is empty (e.g. user opened the link directly).
-  function goBack() {
-    if (window.history.length > 1) navigate(-1);
-    else navigate('/');
-  }
+  const subtitle = notifsQuery.isSuccess ? (unread > 0 ? `${unread} unread` : 'All caught up') : 'Your in-app inbox';
 
   return (
-    <main className="mx-auto max-w-md space-y-4 p-4">
-      <button type="button" onClick={goBack} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Back
-      </button>
-      <header className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">Notifications</h1>
-          <p className="text-sm text-secondary">{notifsQuery.isSuccess ? (unread > 0 ? `${unread} unread` : 'All caught up') : 'Your in-app inbox'}</p>
-        </div>
-        <Button variant="outline" size="sm" disabled={unread === 0 || markAll.isPending} onClick={() => markAll.mutate()}>
-          {markAll.isPending ? 'Marking…' : 'Mark all read'}
-        </Button>
-      </header>
+    <PageShell>
+      <PageHeader
+        title="Notifications"
+        subtitle={subtitle}
+        backTo="/"
+        right={
+          <Button variant="outline" size="sm" disabled={unread === 0 || markAll.isPending} onClick={() => markAll.mutate()}>
+            {markAll.isPending ? 'Marking…' : 'Mark all read'}
+          </Button>
+        }
+      />
 
       {notifsQuery.isPending ? (
         <LoadingSkeleton rows={5} />
@@ -125,7 +120,7 @@ export function NotificationsPage() {
           ))}
         </div>
       )}
-    </main>
+    </PageShell>
   );
 }
 

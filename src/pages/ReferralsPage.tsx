@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Award, IndianRupee, Users } from 'lucide-react';
-import { Card } from '@/components/ui';
+import { Award, IndianRupee, Users } from 'lucide-react';
+import { PageHeader, PageShell } from '@/components/layout';
+import { Card, SectionLabel } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { useReferralDashboard } from '@/hooks/useReferral';
 import { TransferToWalletPanel } from '@/components/referral/TransferToWalletPanel';
@@ -17,11 +17,11 @@ function rupees(paise: number): string {
 function Stat({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
     <Card className="gap-1">
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-secondary">
+      <SectionLabel className="flex items-center gap-1.5">
         {icon} {label}
-      </div>
+      </SectionLabel>
       <div className="text-2xl font-bold tabular-nums">{value}</div>
-      {sub ? <div className="text-xs text-secondary">{sub}</div> : null}
+      {sub ? <div className="text-micro text-muted-foreground">{sub}</div> : null}
     </Card>
   );
 }
@@ -34,12 +34,9 @@ export function ReferralsPage() {
   const q = useReferralDashboard();
 
   return (
-    <main className="mx-auto max-w-3xl space-y-4 p-6">
-      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Home
-      </Link>
-      <h1 className="text-2xl font-bold">Earn by referring verified drivers and agents</h1>
-      <p className="text-sm text-secondary">
+    <PageShell>
+      <PageHeader title="Refer & earn" subtitle="₹50 per qualifying trip from each verified driver or agent you bring on" backTo="/" />
+      <p className="mb-3 text-sm text-muted-foreground">
         Invite trusted drivers and agents to TripKing. Once they become verified, finish their launch credits, and start completing eligible paid trips, you earn ₹50 per trip until your referral cap is reached.
       </p>
 
@@ -48,7 +45,7 @@ export function ReferralsPage() {
       ) : q.isError ? (
         <ErrorState title="Couldn't load referrals" message="Try again." onRetry={() => void q.refetch()} />
       ) : (
-        <>
+        <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Stat icon={<Users className="size-3.5" />} label="Referred" value={String(q.data.summary.counts.totalReferred)} sub={`${q.data.summary.counts.qualified} qualified`} />
             <Stat icon={<Award className="size-3.5" />} label="Lifetime earned" value={rupees(q.data.summary.lifetimeEarnedPaise)} />
@@ -60,9 +57,9 @@ export function ReferralsPage() {
           <TransferToWalletPanel />
           <WithdrawalCard />
           <ReferralTermsAndFAQ />
-        </>
+        </div>
       )}
-    </main>
+    </PageShell>
   );
 }
 
