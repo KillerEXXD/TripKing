@@ -119,17 +119,18 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     expect(shape.trip_type).toBe('one_way');
   });
 
-  // Round-trip body shape: requires waypoint arrive_at to be monotonic + last waypoint city
-  // to match the first. The current attempt 422s — needs the exact monotonic-arrive shape the
-  // server validates. Filed as a small follow-up; one_way coverage above proves the per-tab
-  // body-shape contract in principle.
+  // Round-trip body shape: POST itself succeeds (waypoints are accepted with strictly
+  // monotonic arrive_at), but the readback's waypoints[].city_id is undefined — the joined
+  // shape isn't what we expected. Investigation deferred; the one_way test above proves the
+  // per-trip-type contract in principle.
   test.skip('POST /trips round-trip → trip_type=round_trip + 3-waypoint chain + expected_end_at', async ({ request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     const cities = await getCities(request);
     const carTypes = await getCarTypes(request);
     const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
-    const endAt = new Date(Date.now() + 28 * 3600 * 1000).toISOString();
+    const turnAt = new Date(Date.now() + 8 * 3600 * 1000).toISOString();  // strictly > pickup
+    const endAt = new Date(Date.now() + 28 * 3600 * 1000).toISOString(); // strictly > turn
 
     const post = await request.post(`${API_BASE}/trips`, {
       headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
@@ -143,7 +144,7 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
         trip_type: 'round_trip',
         waypoints: [
           { city_id: cities[0]!.id },
-          { city_id: cities[1]!.id, arrive_at: pickupAt, wait_minutes: 0, is_destination: true },
+          { city_id: cities[1]!.id, arrive_at: turnAt, wait_minutes: 0, is_destination: true },
           { city_id: cities[0]!.id, arrive_at: endAt, wait_minutes: 0, is_destination: true },
         ],
       }),
