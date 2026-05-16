@@ -1,0 +1,41 @@
+/**
+ * Operator Console — "Linear for fleets"
+ * Scoped CSS-variable overrides for descendants of .v2-operator-console.
+ * Tailwind v4 utilities (bg-page, bg-surface, etc.) resolve these at the
+ * cascade level, so swapping the wrapper class swaps the whole skin.
+ */
+.v2-operator-console {
+  /* Near-monochrome surfaces */
+  --color-page: #fafafa;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4f4f5;
+  --color-foreground: #18181b;
+  --color-muted-foreground: #71717a;
+  --color-border: #e4e4e7;
+
+  /* Single accent system: state, not identity */
+  --color-primary: #18181b;
+  --color-primary-foreground: #fafafa;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-destructive: #f43f5e;
+
+  /* Tight radius — table aesthetic */
+  --radius-card: 6px;
+  --radius-control: 4px;
+  --radius-pill: 4px;
+
+  /* Hairline elevation, not soft shadow */
+  --shadow-card: 0 0 0 1px rgba(0, 0, 0, 0.05);
+
+  /* Dense type */
+  --text-header: 14px;
+  --text-section-label: 11px;
+  --text-body: 13px;
+  --text-micro: 11px;
+}
+
+/* Tabular numerals everywhere inside the console */
+.v2-operator-console {
+  font-feature-settings: 'tnum' 1, 'cv11' 1;
+}

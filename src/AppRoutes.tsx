@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminRoute } from '@/components/auth/AdminRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { V2LayoutShell } from '@/components/v2/shared/V2LayoutShell';
 import { LoadingSkeleton, RouteErrorBoundary } from '@/components/feedback';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 
@@ -64,6 +65,11 @@ const WebsitePage = lazyWithRetry(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazyWithRetry(() => import('@/pages/ForAgentsPage'));
 // Public passenger portal — the trip OTP is the credential, no login.
 const PassengerPage = lazyWithRetry(() => import('@/pages/PassengerPage'));
+// v2 prototype routes — alternate UI directions, parallel to v1.
+const V2IndexPage = lazyWithRetry(() => import('@/pages/v2/V2IndexPage'));
+const V2OperatorTripsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/TripsListPage'));
+const V2FieldTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/TripsListPage'));
+const V2PipelineTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripsListPage'));
 
 function PageFallback() {
   return (
@@ -142,6 +148,13 @@ export function AppRoutes() {
             <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
             <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
+          </Route>
+          {/* v2 prototype routes — parallel UI directions; do not touch v1 above. */}
+          <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
+            <Route path="/v2" element={<V2IndexPage />} />
+            <Route path="/v2/operator/trips" element={<V2OperatorTripsPage />} />
+            <Route path="/v2/field/trips" element={<V2FieldTripsPage />} />
+            <Route path="/v2/pipeline/trips" element={<V2PipelineTripsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>
