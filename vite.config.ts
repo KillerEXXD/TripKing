@@ -63,6 +63,12 @@ export default defineConfig({
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
   },
+  // Keep class + function names through minification. Our typed transform errors
+  // set `this.name = new.target.name` (src/lib/api/transforms/base.ts); without
+  // keepNames, Sentry titled them "_: missing FIELD" / "d: missing FIELD" instead
+  // of "TripTransformError" / "DriverTransformError" — impossible to group or grep.
+  // ~1–2% bundle bloat is worth the diagnostic clarity.
+  esbuild: { keepNames: true },
   build: {
     // Hidden source maps — uploaded to Sentry, not served to the browser.
     sourcemap: 'hidden',
