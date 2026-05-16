@@ -327,6 +327,74 @@ export async function acceptTrip(
   return { passengerOtp: res.data.passenger_otp };
 }
 
+/** Driver starts an accepted trip by verifying the passenger OTP. */
+export async function startTrip(
+  req: APIRequestContext,
+  driverToken: string,
+  tripId: string,
+  passengerOtp: string,
+): Promise<void> {
+  const res = await call(req, 'POST', `/trips/${tripId}/start`, { token: driverToken, data: { passenger_otp: passengerOtp } });
+  if (res.status !== 200) throw new Error(`startTrip failed: ${res.status} ${JSON.stringify(res.error)}`);
+}
+
+/** Driver completes an in-progress trip. Triggers the dual-side platform fee charges. */
+export async function completeTrip(
+  req: APIRequestContext,
+  driverToken: string,
+  tripId: string,
+  opts: { driverNotes?: string } = {},
+): Promise<{ status: number; error?: { code?: string; message?: string } | null }> {
+  const res = await call(req, 'POST', `/trips/${tripId}/complete`,
+    { token: driverToken, data: { driver_notes: opts.driverNotes ?? 'e2e' } });
+  return { status: res.status, error: res.error };
+}
+
+/** Cancel a trip (poster only). Optional `cancelReasonId` from `cancel_reasons`. */
+export async function cancelTrip(
+  req: APIRequestContext,
+  agentToken: string,
+  tripId: string,
+  opts: { cancelReasonId?: string } = {},
+): Promise<void> {
+  const res = await call(req, 'POST', `/trips/${tripId}/cancel`,
+    { token: agentToken, data: opts.cancelReasonId ? { cancel_reason_id: opts.cancelReasonId } : {} });
+  if (res.status !== 200) throw new Error(`cancelTrip failed: ${res.status} ${JSON.stringify(res.error)}`);
+}
+
+/** Transfer released referral earnings into the user's cash wallet (Earnings Transfer Credit). */
+export async function transferReleasedToWallet(
+  req: APIRequestContext,
+  userToken: string,
+  amountPaise: number,
+): Promise<{ status: number; error?: { code?: string; message?: string } | null }> {
+  const res = await call(req, 'POST', '/referrals/me/transfer-to-wallet',
+    { token: userToken, data: { amount_paise: amountPaise } });
+  return { status: res.status, error: res.error };
+}
+
+/** Request a UPI withdrawal of released referral earnings. */
+export async function requestWithdrawal(
+  req: APIRequestContext,
+  userToken: string,
+  amountPaise: number,
+  upiId: string,
+): Promise<{ status: number; withdrawalId?: string; error?: { code?: string; message?: string } | null }> {
+  const res = await call<{ id: string }>(req, 'POST', '/referrals/me/withdraw',
+    { token: userToken, data: { amount_paise: amountPaise, upi_id: upiId } });
+  return { status: res.status, withdrawalId: res.data?.id, error: res.error };
+}
+
+/** Read trip — used as an API witness after UI actions. */
+export async function getTrip(
+  req: APIRequestContext,
+  token: string,
+  tripId: string,
+): Promise<Record<string, unknown> | null> {
+  const res = await call<Record<string, unknown>>(req, 'GET', `/trips/${tripId}`, { token });
+  return res.data;
+}
+
 // ── vacancies ───────────────────────────────────────────────────────────────
 
 export async function postVacancy(
