@@ -148,6 +148,7 @@ export function transformTrip(api: Api): Trip {
     cancelReasonId: str(api.cancel_reason_id),
     applicantCount: num(api.applicant_count, 0),
     pendingInvitationCount: num(api.pending_invitation_count, 0),
+    autoInvitedCount: numOpt(api.auto_invited_count),
     invitationId: str(api.invitation_id),
     invitationStatus: typeof api.invitation_status === 'string'
       ? (api.invitation_status as Trip['invitationStatus'])
@@ -310,6 +311,7 @@ export function toApiPostTrip(input: PostTripInput): Record<string, unknown> {
     show_fare_to_passenger: input.showFareToPassenger,
     hide_passenger_phone: input.hidePassengerPhone,
   };
+  if (input.autoInviteMatches !== undefined) body.auto_invite_matches = input.autoInviteMatches;
   // Migration-024 fields — omit when unset so legacy callers continue to POST the same shape.
   if (input.tripType !== undefined) body.trip_type = input.tripType;
   if (input.expectedEndAt !== undefined) body.expected_end_at = input.expectedEndAt;

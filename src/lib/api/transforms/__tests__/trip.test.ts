@@ -207,4 +207,15 @@ describe('toApiPostTrip', () => {
     });
     expect(toApiPostTrip({ ...input, fromPlaceId: 'p1', toPlaceId: 'p2' })).toMatchObject({ from_place_id: 'p1', to_place_id: 'p2' });
   });
+  it('omits auto_invite_matches when not provided (server default applies)', () => {
+    const input: PostTripInput = {
+      fromCityId: 'c1', toCityId: 'c2', pickupAt: 'x', expectedDistanceKm: 1, carTypeId: 'ct',
+      seatsRequired: 4, acRequired: true, ratePerKm: 1, totalFare: 1, commissionPct: 0, gstAmount: 0,
+      driverBata: 0, extrasPaidByPassenger: true, passengerName: '', passengerPhone: '', passengerCount: 1,
+      showFareToPassenger: true, hidePassengerPhone: true,
+    };
+    expect(toApiPostTrip(input)).not.toHaveProperty('auto_invite_matches');
+    expect(toApiPostTrip({ ...input, autoInviteMatches: true })).toMatchObject({ auto_invite_matches: true });
+    expect(toApiPostTrip({ ...input, autoInviteMatches: false })).toMatchObject({ auto_invite_matches: false });
+  });
 });

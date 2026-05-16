@@ -16,6 +16,7 @@ import {
   getTripApplicants,
   getTripByOtp,
   getTripInvites,
+  getTripMatchPreview,
   getTrips,
   inviteDrivers,
   postTrip,
@@ -136,6 +137,21 @@ export function useMyApplications() {
 
 const useInvalidateTrips = createInvalidator('trips', 'trip');
 const useInvalidateVacanciesFromTrips = createInvalidator('vacancies', 'vacancy');
+
+/**
+ * Counts-only auto-invite preview — drives the trip-post form's "N drivers available"
+ * helper text and gates the Post button. Re-fires whenever the pickup city changes.
+ * Short stale time so a driver coming online in the next minute is reflected.
+ */
+export function useTripMatchPreview(fromCityId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['trips', 'match-preview', fromCityId ?? null],
+    queryFn: () => getTripMatchPreview(fromCityId as string),
+    enabled: enabled && !!fromCityId,
+    staleTime: 30_000,
+    retry: 0,
+  });
+}
 
 export function usePostTrip() {
   const invalidate = useInvalidateTrips();
