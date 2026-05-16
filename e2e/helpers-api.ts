@@ -209,6 +209,27 @@ export async function mintAdmin(req: APIRequestContext, opts: { displayName?: st
   return mintUser(req, 'admin', { displayName: opts.displayName ?? uniqueName('admin') });
 }
 
+/** Set a user's cash-wallet sub-balance to an exact paise value. Admin Bearer required.
+ *  Common use: drain a fresh driver's promo balance to ₹0 so the next trip completion 402s.
+ *  Backed by `POST /admin/wallet/set-balance` which inserts an `adjustment` ledger row. */
+export async function setWalletBalance(
+  req: APIRequestContext,
+  adminToken: string,
+  userId: string,
+  subBalance: 'promo' | 'cash' | 'transferred',
+  targetPaise: number,
+): Promise<void> {
+  const res = await call(req, 'POST', '/admin/wallet/set-balance',
+    { token: adminToken, data: { user_id: userId, sub_balance: subBalance, target_paise: targetPaise } });
+  if (res.status !== 200) throw new Error(`setWalletBalance(${subBalance}=${targetPaise}) failed: ${res.status} ${JSON.stringify(res.error)}`);
+}
+
+/** Convenience: drain BOTH promo and cash sub-balances to ₹0 for a fresh-account guard test. */
+export async function drainWallet(req: APIRequestContext, adminToken: string, userId: string): Promise<void> {
+  await setWalletBalance(req, adminToken, userId, 'promo', 0);
+  await setWalletBalance(req, adminToken, userId, 'cash', 0);
+}
+
 /** Transition a driver or agent profile's KYC status mid-test (admin Bearer required). */
 export type KycStatus = 'pending' | 'docs_submitted' | 'video_pending' | 'ready_for_approval' | 'approved' | 'rejected' | 'resubmit_required';
 export async function setKyc(

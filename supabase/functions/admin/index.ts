@@ -328,6 +328,56 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/withdrawals`, 405);
   }
 
+  // ── /admin/wallet/set-balance — admin-only test/ops helper ────────────────
+  // Sets a USER's `cash_wallets` sub-balance to a target absolute value by inserting an
+  // `adjustment` ledger row with the computed delta. Used by:
+  //  (a) e2e tests that need to drain promo → assert insufficient-balance 402 paths
+  //  (b) ops corrections when a stuck top-up needs manual balance fixing
+  // POST body: { user_id, sub_balance: 'promo'|'cash'|'transferred', target_paise: int>=0 }
+  if (segments[0] === 'wallet' && segments[1] === 'set-balance' && req.method === 'POST') {
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
+    const body = await readBody(req);
+    const userId = typeof body.user_id === 'string' ? body.user_id : '';
+    const sub = typeof body.sub_balance === 'string' ? body.sub_balance : '';
+    const target = Number(body.target_paise);
+    if (!userId) return fail('VALIDATION', 'user_id required', 422);
+    if (!['promo', 'cash', 'transferred'].includes(sub)) return fail('VALIDATION', "sub_balance must be 'promo' | 'cash' | 'transferred'", 422);
+    if (!Number.isFinite(target) || target < 0) return fail('VALIDATION', 'target_paise must be an integer >= 0', 422);
+
+    // Ensure wallet row exists (lazy create via the existing RPC) and grab the wallet_id.
+    const { data: walletId, error: ensureErr } = await db.rpc('ensure_cash_wallet', { _user_id: userId });
+    if (ensureErr) return fail('DB_ERROR', ensureErr.message, 500);
+
+    // Read current balance from the view to compute the delta.
+    const { data: bal, error: balErr } = await db
+      .from('cash_wallet_balances')
+      .select('promo_paise, cash_paise, transferred_paise')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (balErr) return fail('DB_ERROR', balErr.message, 500);
+    const currentMap: Record<string, number> = {
+      promo: Number(bal?.promo_paise ?? 0),
+      cash: Number(bal?.cash_paise ?? 0),
+      transferred: Number(bal?.transferred_paise ?? 0),
+    };
+    const current = currentMap[sub] ?? 0;
+    const delta = target - current;
+    if (delta === 0) return ok({ wallet_id: walletId, sub_balance: sub, balance_paise: target, note: 'no change' });
+
+    const { data: entry, error: insErr } = await db.from('cash_wallet_ledger').insert({
+      wallet_id: walletId,
+      entry_type: 'adjustment',
+      sub_balance: sub,
+      amount_paise: delta,
+      note: `admin set-balance by ${a.id}: ${sub} → ${target} paise (was ${current})`,
+    }).select('id').single();
+    if (insErr) return pgFail(insErr);
+
+    await audit(db, a.id, 'set-balance', 'cash_wallets', String(walletId), { sub, from: current }, { sub, to: target, ledger_entry_id: (entry as { id: string }).id });
+    return ok({ wallet_id: walletId, sub_balance: sub, balance_paise: target, ledger_entry_id: (entry as { id: string }).id });
+  }
+
   // ── /admin/app-wallet (Stage 5; admin-only read of platform's accounts receivable) ──
   if (segments[0] === 'app-wallet') {
     const a = await requireAdmin(db, req);
