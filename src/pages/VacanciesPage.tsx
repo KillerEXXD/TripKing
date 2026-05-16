@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowLeft, Car, MapPin, Star, X } from 'lucide-react';
+import { Car, MapPin, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useVacancies } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -13,6 +13,7 @@ import { cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
+import { PageHeader, PageShell } from '@/components/layout';
 import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatINR, formatShortDate } from '@/lib/utils';
@@ -44,7 +45,7 @@ function VacancyCard({ vacancy, canInvite }: { vacancy: Vacancy; canInvite: bool
       ? `★ ${driver.ratingAvg.toFixed(1)} · ${driver.ratingCount} · ${driver.totalTripsCompleted} trips`
       : null;
   return (
-    <Card className="gap-3 transition-colors hover:border-primary/40">
+    <Card className="gap-3 transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <Link to={`/drivers/${vacancy.driverId}`} className="min-w-0 flex-1">
           <DriverIdentity driver={driver} sub={ratingSub} />
@@ -230,7 +231,6 @@ function MyInvitesBadge({ invites }: { invites: VacancyInviteSummary[] }) {
  * driver action — its screen lands separately.)
  */
 export function VacanciesPage() {
-  const navigate = useNavigate();
   const [currentCityId, setCurrentCityId] = useState('');
   const [destinationCityId, setDestinationCityId] = useState('');
   const [near, setNear] = useState<NearRadius | null>(null);
@@ -248,63 +248,48 @@ export function VacanciesPage() {
   // Agents (and admins viewing-as-agent) can invite a driver to one of their open trips.
   const canInvite = effectiveRole === 'trip_manager' || effectiveRole === 'admin';
 
-  const chipSelect = 'h-8 rounded-full border border-input bg-white px-3 text-xs';
+  const subtitle = vacanciesQuery.isSuccess
+    ? `${vacancies.length} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}`
+    : 'Drivers who have posted their availability';
+
+  // Redesign: pills on the page-grey surface instead of a bordered band. The selects keep their
+  // chip look but pick up the rounded-pill token + the new border + hover treatment.
+  const chipSelect = 'h-8 rounded-pill border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-muted';
+
   return (
-    <div className="mx-auto max-w-md">
-      <header className="flex items-center gap-3 border-b bg-white px-4 py-3">
-        <button type="button" aria-label="Back to home" onClick={() => navigate('/')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <div className="min-w-0 flex-1">
-          <h1 className="text-base font-semibold">Vacant drivers</h1>
-          <p className="text-xs text-secondary">
-            {vacanciesQuery.isSuccess ? `${vacancies.length} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}` : 'Drivers who have posted their availability'}
-          </p>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader title="Vacant drivers" subtitle={subtitle} backTo="/" />
 
       {isDriverView && myDriverId ? <IAmAvailableCard driverId={myDriverId} /> : null}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 border-b bg-white px-4 py-2.5">
-        <label className="sr-only" htmlFor="vac-current">
-          Filter by where the driver is
-        </label>
+      <div className="mb-3 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <label className="sr-only" htmlFor="vac-current">Filter by where the driver is</label>
         <select id="vac-current" value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)} className={chipSelect}>
           <option value="">Driver in any city</option>
           {(citiesQuery.data ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
-        <label className="sr-only" htmlFor="vac-dest">
-          Filter by destination
-        </label>
+        <label className="sr-only" htmlFor="vac-dest">Filter by destination</label>
         <select id="vac-dest" value={destinationCityId} onChange={(e) => setDestinationCityId(e.target.value)} className={chipSelect}>
           <option value="">Going anywhere</option>
           {(citiesQuery.data ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
+            <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
         <NearMeFilter value={near} onChange={setNear} />
         {anyFilter ? (
           <button
             type="button"
-            onClick={() => {
-              setCurrentCityId('');
-              setDestinationCityId('');
-              setNear(null);
-            }}
-            className="h-8 rounded-full border border-input bg-white px-3 text-xs font-medium"
+            onClick={() => { setCurrentCityId(''); setDestinationCityId(''); setNear(null); }}
+            className="h-8 shrink-0 rounded-pill border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-muted"
           >
             Clear
           </button>
         ) : null}
       </div>
 
-      <div className="space-y-3 p-4">
+      <div className="space-y-3">
         {vacanciesQuery.isPending ? (
           <LoadingSkeleton rows={5} />
         ) : vacanciesQuery.isError ? (
@@ -319,7 +304,7 @@ export function VacanciesPage() {
           vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} canInvite={canInvite} />)
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
 
