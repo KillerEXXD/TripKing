@@ -44,8 +44,10 @@ export function WithdrawalCard() {
   const request = useRequestWithdrawal();
 
   const withdrawable = dash.data?.summary.withdrawablePaise ?? 0;
-  const minRupees = 1;
+  // ₹500 minimum per spec §22 / WITHDRAW_LIMITS.minWithdrawalRupees.
+  const minRupees = 500;
   const maxRupees = Math.floor(withdrawable / 100);
+  const belowMin = maxRupees < minRupees;
 
   const [amount, setAmount] = useState<number>(0);
   const [upi, setUpi] = useState<string>('');
@@ -78,6 +80,12 @@ export function WithdrawalCard() {
         </div>
       </div>
 
+      {belowMin ? (
+        <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+          Minimum withdrawal is {formatINR(minRupees)}. You currently have <b>{rupees(withdrawable)}</b> released — keep referring to top up.
+        </div>
+      ) : null}
+
       <label className="block text-sm font-medium">
         Amount (₹)
         <input
@@ -87,8 +95,10 @@ export function WithdrawalCard() {
           max={maxRupees}
           value={amount || ''}
           onChange={(e) => setAmount(Number(e.target.value) || 0)}
-          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base"
+          disabled={belowMin}
+          className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-base disabled:cursor-not-allowed disabled:opacity-60"
         />
+        <span className="mt-1 block text-xs text-secondary">Min {formatINR(minRupees)} · 3-day hold after each accrual</span>
       </label>
 
       <div className="flex flex-wrap gap-2">

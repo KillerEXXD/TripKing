@@ -8,6 +8,7 @@ import {
   getMyReferred,
   getMyWithdrawals,
   getReferralLink,
+  getReferralTiers,
   patchAdminWithdrawal,
   requestReferralWithdrawal,
   transferReferralToCashWallet,
@@ -64,6 +65,14 @@ export function useReferred(params?: { status?: string; role?: 'driver' | 'trip_
     queryKey: ['referrals', 'me', 'referred', params ?? {}],
     queryFn: () => getMyReferred(params),
     staleTime: STALE.profile,
+  });
+}
+
+export function useReferralTiers() {
+  return useQuery({
+    queryKey: ['referrals', 'tiers'],
+    queryFn: getReferralTiers,
+    staleTime: STALE.master,
   });
 }
 

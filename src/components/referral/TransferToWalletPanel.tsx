@@ -54,10 +54,16 @@ export function TransferToWalletPanel() {
         </div>
       </div>
 
-      <div className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200">
+      <div className="rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-900 ring-1 ring-rose-200">
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <p>Transferred earnings can be used to pay platform fees but cannot be withdrawn later and will not generate further referral rewards.</p>
+          <div>
+            <p className="font-semibold">This is irreversible.</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+              <li>Transferred earnings <b>cannot be withdrawn later</b>.</li>
+              <li>Trip-wallet credits used to pay platform fees <b>do not generate further referral rewards</b>.</li>
+            </ul>
+          </div>
         </div>
       </div>
 
