@@ -17,6 +17,7 @@ const badgeVariants = cva(
         warning: 'border-transparent bg-amber-100 text-amber-800',
         muted: 'border-transparent bg-gray-100 text-gray-700',
         info: 'border-transparent bg-blue-100 text-blue-800',
+        danger: 'border-transparent bg-red-100 text-red-700',
         // UI redesign — semantic status variants (docs/UI_REDESIGN_PLAN.md §1.7).
         // Pages should prefer these named variants over the legacy success/warning/etc.;
         // ditto for inline `bg-emerald-100` pills. Backed by accent tokens, so a single

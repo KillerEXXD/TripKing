@@ -2,10 +2,10 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Bell, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard, ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { Badge, Card, SectionLabel } from '@/components/ui';
+import { Card, SectionLabel } from '@/components/ui';
 import { PageShell } from '@/components/layout';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
-import { initials } from '@/lib/utils';
+import { getFirstName, initials } from '@/lib/utils';
 
 interface AdminTile {
   to: string;
@@ -46,16 +46,16 @@ const TONE: Record<AdminTile['tone'], string> = {
 
 function Bellish({ count }: { count: number }) {
   return (
-    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative -mr-1 flex size-9 items-center justify-center rounded-full text-secondary hover:bg-muted">
-      <Bell className="size-5" aria-hidden />
-      {count > 0 ? <span className="absolute right-1 top-1 size-2 rounded-full bg-destructive" /> : null}
+    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative flex size-7 items-center justify-center rounded-full text-secondary hover:bg-muted">
+      <Bell className="size-4" aria-hidden />
+      {count > 0 ? <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-destructive" /> : null}
     </Link>
   );
 }
 
 function ProfileAvatar({ name }: { name: string }) {
   return (
-    <Link to="/profile" aria-label="Your profile" className="flex size-9 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-sm font-bold text-primary hover:ring-2 hover:ring-primary/40">
+    <Link to="/profile" aria-label="Your profile" className="flex size-7 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-[11px] font-bold text-primary hover:ring-2 hover:ring-primary/40">
       <span>{name ? initials(name) : '?'}</span>
     </Link>
   );
@@ -89,12 +89,12 @@ export function HomePage() {
   // so it visually matches the other pages.
   return (
     <PageShell>
-      <header className="sticky top-0 z-10 -mx-4 mb-3 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
+      <header className="sticky top-0 z-10 -mx-4 mb-3 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-micro text-muted-foreground">Welcome back</div>
-          <div className="flex items-center gap-2">
-            <span className="truncate text-header font-bold">{name}</span>
-            <Badge variant="verified">Admin</Badge>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{getFirstName(user?.displayName ?? '') || user?.displayName || user?.phone || 'Admin'}</span>
+            <span aria-label="Admin" title="Admin" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-purple-accent text-[10px] font-bold text-white">Ad</span>
           </div>
         </div>
         <div className="flex items-center gap-1">

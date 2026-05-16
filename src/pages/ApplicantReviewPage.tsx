@@ -48,7 +48,7 @@ function ApplicantCard({
 }) {
   const d = acceptance.driver;
   const veh = vehicleLabel(acceptance);
-  const meta = STATUS_BADGE[acceptance.status];
+  const meta = STATUS_BADGE[acceptance.status] ?? { label: String(acceptance.status), variant: 'muted' as const };
   const dim = acceptance.status === 'rejected' || acceptance.status === 'withdrawn' || acceptance.status === 'expired';
   return (
     <Card className={`gap-3 ${acceptance.status === 'accepted' || acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : dim ? 'opacity-70' : ''}`}>

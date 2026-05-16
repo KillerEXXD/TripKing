@@ -19,16 +19,16 @@ const STATUS_LABEL: Record<Trip['status'], string> = { open: 'Open', has_applica
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
-    <Link to="/profile" aria-label="Your profile" className="flex size-9 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-sm font-bold text-primary hover:ring-2 hover:ring-primary/40">
+    <Link to="/profile" aria-label="Your profile" className="flex size-7 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-[11px] font-bold text-primary hover:ring-2 hover:ring-primary/40">
       {photoUrl ? <img src={photoUrl} alt="" className="size-full object-cover" /> : <span>{name ? initials(name) : '?'}</span>}
     </Link>
   );
 }
 function Bellish({ count }: { count: number }) {
   return (
-    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative -mr-1 flex size-9 items-center justify-center rounded-full text-secondary hover:bg-muted">
-      <Bell className="size-5" aria-hidden />
-      {count > 0 ? <span className="absolute right-1 top-1 size-2 rounded-full bg-destructive" /> : null}
+    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative flex size-7 items-center justify-center rounded-full text-secondary hover:bg-muted">
+      <Bell className="size-4" aria-hidden />
+      {count > 0 ? <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-destructive" /> : null}
     </Link>
   );
 }
@@ -158,12 +158,12 @@ function AgentHome({ agent }: { agent: Agent }) {
 
   return (
     <div>
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
+      <header className="sticky top-0 z-10 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
-          <div className="flex items-center gap-2">
-            <span className="truncate font-semibold">{getFirstName(agent.fullName) || user?.displayName || 'Agent'}</span>
-            <Badge variant="secondary">Agent</Badge>
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{getFirstName(agent.fullName) || user?.displayName || 'Agent'}</span>
+            <span aria-label="Agent" title="Agent" className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-amber-400 text-[10px] font-bold text-amber-950">A</span>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -262,7 +262,7 @@ function AgentHome({ agent }: { agent: Agent }) {
 function AgentHomeChromeFallback() {
   return (
     <div>
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-3 bg-surface px-4 py-3 shadow-header">
+      <header className="sticky top-0 z-10 flex items-end justify-between gap-3 bg-surface px-4 py-3 shadow-header">
         <div className="min-w-0">
           <div className="text-xs text-secondary">Welcome back</div>
           <div className="text-base font-semibold">Loading your home…</div>

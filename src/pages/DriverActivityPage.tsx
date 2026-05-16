@@ -32,15 +32,16 @@ function isTab(v: string | null): v is Tab {
   return !!v && (TAB_IDS as string[]).includes(v);
 }
 
-const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' }> = {
+const APPLICATION_BADGE: Record<AcceptanceStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' | 'destructive' | 'danger' }> = {
   applied: { label: 'Awaiting decision', variant: 'info' },
   selected: { label: 'Selected — accept it!', variant: 'warning' },
   accepted: { label: 'Accepted', variant: 'success' },
   rejected: { label: 'Not selected', variant: 'muted' },
-  // Withdrawn: use the destructive (light-red) variant so the driver
-  // immediately spots a card they pulled out of and doesn't confuse it
-  // with a rejection.
-  withdrawn: { label: 'Withdrawn', variant: 'destructive' },
+  // Withdrawn: use the lighter `danger` variant (bg-red-100 text-red-700) so the
+  // card pops in the driver's "My applications" list without screaming at them.
+  // Main introduced `danger`; the redesign branch had been on `destructive` (solid
+  // red) which was too aggressive — keeping `danger` here.
+  withdrawn: { label: 'Withdrawn', variant: 'danger' },
   expired: { label: 'Expired', variant: 'muted' },
 };
 
@@ -65,6 +66,11 @@ function applicantBanner(status: AcceptanceStatus, tripStatus: TripStatus): stri
 function ApplicationRow({ app }: { app: MyApplication }) {
   const t = app.trip;
   const badge = APPLICATION_BADGE[app.status] ?? APPLICATION_BADGE.applied;
+  // Defensive: STATUS_META is keyed by TripStatus, but the API has historically grown
+  // its enum (selected/accepted/in_progress landed across separate releases). A trip
+  // returned with an unrecognised status would crash with "Cannot read properties of
+  // undefined (reading 'variant'|'label')" — surfaced 3 events / 1 user in Sentry.
+  const tripMeta = STATUS_META[t.status] ?? { variant: 'muted' as const, label: String(t.status) };
   const picked = isPickedStatus(app.status);
   const [expanded, setExpanded] = useState(false);
   const withdrawMutation = useWithdrawApplication();
@@ -100,7 +106,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
         Pickup: {formatPickupTime(t.pickupAt)}
         {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
         {' · trip is '}
-        {STATUS_META[t.status].label.toLowerCase()}
+        {tripMeta.label.toLowerCase()}
       </div>
     </div>
   );
@@ -136,7 +142,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded ? 'true' : 'false'}
+        aria-expanded={expanded}
         aria-controls={`applied-${app.acceptanceId}-body`}
         className="block w-full text-left"
       >
@@ -191,7 +197,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          aria-expanded={expanded ? 'true' : 'false'}
+          aria-expanded={expanded}
           aria-controls={`applied-${app.acceptanceId}-body`}
           className="flex items-center text-primary"
         >

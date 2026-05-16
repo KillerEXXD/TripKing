@@ -37,7 +37,7 @@ function InvitationCard({
   withdrawing: boolean;
 }) {
   const d = invite.driver;
-  const meta = STATUS_BADGE[invite.status];
+  const meta = STATUS_BADGE[invite.status] ?? { label: String(invite.status), variant: 'muted' as const };
   const reciprocated = invite.status === 'applied';
   const heading = reciprocated && d?.fullName ? d.fullName : d?.displayHandle ? `Driver ${d.displayHandle}` : 'Driver';
   const dim = invite.status === 'declined' || invite.status === 'withdrawn' || invite.status === 'expired';

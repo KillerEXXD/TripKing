@@ -29,6 +29,16 @@ describe('ReviewList', () => {
     expect(screen.getByLabelText('4 out of 5')).toBeInTheDocument();
   });
 
+  it('fills exactly `score` stars — a 3★ review renders 3 amber + 2 grey, not 5', () => {
+    const { container } = render(<ReviewList reviews={[makeReview({ score: 3 })]} />);
+    const stars = container.querySelectorAll('[aria-label="3 out of 5"] svg');
+    expect(stars).toHaveLength(5);
+    const filled = Array.from(stars).filter((el) => el.getAttribute('class')?.includes('fill-amber-400'));
+    const empty = Array.from(stars).filter((el) => el.getAttribute('class')?.includes('fill-transparent'));
+    expect(filled).toHaveLength(3);
+    expect(empty).toHaveLength(2);
+  });
+
   it('renders tag labels when a label map is supplied', () => {
     render(<ReviewList reviews={[makeReview({ tagIds: ['tag1'] })]} tagLabels={{ tag1: 'Punctual' }} />);
     expect(screen.getByText('★ Punctual')).toBeInTheDocument();

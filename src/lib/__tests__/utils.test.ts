@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, formatINR, formatKm, formatRating, formatClockTime, formatShortDate, isValidUUID, initials, haversineKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatRating, formatClockTime, formatShortDate, getFirstName, isValidUUID, initials, haversineKm } from '@/lib/utils';
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -63,6 +63,28 @@ describe('initials', () => {
   });
   it('falls back to the first two letters of a single name', () => {
     expect(initials('Ravi')).toBe('RA');
+  });
+});
+
+describe('getFirstName (header greeting)', () => {
+  it('returns the only word when the full name is a single word', () => {
+    expect(getFirstName('Ravee')).toBe('Ravee');
+  });
+  it('appends the second word\'s upper-cased initial', () => {
+    expect(getFirstName('Ravi Kumar')).toBe('Ravi K');
+    expect(getFirstName('ravi kumar')).toBe('ravi K');
+  });
+  it('keeps only one initial — third+ words are dropped', () => {
+    expect(getFirstName('Ravi Kumar Sharma')).toBe('Ravi K');
+  });
+  it('handles extra whitespace', () => {
+    expect(getFirstName('  Ravi   Kumar  ')).toBe('Ravi K');
+  });
+  it('returns empty string for nullish / blank input', () => {
+    expect(getFirstName(undefined)).toBe('');
+    expect(getFirstName(null)).toBe('');
+    expect(getFirstName('')).toBe('');
+    expect(getFirstName('   ')).toBe('');
   });
 });
 

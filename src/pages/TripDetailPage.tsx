@@ -634,7 +634,9 @@ function AwaitingAcceptanceBanner({ trip }: { trip: Trip }) {
 }
 
 function TripDetail({ trip, viewer, fillPassenger }: { trip: Trip; viewer: { isDriver: boolean; isPoster: boolean; iPosted: boolean; isAdmin: boolean; isAssignedDriver: boolean; myDriverId?: string; myDriverPending: boolean; myDriverMissing: boolean; myDriverKycApproved: boolean }; fillPassenger: boolean }) {
-  const badge = STATUS_BADGE[trip.status];
+  // Defensive fallback: trip.status comes from the server; an unrecognised value would
+  // otherwise crash render with "Cannot read properties of undefined (reading 'variant')".
+  const badge = STATUS_BADGE[trip.status] ?? { label: String(trip.status), variant: 'muted' as const };
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
   const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
   const applyable = trip.status === 'open' || trip.status === 'has_applicants';
