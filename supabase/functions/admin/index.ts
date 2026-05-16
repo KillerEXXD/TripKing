@@ -156,6 +156,125 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/${segments[0]}`, 405);
   }
 
+  // ── /admin/referrals (Stage 9; admin-only — list, status, reverse, flags) ──
+  if (segments[0] === 'referrals') {
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
+
+    // GET /admin/referrals/flags?resolved=&severity=
+    if (segments.length === 2 && segments[1] === 'flags' && req.method === 'GET') {
+      let q = db.from('referral_fraud_flags')
+        .select('id, referral_link_id, flag_type, severity, auto_detected, action_taken, detail, note, created_at, resolved_at, resolved_by, resolved_note')
+        .order('created_at', { ascending: false });
+      const resolved = url.searchParams.get('resolved');
+      if (resolved === 'true')  q = q.not('resolved_at', 'is', null);
+      if (resolved === 'false') q = q.is('resolved_at', null);
+      const sev = url.searchParams.get('severity');
+      if (sev) q = q.eq('severity', sev);
+      const ftype = url.searchParams.get('flag_type');
+      if (ftype) q = q.eq('flag_type', ftype);
+      const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') ?? '100')));
+      const { data, error } = await q.limit(limit);
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data ?? []);
+    }
+
+    // PATCH /admin/referrals/flags/<id>  body = { resolved_note?, manual_flag? }
+    if (segments.length === 3 && segments[1] === 'flags' && (req.method === 'PATCH' || req.method === 'PUT')) {
+      const id = decodeURIComponent(segments[2]);
+      const body = await readBody(req);
+      const { data: before } = await db.from('referral_fraud_flags').select('*').eq('id', id).maybeSingle();
+      if (!before) return fail('NOT_FOUND', `flag ${id} not found`, 404);
+      const { data, error } = await db.from('referral_fraud_flags')
+        .update({ resolved_at: new Date().toISOString(), resolved_by: a.id, resolved_note: typeof body.resolved_note === 'string' ? body.resolved_note : null })
+        .eq('id', id).select('*').single();
+      if (error) return pgFail(error);
+      await audit(db, a.id, 'resolve', 'referral_fraud_flags', id, before, data);
+      return ok(data);
+    }
+
+    // POST /admin/referrals/flags  body = { referral_link_id, flag_type, severity, note? }
+    if (segments.length === 2 && segments[1] === 'flags' && req.method === 'POST') {
+      const body = await readBody(req);
+      const linkId = typeof body.referral_link_id === 'string' ? body.referral_link_id : '';
+      const ftype  = typeof body.flag_type === 'string' ? body.flag_type : '';
+      const sev    = typeof body.severity === 'string' ? body.severity : '';
+      if (!linkId || !ftype || !sev) return fail('VALIDATION', 'referral_link_id, flag_type, severity required', 422);
+      const { data, error } = await db.from('referral_fraud_flags')
+        .insert({ referral_link_id: linkId, flag_type: ftype, severity: sev, auto_detected: false, created_by: a.id, note: typeof body.note === 'string' ? body.note : null })
+        .select('*').single();
+      if (error) return pgFail(error);
+      await audit(db, a.id, 'create', 'referral_fraud_flags', (data as Record<string, unknown>).id as string, null, data);
+      return ok(data);
+    }
+
+    // GET /admin/referrals?status=&referrer_user_id=&referred_user_id=&q=
+    if (segments.length === 1 && req.method === 'GET') {
+      let q = db.from('referral_links')
+        .select('id, referrer_user_id, referred_user_id, referred_user_role, status, cap_paise, payout_per_trip_paise, qualified_at, cap_reached_at, eligible_paid_trips_count, total_earned_paise, created_at, referrer:users!referrer_user_id(display_name, phone), referred:users!referred_user_id(display_name, phone)')
+        .order('created_at', { ascending: false });
+      const status = url.searchParams.get('status');
+      if (status) q = q.eq('status', status);
+      const referrerId = url.searchParams.get('referrer_user_id');
+      if (referrerId) q = q.eq('referrer_user_id', referrerId);
+      const referredId = url.searchParams.get('referred_user_id');
+      if (referredId) q = q.eq('referred_user_id', referredId);
+      const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') ?? '100')));
+      const { data, error } = await q.limit(limit);
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data ?? []);
+    }
+
+    // PATCH /admin/referrals/<link_id>/status  body = { status, note? }
+    if (segments.length === 3 && segments[2] === 'status' && (req.method === 'PATCH' || req.method === 'PUT')) {
+      const linkId = decodeURIComponent(segments[1]);
+      const body = await readBody(req);
+      const newStatus = typeof body.status === 'string' ? body.status : '';
+      if (!newStatus) return fail('VALIDATION', 'status required', 422);
+      const { data: before } = await db.from('referral_links').select('*').eq('id', linkId).maybeSingle();
+      if (!before) return fail('NOT_FOUND', `referral link ${linkId} not found`, 404);
+      const { data, error } = await db.from('referral_links').update({ status: newStatus }).eq('id', linkId).select('*').single();
+      if (error) return pgFail(error);
+      await audit(db, a.id, 'set_status', 'referral_links', linkId, before, data);
+      return ok(data);
+    }
+
+    // POST /admin/referrals/<link_id>/reverse-earnings  body = { note? }
+    if (segments.length === 3 && segments[2] === 'reverse-earnings' && req.method === 'POST') {
+      const linkId = decodeURIComponent(segments[1]);
+      const body = await readBody(req);
+      const { data: before } = await db.from('referral_links').select('*').eq('id', linkId).maybeSingle();
+      if (!before) return fail('NOT_FOUND', `referral link ${linkId} not found`, 404);
+      const { data, error } = await db.rpc('reverse_referral_earnings', { _link_id: linkId, _admin_actor_user_id: a.id, _note: typeof body.note === 'string' ? body.note : 'fraud reversal' });
+      if (error) {
+        const msg = error.message || '';
+        if (msg.includes('NOT_FOUND')) return fail('NOT_FOUND', msg, 404);
+        return fail('DB_ERROR', msg, 500);
+      }
+      const reversed = Number(data ?? 0);
+      const { data: after } = await db.from('referral_links').select('*').eq('id', linkId).maybeSingle();
+      await audit(db, a.id, 'reverse_earnings', 'referral_links', linkId, before, { ...after, reversed_paise: reversed });
+      return ok({ reversed_paise: reversed, link: after });
+    }
+
+    return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/referrals/${segments.slice(1).join('/')}`, 405);
+  }
+
+  // ── PATCH /admin/users/<id>/risk  (Stage 9) ───────────────────────────────
+  if (segments[0] === 'users' && segments.length === 3 && segments[2] === 'risk' && (req.method === 'PATCH' || req.method === 'PUT')) {
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
+    const id = decodeURIComponent(segments[1]);
+    const body = await readBody(req);
+    const isHighRisk = body.is_high_risk === true;
+    const { data: before } = await db.from('users').select('id, is_high_risk, display_name').eq('id', id).maybeSingle();
+    if (!before) return fail('NOT_FOUND', 'user not found', 404);
+    const { data, error } = await db.from('users').update({ is_high_risk: isHighRisk }).eq('id', id).select('id, is_high_risk, display_name').single();
+    if (error) return pgFail(error);
+    await audit(db, a.id, isHighRisk ? 'mark_high_risk' : 'clear_high_risk', 'users', id, before, data);
+    return ok(data);
+  }
+
   // ── /admin/withdrawals (Stage 7; admin-only — list + transition queue) ──
   if (segments[0] === 'withdrawals') {
     const a = await requireAdmin(db, req);
