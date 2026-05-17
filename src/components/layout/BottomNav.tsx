@@ -121,14 +121,32 @@ export function BottomNav() {
         });
       }
     };
+    // visualViewport.height isn't always settled when the effect first runs —
+    // on initial load Chrome reports vv.height === innerHeight until layout
+    // calibrates a frame or two later, and no resize event fires. Without a
+    // re-measure the nav stays at bottom: 0 and labels get clipped (the
+    // exact bug shipping the original fix didn't fully solve). Re-measure
+    // after first paint (rAF), and again on a short timeout fallback for
+    // browsers that paint before vv calibrates.
     update();
+    const raf1 = requestAnimationFrame(() => {
+      update();
+      requestAnimationFrame(update);
+    });
+    const t1 = window.setTimeout(update, 100);
+    const t2 = window.setTimeout(update, 500);
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
     window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
     return () => {
+      cancelAnimationFrame(raf1);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
     };
   }, [debugOn, role]);
 

@@ -88,6 +88,30 @@ describe('BottomNav', () => {
     Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
   });
 
+  it('re-measures after first paint to catch visualViewport calibrating late (no resize event ever fires)', async () => {
+    // Regression: on initial load Chrome reports vv.height === innerHeight
+    // (i.e. no chrome overlay) until layout calibrates a frame or two later,
+    // and crucially no resize event fires when it does. Without a scheduled
+    // re-measure the nav sticks at bottom: 0 and labels get clipped.
+    const originalVV = window.visualViewport;
+    const originalInner = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 967, configurable: true });
+    // Start uncalibrated (vv.height === innerHeight); flip to the real value
+    // before the rAF callback fires so the second update() sees the change.
+    const vvObj = { height: 967, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vvObj });
+    setUser(driver);
+    renderNav();
+    const nav = screen.getByRole('navigation', { name: /primary/i });
+    await Promise.resolve();
+    expect(nav.style.bottom).toBe('0px'); // first measurement: uncalibrated
+    vvObj.height = 932; // late calibration happens silently
+    await new Promise((r) => setTimeout(r, 150)); // rAF + setTimeout(100) both fire
+    expect(nav.style.bottom).toBe('35px'); // second measurement caught it
+    Object.defineProperty(window, 'innerHeight', { value: originalInner, configurable: true });
+    Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
+  });
+
   it('navigates when a tab is tapped', () => {
     setUser(driver);
     render(
