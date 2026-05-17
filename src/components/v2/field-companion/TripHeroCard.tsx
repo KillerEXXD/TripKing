@@ -10,7 +10,7 @@ import { FareNumeral } from './FareNumeral';
 export function TripHeroCard({ trip }: { trip: Trip }) {
   return (
     <Link
-      to={`/trips/${trip.id}?from=/v2/field/trips`}
+      to={`/trips/${trip.id}?from=/v3`}
       className="block rounded-card bg-surface p-5 shadow-card transition-transform active:scale-[0.99]"
     >
       <div className="flex items-start justify-between gap-4">

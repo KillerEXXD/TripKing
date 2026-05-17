@@ -65,11 +65,12 @@ const WebsitePage = lazyWithRetry(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazyWithRetry(() => import('@/pages/ForAgentsPage'));
 // Public passenger portal — the trip OTP is the credential, no login.
 const PassengerPage = lazyWithRetry(() => import('@/pages/PassengerPage'));
-// v2 prototype routes — alternate UI directions, parallel to v1.
-const V2IndexPage = lazyWithRetry(() => import('@/pages/v2/V2IndexPage'));
+// v2..v6 prototype skins — one design per top-level prefix. v1 routes untouched.
 const V2OperatorTripsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/TripsListPage'));
-const V2FieldTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/TripsListPage'));
-const V2PipelineTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripsListPage'));
+const V3FieldTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/TripsListPage'));
+const V4PipelineTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripsListPage'));
+const V5EditorialTripsPage = lazyWithRetry(() => import('@/pages/v2/editorial/TripsListPage'));
+const V6BharatTripsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/TripsListPage'));
 
 function PageFallback() {
   return (
@@ -149,12 +150,13 @@ export function AppRoutes() {
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
             <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
           </Route>
-          {/* v2 prototype routes — parallel UI directions; do not touch v1 above. */}
+          {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
-            <Route path="/v2" element={<V2IndexPage />} />
-            <Route path="/v2/operator/trips" element={<V2OperatorTripsPage />} />
-            <Route path="/v2/field/trips" element={<V2FieldTripsPage />} />
-            <Route path="/v2/pipeline/trips" element={<V2PipelineTripsPage />} />
+            <Route path="/v2" element={<V2OperatorTripsPage />} />
+            <Route path="/v3" element={<V3FieldTripsPage />} />
+            <Route path="/v4" element={<V4PipelineTripsPage />} />
+            <Route path="/v5" element={<V5EditorialTripsPage />} />
+            <Route path="/v6" element={<V6BharatTripsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>

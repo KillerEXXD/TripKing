@@ -10,7 +10,7 @@ import { routeChainText } from '@/components/trip/RouteChain';
 export function PipelineCard({ trip }: { trip: Trip }) {
   return (
     <Link
-      to={`/trips/${trip.id}?from=/v2/pipeline/trips`}
+      to={`/trips/${trip.id}?from=/v4`}
       className="block rounded-card border border-border bg-surface p-3 shadow-card transition-shadow hover:shadow-md"
     >
       <div className="truncate text-[14px] font-semibold">{routeChainText(trip)}</div>
