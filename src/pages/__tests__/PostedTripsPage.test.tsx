@@ -52,9 +52,9 @@ function setTrips(state: TripsState) {
   vi.mocked(useTrips).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...state } as never);
 }
 
-function renderPosted() {
+function renderPosted(url = '/posted-trips') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <PostedTripsPage />
     </MemoryRouter>,
   );
@@ -185,5 +185,51 @@ describe('PostedTripsPage', () => {
     renderPosted();
     expect(screen.queryByText('NEW')).toBeNull();
     expect(screen.queryByText(/Posted/i)).toBeNull();
+  });
+
+  // ── ?scope=invites-sent (drill-down view from the home "Invites sent" card) ────
+  it('?scope=invites-sent — hides the filter chips, swaps the title, shows a back arrow, lists only trips with pending invites', () => {
+    setTrips({ data: [
+      makeTrip({ id: 'i1', status: 'open', pendingInvitationCount: 2, fromCity: city('c1', 'WithInvites') }),
+      makeTrip({ id: 'i2', status: 'has_applicants', pendingInvitationCount: 1, fromCity: city('c2', 'AlsoWithInvites') }),
+      makeTrip({ id: 'n1', status: 'open', pendingInvitationCount: 0, fromCity: city('c3', 'NoInvites') }),
+      makeTrip({ id: 'd1', status: 'cancelled', pendingInvitationCount: 5, fromCity: city('c4', 'CancelledOutsideScope') }),
+    ] });
+    renderPosted('/posted-trips?scope=invites-sent&from=/');
+    // Title swap + scope-specific subtitle (2 trips · 3 pending invites)
+    expect(screen.getByText('Invites sent')).toBeInTheDocument();
+    expect(screen.getByText(/2 trips · 3 pending invites/i)).toBeInTheDocument();
+    // Back arrow renders + points to /
+    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/');
+    // Filter chip strip is gone
+    expect(screen.queryByRole('button', { name: /^all/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^invited/i })).toBeNull();
+    // Only the two trips with pending invites + open/has_applicants show; cancelled (even with pending invites) is filtered out
+    const headlines = screen.getAllByText(/→ Chennai/i).map((el) => el.textContent ?? '');
+    expect(headlines.some((t) => t.includes('WithInvites'))).toBe(true);
+    expect(headlines.some((t) => t.includes('AlsoWithInvites'))).toBe(true);
+    expect(headlines.some((t) => t.includes('NoInvites'))).toBe(false);
+    expect(headlines.some((t) => t.includes('CancelledOutsideScope'))).toBe(false);
+  });
+
+  it('?scope=invites-sent with no qualifying trips — renders the scoped empty state with a "Back to home" action', () => {
+    setTrips({ data: [makeTrip({ id: 'p1', status: 'open', pendingInvitationCount: 0 })] });
+    renderPosted('/posted-trips?scope=invites-sent&from=/');
+    expect(screen.getByText('No invitations pending')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+  });
+
+  it('?scope=invites-sent — trip-card link includes ?from=/posted-trips?scope=invites-sent so the trip detail walks back to the scoped list', () => {
+    setTrips({ data: [
+      makeTrip({ id: 'i1', status: 'open', pendingInvitationCount: 2, fromCity: city('c1', 'Vellore') }),
+    ] });
+    renderPosted('/posted-trips?scope=invites-sent&from=/');
+    const tripLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/trips/i1'));
+    expect(tripLinks.length).toBeGreaterThan(0);
+    for (const a of tripLinks) {
+      expect(a.getAttribute('href')).toMatch(/^\/trips\/i1(\/[a-z]+)?\?from=/);
+      const fromParam = new URL(a.getAttribute('href')!, 'https://x').searchParams.get('from');
+      expect(fromParam).toContain('/posted-trips?scope=invites-sent');
+    }
   });
 });

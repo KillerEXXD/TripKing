@@ -55,23 +55,23 @@ describe('InvitesSentCard', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('links to the single trip\'s invitations page when exactly one trip has pending invites', () => {
+  it('links to the single trip\'s invitations page (with ?from=/ so its back arrow returns home)', () => {
     renderCard([
       makeTrip({ id: 'ta', pendingInvitationCount: 0 }),
       makeTrip({ id: 'tb', pendingInvitationCount: 2 }),
     ]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/trips/tb/invitations');
+    expect(link).toHaveAttribute('href', '/trips/tb/invitations?from=/');
     expect(link).toHaveTextContent(/2 invites awaiting driver/i);
   });
 
-  it('links to /posted-trips?status=invited when multiple trips have pending invites', () => {
+  it('links to the scoped /posted-trips?scope=invites-sent view when 2+ trips have pending invites', () => {
     renderCard([
       makeTrip({ id: 't1', pendingInvitationCount: 1 }),
       makeTrip({ id: 't2', pendingInvitationCount: 3 }),
     ]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/posted-trips?status=invited');
+    expect(link).toHaveAttribute('href', '/posted-trips?scope=invites-sent&from=/');
     expect(link).toHaveTextContent(/4 invites awaiting driver/i);
     expect(link).toHaveTextContent(/across 2 trips/i);
   });

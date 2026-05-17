@@ -78,7 +78,7 @@ function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsS
     return selector ? selector(state) : state;
   }) as never);
 }
-const renderPage = () => render(<MemoryRouter><DriverActivityPage /></MemoryRouter>);
+const renderPage = (url = '/my-trips') => render(<MemoryRouter initialEntries={[url]}><DriverActivityPage /></MemoryRouter>);
 
 describe('DriverActivityPage', () => {
   beforeEach(() => {
@@ -337,5 +337,22 @@ describe('DriverActivityPage', () => {
     // (which would show 'Selected — you got it!'). Verify it took the higher-priority bucket.
     expect(screen.queryByText(/selected — you got it/i)).toBeNull();
     expect(screen.getByText(/in progress/i)).toBeInTheDocument();
+  });
+
+  it('?scope=invites-received — hides the tab strip, swaps the header to a back arrow + scoped title, renders just the InvitedList', () => {
+    setUp({
+      invited: tripsState({ data: [makeTrip({ id: 'inv-a', toCity: city('cA', 'InvitedA-to') }), makeTrip({ id: 'inv-b', toCity: city('cB', 'InvitedB-to') })] }),
+    });
+    renderPage('/my-trips?scope=invites-received&from=/');
+    // Scoped header
+    expect(screen.getByText('Invites received')).toBeInTheDocument();
+    expect(screen.getByText(/2 trips waiting for your decision/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/');
+    // No tab strip — the "All" / "Driving" / "Invited" tab buttons should NOT be present
+    expect(screen.queryByRole('button', { name: /^all/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^driving/i })).toBeNull();
+    // Both invited trips render
+    expect(screen.getByText(/vellore → invitedA-to/i)).toBeInTheDocument();
+    expect(screen.getByText(/vellore → invitedB-to/i)).toBeInTheDocument();
   });
 });

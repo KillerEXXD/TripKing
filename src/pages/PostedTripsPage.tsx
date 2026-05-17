@@ -79,7 +79,7 @@ function isFilter(v: string | null): v is Filter {
   return !!v && (FILTERS as string[]).includes(v);
 }
 
-export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => void }) {
+export function PostedTripCard({ trip, onShare, linkFromPath }: { trip: Trip; onShare: () => void; linkFromPath?: string }) {
   // Fallback to a muted "raw status" label if the server sends a value we don't
   // have a mapping for (e.g. a new lifecycle state shipped before the client rebuild).
   // Prevents `Cannot read properties of undefined (reading 'variant')` crashes.
@@ -88,7 +88,12 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
   const hasInvites = trip.pendingInvitationCount > 0;
   const reviewable = hasApplicants && trip.status === 'has_applicants';
   const shareable = trip.status === 'open' || trip.status === 'has_applicants';
-  const dest = reviewable ? `/trips/${trip.id}/applicants` : `/trips/${trip.id}`;
+  // When the parent list page knows the user came through it (e.g. from a home-card
+  // scoped view), it passes `linkFromPath` so the trip detail's back arrow returns
+  // to the list — not to the detail page's default fallback.
+  const fromSuffix = linkFromPath ? `?from=${encodeURIComponent(linkFromPath)}` : '';
+  const dest = reviewable ? `/trips/${trip.id}/applicants${fromSuffix}` : `/trips/${trip.id}${fromSuffix}`;
+  const invitesDest = `/trips/${trip.id}/invitations${fromSuffix}`;
   // Trips posted within the last 5 minutes wear a sparkle NEW badge + "Posted Xm ago"
   // line. Pure client-side derived from `trip.createdAt` — no URL param needed; the
   // listing already sorts newest-first so the fresh card is at the top.
@@ -151,7 +156,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
         )}
         <div className="flex items-center gap-3">
           {hasInvites ? (
-            <Link to={`/trips/${trip.id}/invitations`} className="flex items-center text-blue-700">
+            <Link to={invitesDest} className="flex items-center text-blue-700">
               View invites <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
             </Link>
           ) : null}
@@ -172,13 +177,35 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
  * + applicant badge) with a Share button and a "Review applicants / View details"
  * link. Server-filtered to the caller via `useTrips({ postedByUserId })`.
  */
+/** Focused drill-down view triggered by a home-card tap.
+ *  When `?scope=invites-sent` is set the page becomes a slim "Invites sent" list — filter
+ *  chips hidden (scope IS the filter), title swapped, back arrow to the home-card source
+ *  (`?from=…`, defaults to `/`). Other scopes can be added later.
+ */
+type Scope = 'invites-sent';
+const SCOPE_META: Record<Scope, { title: string; pred: (t: Trip) => boolean }> = {
+  'invites-sent': {
+    title: 'Invites sent',
+    // Same predicate as the legacy `?status=invited` virtual chip.
+    pred: (t) => t.pendingInvitationCount > 0 && (t.status === 'open' || t.status === 'has_applicants'),
+  },
+};
+function isScope(v: string | null): v is Scope {
+  return v === 'invites-sent';
+}
+
 export function PostedTripsPage() {
   const { user } = useAuth();
   // Filter is URL-backed (`?status=`) so deep links from /home priority cards work and
   // changing tabs updates the URL — mirrors the DriverActivityPage `?tab=` pattern (PR #64).
+  // A separate `?scope=` param swaps the page into a scoped drill-down (no chip strip,
+  // back arrow, scope-specific title) without touching the existing filter behaviour.
   const [searchParams, setSearchParams] = useSearchParams();
   const urlFilter = searchParams.get('status');
   const filter: Filter = isFilter(urlFilter) ? urlFilter : 'open';
+  const urlScope = searchParams.get('scope');
+  const scope: Scope | null = isScope(urlScope) ? urlScope : null;
+  const from = searchParams.get('from') ?? '/';
   const setFilter = (next: Filter) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'open') params.delete('status');
@@ -189,7 +216,10 @@ export function PostedTripsPage() {
   const tripsQuery = useTrips(user ? { postedByUserId: user.id } : undefined, { enabled: !!user });
 
   const trips = tripsQuery.data ?? [];
-  const shown = filter === 'all'
+  const scopedTrips = scope ? trips.filter(SCOPE_META[scope].pred) : trips;
+  const shown = scope
+    ? scopedTrips
+    : filter === 'all'
     // "All" — sort by lifecycle priority (live trips first), then pickupAt ASC.
     ? [...trips].sort((a, b) => {
         const pa = FILTER_PRIORITY[bucketFor(a)];
@@ -200,36 +230,51 @@ export function PostedTripsPage() {
     : trips.filter((t) => bucketFor(t) === filter);
   const countFor = (f: Filter) => (f === 'all' ? trips.length : trips.filter((t) => bucketFor(t) === f).length);
 
-  const subtitle = tripsQuery.isSuccess
+  // Subtitle changes shape per mode.
+  const subtitle = scope
+    ? (() => {
+        const tripCount = scopedTrips.length;
+        if (scope === 'invites-sent') {
+          const total = scopedTrips.reduce((s, t) => s + (t.pendingInvitationCount ?? 0), 0);
+          return `${tripCount} trip${tripCount === 1 ? '' : 's'} · ${total} pending invite${total === 1 ? '' : 's'}`;
+        }
+        return `${tripCount} trip${tripCount === 1 ? '' : 's'}`;
+      })()
+    : tripsQuery.isSuccess
     ? `${trips.length} trip${trips.length === 1 ? '' : 's'}`
     : 'Trips you have posted';
 
   return (
     <PageShell>
       <PageHeader
-        title={<span className="inline-flex items-center gap-2">My posts <LiveDot /></span>}
+        title={scope ? SCOPE_META[scope].title : <span className="inline-flex items-center gap-2">My posts <LiveDot /></span>}
         subtitle={subtitle}
+        backTo={scope ? from : undefined}
         right={
-          <Button asChild size="sm" className="gap-1.5">
-            <Link to="/trips/new">
-              <Plus className="size-4" aria-hidden /> Post
-            </Link>
-          </Button>
+          !scope ? (
+            <Button asChild size="sm" className="gap-1.5">
+              <Link to="/trips/new">
+                <Plus className="size-4" aria-hidden /> Post
+              </Link>
+            </Button>
+          ) : undefined
         }
       />
 
-      <FilterBar ariaLabel="Filter trips by status" wrap className="mb-3">
-        {FILTERS.map((f) => (
-          <FilterPill
-            key={f}
-            active={filter === f}
-            onClick={() => setFilter(f)}
-            count={tripsQuery.isSuccess ? countFor(f) : undefined}
-          >
-            {FILTER_LABEL[f]}
-          </FilterPill>
-        ))}
-      </FilterBar>
+      {!scope ? (
+        <FilterBar ariaLabel="Filter trips by status" wrap className="mb-3">
+          {FILTERS.map((f) => (
+            <FilterPill
+              key={f}
+              active={filter === f}
+              onClick={() => setFilter(f)}
+              count={tripsQuery.isSuccess ? countFor(f) : undefined}
+            >
+              {FILTER_LABEL[f]}
+            </FilterPill>
+          ))}
+        </FilterBar>
+      ) : null}
 
       <div className="space-y-3">
         {tripsQuery.isPending ? (
@@ -247,12 +292,25 @@ export function PostedTripsPage() {
             }
           />
         ) : shown.length === 0 ? (
-          <EmptyState title={`No ${FILTER_LABEL[filter].toLowerCase()} trips`} message="Pick a different status." action={<Button variant="outline" size="sm" onClick={() => setFilter('all')}>Show all</Button>} />
+          scope ? (
+            <EmptyState
+              title={scope === 'invites-sent' ? 'No invitations pending' : 'Nothing to show'}
+              message={scope === 'invites-sent' ? 'All your trips have been actioned or have no outstanding invites.' : 'Nothing matches this view.'}
+              action={<Button asChild variant="outline" size="sm"><Link to={from}>Back to home</Link></Button>}
+            />
+          ) : (
+            <EmptyState title={`No ${FILTER_LABEL[filter].toLowerCase()} trips`} message="Pick a different status." action={<Button variant="outline" size="sm" onClick={() => setFilter('all')}>Show all</Button>} />
+          )
         ) : (
           shown.map((t) => (
             t.status === 'in_progress'
               ? <AgentInProgressTripCard key={t.id} trip={t} />
-              : <PostedTripCard key={t.id} trip={t} onShare={() => setShareTrip(t)} />
+              : <PostedTripCard
+                  key={t.id}
+                  trip={t}
+                  onShare={() => setShareTrip(t)}
+                  linkFromPath={scope ? `/posted-trips?scope=${scope}${from && from !== '/' ? `&from=${from}` : '&from=/'}` : undefined}
+                />
           ))
         )}
       </div>
