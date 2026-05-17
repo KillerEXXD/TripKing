@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, Sparkles } from 'lucide-react';
 import { useMyApplications } from '@/hooks/useTrips';
 import { Badge, Button, Card } from '@/components/ui';
+import { ScopedPageHeader } from '@/components/layout';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { MyApplication } from '@/types';
@@ -38,19 +39,14 @@ export function ReviewSelectionsPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-        <button
-          type="button"
-          aria-label="Back"
-          onClick={onBack}
-          className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted"
-        >
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <h1 className="flex items-center gap-1.5 text-base font-semibold">
-          <Sparkles className="size-4 text-blue-700" aria-hidden /> Trips to review
-        </h1>
-      </header>
+      {/* Indigo tint mirrors AwaitingMyDecisionCard's tone on Driver home. */}
+      <ScopedPageHeader
+        title="Trips to review"
+        subtitle={awaiting.length > 0 ? `${awaiting.length} trip${awaiting.length === 1 ? '' : 's'} waiting on your accept` : undefined}
+        icon={<Sparkles className="size-4" aria-hidden />}
+        onBack={onBack}
+        tone="indigo"
+      />
 
       <div className="space-y-3 p-4">
         {query.isPending ? (

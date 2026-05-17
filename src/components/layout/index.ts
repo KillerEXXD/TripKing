@@ -5,3 +5,4 @@ export * from './InstallAppCard';
 export * from './PageHeader';
 export * from './PageShell';
 export * from './RoleSwitcher';
+export * from './ScopedPageHeader';

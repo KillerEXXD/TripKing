@@ -44,7 +44,8 @@ export function AgentNeedsActionQueuePage() {
     <QueueListPage
       title="Waiting for your decision"
       subtitle={trips.length > 0 ? `${trips.length} trip${trips.length === 1 ? '' : 's'} need a driver` : undefined}
-      icon={<Sparkles className="size-4 text-amber-700" />}
+      icon={<Sparkles className="size-4" />}
+      tone="amber"
       items={trips}
       getKey={(t) => t.id}
       renderItem={(t) => <TripRow trip={t} />}

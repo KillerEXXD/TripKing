@@ -64,9 +64,10 @@ describe('QueueListPage', () => {
     expect(screen.getByText('Trip B')).toBeInTheDocument();
   });
 
-  it('back button navigates to backTo (default `/`)', () => {
+  it('back arrow navigates to backTo (default `/`)', () => {
     renderQueue({ items: [{ id: 'a', label: 'Trip A' }] });
-    fireEvent.click(screen.getByRole('button', { name: /back to home/i }));
+    // Default (no `tone`) branch renders a <Link>; tone-tinted branch also renders <Link>.
+    fireEvent.click(screen.getByRole('link', { name: /back to home/i }));
     expect(screen.getByText('home page')).toBeInTheDocument();
   });
 

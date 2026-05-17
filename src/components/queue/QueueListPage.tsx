@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
+import { ScopedPageHeader, type ScopedHeaderTone } from '@/components/layout';
 
 interface QueueListPageProps<T> {
   title: string;
@@ -17,6 +18,9 @@ interface QueueListPageProps<T> {
   emptyMessage?: string;
   emptyAction?: ReactNode;
   backTo?: string;
+  /** Tone matches the source home-card so the click-through reads as a colour-continuous flow.
+   *  Omit for the legacy neutral header. */
+  tone?: ScopedHeaderTone;
 }
 
 /**
@@ -41,6 +45,7 @@ export function QueueListPage<T>({
   emptyMessage,
   emptyAction,
   backTo = '/',
+  tone,
 }: QueueListPageProps<T>) {
   const navigate = useNavigate();
   const sawItemsRef = useRef(false);
@@ -57,23 +62,26 @@ export function QueueListPage<T>({
 
   return (
     <div className="mx-auto max-w-md">
-      <header className="flex items-center gap-3 border-b bg-white px-4 py-3">
-        <button
-          type="button"
-          aria-label="Back to home"
-          onClick={() => navigate(backTo)}
-          className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted"
-        >
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-1.5 text-base font-semibold">
-            {icon ? <span aria-hidden>{icon}</span> : null}
-            {title}
-          </h1>
-          {subtitle ? <div className="truncate text-xs text-secondary">{subtitle}</div> : null}
-        </div>
-      </header>
+      {tone ? (
+        <ScopedPageHeader title={title} subtitle={subtitle} icon={icon} backTo={backTo} tone={tone} />
+      ) : (
+        <header className="flex items-center gap-3 border-b bg-white px-4 py-3">
+          <Link
+            to={backTo}
+            aria-label="Back to home"
+            className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted"
+          >
+            <ArrowLeft className="size-5" aria-hidden />
+          </Link>
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-1.5 text-base font-semibold">
+              {icon ? <span aria-hidden>{icon}</span> : null}
+              {title}
+            </h1>
+            {subtitle ? <div className="truncate text-xs text-secondary">{subtitle}</div> : null}
+          </div>
+        </header>
+      )}
 
       <div className="space-y-3 p-4">
         {isPending ? (
