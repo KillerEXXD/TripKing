@@ -195,6 +195,21 @@ describe('DriverActivityPage', () => {
     expect(rendered[rendered.length - 1]).toMatch(/olddest/i);
   });
 
+  // Regression: user reported that tapping a trip from /my-trips?tab=posted → trip detail →
+  // Back arrow was returning to the default Driving tab instead of staying on Posted. Fix is
+  // to pass linkFromPath="/my-trips?tab=posted" to each card, so trip-detail's Back honors it.
+  it('the Posted tab encodes ?tab=posted in each trip card link so back-nav preserves the tab', () => {
+    setUp({ posted: tripsState({ data: [makeTrip({ id: 'p-back', toCity: city('cb', 'BackCity') })] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /posted by me/i }));
+    const links = screen.getAllByRole('link').filter((a) => (a.getAttribute('href') ?? '').startsWith('/trips/p-back'));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      // /my-trips?tab=posted encoded → %2Fmy-trips%3Ftab%3Dposted
+      expect(link.getAttribute('href')).toMatch(/[?&]from=%2Fmy-trips%3Ftab%3Dposted/);
+    }
+  });
+
   it('empty states — no assigned trips; no applications (with a Browse CTA)', () => {
     setUp();
     renderPage();
