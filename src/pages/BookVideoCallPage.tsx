@@ -14,7 +14,7 @@ import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useAvailableVideoSlots, useBookVideoCall, useCancelVideoCall, useRescheduleVideoCall, useVideoVerification } from '@/hooks/useVideoVerification';
 import { Button, Card, StatusBanner } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatPickupTime } from '@/lib/utils';
+import { formatPickupDateTime } from '@/lib/utils';
 
 function Header({ onBack }: { onBack: () => void }) {
   return <PageHeader title="Video verification" onBack={onBack} />;
@@ -108,7 +108,7 @@ export function BookVideoCallPage() {
 
         {kyc === 'video_pending' && vv && vv.status === 'scheduled' && !rescheduling && (
           <Card className="gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="size-4 text-blue-600" aria-hidden /> Scheduled for {formatPickupTime(vv.scheduledAt)}</div>
+            <div className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="size-4 text-blue-600" aria-hidden /> Scheduled for {formatPickupDateTime(vv.scheduledAt)}</div>
             <p className="text-sm text-secondary">On the call, an admin will ask you to show your original documents to the camera and do a quick liveness check (turn your head / blink).</p>
             {vv.meetingUrl && (
               <Button variant="full" asChild>

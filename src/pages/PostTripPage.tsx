@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
-import { ArrowLeft, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, BellRing, Car, ChevronDown, ChevronRight, FileText, Info, Loader2, Route, Users, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip, useTripMatchPreview } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
@@ -13,10 +13,10 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
-import { Button, Card, Input, ProgressBar, StatusBanner } from '@/components/ui';
+import { Button, Card, Input, ProgressBar, SectionLabel, Select, StatusBanner, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
+import { cn, formatINR, formatKmAndDuration, formatShortDate, haversineKm } from '@/lib/utils';
 import type { Place, PostTripInput, Trip, TripType, WaypointInput } from '@/types';
 
 interface PostTripForm {
@@ -69,8 +69,7 @@ const DEFAULTS: PostTripForm = {
 };
 
 const STEP1_FIELDS = ['fromCityId', 'toCityId', 'pickupAt', 'expectedDistanceKm', 'carTypeId', 'seatsRequired', 'acRequired'] as const;
-const selectClass = 'h-11 w-full rounded-lg border border-input bg-background px-3 text-base';
-const sectionLabel = 'text-[11px] font-semibold uppercase tracking-wide text-secondary';
+const PREFERRED_DEFAULT_CAR_TYPE = 'SUV';
 /** Road routes run longer than the crow-flies line — a rough multiplier so the auto-estimate isn't an under-count. */
 const ROAD_DISTANCE_FACTOR = 1.3;
 
@@ -130,6 +129,17 @@ export function PostTripPage() {
     if (!cur.gstAmount) setValue('gstAmount', s.defaultGstAmount);
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
+
+  // Pre-select "SUV" once the car_types list loads (falls back to first active row if missing /
+  // renamed). Saves the agent a tap on the most common choice. `shouldDirty: false` so the form
+  // doesn't think the user touched it.
+  useEffect(() => {
+    if (getValues('carTypeId')) return;
+    const active = (carTypesQuery.data ?? []).filter((c) => c.isActive);
+    if (active.length === 0) return;
+    const preferred = active.find((c) => c.label.trim().toLowerCase() === PREFERRED_DEFAULT_CAR_TYPE.toLowerCase()) ?? active[0];
+    if (preferred) setValue('carTypeId', preferred.id, { shouldDirty: false, shouldValidate: false });
+  }, [carTypesQuery.data, getValues, setValue]);
 
   const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch, autoInviteWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata', 'autoInviteMatches']);
   // Auto-invite preview — re-runs whenever the pickup city changes. Only meaningful in step 2,
@@ -377,29 +387,29 @@ export function PostTripPage() {
           <>
             <TripTypeTabs value={tripType} onChange={setTripType} />
             <Card className="gap-3">
-              <div className={sectionLabel}>
-                {tripType === 'one_way' ? 'Route & schedule' : tripType === 'round_trip' ? 'Round-trip plan' : 'Multi-way itinerary'}
-              </div>
+              <SectionLabel icon={<Route />} accent="green">
+                {tripType === 'one_way' ? 'Route & Schedule' : tripType === 'round_trip' ? 'Round-trip plan' : 'Multi-way itinerary'}
+              </SectionLabel>
               <div className="space-y-1.5">
                 <Field label={tripType === 'one_way' ? 'From (pickup city)' : 'Trip starts from (city)'} error={errors.fromCityId?.message}>
-                  <select className={selectClass} {...register('fromCityId', { required: 'Pick a starting city' })}>
+                  <Select tone="accent" {...register('fromCityId', { required: 'Pick a starting city' })}>
                     <option value="">Select a city</option>
                     {cities.map((c) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
                 <PlacePinField value={fromPlace} onChange={setFromPlace} pinLabel="Pin the exact pickup point" pickerTitle="Pickup location" />
               </div>
               {tripType !== 'multi_way' ? (
                 <div className="space-y-1.5">
                   <Field label={tripType === 'round_trip' ? 'Turnaround city' : 'To (drop-off city)'} error={errors.toCityId?.message}>
-                    <select className={selectClass} {...register('toCityId', { required: 'Pick a destination city' })}>
+                    <Select tone="accent" {...register('toCityId', { required: 'Pick a destination city' })}>
                       <option value="">Select a city</option>
                       {cities.map((c) => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
                   <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact drop-off point" pickerTitle="Drop-off location" />
                 </div>
@@ -445,28 +455,26 @@ export function PostTripPage() {
                   <DateTimeField value={expectedEndAt} onChange={setExpectedEndAt} />
                 </Field>
               ) : null}
-              <Field label="Expected distance (km)" error={errors.expectedDistanceKm?.message} hint="Worked out from the route — you don't need to enter it">
-                <div className="relative">
-                  <Input
-                    type="number"
-                    readOnly
-                    tabIndex={-1}
-                    aria-readonly="true"
-                    inputMode="numeric"
-                    className={cn('bg-muted/60', distanceCalculating && 'text-transparent')}
-                    {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Pick the pickup & drop-off points so we can work out the distance' })}
-                  />
-                  {distanceCalculating ? (
-                    <span className="pointer-events-none absolute inset-0 flex items-center gap-1.5 px-3 text-sm text-secondary" role="status">
-                      <Loader2 className="size-4 animate-spin" aria-hidden /> Calculating route…
-                    </span>
-                  ) : null}
-                </div>
-              </Field>
+              {/* keep the value in form state for validation + submit, but show it as an emerald summary row */}
+              <input type="hidden" {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Pick the pickup & drop-off points so we can work out the distance' })} />
+              <div className="rounded-control border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm" role="status" aria-live="polite">
+                {distanceCalculating ? (
+                  <span className="flex items-center gap-1.5 text-secondary">
+                    <Loader2 className="size-4 animate-spin" aria-hidden /> Calculating route…
+                  </span>
+                ) : distance >= 1 ? (
+                  <span className="text-emerald-900">
+                    Estimated distance: <strong className="font-bold text-emerald-700">{formatKmAndDuration(distance)}</strong>
+                  </span>
+                ) : (
+                  <span className="text-secondary">Pick the pickup & drop-off points to see the route distance and ETA.</span>
+                )}
+              </div>
+              {errors.expectedDistanceKm ? <span className="block text-xs text-red-700">{errors.expectedDistanceKm.message}</span> : null}
             </Card>
 
             <Card className="gap-3">
-              <div className={sectionLabel}>Vehicle requirements</div>
+              <SectionLabel icon={<Car />} accent="green">Vehicle Requirements</SectionLabel>
               <div className="space-y-1">
                 <span className="text-sm font-medium">Car type required</span>
                 <div className="flex gap-1.5 overflow-x-auto pb-1">
@@ -496,7 +504,7 @@ export function PostTripPage() {
         ) : (
           <>
             <Card className="gap-3">
-              <div className={sectionLabel}>Pricing</div>
+              <SectionLabel icon={<Wallet />} accent="green">Pricing</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Rate per km (₹)" error={errors.ratePerKm?.message}>
                   <Input type="number" min={1} step={1} inputMode="numeric" {...register('ratePerKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter a rate per km' })} />
@@ -565,7 +573,7 @@ export function PostTripPage() {
                 className="flex w-full items-center justify-between px-4 py-3 text-left"
               >
                 <div>
-                  <div className={sectionLabel}>Passenger details</div>
+                  <SectionLabel icon={<Users />} accent="green">Passenger Details</SectionLabel>
                   <div className="text-xs text-secondary">{passengerSectionOpen ? 'Tap to collapse' : 'Optional — you can add these after assigning a driver'}</div>
                 </div>
                 {passengerSectionOpen ? <ChevronDown className="size-4 text-secondary" aria-hidden /> : <ChevronRight className="size-4 text-secondary" aria-hidden />}
@@ -635,7 +643,7 @@ export function PostTripPage() {
                 autoInviteWatch ? 'border-emerald-300 bg-emerald-50/60 ring-1 ring-emerald-200' : ''
               }`}
             >
-              <div className={sectionLabel}>Driver invitations</div>
+              <SectionLabel icon={<BellRing />} accent="green">Driver Invitations</SectionLabel>
               <label className="flex items-start gap-2 text-sm font-medium">
                 <input type="checkbox" className="mt-0.5" {...register('autoInviteMatches')} />
                 <span className="flex-1">
@@ -662,7 +670,7 @@ export function PostTripPage() {
             </Card>
 
             <Card className="gap-3">
-              <div className={sectionLabel}>More details</div>
+              <SectionLabel icon={<FileText />} accent="green">More Details</SectionLabel>
               <Field label="Instructions for the driver (optional)">
                 <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('driverInstructions')} />
               </Field>
@@ -676,7 +684,7 @@ export function PostTripPage() {
         )}
       </form>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md border-t bg-white px-4 py-3">
+      <StickyFooterCTA>
         {step === 1 ? (
           <>
             {summary ? <p className="mb-2 truncate text-center text-xs text-secondary">{summary}</p> : null}
@@ -695,7 +703,7 @@ export function PostTripPage() {
             {submitting ? 'Posting…' : !previewSettled ? 'Checking drivers…' : 'Post trip'}
           </Button>
         )}
-      </div>
+      </StickyFooterCTA>
 
       {postedTrip ? <ShareTripModal trip={postedTrip} onClose={() => navigate(`/trips/${postedTrip.id}`)} /> : null}
     </div>

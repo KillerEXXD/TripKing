@@ -3,7 +3,7 @@ import { ChevronRight, Sparkles } from 'lucide-react';
 import { useMyApplications } from '@/hooks/useTrips';
 import { Badge, Button, Card } from '@/components/ui';
 import { QueueListPage } from '@/components/queue/QueueListPage';
-import { formatINR, formatKm, formatPickupTime } from '@/lib/utils';
+import { formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { MyApplication } from '@/types';
 
 /**
@@ -48,13 +48,13 @@ function SelectedRow({ app }: { app: MyApplication }) {
           <div className="min-w-0">
             <div className="truncate font-bold">{t.fromCity.name} → {t.toCity.name}</div>
             <div className="truncate text-xs text-secondary">
-              {formatKm(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · +{formatINR(t.driverBata)} bata
+              {formatKmAndDuration(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · +{formatINR(t.driverBata)} bata
             </div>
           </div>
           <Badge variant="success" className="shrink-0">Selected — you got it!</Badge>
         </div>
         <div className="text-xs text-secondary">
-          Pickup: {formatPickupTime(t.pickupAt)}
+          Pickup: {formatPickupDateTime(t.pickupAt)}
           {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
         </div>
       </Link>

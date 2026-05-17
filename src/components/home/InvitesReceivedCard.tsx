@@ -1,6 +1,6 @@
 import { Mail } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
-import { formatINR, formatPickupTime } from '@/lib/utils';
+import { formatINR, formatPickupDateTime } from '@/lib/utils';
 import type { Trip } from '@/types';
 
 /**
@@ -25,7 +25,7 @@ export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
         icon={icon}
         label="Invitation waiting"
         title={`${trip.fromCity.name} → ${trip.toCity.name}`}
-        subtitle={`Pickup: ${formatPickupTime(trip.pickupAt)} · ${formatINR(trip.driverPayout)} payout`}
+        subtitle={`Pickup: ${formatPickupDateTime(trip.pickupAt)} · ${formatINR(trip.driverPayout)} payout`}
         cta={{ label: 'Accept or decline' }}
       />
     );

@@ -12,7 +12,7 @@ import { HomeTileRow } from '@/components/home/HomeTileRow';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
+import { formatINR, formatPickupDateTime, getFirstName, initials } from '@/lib/utils';
 import type { Agent, Trip } from '@/types';
 
 
@@ -51,7 +51,7 @@ function TripsInProgressCard({ trips }: { trips: Trip[] }) {
         subtitle={`${Math.round(t.expectedDistanceKm)} km · ${formatINR(t.driverPayout)} payout · ${driverName}`}
       >
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-emerald-200 pt-2.5 text-xs text-emerald-900">
-          <TripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(t.pickupAt)} />
+          <TripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupDateTime(t.pickupAt)} />
           <TripStat icon={<Navigation className="size-3.5" aria-hidden />} label="To destination" value={t.distanceToDestinationKm ? `${Math.round(t.distanceToDestinationKm)} km` : '—'} />
           <TripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
         </div>
@@ -105,7 +105,7 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
         cta={{ label: 'Review applicants' }}
       >
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-amber-200 pt-2.5 text-xs text-amber-900">
-          <TripStat tone="amber" icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(t.pickupAt)} />
+          <TripStat tone="amber" icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupDateTime(t.pickupAt)} />
           <TripStat tone="amber" icon={<Wallet className="size-3.5" aria-hidden />} label="Payout" value={formatINR(t.driverPayout)} />
           <TripStat tone="amber" icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
         </div>

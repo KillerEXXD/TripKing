@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { QueueListPage } from '@/components/queue/QueueListPage';
 import { Card } from '@/components/ui';
-import { formatINR, formatPickupTime } from '@/lib/utils';
+import { formatINR, formatPickupDateTime } from '@/lib/utils';
 import type { Trip } from '@/types';
 
 function TripRow({ trip }: { trip: Trip }) {
@@ -14,7 +14,7 @@ function TripRow({ trip }: { trip: Trip }) {
       <Card className="gap-1.5 transition-colors hover:border-primary/40">
         <div className="font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
         <div className="text-xs text-secondary">
-          {driverName} · pickup {formatPickupTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout
+          {driverName} · pickup {formatPickupDateTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout
         </div>
       </Card>
     </Link>

@@ -11,6 +11,7 @@ export * from './ProgressBar';
 export * from './SectionCard';
 export * from './SectionLabel';
 export * from './SegmentedTabs';
+export * from './select';
 export * from './StatusBanner';
 export * from './StickyFooterCTA';
 export * from './calendar';

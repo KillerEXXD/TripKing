@@ -25,6 +25,16 @@ export function formatKm(km: number): string {
 }
 
 /**
+ * Distance + an at-a-glance driving estimate: 140 → "140 km · ~3 hr 30 min".
+ * Combines `formatKm` and `etaLabel` (40 km/h flat). Use on trip cards / detail pages
+ * wherever a route distance is shown. Prefer `formatKm` alone in contexts where a
+ * driving time would be misleading (radius filters like "within 25 km").
+ */
+export function formatKmAndDuration(km: number): string {
+  return `${formatKm(km)} · ${etaLabel(km)}`;
+}
+
+/**
  * Star rating display: 4.85 → "★ 4.9"
  */
 export function formatRating(avg: number): string {
@@ -53,12 +63,27 @@ export function isValidUUID(value: string | null | undefined): value is string {
 /**
  * Pickup-time line used across trip cards / detail / book screens:
  * "2026-05-14T08:30:00Z" → "Wed, 14 May, 2:00 pm". Falls back to the raw string when unparseable.
+ * @deprecated Prefer `formatPickupDateTime` — same input, more explicit "06/10/2026 08:00 AM" format
+ *   so users don't read "Wed" as "this Wednesday" and miss the date entirely.
  */
 export function formatPickupTime(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())
     ? iso
     : d.toLocaleString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+}
+
+/**
+ * Full, unambiguous pickup date+time used everywhere a trip's scheduled time is shown:
+ * "2026-10-06T08:00:00Z" (rendered in IST) → "06/10/2026 08:00 AM".
+ * DD/MM/YYYY HH:MM AM/PM, en-IN. Falls back to the raw string when unparseable.
+ */
+export function formatPickupDateTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const date = d.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const time = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return `${date} ${time.toUpperCase()}`;
 }
 
 /**

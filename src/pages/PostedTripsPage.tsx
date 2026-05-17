@@ -10,7 +10,7 @@ import { Badge, Button, Card, FilterBar, FilterPill } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { BadgeProps } from '@/components/ui';
-import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
+import { cn, formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
 type StatusBadgeVariant = NonNullable<BadgeProps['variant']>;
@@ -80,7 +80,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
               {trip.fromCity.name} → {trip.toCity.name}
             </div>
             <div className="truncate text-xs text-secondary">
-              {formatKm(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · +{formatINR(trip.driverBata)} bata
+              {formatKmAndDuration(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · +{formatINR(trip.driverBata)} bata
             </div>
           </div>
           <Badge variant={meta.variant} className="shrink-0">
@@ -88,7 +88,7 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
           </Badge>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-secondary">Pickup: {formatPickupTime(trip.pickupAt)}</span>
+          <span className="text-secondary">Pickup: {formatPickupDateTime(trip.pickupAt)}</span>
           <div className="flex items-center gap-1.5">
             {hasInvites ? (
               <Badge variant="info">

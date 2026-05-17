@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { MapPin, X } from 'lucide-react';
+import { Compass, MapPin, Route, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -185,6 +185,7 @@ export function PostVacancyPage() {
       <PageHeader title={pageTitle} backTo="/" />
       <div className="space-y-3">
       <Card className="gap-3">
+        <SectionLabel icon={<Compass />} accent="green">Where & When</SectionLabel>
         <div className="space-y-1.5">
           <label className="block space-y-1">
             <span className="text-sm font-medium">Where are you?</span>
@@ -252,7 +253,7 @@ export function PostVacancyPage() {
       </Card>
 
       <Card className="gap-2">
-        <SectionLabel>Willing to drive to</SectionLabel>
+        <SectionLabel icon={<Route />} accent="green">Willing to drive to</SectionLabel>
         <Input
           type="search"
           value={destQuery}

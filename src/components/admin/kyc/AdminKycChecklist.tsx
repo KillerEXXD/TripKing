@@ -15,7 +15,7 @@ import { useDriverVehicles, useVehiclePhotoUrls } from '@/hooks/useVehicles';
 import { useSetVideoCallStatus } from '@/hooks/useVideoVerification';
 import { Badge, Button, Card, Input } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatPickupTime } from '@/lib/utils';
+import { formatPickupDateTime } from '@/lib/utils';
 import type { KycDocs, VerificationStepStatus, Vehicle, VerificationSummary, VideoOutcome, VideoVerificationStatus } from '@/types';
 
 export type AdminKycKind = 'driver' | 'agent';
@@ -214,7 +214,7 @@ function VideoPanel({ vv }: { vv?: { id: string; status: VideoVerificationStatus
         <Video className="size-4 text-blue-600" aria-hidden />
         <span className="font-semibold capitalize">{vv.status.replace('_', ' ')}</span>
         {vv.outcome ? <Badge variant={vv.outcome === 'approved' ? 'success' : vv.outcome === 'rejected' ? 'destructive' : 'warning'}>{vv.outcome.replace('_', ' ')}</Badge> : null}
-        <span className="text-xs text-secondary">{formatPickupTime(vv.scheduledAt)}</span>
+        <span className="text-xs text-secondary">{formatPickupDateTime(vv.scheduledAt)}</span>
       </div>
       {vv.meetingUrl ? (
         <a href={vv.meetingUrl} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center rounded-full border border-input bg-background px-3 text-xs font-medium hover:bg-muted">

@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { useFinalizeVideoCall, useMarkVideoCallNoShow, useScheduledVideoCalls } from '@/hooks/useVideoVerification';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatPickupTime } from '@/lib/utils';
+import { formatPickupDateTime } from '@/lib/utils';
 import type { VideoOutcome, VideoVerification, VideoVerificationStatus } from '@/types';
 
 const STATUS_TABS: { value: VideoVerificationStatus[]; label: string }[] = [
@@ -59,7 +59,7 @@ function CallCard({ vv }: { vv: VideoVerification }) {
         <div className="min-w-0">
           <div className="font-bold">{s.name}</div>
           <div className="text-xs text-secondary">{s.kind}{s.city ? ` · ${s.city}` : ''}{s.phone ? ` · ${s.phone}` : ''}</div>
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary"><CalendarClock className="size-3.5" aria-hidden /> {formatPickupTime(vv.scheduledAt)}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary"><CalendarClock className="size-3.5" aria-hidden /> {formatPickupDateTime(vv.scheduledAt)}</div>
         </div>
         <div className="shrink-0 text-right">
           <Badge variant={vv.status === 'scheduled' ? 'info' : vv.outcome === 'approved' ? 'success' : vv.status === 'completed' ? 'warning' : 'muted'}>

@@ -40,7 +40,7 @@ export function PlacePinField({
           <MapPin className="size-3" aria-hidden /> {value.name} <X className="size-3" aria-hidden />
         </button>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 text-xs text-secondary underline underline-offset-2">
+        <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1 text-xs font-medium text-primary underline underline-offset-2 hover:text-emerald-800">
           <MapPin className="size-3" aria-hidden /> {pinLabel} <span className="font-normal">(optional)</span>
         </button>
       )}

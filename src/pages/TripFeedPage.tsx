@@ -8,7 +8,7 @@ import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatINR, formatPickupTime } from '@/lib/utils';
+import { formatINR, formatPickupDateTime } from '@/lib/utils';
 import type { NearRadius, Trip, TripStatus } from '@/types';
 
 /** Trips a driver can still apply to. */
@@ -22,7 +22,7 @@ function TripCard({ trip }: { trip: Trip }) {
           <div className="min-w-0">
             <div className="truncate font-bold">{routeChainText(trip)}</div>
             <div className="text-xs text-secondary">
-              {Math.round(trip.expectedDistanceKm)} km · {formatPickupTime(trip.pickupAt)}
+              {Math.round(trip.expectedDistanceKm)} km · {formatPickupDateTime(trip.pickupAt)}
             </div>
           </div>
           <div className="shrink-0 text-right">

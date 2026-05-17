@@ -3,7 +3,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Check, Copy, ExternalLink, Share2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui';
-import { formatPickupTime } from '@/lib/utils';
+import { formatPickupDateTime } from '@/lib/utils';
 import { renderTripShareImage } from '@/lib/share/tripShareImage';
 import type { Trip } from '@/types';
 
@@ -29,7 +29,7 @@ function passengerLink(otp: string): string {
 export function PassengerLinkModal({ trip, otp, onClose }: PassengerLinkModalProps) {
   const url = passengerLink(otp);
   const route = `${trip.fromCity.name} → ${trip.toCity.name}`;
-  const pickup = formatPickupTime(trip.pickupAt);
+  const pickup = formatPickupDateTime(trip.pickupAt);
   // Single line — line breaks render badly in WhatsApp.
   const caption = `Your TripKing trip is confirmed — ${route}, pickup ${pickup}. Passenger OTP: ${otp}. Open the trip: ${url}`;
   const [copied, setCopied] = useState(false);
@@ -81,7 +81,7 @@ export function PassengerLinkModal({ trip, otp, onClose }: PassengerLinkModalPro
             <div>
               <Dialog.Title className="text-base font-semibold">Share with the passenger</Dialog.Title>
               <Dialog.Description className="text-xs text-secondary">
-                {trip.fromCity.name} → {trip.toCity.name} · pickup {formatPickupTime(trip.pickupAt)}
+                {trip.fromCity.name} → {trip.toCity.name} · pickup {formatPickupDateTime(trip.pickupAt)}
               </Dialog.Description>
             </div>
             <Dialog.Close asChild>

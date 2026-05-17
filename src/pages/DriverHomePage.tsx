@@ -19,7 +19,7 @@ import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { WalletPill } from '@/components/wallet/WalletPill';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, formatPickupTime, getFirstName, initials } from '@/lib/utils';
+import { formatINR, formatPickupDateTime, getFirstName, initials } from '@/lib/utils';
 import type { Driver, MyApplication, Trip } from '@/types';
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
@@ -105,7 +105,7 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
       }
     >
       <div className="mt-3 grid grid-cols-3 gap-2 border-t border-emerald-200 pt-2.5 text-xs text-emerald-900">
-        <CurrentTripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
+        <CurrentTripStat icon={<Clock className="size-3.5" aria-hidden />} label="Pickup" value={formatPickupDateTime(trip.pickupAt)} />
         <CurrentTripStat icon={<Navigation className="size-3.5" aria-hidden />} label="To destination" value={trip.distanceToDestinationKm ? `${Math.round(trip.distanceToDestinationKm)} km` : '—'} />
         <CurrentTripStat icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${trip.passengerCount} pax`} />
       </div>
@@ -137,7 +137,7 @@ function AssignedTripCard({ trip }: { trip: Trip }) {
       icon={<CheckCircle2 className="size-3.5" aria-hidden />}
       label="Ready to start"
       title={`${trip.fromCity.name} → ${trip.toCity.name}`}
-      subtitle={`Pickup: ${formatPickupTime(trip.pickupAt)} · ${Math.round(trip.expectedDistanceKm)} km`}
+      subtitle={`Pickup: ${formatPickupDateTime(trip.pickupAt)} · ${Math.round(trip.expectedDistanceKm)} km`}
       cta={{ label: 'Start the trip' }}
     />
   );
@@ -163,7 +163,7 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
       icon={<Sparkles className="size-3.5" aria-hidden />}
       label={`${apps.length} trip${apps.length === 1 ? '' : 's'} waiting for your decision`}
       title={`${first.trip.fromCity.name} → ${first.trip.toCity.name}`}
-      subtitle={`Pickup: ${formatPickupTime(first.trip.pickupAt)}${more > 0 ? ` · +${more} more` : ''}`}
+      subtitle={`Pickup: ${formatPickupDateTime(first.trip.pickupAt)}${more > 0 ? ` · +${more} more` : ''}`}
       cta={{ label: 'Review' }}
     />
   );

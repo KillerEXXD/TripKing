@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { QueueListPage } from '@/components/queue/QueueListPage';
 import { Badge, Card } from '@/components/ui';
-import { formatINR, formatPickupTime } from '@/lib/utils';
+import { formatINR, formatPickupDateTime } from '@/lib/utils';
 import type { Trip } from '@/types';
 
 function TripRow({ trip }: { trip: Trip }) {
@@ -15,7 +15,7 @@ function TripRow({ trip }: { trip: Trip }) {
           <div className="min-w-0">
             <div className="truncate font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
             <div className="text-xs text-secondary">
-              Pickup {formatPickupTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout
+              Pickup {formatPickupDateTime(trip.pickupAt)} · {formatINR(trip.driverPayout)} payout
             </div>
           </div>
           <Badge variant="warning" className="shrink-0">
