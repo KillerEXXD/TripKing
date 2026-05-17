@@ -81,6 +81,11 @@ const V3FieldHomePage = lazyWithRetry(() => import('@/pages/v2/field-companion/H
 const V4PipelineHomePage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/HomePage'));
 const V5EditorialHomePage = lazyWithRetry(() => import('@/pages/v2/editorial/HomePage'));
 const V6BharatHomePage = lazyWithRetry(() => import('@/pages/v2/bharat-native/HomePage'));
+const V2OperatorProfilePage = lazyWithRetry(() => import('@/pages/v2/operator-console/ProfilePage'));
+const V3FieldProfilePage = lazyWithRetry(() => import('@/pages/v2/field-companion/ProfilePage'));
+const V4PipelineProfilePage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/ProfilePage'));
+const V5EditorialProfilePage = lazyWithRetry(() => import('@/pages/v2/editorial/ProfilePage'));
+const V6BharatProfilePage = lazyWithRetry(() => import('@/pages/v2/bharat-native/ProfilePage'));
 
 function PageFallback() {
   return (
@@ -177,6 +182,11 @@ export function AppRoutes() {
             <Route path="/v6" element={<V6BharatHomePage />} />
             <Route path="/v6/trips" element={<V6BharatTripsPage />} />
             <Route path="/v6/trips/:id" element={<V6BharatTripDetailPage />} />
+            <Route path="/v2/profile" element={<V2OperatorProfilePage />} />
+            <Route path="/v3/profile" element={<V3FieldProfilePage />} />
+            <Route path="/v4/profile" element={<V4PipelineProfilePage />} />
+            <Route path="/v5/profile" element={<V5EditorialProfilePage />} />
+            <Route path="/v6/profile" element={<V6BharatProfilePage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>
