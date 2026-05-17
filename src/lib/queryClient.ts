@@ -14,7 +14,11 @@ import { addDataBreadcrumb, captureDataError, isReported, messageForError } from
  */
 export const STALE = {
   immutable: Infinity,
-  live: 30_000,
+  // 60s (was 30s, 2026-05-17): halves React Query's background refetch volume on the
+  // "live" tier (trip lists, applicant lists, vacancy feed). Users don't notice a 60s
+  // staleness window. Mutations still invalidateQueries to force a refresh on the user's
+  // own actions, so the user-perceived cache stays immediate-feeling.
+  live: 60_000,
   master: 15 * 60_000,
   profile: 60_000,
 } as const;
