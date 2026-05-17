@@ -181,6 +181,41 @@ describe('TripInvitationsPage', () => {
     );
   });
 
+  // Regression: the top summary used to be a bespoke 2-line Card showing only route + km/rate.
+  // User asked for parity with the Driver "Invites received" rich card — pickup time, status
+  // badge, Share, and a tappable "View details" link to the trip detail page.
+  it('renders the top trip summary as a rich PostedTripCard (pickup time + status badge + tappable detail link)', () => {
+    setAuth(agent);
+    setTrip({ data: makeTrip({ status: 'has_applicants', applicantCount: 2 }) });
+    setInvites({ data: [makeInvite({ status: 'pending' })] });
+    renderPage();
+    // Pickup time line (PostedTripCard renders "Pickup: <formatted>")
+    expect(screen.getAllByText(/pickup:/i).length).toBeGreaterThan(0);
+    // Status badge from PostedTripCard
+    expect(screen.getByText(/has applicants/i)).toBeInTheDocument();
+    // Share button (only on open / has_applicants trips)
+    expect(screen.getByRole('button', { name: /share vellore to chennai/i })).toBeInTheDocument();
+    // "Review applicants" link (PostedTripCard renders this instead of "View details" when
+    // status=has_applicants) → points to /trips/:id/applicants with the breadcrumb attached.
+    const reviewLink = screen.getByRole('link', { name: /review applicants/i });
+    expect(reviewLink.getAttribute('href')).toMatch(/^\/trips\/t1\/applicants\?from=/);
+  });
+
+  it('passes a breadcrumb (?from=/trips/:id/invitations) so the trip detail back-arrow returns HERE', () => {
+    setAuth(agent);
+    setTrip({ data: makeTrip() });
+    setInvites({ data: [makeInvite({ status: 'pending' })] });
+    renderPage();
+    // The PostedTripCard renders a Link to /trips/:id (or /applicants). Whichever it picks,
+    // the breadcrumb must carry /trips/t1/invitations encoded as the ?from= target.
+    const links = screen.getAllByRole('link').filter((a) => (a.getAttribute('href') ?? '').includes('?from='));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      const href = link.getAttribute('href') ?? '';
+      expect(href).toMatch(/\?from=%2Ftrips%2Ft1%2Finvitations/);
+    }
+  });
+
   it('renders the page header with the blue tile-accent (matches the home InvitesSentCard)', () => {
     setAuth(agent);
     setTrip({ data: makeTrip() });
