@@ -28,7 +28,7 @@ import { CountdownTimer } from '@/components/ui/CountdownTimer';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { toast } from 'sonner';
-import { cn, formatINR, formatKm, formatPickupTime } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { Trip, TripStatus, Vehicle } from '@/types';
 
 // Redesign: prefer the new semantic Badge variants (open / invited / live /
@@ -727,7 +727,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
           <ol className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
             {(trip.waypoints ?? []).map((w, i) => {
               const name = w.place?.name ?? w.city?.name ?? '—';
-              const time = w.arriveAt ? formatPickupTime(w.arriveAt) : null;
+              const time = w.arriveAt ? formatPickupDateTime(w.arriveAt) : null;
               const wait = w.waitMinutes > 0 ? (w.waitMinutes >= 60 ? `${Math.round(w.waitMinutes / 60)}h` : `${w.waitMinutes}m`) + ' wait' : null;
               const sub = [time, wait].filter(Boolean).join(' · ');
               return (
@@ -746,8 +746,8 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
           <TripTypeBadge trip={trip} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Stat icon={<MapPin />} label="Distance" value={formatKm(trip.expectedDistanceKm)} />
-          <Stat icon={<Clock />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
+          <Stat icon={<MapPin />} label="Distance" value={formatKmAndDuration(trip.expectedDistanceKm)} />
+          <Stat icon={<Clock />} label="Pickup" value={formatPickupDateTime(trip.pickupAt)} />
           <Stat icon={<Users />} label="Passengers" value={`${trip.passengerCount} pax · ${trip.seatsRequired} seat${trip.seatsRequired === 1 ? '' : 's'}`} />
           <Stat icon={<Wallet />} label="Rate" value={`${formatINR(trip.ratePerKm)}/km`} />
         </div>

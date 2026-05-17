@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, Clock, Phone, User } from 'lucide-react';
 import { Badge, Card } from '@/components/ui';
-import { etaLabel, formatINR, formatKm, initials } from '@/lib/utils';
+import { etaLabel, formatINR, formatKm, formatKmAndDuration, initials } from '@/lib/utils';
 import type { Trip } from '@/types';
 
 /**
@@ -30,7 +30,7 @@ export function AgentInProgressTripCard({ trip }: { trip: Trip }) {
               {trip.fromCity.name} → {trip.toCity.name}
             </div>
             <div className="truncate text-xs text-secondary">
-              {formatKm(trip.expectedDistanceKm)} · {formatINR(trip.totalFare)} fare
+              {formatKmAndDuration(trip.expectedDistanceKm)} · {formatINR(trip.totalFare)} fare
             </div>
           </div>
           <Badge variant="info" className="shrink-0">In progress</Badge>

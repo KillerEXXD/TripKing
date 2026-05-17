@@ -11,7 +11,7 @@ import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatClockTime, formatINR, formatKm, formatPickupTime, formatShortDate } from '@/lib/utils';
+import { cn, formatClockTime, formatINR, formatKmAndDuration, formatPickupDateTime, formatShortDate } from '@/lib/utils';
 import type { AcceptanceStatus, MyApplication, Trip, TripStatus, Vacancy } from '@/types';
 
 type Tab = 'all' | 'driving' | 'invited' | 'applied' | 'selected' | 'completed' | 'cancelled' | 'available' | 'posted';
@@ -95,7 +95,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
             {t.fromCity.name} → {t.toCity.name}
           </div>
           <div className="truncate text-xs text-secondary">
-            {formatKm(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · +{formatINR(t.driverBata)} bata
+            {formatKmAndDuration(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · +{formatINR(t.driverBata)} bata
           </div>
         </div>
         <Badge variant={badge.variant} className="shrink-0">
@@ -103,7 +103,7 @@ function ApplicationRow({ app }: { app: MyApplication }) {
         </Badge>
       </div>
       <div className="truncate text-xs text-secondary">
-        Pickup: {formatPickupTime(t.pickupAt)}
+        Pickup: {formatPickupDateTime(t.pickupAt)}
         {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
         {' · trip is '}
         {tripMeta.label.toLowerCase()}
@@ -155,9 +155,9 @@ function ApplicationRow({ app }: { app: MyApplication }) {
             <dt className="text-secondary">Route</dt>
             <dd className="text-right font-medium">{t.fromCity.name} → {t.toCity.name}</dd>
             <dt className="text-secondary">Distance</dt>
-            <dd className="text-right font-medium">{formatKm(t.expectedDistanceKm)}</dd>
+            <dd className="text-right font-medium">{formatKmAndDuration(t.expectedDistanceKm)}</dd>
             <dt className="text-secondary">Pickup</dt>
-            <dd className="text-right font-medium">{formatPickupTime(t.pickupAt)}</dd>
+            <dd className="text-right font-medium">{formatPickupDateTime(t.pickupAt)}</dd>
             {t.fromPlace?.name ? (
               <>
                 <dt className="text-secondary">Pickup area</dt>

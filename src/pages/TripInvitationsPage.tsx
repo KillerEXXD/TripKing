@@ -7,7 +7,7 @@ import { Badge, Button, Card } from '@/components/ui';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, formatKm } from '@/lib/utils';
+import { formatINR, formatKmAndDuration } from '@/lib/utils';
 import type { TripInvitation, TripInvitationStatus } from '@/types';
 
 const STATUS_BADGE: Record<TripInvitationStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' }> = {
@@ -157,7 +157,7 @@ export function TripInvitationsPage() {
             <Card className="gap-1">
               <div className="font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
               <div className="text-xs text-secondary">
-                {formatKm(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · {formatINR(trip.driverPayout)} driver payout
+                {formatKmAndDuration(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · {formatINR(trip.driverPayout)} driver payout
               </div>
             </Card>
             {invitesQuery.isPending ? (

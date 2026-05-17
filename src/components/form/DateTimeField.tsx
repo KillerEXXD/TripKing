@@ -71,8 +71,12 @@ function formatDisplay(v: string): string {
   if (!v) return '';
   const { date, hour12, minute, meridiem } = parseValue(v);
   if (!date) return '';
-  const fmt = date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
-  return `${fmt}, ${pad(hour12)}:${pad(minute)} ${meridiem}`;
+  // Matches `formatPickupDateTime` in lib/utils.ts — DD/MM/YYYY HH:MM AM/PM (en-IN), so the
+  // form button and the post-submit detail page render the same string.
+  const dd = pad(date.getDate());
+  const mm = pad(date.getMonth() + 1);
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy} ${pad(hour12)}:${pad(minute)} ${meridiem}`;
 }
 
 export function DateTimeField({

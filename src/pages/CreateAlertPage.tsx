@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { useCreateAlert } from '@/hooks/useAlerts';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { PlacePinField } from '@/components/location/PlacePinField';
-import { Button, Card, Input } from '@/components/ui';
+import { BellRing, Car } from 'lucide-react';
+import { Button, Card, Input, SectionLabel } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { AlertInput, NotifyChannel, Place } from '@/types';
 
@@ -163,7 +164,7 @@ export function CreateAlertPage() {
       </Card>
 
       <Card className="gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Car types (optional — any if none picked)</div>
+        <SectionLabel icon={<Car />} accent="green">Car Types <span className="font-normal text-secondary">(optional — any if none picked)</span></SectionLabel>
         <div className="flex flex-wrap gap-1.5">
           {carTypes.map((ct) => {
             const active = carTypeIds.includes(ct.id);
@@ -183,7 +184,7 @@ export function CreateAlertPage() {
       </Card>
 
       <Card className="gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Notify me via</div>
+        <SectionLabel icon={<BellRing />} accent="green">Notify Me Via</SectionLabel>
         <div className="flex flex-wrap gap-3">
           {CHANNELS.map((ch) => (
             <label key={ch.value} className="flex items-center gap-2 text-sm font-medium">

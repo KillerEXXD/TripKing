@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, formatINR, formatKm, formatRating, formatClockTime, formatShortDate, getFirstName, isValidUUID, initials, haversineKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatKmAndDuration, formatPickupDateTime, formatRating, formatClockTime, formatShortDate, getFirstName, isValidUUID, initials, haversineKm } from '@/lib/utils';
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -20,6 +20,11 @@ describe('money / distance formatters', () => {
   });
   it('formats km', () => {
     expect(formatKm(140)).toBe('140 km');
+  });
+  it('formats km + driving duration together', () => {
+    // etaLabel uses 40 km/h → 140 km → 210 min → "~3 hr 30 min"
+    expect(formatKmAndDuration(140)).toBe('140 km · ~3 hr 30 min');
+    expect(formatKmAndDuration(20)).toBe('20 km · ~30 min'); // <1hr branch
   });
   it('formats a rating to one decimal', () => {
     expect(formatRating(4.84)).toBe('★ 4.8');
@@ -42,6 +47,14 @@ describe('date / time formatters', () => {
     const t = formatClockTime(new Date(2026, 4, 12, 9, 5));
     expect(t).toContain('9:05');
     expect(t.toLowerCase()).toMatch(/a\.?m/);
+  });
+  it('formatPickupDateTime renders DD/MM/YYYY HH:MM AM/PM', () => {
+    // Construct in local time so the en-IN locale matches the assertion regardless of test-runner TZ.
+    const out = formatPickupDateTime(new Date(2026, 9, 6, 8, 0).toISOString()); // 6 Oct 2026, 08:00 local
+    expect(out).toMatch(/^06\/10\/2026 08:00 AM$/);
+  });
+  it('formatPickupDateTime falls back to raw string when unparseable', () => {
+    expect(formatPickupDateTime('not-a-date')).toBe('not-a-date');
   });
 });
 

@@ -24,7 +24,8 @@ describe('DateTimeField', () => {
 
   it('formats an initial value on the trigger', () => {
     render(<Harness initial="2026-06-15T14:30" />);
-    expect(screen.getByRole('button')).toHaveTextContent(/Jun.*15.*2026.*02:30 PM/);
+    // formatDisplay now matches formatPickupDateTime: DD/MM/YYYY HH:MM AM/PM.
+    expect(screen.getByRole('button')).toHaveTextContent('15/06/2026 02:30 PM');
   });
 
   it('OK commits the draft and closes the popover', () => {

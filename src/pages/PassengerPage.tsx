@@ -5,7 +5,7 @@ import { useTripByOtp } from '@/hooks/useTrips';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { Avatar, AvatarFallback, Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
+import { formatINR, formatKm, formatKmAndDuration, formatPickupDateTime, initials } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
 
 const STATUS_LABEL: Partial<Record<TripStatus, { label: string; variant: 'success' | 'info' | 'muted' | 'destructive' }>> = {
@@ -81,8 +81,8 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
           {trip.fromCity.name} → {trip.toCity.name}
         </div>
         <div className="grid grid-cols-2 gap-3 pt-1">
-          <Stat icon={<MapPin />} label="Distance" value={formatKm(trip.expectedDistanceKm)} />
-          <Stat icon={<Calendar />} label="Pickup" value={formatPickupTime(trip.pickupAt)} />
+          <Stat icon={<MapPin />} label="Distance" value={formatKmAndDuration(trip.expectedDistanceKm)} />
+          <Stat icon={<Calendar />} label="Pickup" value={formatPickupDateTime(trip.pickupAt)} />
           <Stat icon={<Car />} label="Vehicle" value={`${trip.carTypeLabel ?? 'Any car'}${trip.acRequired ? ' · AC' : ''}`} />
           <Stat icon={<KeyRound />} label="Your OTP" value={otp} />
         </div>

@@ -3,7 +3,7 @@ import { ArrowLeft, ChevronRight, Sparkles } from 'lucide-react';
 import { useMyApplications } from '@/hooks/useTrips';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { formatINR, formatKm, formatPickupTime } from '@/lib/utils';
+import { formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { MyApplication } from '@/types';
 
 type Origin = 'home' | 'my-trips';
@@ -94,10 +94,10 @@ function SelectedTripCard({ app, from }: { app: MyApplication; from: Origin | un
             {t.fromCity.name} → {t.toCity.name}
           </Link>
           <div className="text-xs text-secondary">
-            Pickup: {formatPickupTime(t.pickupAt)}
+            Pickup: {formatPickupDateTime(t.pickupAt)}
           </div>
           <div className="text-xs text-secondary">
-            {formatKm(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · {formatINR(t.driverPayout)} driver payout
+            {formatKmAndDuration(t.expectedDistanceKm)} · {formatINR(t.ratePerKm)}/km · {formatINR(t.totalFare)} fare · {formatINR(t.driverPayout)} driver payout
           </div>
         </div>
         <Badge variant="success" className="shrink-0">Selected — you got it!</Badge>

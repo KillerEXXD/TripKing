@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { useDismissedRowsStore } from '@/stores/dismissedRowsStore';
-import { formatINR, formatKm, formatPickupTime, initials } from '@/lib/utils';
+import { formatINR, formatKmAndDuration, formatPickupDateTime, initials } from '@/lib/utils';
 import type { AcceptanceStatus, Trip, TripAcceptance } from '@/types';
 
 /** Terminal "negative" applicant states — soft-red row + Remove action. */
@@ -157,7 +157,7 @@ function TripSummaryCard({ trip, isPoster }: { trip: Trip; isPoster: boolean }) 
             {trip.fromCity.name} → {trip.toCity.name}
           </div>
           <div className="text-xs text-secondary">
-            {formatKm(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · {formatINR(trip.driverPayout)} driver payout
+            {formatKmAndDuration(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · {formatINR(trip.driverPayout)} driver payout
           </div>
         </div>
         <ChevronDown
@@ -167,7 +167,7 @@ function TripSummaryCard({ trip, isPoster }: { trip: Trip; isPoster: boolean }) 
       </button>
       {expanded ? (
         <div id={panelId} className="space-y-1.5 border-t px-4 py-3 text-xs text-secondary">
-          <div><span className="font-semibold text-foreground">Pickup:</span> {formatPickupTime(trip.pickupAt)}</div>
+          <div><span className="font-semibold text-foreground">Pickup:</span> {formatPickupDateTime(trip.pickupAt)}</div>
           <div>
             <span className="font-semibold text-foreground">Vehicle:</span>{' '}
             {[trip.carTypeLabel, `${trip.seatsRequired} seats`, trip.acRequired ? 'AC' : 'Non-AC'].filter(Boolean).join(' · ')}

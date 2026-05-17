@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { LoadingSkeleton } from '@/components/feedback';
 import { useOverlappingApplications } from '@/hooks/useTrips';
-import { cn, formatINR, formatPickupTime } from '@/lib/utils';
+import { cn, formatINR, formatPickupDateTime } from '@/lib/utils';
 import type { MyApplication, Trip } from '@/types';
 
 /**
@@ -82,7 +82,7 @@ export function AcceptTripDialog({
         <p className="text-sm text-secondary">
           You&apos;ve applied to {overlapping.length} other trip{overlapping.length === 1 ? '' : 's'} that overlap
           {' '}<b>{trip.fromCity?.name} → {trip.toCity?.name}</b>{' '}
-          on {formatPickupTime(trip.pickupAt)}. We&apos;ll withdraw the checked ones automatically so the other
+          on {formatPickupDateTime(trip.pickupAt)}. We&apos;ll withdraw the checked ones automatically so the other
           agents can pick someone else.
         </p>
         <ul className="space-y-2">
@@ -129,7 +129,7 @@ function OverlappingRow({ app, checked, onToggle }: { app: MyApplication; checke
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold">{t.fromCity?.name} → {t.toCity?.name}</div>
           <div className="text-xs text-secondary">
-            Pickup {formatPickupTime(t.pickupAt)} · {formatINR(t.totalFare)} fare · status: <span className="font-medium">{app.status}</span>
+            Pickup {formatPickupDateTime(t.pickupAt)} · {formatINR(t.totalFare)} fare · status: <span className="font-medium">{app.status}</span>
           </div>
         </div>
       </label>

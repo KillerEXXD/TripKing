@@ -178,15 +178,19 @@ describe('PostTripPage', () => {
     expect(screen.getByRole('button', { name: /next: price/i })).toBeDisabled();
   });
 
-  it('computes the expected distance from the route — read-only, with a spinner while working, and re-runs when an exact point is pinned', async () => {
+  it('computes the expected distance from the route — hidden input + emerald summary line with km + ETA, spinner while working, re-runs when an exact point is pinned', async () => {
     const { container } = renderPost();
-    const distanceInput = () => container.querySelector<HTMLInputElement>('[name="expectedDistanceKm"]')!;
-    expect(distanceInput()).toHaveAttribute('readonly'); // the agent / driver can't type it
+    const distanceInput = () => container.querySelector<HTMLInputElement>('input[type="hidden"][name="expectedDistanceKm"]')!;
+    // Now a hidden input — the visible row is the emerald summary; the agent can't type either way.
+    expect(distanceInput().type).toBe('hidden');
     set(container, 'fromCityId', 'c1');
     set(container, 'toCityId', 'c2'); // distinct coords → triggers a calculation
     expect(screen.getByText(/calculating route/i)).toBeInTheDocument(); // the processing indicator
     await waitFor(() => expect(Number(distanceInput().value)).toBeGreaterThanOrEqual(1));
     expect(screen.queryByText(/calculating route/i)).toBeNull();
+    // The emerald summary shows "Estimated distance: <km> · ~<duration>".
+    expect(screen.getByText(/estimated distance:/i)).toBeInTheDocument();
+    expect(screen.getByText(/~\d+\s?(?:min|hr)/i)).toBeInTheDocument();
     const fromCities = Number(distanceInput().value);
     fireEvent.click(screen.getByRole('button', { name: /pin the exact pickup point/i })); // re-runs with the pinned coords
     await waitFor(() => expect(Number(distanceInput().value)).not.toBe(fromCities));
