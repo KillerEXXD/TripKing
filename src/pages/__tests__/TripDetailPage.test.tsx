@@ -8,9 +8,9 @@ import type { Trip, User, Vehicle } from '@/types';
 vi.mock('@/components/trip/InviteDriversCard', () => ({ InviteDriversCard: () => null }));
 vi.mock('@/hooks/useTrips', () => {
   const noOverlap = Object.freeze({ isPending: false, isSuccess: true, data: Object.freeze([]) });
-  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
+  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useDeclineTripInvite: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
 });
-import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger, useAcceptTrip, useDeclineTrip, useCancelAssignment } from '@/hooks/useTrips';
+import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger, useAcceptTrip, useDeclineTrip, useDeclineTripInvite, useCancelAssignment } from '@/hooks/useTrips';
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(() => ({ data: null, isFetching: false, isSuccess: false })), isLookupablePhone: vi.fn(() => false) }));
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
 import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
@@ -113,6 +113,7 @@ let cancelMutateAsync: ReturnType<typeof vi.fn>;
 let acceptMutateAsync: ReturnType<typeof vi.fn>;
 let declineMutateAsync: ReturnType<typeof vi.fn>;
 let cancelAssignMutateAsync: ReturnType<typeof vi.fn>;
+let declineInviteMutateAsync: ReturnType<typeof vi.fn>;
 let updatePassengerMutateAsync: ReturnType<typeof vi.fn>;
 function setMutations() {
   applyMutateAsync = vi.fn().mockResolvedValue({ id: 'a1', appliedAt: '2099-05-31T00:00:00.000Z' });
@@ -133,6 +134,8 @@ function setMutations() {
   vi.mocked(useAcceptTrip).mockReturnValue({ mutateAsync: acceptMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useDeclineTrip).mockReturnValue({ mutateAsync: declineMutateAsync, isPending: false, isError: false } as never);
   vi.mocked(useCancelAssignment).mockReturnValue({ mutateAsync: cancelAssignMutateAsync, isPending: false, isError: false } as never);
+  declineInviteMutateAsync = vi.fn().mockResolvedValue({});
+  vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync: declineInviteMutateAsync, isPending: false, isError: false } as never);
 }
 const CANCEL_REASONS = [
   { id: 'cr1', label: 'Passenger no longer needs the ride', appliesTo: 'both', sortOrder: 1, isActive: true },
@@ -173,6 +176,7 @@ describe('TripDetailPage', () => {
     vi.mocked(useStartTrip).mockReset();
     vi.mocked(useCompleteTrip).mockReset();
     vi.mocked(useCancelTrip).mockReset();
+    vi.mocked(useDeclineTripInvite).mockReset();
     vi.mocked(cancelReasonHooks.useList).mockReset();
     setCancelReasons();
     vi.mocked(useUpdateDriverLocation).mockReset().mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
@@ -438,6 +442,25 @@ describe('TripDetailPage', () => {
     renderDetail();
     fireEvent.click(screen.getByRole('button', { name: /quote a different rate/i }));
     expect(screen.getByPlaceholderText(/short note to the manager/i)).toBeInTheDocument();
+  });
+
+  it('shows a Decline invitation button to an invited driver and fires the decline mutation on confirm', async () => {
+    setTrip({ data: makeTrip({ invitationId: 'inv-1', invitationStatus: 'pending' }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderDetail();
+    expect(screen.getByText(/you've been invited to this trip/i)).toBeInTheDocument();
+    const declineBtn = screen.getByRole('button', { name: /decline invitation/i });
+    fireEvent.click(declineBtn);
+    await waitFor(() =>
+      expect(declineInviteMutateAsync).toHaveBeenCalledWith({ tripId: 't1', inviteId: 'inv-1' }),
+    );
+    confirmSpy.mockRestore();
+  });
+
+  it('does not show Decline when the trip has no pending invitation for this driver', () => {
+    setTrip({ data: makeTrip() });
+    renderDetail();
+    expect(screen.queryByRole('button', { name: /decline invitation/i })).toBeNull();
   });
 
   it('shows the multi-vehicle dropdown when the driver has more than one active vehicle', () => {

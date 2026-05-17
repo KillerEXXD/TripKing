@@ -1211,19 +1211,28 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     await enrichPostedByKyc([raw]);
     await enrichPendingInvitationCount([raw]);
     await enrichPlatformFeeBreakdown([raw]);
-    const myDriverId = (u.role !== 'admin' && raw.posted_by_user_id !== u.id && raw.assigned_driver_id) ? await driverIdFor(u.id) : null;
+    // For non-poster users, resolve their driver id once — we reuse it for both the agent-reveal
+    // gate AND the invitation stamp (so the trip-detail page can show a Decline button when an
+    // invited driver is viewing — parity with the `?invited=me` list-stamp at lines ~940). We
+    // don't gate on role here: admins can also have a driver profile (e.g. the dev role-switcher),
+    // and the relationshipFor() check still classifies them as 'admin'.
+    const myDriverId = (raw.posted_by_user_id !== u.id) ? await driverIdFor(u.id) : null;
     const rel = relationshipFor(raw, u, myDriverId);
     let posterReveal = false;
     const posterUserId = raw.posted_by_user_id as string | undefined;
+    let myInvitation: { id: string; status: string } | null = null;
+    if (myDriverId) {
+      const { data: inv } = await db.from('trip_invitations').select('id, status').eq('trip_id', raw.id as string).eq('driver_id', myDriverId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      if (inv) myInvitation = { id: inv.id as string, status: inv.status as string };
+    }
     if (rel === 'browse') {
       if (posterUserId) {
         const rc = revealCache(db);
         posterReveal = await rc.canRevealAgentUser(u.id, posterUserId);
         // Phase 4: invited drivers get the agent's name+phone pre-revealed BEFORE applying,
         // so they can call to discuss. The invitation row IS the reveal credential.
-        if (!posterReveal && myDriverId) {
-          const { data: inv } = await db.from('trip_invitations').select('id').eq('trip_id', raw.id as string).eq('driver_id', myDriverId).in('status', ['pending', 'applied']).maybeSingle();
-          if (inv) posterReveal = true;
+        if (!posterReveal && myInvitation && (myInvitation.status === 'pending' || myInvitation.status === 'applied')) {
+          posterReveal = true;
         }
         if (posterReveal) await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: 'GET /trips/:id', trip_id: raw.id as string });
       }
@@ -1233,6 +1242,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       await logPiiReveal(db, { viewer_user_id: u.id, target_user_id: posterUserId, surface: `GET /trips/:id (${rel})`, trip_id: raw.id as string });
     }
     const redacted = redactTrip(raw, rel, posterReveal);
+    if (myInvitation) {
+      (redacted as Record<string, unknown>).invitation_id = myInvitation.id;
+      (redacted as Record<string, unknown>).invitation_status = myInvitation.status;
+    }
     // After-assignment counterparty verification: poster/admin gets the driver's checklist;
     // the assigned driver gets the poster's. We only attach on GET /trips/:id (detail) — the
     // builder makes 2-3 extra queries, which is fine for one trip but expensive for a list.
