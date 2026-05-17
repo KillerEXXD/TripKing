@@ -43,12 +43,22 @@ Reading the output:
 - **`hits` / `misses`**: requests that went through `withCache`. `hits/(hits+misses)` = the **hit rate**.
 - **`unwrapped`**: `cache_status IS NULL` — request didn't go through `withCache` at all. Some of this is intentional (POST/PATCH writes, auth-failure short-circuits, design-justified single-row GETs like `/alerts/:id`); a *new* high count on an endpoint that used to be wrapped is a regression signal.
 
-Baseline expectations (post-issue #114 rollout, see closing comment):
-- `trips`, `vacancies`, `notifications` — should show non-zero `shared` hits.
-- `alerts`, `reviews` — list endpoints wrapped; small absolute hit count fine at low traffic.
-- `drivers`, `agents`, `analytics` — currently uncached lists (not in scope of #114).
+**IMPORTANT — read the source before flagging a "regression":** the query above splits a `memory` hit from a `shared` hit, but our older breakdown lumped them together. An endpoint can legitimately show **0 `shared` hits with lots of `memory` hits** when its `withCache` calls use `tier: 'memory'` (per-user keys, low-traffic admin endpoints, anything where the shared write would be wasteful). Before flagging an endpoint as a "cache regression":
+1. `grep -n "withCache" supabase/functions/<endpoint>/index.ts` and read the tier.
+2. If every `withCache` call uses `tier: 'memory'`, 0 shared hits is correct — DO NOT flag.
+3. If a call uses `tier: 'shared'` but shows 0 shared hits AND non-trivial misses, that IS a regression worth flagging.
+4. High-cardinality cache keys (e.g. `vacancies:list` keyed on city+driver+status combos) will show low shared-hit rates by design — note "structurally low" rather than "regression".
 
-Flag in the report if any *previously-wrapped* endpoint shows 0 hits + 0 misses (cache wrapper likely dropped — orphan / regression).
+Baseline expectations (post-issue #114 rollout, see closing comment):
+- `trips`, `notifications` — `tier: 'shared'`, should show non-zero `shared` hits.
+- `vacancies` — `tier: 'shared'` but high-key cardinality; low shared hit rate is structural, not a regression.
+- `alerts`, `reviews` — list endpoints wrapped; small absolute hit count fine at low traffic.
+- `analytics`, `agents` — mostly `tier: 'memory'` (per-user keys); 0 shared hits is correct, don't flag.
+- `drivers` — currently uncached lists (not in scope of #114).
+
+Flag in the report ONLY if:
+- A previously-wrapped endpoint shows 0 hits + 0 misses (cache wrapper likely dropped — orphan / regression), OR
+- A `tier: 'shared'` endpoint shows 0 shared hits AND a high miss count (the SET path is broken).
 
 ## Step 3 — Migrations applied vs on disk
 
