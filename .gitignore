@@ -18,6 +18,9 @@ dist-ssr
 # Claude Code — only the local secrets file is ignored (.mcp.json + .claude/settings.json are committed;
 # secret values referenced by ${...} in .mcp.json live in .claude/settings.local.json's "env" block)
 .claude/settings.local.json
+# QA-impact queue — local-only state populated by the PostToolUse hook (qa-impact-enqueue.js)
+# and consumed by the /qa-impact slash command. Per-machine; never committed.
+.claude/qa-impact-queue.jsonl
 .idea
 .DS_Store
 *.suo

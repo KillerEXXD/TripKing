@@ -14,6 +14,21 @@
           { "type": "command", "command": "node .claude/hooks/scripts/mcp-health-check.js" }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__github__(create|merge)_pull_request",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/scripts/qa-impact-enqueue.cjs" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/scripts/qa-impact-reminder.cjs" }
+        ]
+      }
     ]
   }
 }
