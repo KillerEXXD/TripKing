@@ -19,6 +19,11 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { authUser } from '../_shared/auth.ts';
+import { withCache, okCached } from '../_shared/withCache.ts';
+import { CacheTTL } from '../_shared/cache.ts';
+
+// Bump when the GET /referrals/tiers response shape changes.
+const TIERS_CACHE_EPOCH = 'v1';
 
 type Db = ReturnType<typeof serviceClient>;
 type Row = Record<string, unknown>;
@@ -161,14 +166,23 @@ const handler = withTiming('referrals', async (req: Request): Promise<Response> 
   if (!u) return fail('UNAUTHORIZED', 'Sign in to view your referrals', 401);
 
   // ── GET /tiers (public; for the tier-progress widget on /referrals) ─────
+  // Effectively-immutable config — only changes when an admin edits the program structure.
+  // LONG TTL (15min) on shared cache + ETag means every viewer's browser revalidates with
+  // 304 (no body) after expiry. This used to be a fresh SELECT on every /referrals load.
   if (req.method === 'GET' && route === 'tiers') {
-    const { data, error } = await db
-      .from('referral_tiers')
-      .select('id, slot_name, min_qualified_referrals, max_qualified_referrals, cap_paise, payout_per_trip_paise, applies_to_role, sort_order, is_active')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
-    if (error) return fail('DB_ERROR', error.message, 500);
-    return ok(data ?? []);
+    const { data, hit } = await withCache<unknown[]>(
+      { key: `referrals:tiers:${TIERS_CACHE_EPOCH}`, ttl: CacheTTL.LONG, tier: 'shared', cacheType: 'admin', entityKind: 'admin', entityId: 'referral-tiers' },
+      async () => {
+        const { data, error } = await db
+          .from('referral_tiers')
+          .select('id, slot_name, min_qualified_referrals, max_qualified_referrals, cap_paise, payout_per_trip_paise, applies_to_role, sort_order, is_active')
+          .eq('is_active', true)
+          .order('sort_order', { ascending: true });
+        if (error) throw new Error(error.message);
+        return data ?? [];
+      },
+    );
+    return await okCached(req, data, { hit, ttl: CacheTTL.LONG, scope: 'public' });
   }
 
   // ── GET /me ─────────────────────────────────────────────────────────────
