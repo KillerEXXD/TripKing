@@ -118,11 +118,11 @@ describe('PostVacancyPage', () => {
     const end4 = new Date(start.getTime() + 4 * 3_600_000); // default window is 4 hrs
     expect(screen.getAllByText((t) => t.includes(formatClockTime(start)) && t.includes(formatClockTime(end4))).length).toBeGreaterThan(0);
     expect(screen.getAllByText((t) => t.includes('(4 hrs)')).length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4 → 4.5
-    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4.5 → 5
-    const end5 = new Date(start.getTime() + 5 * 3_600_000);
-    expect(screen.getAllByText((t) => t.includes(formatClockTime(start)) && t.includes(formatClockTime(end5))).length).toBeGreaterThan(0);
-    expect(screen.getAllByText((t) => t.includes('(5 hrs)')).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4 → 5
+    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 5 → 6
+    const end6 = new Date(start.getTime() + 6 * 3_600_000);
+    expect(screen.getAllByText((t) => t.includes(formatClockTime(start)) && t.includes(formatClockTime(end6))).length).toBeGreaterThan(0);
+    expect(screen.getAllByText((t) => t.includes('(6 hrs)')).length).toBeGreaterThan(0);
   });
 
   it('filters the destination chips by the search box and keeps a selected chip visible', () => {
@@ -144,8 +144,8 @@ describe('PostVacancyPage', () => {
     fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
     fireEvent.change(screen.getByLabelText(/available from/i), { target: { value: '2099-06-01T09:00' } });
     fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
-    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4 → 4.5
-    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4.5 → 5
+    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 4 → 5
+    fireEvent.click(screen.getByRole('button', { name: /more hours/i })); // 5 → 6
     fireEvent.click(screen.getByRole('button', { name: /^post vacant$/i }));
     const start = new Date('2099-06-01T09:00'); // datetime-local strings parse as local time
     await waitFor(() =>
@@ -153,7 +153,7 @@ describe('PostVacancyPage', () => {
         expect.objectContaining({
           currentCityId: 'c1',
           availableFrom: start.toISOString(),
-          availableUntil: new Date(start.getTime() + 5 * 3_600_000).toISOString(),
+          availableUntil: new Date(start.getTime() + 6 * 3_600_000).toISOString(),
           destinationCityIds: ['c2'],
           destinations: [{ cityId: 'c2' }],
         }),
