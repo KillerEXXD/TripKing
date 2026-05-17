@@ -224,23 +224,15 @@ function DriverHome({ driver }: { driver: Driver }) {
         {/* Priority stack — natural top-down priority: live trip → action needed → CTA.
             Driving now and Review are hidden when empty; I'm vacant always renders
             (it's the platform's primary call-to-action — drivers must post availability
-            for the marketplace to work, and its own internal state handles the empty case). */}
+            for the marketplace to work, and its own internal state handles the empty case).
+            Trips-you-posted indicators (applicants-waiting + invites-sent) bubble up here
+            BEFORE the reputation card — they're actionable; reputation is informational. */}
         {inProgressTrip ? <CurrentTripCard trip={inProgressTrip} /> : null}
         {awaitingDecision.length > 0 ? <AwaitingMyDecisionCard apps={awaitingDecision} /> : null}
         <IAmAvailableCard driverId={driver.id} />
         {pendingReceivedInvites.length > 0 ? <InvitesReceivedCard trips={pendingReceivedInvites} /> : null}
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
 
-        <ReputationCard driver={driver} />
-
-        <HomeTileRow role="driver" />
-      </div>
-
-      <div className="px-4 pb-4">
-        <InstallAppCard dismissable />
-      </div>
-
-      <div className="space-y-3 px-4">
         {postedWithApplicants > 0 ? (
           <PriorityCard
             to="/posted-trips"
@@ -253,6 +245,14 @@ function DriverHome({ driver }: { driver: Driver }) {
           />
         ) : null}
         <InvitesSentCard trips={myPosts} />
+
+        <ReputationCard driver={driver} />
+
+        <HomeTileRow role="driver" />
+      </div>
+
+      <div className="px-4 pb-4">
+        <InstallAppCard dismissable />
       </div>
 
     </div>
