@@ -83,6 +83,13 @@ export function BottomNav() {
   // the Tailwind v4 + workbox + Vercel chain keeps interfering. Inline styles
   // bypass ALL of that — they win every specificity battle and can't be cached
   // separately from the JSX. Visual + layout intent stays identical.
+  // minHeight (not height) lets the nav grow to fit its content rather than
+  // clip labels. The recurring "labels cut off" reports (5+ fixes in git
+  // history) all stemmed from a fixed height + items-center: any pixel growth
+  // in icon size, active-pill padding, or safe-area inset pushed the bottom
+  // label row past the nav's hard bottom. minHeight removes the clip while
+  // preserving the visual baseline; the extra 4px of bottom padding gives
+  // labels predictable clearance from any home-indicator zone underneath.
   const navStyle = {
     background: 'rgba(255, 255, 255, 0.98)',
     backdropFilter: 'blur(24px)',
@@ -90,9 +97,9 @@ export function BottomNav() {
     boxShadow: '0 -1px 0 rgba(0,0,0,0.05), 0 -6px 20px rgba(0,0,0,0.05)',
     paddingTop: '10px',
     paddingRight: '20px',
-    paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))',
+    paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
     paddingLeft: '20px',
-    height: 'calc(92px + env(safe-area-inset-bottom, 0px))',
+    minHeight: 'calc(96px + env(safe-area-inset-bottom, 0px))',
     boxSizing: 'border-box' as const,
   };
   const labelBase = {
