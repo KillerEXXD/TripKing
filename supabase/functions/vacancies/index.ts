@@ -42,6 +42,14 @@ const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 // migration 040 reconciled 3 vacancies that drifted across the 039 deploy boundary.
 // v5 (2026-05-16): bumped after QA-data reset wipe.
 const CACHE_EPOCH = 'v5';
+/** Split the cache scope so a single driver editing their own vacancy doesn't purge the
+ * agent's "find available drivers in Chennai" search. Returns the entityId to use as the
+ * invalidation tag — `'list-public'` for the agent search, `'list-driver-<id>'` per driver. */
+function vacanciesListScope(url: URL): string {
+  const driverId = url.searchParams.get('driver_id');
+  return driverId ? `list-driver-${driverId}` : 'list-public';
+}
+
 function vacanciesListKey(url: URL): string {
   const params: string[] = [];
   for (const [k, v] of Array.from(url.searchParams.entries()).sort(([a], [b]) => a.localeCompare(b))) {
@@ -59,6 +67,19 @@ function vacanciesListKey(url: URL): string {
   }
   const tail = params.length ? `:${params.join(':')}` : '';
   return `vacancies:list${tail}:${CACHE_EPOCH}`;
+}
+
+/** Fields on `vacancies` that affect what shows up in the list query. A PATCH that touches
+ * NONE of these doesn't need a list invalidation — saves the cache row that an agent might
+ * otherwise be about to hit. (notes / vehicle_id / current_place_id / min_rate_per_km /
+ * available_from are vacancy details but not list filters per the GET handler.) */
+const LIST_FILTER_FIELDS = new Set(['current_city_id', 'available_until', 'status']);
+function patchAffectsList(update: Record<string, unknown>, destinationsChanged: boolean): boolean {
+  if (destinationsChanged) return true; // destinations filter is real
+  for (const k of Object.keys(update)) {
+    if (LIST_FILTER_FIELDS.has(k)) return true;
+  }
+  return false;
 }
 
 type Db = ReturnType<typeof serviceClient>;
@@ -173,7 +194,14 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     // invites are stitched in below.
     const viewer = await authUser(db, req);
     const { data: rows, hit } = await withCache<Record<string, unknown>[]>(
-      { key: vacanciesListKey(url), ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'vacancy', entityId: 'list' },
+      // TTL 90s (not the 30s SHORT tier): vacancy lists aren't a chat — agents searching for
+      // "drivers in city X" don't need second-fresh data. The 7-day cache miss rate at 30s
+      // was 98% (1467 miss / 30 shared hit) because every mutation purged the list AND the
+      // window was too short to accumulate hits. With 90s + scope-split (below) + conditional
+      // PATCH-invalidation, hit rate should climb significantly.
+      // entityId now uses `vacanciesListScope(url)` so DriverA editing his own row only purges
+      // his per-driver key, NOT the public agent search every other agent is hitting.
+      { key: vacanciesListKey(url), ttl: 90, tier: 'shared', cacheType: 'live', entityKind: 'vacancy', entityId: vacanciesListScope(url) },
       async () => {
         let q = db.from('vacancies').select(VACANCY_SELECT);
         const city = url.searchParams.get('current_city_id');
@@ -324,7 +352,11 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     // fire alert_match notifications for matching active alerts (best-effort; never fails the POST).
     try { await db.rpc('match_alerts_for_vacancy', { p_vacancy_id: vacancyId }); } catch { /* ignore */ }
     cacheDeletePattern('vacancies:*');
-    await sharedCacheInvalidateEntity('vacancy', 'list');
+    // A new vacancy affects the public agent search AND the driver's own list.
+    await Promise.all([
+      sharedCacheInvalidateEntity('vacancy', 'list-public'),
+      sharedCacheInvalidateEntity('vacancy', `list-driver-${did}`),
+    ]);
     purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(vacancyId, false);
   }
@@ -398,12 +430,22 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         if (insErr) return pgFail(insErr);
       }
     }
-    cacheDeletePattern('vacancies:*');
-    await Promise.all([
-      sharedCacheInvalidateEntity('vacancy', 'list'),
-      sharedCacheInvalidateEntity('vacancy', id),
-    ]);
-    purgeCloudflareAsync(VACANCY_PURGE_URLS);
+    // Only purge list caches if the PATCH actually changed a list-shape field. Edits to
+    // notes / vehicle_id / min_rate_per_km / available_from don't move the row in or out
+    // of any list, so skipping the invalidation lets in-flight cached lists keep serving.
+    const destinationsChanged = nextDestPairs !== null;
+    const listAffected = patchAffectsList(update, destinationsChanged);
+    cacheDeletePattern(`vacancies:item:${id}:`); // always purge the item cache
+    const invals: Promise<unknown>[] = [sharedCacheInvalidateEntity('vacancy', id)];
+    if (listAffected) {
+      cacheDeletePattern('vacancies:list');
+      invals.push(
+        sharedCacheInvalidateEntity('vacancy', 'list-public'),
+        sharedCacheInvalidateEntity('vacancy', `list-driver-${vac.driver_id}`),
+      );
+    }
+    await Promise.all(invals);
+    if (listAffected) purgeCloudflareAsync(VACANCY_PURGE_URLS);
     return fullVacancy(id, false);
   }
 
@@ -419,9 +461,11 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     if (vac.status === 'cancelled') return fail('CONFLICT', 'Vacancy is already cancelled', 409);
     const { error } = await db.from('vacancies').update({ status: 'cancelled', cancelled_at: new Date().toISOString() }).eq('id', id);
     if (error) return pgFail(error);
+    // Cancel always affects the list (status transitions from active → cancelled).
     cacheDeletePattern('vacancies:*');
     await Promise.all([
-      sharedCacheInvalidateEntity('vacancy', 'list'),
+      sharedCacheInvalidateEntity('vacancy', 'list-public'),
+      sharedCacheInvalidateEntity('vacancy', `list-driver-${vac.driver_id}`),
       sharedCacheInvalidateEntity('vacancy', id),
     ]);
     purgeCloudflareAsync(VACANCY_PURGE_URLS);
