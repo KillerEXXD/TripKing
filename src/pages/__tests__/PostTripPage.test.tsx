@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { PostTripPage } from '@/pages/PostTripPage';
 
@@ -84,6 +84,17 @@ function setPassengerLookup(over: { isFetching?: boolean; isSuccess?: boolean; i
   vi.mocked(useLookupPassengerByPhone).mockReturnValue({ isFetching: false, isSuccess: false, isError: false, data: undefined, refetch: vi.fn(), ...over } as never);
 }
 
+// Tiny stubs that echo the `?…` query string back into the DOM so we can assert the deep-link
+// (status=open / tab=posted) the post-trip redirect carries.
+function PostedTripsListingStub() {
+  const { search } = useLocation();
+  return <div>posted trips listing {search}</div>;
+}
+function MyTripsListingStub() {
+  const { search } = useLocation();
+  return <div>my trips listing {search}</div>;
+}
+
 function renderPost() {
   return render(
     <MemoryRouter initialEntries={['/trips/new']}>
@@ -91,8 +102,8 @@ function renderPost() {
         <Route path="/trips/new" element={<PostTripPage />} />
         <Route path="/" element={<div>home</div>} />
         <Route path="/trips/:id" element={<div>trip detail</div>} />
-        <Route path="/posted-trips" element={<div>posted trips listing</div>} />
-        <Route path="/my-trips" element={<div>my trips listing</div>} />
+        <Route path="/posted-trips" element={<PostedTripsListingStub />} />
+        <Route path="/my-trips" element={<MyTripsListingStub />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -226,10 +237,13 @@ describe('PostTripPage', () => {
       ),
     );
     expect(await screen.findByText('share modal')).toBeInTheDocument();
-    // Done on the share modal now lands the AGENT on their "My posts" listing (not the trip detail).
+    // Done on the share modal now lands the AGENT on their "My posts" listing pre-filtered to
+    // ?status=open so the freshly-posted trip is immediately visible in the right bucket.
     // "View the trip" is the optional secondary action that goes to the detail page.
     fireEvent.click(screen.getByRole('button', { name: /close share/i }));
-    expect(await screen.findByText('posted trips listing')).toBeInTheDocument();
+    const landing = await screen.findByText(/posted trips listing/);
+    expect(landing).toBeInTheDocument();
+    expect(landing.textContent).toContain('?status=open');
   });
 
   it('after posting, the agent\'s "View the trip" action on the share modal goes to /trips/:id', async () => {
@@ -253,7 +267,9 @@ describe('PostTripPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
     expect(await screen.findByText('share modal')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /close share/i }));
-    expect(await screen.findByText('my trips listing')).toBeInTheDocument();
+    const landing = await screen.findByText(/my trips listing/);
+    expect(landing).toBeInTheDocument();
+    expect(landing.textContent).toContain('?tab=posted');
   });
 
   it('shows the verification gate instead of the wizard when the poster is not approved', () => {
