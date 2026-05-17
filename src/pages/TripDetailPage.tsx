@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
-import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useDeclineTripInvite, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
@@ -77,6 +77,10 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   const vehiclesQuery = useDriverVehicles(myDriverId);
   const applyMutation = useApplyToTrip();
   const withdrawMutation = useWithdrawApplication();
+  const declineInviteMutation = useDeclineTripInvite();
+  // The trip detail endpoint stamps `invitationId` + `invitationStatus` for the requesting
+  // driver — so an invited driver who hasn't applied yet sees a Decline action alongside Apply.
+  const invitedPending = trip.invitationStatus === 'pending' && !!trip.invitationId;
   const { byTrip, recordApplication, markWithdrawn } = useMyApplicationsStore();
   const myApplication: MyApplication | undefined = byTrip[trip.id];
 
@@ -109,6 +113,17 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
       toast.error("Couldn't apply — please try again.");
     }
   }
+  async function onDeclineInvite() {
+    if (!trip.invitationId) return;
+    if (!window.confirm("Decline this invitation? The trip manager will be notified.")) return;
+    try {
+      await declineInviteMutation.mutateAsync({ tripId: trip.id, inviteId: trip.invitationId });
+      toast.success('Invitation declined.');
+      navigate(returnTo);
+    } catch {
+      toast.error("Couldn't decline — please try again.");
+    }
+  }
   async function onWithdraw() {
     if (!myApplication) return;
     try {
@@ -122,8 +137,14 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
     }
   }
 
+  const declining = declineInviteMutation.isPending;
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md space-y-2 border-t bg-white px-4 py-3">
+      {invitedPending && !isApplied && !withdrawn ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-900">
+          You&apos;ve been invited to this trip
+        </div>
+      ) : null}
       {withdrawn ? (
         <>
           <div className="flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-3 text-sm font-bold text-red-800">
@@ -194,6 +215,11 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
           </Button>
         </>
       )}
+      {invitedPending && !isApplied && !withdrawn ? (
+        <Button variant="ghost" size="sm" className="w-full text-destructive hover:text-destructive" disabled={declining} onClick={() => void onDeclineInvite()}>
+          {declining ? 'Declining…' : 'Decline invitation'}
+        </Button>
+      ) : null}
     </div>
   );
 }
