@@ -25,7 +25,7 @@ export function BharatTripCard({ trip }: { trip: Trip }) {
   const toTa = ta(trip.toCity?.name);
   return (
     <Link
-      to={`/trips/${trip.id}?from=/v6`}
+      to={`/v6/trips/${trip.id}`}
       className="block rounded-card border border-border bg-surface p-4 shadow-card"
     >
       <div className="flex items-start justify-between gap-4">

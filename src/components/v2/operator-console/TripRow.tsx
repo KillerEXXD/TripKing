@@ -12,7 +12,7 @@ import { StatusDot } from './StatusDot';
 export function TripRow({ trip }: { trip: Trip }) {
   return (
     <Link
-      to={`/trips/${trip.id}?from=/v2`}
+      to={`/v2/trips/${trip.id}`}
       className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] items-center gap-3 border-b border-border px-3 py-2.5 text-[13px] hover:bg-surface-muted"
     >
       <StatusDot status={trip.status} />

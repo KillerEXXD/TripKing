@@ -19,6 +19,17 @@ const SKINS: Skin[] = [
  * while viewing the same screen-equivalent. Active chip uses the
  * current skin's `--color-primary`, so it re-tints per direction.
  */
+/**
+ * Re-write a path's /vN prefix to the new skin's /vN. So a viewer on
+ * /v2/trips/abc tapping the v3 chip lands on /v3/trips/abc — same
+ * screen-equivalent, different design.
+ */
+function swapPrefix(pathname: string, currentPrefix: string | undefined, nextPrefix: string): string {
+  if (!currentPrefix) return nextPrefix;
+  const rest = pathname.slice(currentPrefix.length); // '' or '/...'
+  return `${nextPrefix}${rest}`;
+}
+
 export function SkinSwitcher() {
   const location = useLocation();
   const activePath = SKINS.find((s) => location.pathname === s.path || location.pathname.startsWith(`${s.path}/`))?.path;
@@ -29,10 +40,11 @@ export function SkinSwitcher() {
     >
       {SKINS.map((s) => {
         const active = s.path === activePath;
+        const target = swapPrefix(location.pathname, activePath, s.path);
         return (
           <Link
             key={s.path}
-            to={s.path}
+            to={target}
             aria-current={active ? 'page' : undefined}
             className={`shrink-0 rounded-pill px-3 py-1 text-[11px] font-semibold transition-colors ${
               active

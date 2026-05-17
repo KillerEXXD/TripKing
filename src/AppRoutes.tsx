@@ -71,6 +71,11 @@ const V3FieldTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/
 const V4PipelineTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripsListPage'));
 const V5EditorialTripsPage = lazyWithRetry(() => import('@/pages/v2/editorial/TripsListPage'));
 const V6BharatTripsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/TripsListPage'));
+const V2OperatorTripDetailPage = lazyWithRetry(() => import('@/pages/v2/operator-console/TripDetailPage'));
+const V3FieldTripDetailPage = lazyWithRetry(() => import('@/pages/v2/field-companion/TripDetailPage'));
+const V4PipelineTripDetailPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripDetailPage'));
+const V5EditorialTripDetailPage = lazyWithRetry(() => import('@/pages/v2/editorial/TripDetailPage'));
+const V6BharatTripDetailPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/TripDetailPage'));
 
 function PageFallback() {
   return (
@@ -153,10 +158,15 @@ export function AppRoutes() {
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
             <Route path="/v2" element={<V2OperatorTripsPage />} />
+            <Route path="/v2/trips/:id" element={<V2OperatorTripDetailPage />} />
             <Route path="/v3" element={<V3FieldTripsPage />} />
+            <Route path="/v3/trips/:id" element={<V3FieldTripDetailPage />} />
             <Route path="/v4" element={<V4PipelineTripsPage />} />
+            <Route path="/v4/trips/:id" element={<V4PipelineTripDetailPage />} />
             <Route path="/v5" element={<V5EditorialTripsPage />} />
+            <Route path="/v5/trips/:id" element={<V5EditorialTripDetailPage />} />
             <Route path="/v6" element={<V6BharatTripsPage />} />
+            <Route path="/v6/trips/:id" element={<V6BharatTripDetailPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>

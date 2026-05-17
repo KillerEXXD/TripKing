@@ -12,7 +12,7 @@ export function EditorialTripCard({ trip, variant = 'left' }: { trip: Trip; vari
   const isLeft = variant === 'left';
   return (
     <Link
-      to={`/trips/${trip.id}?from=/v5`}
+      to={`/v5/trips/${trip.id}`}
       className={`group grid items-center gap-5 border-b border-border py-7 ${
         isLeft ? 'grid-cols-[1fr_auto]' : 'grid-cols-[auto_1fr]'
       }`}
