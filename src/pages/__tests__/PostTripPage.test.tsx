@@ -30,12 +30,17 @@ vi.mock('@/components/form', async () => {
 });
 import { toast } from 'sonner';
 vi.mock('@/components/share/ShareTripModal', () => ({
-  ShareTripModal: ({ onClose }: { onClose: () => void }) => (
+  ShareTripModal: ({ onClose, onViewTrip }: { onClose: () => void; onViewTrip?: () => void }) => (
     <div>
       share modal
       <button type="button" onClick={onClose}>
         close share
       </button>
+      {onViewTrip ? (
+        <button type="button" onClick={onViewTrip}>
+          view the trip
+        </button>
+      ) : null}
     </div>
   ),
 }));
@@ -86,6 +91,8 @@ function renderPost() {
         <Route path="/trips/new" element={<PostTripPage />} />
         <Route path="/" element={<div>home</div>} />
         <Route path="/trips/:id" element={<div>trip detail</div>} />
+        <Route path="/posted-trips" element={<div>posted trips listing</div>} />
+        <Route path="/my-trips" element={<div>my trips listing</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -219,8 +226,34 @@ describe('PostTripPage', () => {
       ),
     );
     expect(await screen.findByText('share modal')).toBeInTheDocument();
+    // Done on the share modal now lands the AGENT on their "My posts" listing (not the trip detail).
+    // "View the trip" is the optional secondary action that goes to the detail page.
     fireEvent.click(screen.getByRole('button', { name: /close share/i }));
+    expect(await screen.findByText('posted trips listing')).toBeInTheDocument();
+  });
+
+  it('after posting, the agent\'s "View the trip" action on the share modal goes to /trips/:id', async () => {
+    setPoster('trip_manager', 'approved');
+    setPostTrip();
+    const { container } = renderPost();
+    await completeStep1(container);
+    set(container, 'ratePerKm', '15');
+    fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
+    expect(await screen.findByText('share modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /view the trip/i }));
     expect(await screen.findByText('trip detail')).toBeInTheDocument();
+  });
+
+  it('after posting as a DRIVER, Done on the share modal lands on /my-trips (the "Posted by me" tab)', async () => {
+    setPoster('driver', 'approved');
+    setPostTrip();
+    const { container } = renderPost();
+    await completeStep1(container);
+    set(container, 'ratePerKm', '15');
+    fireEvent.click(screen.getByRole('button', { name: /^post trip$/i }));
+    expect(await screen.findByText('share modal')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /close share/i }));
+    expect(await screen.findByText('my trips listing')).toBeInTheDocument();
   });
 
   it('shows the verification gate instead of the wizard when the poster is not approved', () => {

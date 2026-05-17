@@ -55,6 +55,40 @@ export function formatShortDate(d: Date): string {
   return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
 
+/**
+ * `true` if `iso` is within the last `minutes` minutes (default 5). Used to flag a freshly-
+ * created trip with a "NEW" badge on the user's own listing pages.
+ *
+ * NOTE: this is a snapshot. Callers that want the badge to time out without a navigation
+ * should re-evaluate on a timer (see PostedTripCard).
+ */
+export function isWithinMinutes(iso: string | null | undefined, minutes = 5): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return false;
+  return Date.now() - t < minutes * 60_000;
+}
+
+/**
+ * "just now" / "2m ago" / "1h ago" / "3d ago" — coarse relative-time label for freshly-
+ * created content. Returns `""` for unparseable input. Pair with `isWithinMinutes` to show
+ * "Posted just now" on a card the user just created.
+ */
+export function formatRelativeTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return '';
+  const secs = Math.floor((Date.now() - t) / 1000);
+  if (secs < 30) return 'just now';
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isValidUUID(value: string | null | undefined): value is string {
   return !!value && UUID_RE.test(value);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, formatINR, formatKm, formatKmAndDuration, formatPickupDateTime, formatRating, formatClockTime, formatShortDate, getFirstName, isValidUUID, initials, haversineKm } from '@/lib/utils';
+import { cn, formatINR, formatKm, formatKmAndDuration, formatPickupDateTime, formatRating, formatClockTime, formatRelativeTime, formatShortDate, getFirstName, isValidUUID, initials, haversineKm, isWithinMinutes } from '@/lib/utils';
 
 describe('cn', () => {
   it('merges class names', () => {
@@ -55,6 +55,32 @@ describe('date / time formatters', () => {
   });
   it('formatPickupDateTime falls back to raw string when unparseable', () => {
     expect(formatPickupDateTime('not-a-date')).toBe('not-a-date');
+  });
+});
+
+describe('freshness helpers (NEW badge)', () => {
+  const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  it('isWithinMinutes — true for trips inside the window, false outside', () => {
+    expect(isWithinMinutes(minsAgo(1), 5)).toBe(true);
+    expect(isWithinMinutes(minsAgo(4.99), 5)).toBe(true);
+    expect(isWithinMinutes(minsAgo(5.01), 5)).toBe(false);
+    expect(isWithinMinutes(minsAgo(60), 5)).toBe(false);
+  });
+  it('isWithinMinutes — null / unparseable → false (no badge for missing data)', () => {
+    expect(isWithinMinutes(null)).toBe(false);
+    expect(isWithinMinutes(undefined)).toBe(false);
+    expect(isWithinMinutes('garbage')).toBe(false);
+  });
+  it('formatRelativeTime — bucketed coarsely', () => {
+    expect(formatRelativeTime(minsAgo(0))).toBe('just now');
+    expect(formatRelativeTime(minsAgo(2))).toBe('2m ago');
+    expect(formatRelativeTime(minsAgo(90))).toBe('1h ago'); // 90 min → 1h ago (floor)
+    expect(formatRelativeTime(new Date(Date.now() - 3 * 24 * 60 * 60_000).toISOString())).toBe('3d ago');
+  });
+  it('formatRelativeTime — empty / unparseable → empty string', () => {
+    expect(formatRelativeTime(null)).toBe('');
+    expect(formatRelativeTime('')).toBe('');
+    expect(formatRelativeTime('garbage')).toBe('');
   });
 });
 
