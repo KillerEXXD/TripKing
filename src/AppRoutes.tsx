@@ -97,6 +97,21 @@ const V3FieldNotificationsPage = lazyWithRetry(() => import('@/pages/v2/field-co
 const V4PipelineNotificationsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/NotificationsPage'));
 const V5EditorialNotificationsPage = lazyWithRetry(() => import('@/pages/v2/editorial/NotificationsPage'));
 const V6BharatNotificationsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/NotificationsPage'));
+const V2OperatorPostTripPage = lazyWithRetry(() => import('@/pages/v2/operator-console/PostTripPage'));
+const V3FieldPostTripPage = lazyWithRetry(() => import('@/pages/v2/field-companion/PostTripPage'));
+const V4PipelinePostTripPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/PostTripPage'));
+const V5EditorialPostTripPage = lazyWithRetry(() => import('@/pages/v2/editorial/PostTripPage'));
+const V6BharatPostTripPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/PostTripPage'));
+const V2OperatorReferralsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/ReferralsPage'));
+const V3FieldReferralsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/ReferralsPage'));
+const V4PipelineReferralsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/ReferralsPage'));
+const V5EditorialReferralsPage = lazyWithRetry(() => import('@/pages/v2/editorial/ReferralsPage'));
+const V6BharatReferralsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/ReferralsPage'));
+const V2OperatorWalletPage = lazyWithRetry(() => import('@/pages/v2/operator-console/WalletPage'));
+const V3FieldWalletPage = lazyWithRetry(() => import('@/pages/v2/field-companion/WalletPage'));
+const V4PipelineWalletPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/WalletPage'));
+const V5EditorialWalletPage = lazyWithRetry(() => import('@/pages/v2/editorial/WalletPage'));
+const V6BharatWalletPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/WalletPage'));
 
 function PageFallback() {
   return (
@@ -209,6 +224,21 @@ export function AppRoutes() {
             <Route path="/v4/notifications" element={<V4PipelineNotificationsPage />} />
             <Route path="/v5/notifications" element={<V5EditorialNotificationsPage />} />
             <Route path="/v6/notifications" element={<V6BharatNotificationsPage />} />
+            <Route path="/v2/trips/new" element={<V2OperatorPostTripPage />} />
+            <Route path="/v3/trips/new" element={<V3FieldPostTripPage />} />
+            <Route path="/v4/trips/new" element={<V4PipelinePostTripPage />} />
+            <Route path="/v5/trips/new" element={<V5EditorialPostTripPage />} />
+            <Route path="/v6/trips/new" element={<V6BharatPostTripPage />} />
+            <Route path="/v2/referrals" element={<V2OperatorReferralsPage />} />
+            <Route path="/v3/referrals" element={<V3FieldReferralsPage />} />
+            <Route path="/v4/referrals" element={<V4PipelineReferralsPage />} />
+            <Route path="/v5/referrals" element={<V5EditorialReferralsPage />} />
+            <Route path="/v6/referrals" element={<V6BharatReferralsPage />} />
+            <Route path="/v2/wallet" element={<V2OperatorWalletPage />} />
+            <Route path="/v3/wallet" element={<V3FieldWalletPage />} />
+            <Route path="/v4/wallet" element={<V4PipelineWalletPage />} />
+            <Route path="/v5/wallet" element={<V5EditorialWalletPage />} />
+            <Route path="/v6/wallet" element={<V6BharatWalletPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>
