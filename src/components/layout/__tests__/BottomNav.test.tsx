@@ -53,6 +53,18 @@ describe('BottomNav', () => {
     expect(screen.getByRole('button', { name: /^home$/i })).not.toHaveAttribute('aria-current');
   });
 
+  it('grows to fit its content via minHeight (not a fixed height) so labels are never clipped', () => {
+    // Regression: prior versions used a fixed `height` that clipped the bottom
+    // label row whenever the active-pill / icon / safe-area pushed past the cap.
+    // The fix uses `min-height` so the nav grows to its content.
+    setUser(driver);
+    renderNav();
+    const nav = screen.getByRole('navigation', { name: /primary/i });
+    expect(nav.style.minHeight).toBeTruthy();
+    expect(nav.style.minHeight).toMatch(/safe-area-inset-bottom/);
+    expect(nav.style.height).toBe('');
+  });
+
   it('navigates when a tab is tapped', () => {
     setUser(driver);
     render(
