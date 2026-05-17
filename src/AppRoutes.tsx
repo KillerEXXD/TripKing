@@ -86,6 +86,16 @@ const V3FieldProfilePage = lazyWithRetry(() => import('@/pages/v2/field-companio
 const V4PipelineProfilePage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/ProfilePage'));
 const V5EditorialProfilePage = lazyWithRetry(() => import('@/pages/v2/editorial/ProfilePage'));
 const V6BharatProfilePage = lazyWithRetry(() => import('@/pages/v2/bharat-native/ProfilePage'));
+const V2OperatorMyTripsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/MyTripsPage'));
+const V3FieldMyTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/MyTripsPage'));
+const V4PipelineMyTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/MyTripsPage'));
+const V5EditorialMyTripsPage = lazyWithRetry(() => import('@/pages/v2/editorial/MyTripsPage'));
+const V6BharatMyTripsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/MyTripsPage'));
+const V2OperatorNotificationsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/NotificationsPage'));
+const V3FieldNotificationsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/NotificationsPage'));
+const V4PipelineNotificationsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/NotificationsPage'));
+const V5EditorialNotificationsPage = lazyWithRetry(() => import('@/pages/v2/editorial/NotificationsPage'));
+const V6BharatNotificationsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/NotificationsPage'));
 
 function PageFallback() {
   return (
@@ -187,6 +197,16 @@ export function AppRoutes() {
             <Route path="/v4/profile" element={<V4PipelineProfilePage />} />
             <Route path="/v5/profile" element={<V5EditorialProfilePage />} />
             <Route path="/v6/profile" element={<V6BharatProfilePage />} />
+            <Route path="/v2/my-trips" element={<V2OperatorMyTripsPage />} />
+            <Route path="/v3/my-trips" element={<V3FieldMyTripsPage />} />
+            <Route path="/v4/my-trips" element={<V4PipelineMyTripsPage />} />
+            <Route path="/v5/my-trips" element={<V5EditorialMyTripsPage />} />
+            <Route path="/v6/my-trips" element={<V6BharatMyTripsPage />} />
+            <Route path="/v2/notifications" element={<V2OperatorNotificationsPage />} />
+            <Route path="/v3/notifications" element={<V3FieldNotificationsPage />} />
+            <Route path="/v4/notifications" element={<V4PipelineNotificationsPage />} />
+            <Route path="/v5/notifications" element={<V5EditorialNotificationsPage />} />
+            <Route path="/v6/notifications" element={<V6BharatNotificationsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>
