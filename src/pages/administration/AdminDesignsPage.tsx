@@ -1,9 +1,13 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { SegmentedTabs } from '@/components/ui';
+import { SKIN_PAGES } from '@/components/v2/shared/skinPages';
 
 interface DesignRoute {
   label: string;
-  to: string;
+  /** Sub-path under the design's prefix (matches SKIN_PAGES.sub). */
+  sub: string;
 }
 
 interface Design {
@@ -11,9 +15,12 @@ interface Design {
   name: string;
   tagline: string;
   optimizedFor: string;
-  swatchClass: string;       // primary colour swatch (Tailwind)
+  swatchClass: string;
+  /** Pulled from SKIN_PAGES to keep both tabs and SkinSwitcher in sync. */
   routes: DesignRoute[];
 }
+
+const ROUTES: DesignRoute[] = SKIN_PAGES.map((p) => ({ label: p.cardLabel, sub: p.sub }));
 
 const DESIGNS: Design[] = [
   {
@@ -22,18 +29,7 @@ const DESIGNS: Design[] = [
     tagline: 'Linear-for-fleets — dense monochrome tables, state-as-accent.',
     optimizedFor: 'Power agents + admins',
     swatchClass: 'bg-zinc-900',
-    routes: [
-      { label: 'Home (dashboard)', to: '/v2' },
-      { label: 'Trips list (dense table)', to: '/v2/trips' },
-      { label: 'Trip detail', to: '/v2/trips' },
-      { label: 'Profile', to: '/v2/profile' },
-      { label: 'My trips', to: '/v2/my-trips' },
-      { label: 'Notifications', to: '/v2/notifications' },
-      { label: 'Post trip (form)', to: '/v2/trips/new' },
-      { label: 'Referrals', to: '/v2/referrals' },
-      { label: 'Wallet', to: '/v2/wallet' },
-      { label: 'Home cards + live tracking', to: '/v2/scenarios' },
-    ],
+    routes: ROUTES,
   },
   {
     path: '/v3',
@@ -41,18 +37,7 @@ const DESIGNS: Design[] = [
     tagline: 'One thumb at 60 km/h — navy, sunrise CTA, one decision per screen.',
     optimizedFor: 'Drivers on the road',
     swatchClass: 'bg-[#0b1d3a]',
-    routes: [
-      { label: 'Home (hero greeting)', to: '/v3' },
-      { label: 'Trips list (hero cards)', to: '/v3/trips' },
-      { label: 'Trip detail (timeline)', to: '/v3/trips' },
-      { label: 'Profile', to: '/v3/profile' },
-      { label: 'My trips', to: '/v3/my-trips' },
-      { label: 'Notifications', to: '/v3/notifications' },
-      { label: 'Post trip (wizard)', to: '/v3/trips/new' },
-      { label: 'Referrals', to: '/v3/referrals' },
-      { label: 'Wallet', to: '/v3/wallet' },
-      { label: 'Home cards + live tracking', to: '/v3/scenarios' },
-    ],
+    routes: ROUTES,
   },
   {
     path: '/v4',
@@ -60,18 +45,7 @@ const DESIGNS: Design[] = [
     tagline: 'Trello for trip lifecycle — pastel columns by state, swipe between.',
     optimizedFor: 'Agents juggling many trips',
     swatchClass: 'bg-indigo-600',
-    routes: [
-      { label: 'Home (column overview)', to: '/v4' },
-      { label: 'Trips board', to: '/v4/trips' },
-      { label: 'Trip detail (stages)', to: '/v4/trips' },
-      { label: 'Profile', to: '/v4/profile' },
-      { label: 'My applications (board)', to: '/v4/my-trips' },
-      { label: 'Notifications', to: '/v4/notifications' },
-      { label: 'Post trip (card stack)', to: '/v4/trips/new' },
-      { label: 'Referrals (4 columns)', to: '/v4/referrals' },
-      { label: 'Wallet', to: '/v4/wallet' },
-      { label: 'Home cards + live tracking', to: '/v4/scenarios' },
-    ],
+    routes: ROUTES,
   },
   {
     path: '/v5',
@@ -79,18 +53,7 @@ const DESIGNS: Design[] = [
     tagline: 'Magazine — cream + serif italic, asymmetric feature cards.',
     optimizedFor: 'Premium / acquisition',
     swatchClass: 'bg-[#0f766e]',
-    routes: [
-      { label: 'Home (magazine cover)', to: '/v5' },
-      { label: 'Trips (feature spread)', to: '/v5/trips' },
-      { label: 'Trip detail (full bleed)', to: '/v5/trips' },
-      { label: 'Profile (the contributor)', to: '/v5/profile' },
-      { label: 'My trips (in progress)', to: '/v5/my-trips' },
-      { label: 'Dispatches', to: '/v5/notifications' },
-      { label: 'File a submission (form)', to: '/v5/trips/new' },
-      { label: "Patron's column (referrals)", to: '/v5/referrals' },
-      { label: 'Your purse (wallet)', to: '/v5/wallet' },
-      { label: 'Scenes from today (cards + tracking)', to: '/v5/scenarios' },
-    ],
+    routes: ROUTES,
   },
   {
     path: '/v6',
@@ -98,46 +61,37 @@ const DESIGNS: Design[] = [
     tagline: 'Tier-2 India first — bilingual Tamil/English, big numerals, festive.',
     optimizedFor: 'Mass-market Indian drivers',
     swatchClass: 'bg-[#312e81]',
-    routes: [
-      { label: 'Home (icon menu)', to: '/v6' },
-      { label: 'Trips list', to: '/v6/trips' },
-      { label: 'Trip detail (4 tiles)', to: '/v6/trips' },
-      { label: 'Profile', to: '/v6/profile' },
-      { label: 'My trips', to: '/v6/my-trips' },
-      { label: 'Notifications', to: '/v6/notifications' },
-      { label: 'Post trip (bilingual form)', to: '/v6/trips/new' },
-      { label: 'Refer a friend', to: '/v6/referrals' },
-      { label: 'Wallet', to: '/v6/wallet' },
-      { label: 'காட்சிகள் · Scenarios + tracking', to: '/v6/scenarios' },
-    ],
+    routes: ROUTES,
   },
   {
     path: '/v7',
     name: 'Simple Mode',
-    tagline: 'Built for clarity — high-contrast colors, Tamil-first labels, one decision per screen.',
+    tagline: 'Built for clarity — high-contrast colors, one decision per screen, English.',
     optimizedFor: 'Low-literacy users — drivers and agents new to apps',
     swatchClass: 'bg-[#16a34a]',
-    routes: [
-      { label: 'Home (4 icon tiles)', to: '/v7' },
-      { label: 'Trips (big cards + green CTA)', to: '/v7/trips' },
-      { label: 'Trip detail (3-step ladder)', to: '/v7/trips' },
-      { label: 'Profile (big tiles)', to: '/v7/profile' },
-      { label: 'My trips (status icons)', to: '/v7/my-trips' },
-      { label: 'Notifications', to: '/v7/notifications' },
-      { label: 'Post trip (1 question per screen)', to: '/v7/trips/new' },
-      { label: 'Friend money (referrals)', to: '/v7/referrals' },
-      { label: 'My money (wallet)', to: '/v7/wallet' },
-      { label: 'Examples (scenarios + tracking)', to: '/v7/scenarios' },
-    ],
+    routes: ROUTES,
   },
 ];
 
+const DEFAULT_DESIGN: `/v${number}` = '/v2';
+
+type Tab = 'pages' | 'design';
+
 /**
- * Admin → Designs. Lists the 5 v2-v6 prototype skins with deep links into
- * each direction's screens. The SkinSwitcher chip rail at the top of every
- * /vN page lets you hop between equivalents while inside a design.
+ * Admin → Designs. Two-tab launchpad for the prototype skins:
+ *
+ * Pages tab — list of 9 page names. Tap one → lands on /v2{sub}?nav=pages,
+ *             where the SkinSwitcher renders VERSION chips (compare same
+ *             screen across all 6 designs).
+ *
+ * Design tab — list of 6 designs (current grouping). Tap a design's Open
+ *             button or a sub-route → lands on /vN{sub}?nav=design, where
+ *             the SkinSwitcher renders PAGE chips (walk through all pages
+ *             within that one design).
  */
 export function AdminDesignsPage() {
+  const [tab, setTab] = useState<Tab>('design');
+
   return (
     <main className="mx-auto max-w-2xl space-y-5 p-6">
       <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
@@ -146,57 +100,92 @@ export function AdminDesignsPage() {
       <header>
         <h1 className="text-2xl font-bold">Design previews</h1>
         <p className="mt-1 text-sm text-secondary">
-          Five alternate UI directions under <code className="font-mono">/v2</code>–<code className="font-mono">/v6</code>.
-          Same hooks, same data — different design language. Tap any direction's Home, or jump
-          directly to a screen. Inside each design a sticky chip rail lets you hop between the five.
+          Six alternate UI directions, nine screens each. Browse by <strong>Pages</strong> to compare a
+          single screen across designs, or by <strong>Design</strong> to walk all screens within one direction.
         </p>
       </header>
 
-      <ul className="space-y-3">
-        {DESIGNS.map((d) => (
-          <li key={d.path} className="rounded-card bg-surface p-4 shadow-card">
-            <div className="flex items-start gap-3">
-              <span aria-hidden className={`mt-1 inline-block size-6 shrink-0 rounded-full ${d.swatchClass}`} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-secondary">{d.path}</span>
-                  <h2 className="text-base font-semibold">{d.name}</h2>
-                </div>
-                <p className="mt-0.5 text-sm text-secondary">{d.tagline}</p>
-                <p className="mt-1 text-xs uppercase tracking-wide text-secondary">For: {d.optimizedFor}</p>
-              </div>
-              <Link
-                to={d.path}
-                className="shrink-0 self-center rounded-pill bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
-              >
-                Open <ExternalLink className="inline size-3" aria-hidden />
-              </Link>
-            </div>
-            <nav aria-label={`${d.name} screens`} className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
-              {d.routes.map((r) => (
-                <Link
-                  key={`${d.path}-${r.label}`}
-                  to={r.to}
-                  className="flex items-center justify-between rounded-control px-2 py-1.5 text-sm hover:bg-muted"
-                >
-                  <span>
-                    <span className="text-foreground">{r.label}</span>
-                    <span className="ml-2 font-mono text-xs text-secondary">{r.to}</span>
-                  </span>
-                  <ChevronRight className="size-3.5 text-secondary" aria-hidden />
-                </Link>
-              ))}
-            </nav>
+      <SegmentedTabs<Tab>
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'pages',  label: 'Pages' },
+          { value: 'design', label: 'Design' },
+        ]}
+        ariaLabel="Grouping"
+      />
+
+      {tab === 'pages' ? <PagesTab /> : <DesignTab />}
+    </main>
+  );
+}
+
+function PagesTab() {
+  return (
+    <>
+      <p className="text-xs text-secondary">
+        Tap a page → lands on it in v2 (default). Use the chip rail at the top of the page to switch designs.
+      </p>
+      <ul className="space-y-2">
+        {SKIN_PAGES.map((p) => (
+          <li key={p.sub || '_home'}>
+            <Link
+              to={`${DEFAULT_DESIGN}${p.sub}?nav=pages`}
+              className="flex items-center justify-between rounded-card bg-surface px-4 py-3 shadow-card transition-colors hover:border-primary/40"
+            >
+              <span>
+                <span className="text-sm font-semibold">{p.cardLabel}</span>
+                <span className="ml-2 font-mono text-xs text-secondary">{DEFAULT_DESIGN}{p.sub}</span>
+              </span>
+              <ChevronRight className="size-4 text-secondary" aria-hidden />
+            </Link>
           </li>
         ))}
       </ul>
+    </>
+  );
+}
 
-      <p className="rounded-card border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-        <strong>Note:</strong> 9 screens per direction (home, trips list, trip detail, profile,
-        my-trips, notifications, post-trip form, referrals, wallet). Other v1 routes (vacancies,
-        alerts, KYC, admin pages, marketing, etc.) still render in v1. Pick a direction and we expand it.
-      </p>
-    </main>
+function DesignTab() {
+  return (
+    <ul className="space-y-3">
+      {DESIGNS.map((d) => (
+        <li key={d.path} className="rounded-card bg-surface p-4 shadow-card">
+          <div className="flex items-start gap-3">
+            <span aria-hidden className={`mt-1 inline-block size-6 shrink-0 rounded-full ${d.swatchClass}`} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs text-secondary">{d.path}</span>
+                <h2 className="text-base font-semibold">{d.name}</h2>
+              </div>
+              <p className="mt-0.5 text-sm text-secondary">{d.tagline}</p>
+              <p className="mt-1 text-xs uppercase tracking-wide text-secondary">For: {d.optimizedFor}</p>
+            </div>
+            <Link
+              to={`${d.path}?nav=design`}
+              className="shrink-0 self-center rounded-pill bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              Open <ExternalLink className="inline size-3" aria-hidden />
+            </Link>
+          </div>
+          <nav aria-label={`${d.name} screens`} className="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
+            {d.routes.map((r) => (
+              <Link
+                key={`${d.path}-${r.sub || '_home'}`}
+                to={`${d.path}${r.sub}?nav=design`}
+                className="flex items-center justify-between rounded-control px-2 py-1.5 text-sm hover:bg-muted"
+              >
+                <span>
+                  <span className="text-foreground">{r.label}</span>
+                  <span className="ml-2 font-mono text-xs text-secondary">{d.path}{r.sub}</span>
+                </span>
+                <ChevronRight className="size-3.5 text-secondary" aria-hidden />
+              </Link>
+            ))}
+          </nav>
+        </li>
+      ))}
+    </ul>
   );
 }
 
