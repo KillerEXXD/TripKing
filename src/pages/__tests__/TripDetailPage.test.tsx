@@ -287,6 +287,32 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('applicant review')).toBeInTheDocument();
   });
 
+  it("shows an agent banner when the selected driver declined — with 'Review applicants' CTA when more applicants are waiting", () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'has_applicants', applicantCount: 2, driverAcceptanceStatus: 'declined' }) });
+    renderDetail();
+    expect(screen.getByText(/your selected driver declined this trip/i)).toBeInTheDocument();
+    expect(screen.getByText(/pick another driver — 2 applicants still waiting/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /review applicants/i })).toHaveAttribute('href', expect.stringContaining('/applicants'));
+  });
+
+  it('agent banner softens to "invite drivers" copy when no applicants remain after the decline', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'open', applicantCount: 0, driverAcceptanceStatus: 'declined' }) });
+    renderDetail();
+    expect(screen.getByText(/your selected driver declined this trip/i)).toBeInTheDocument();
+    expect(screen.getByText(/invite drivers below to keep this trip moving/i)).toBeInTheDocument();
+    // No Review-applicants CTA when there's nobody to review.
+    expect(screen.queryByRole('link', { name: /review applicants/i })).toBeNull();
+  });
+
+  it('agent banner does NOT render once a new driver has been (re-)selected — driverAcceptanceStatus resets to pending', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    setTrip({ data: makeTrip({ status: 'selected', applicantCount: 0, driverAcceptanceStatus: 'pending' }) });
+    renderDetail();
+    expect(screen.queryByText(/your selected driver declined/i)).toBeNull();
+  });
+
   it('lets the assigned driver start the trip with the passenger OTP + odometer reading', async () => {
     setTrip({ data: makeTrip({ status: 'accepted', assignedDriverId: 'd1' }) });
     renderDetail();
