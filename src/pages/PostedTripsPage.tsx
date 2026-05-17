@@ -135,7 +135,11 @@ export function PostedTripCard({ trip, onShare, linkFromPath, footerSlot }: { tr
         <div className="flex items-center justify-between gap-2 text-xs">
           <span className="text-secondary">
             Pickup: {formatPickupDateTime(trip.pickupAt)}
-            {fresh ? <span className="ml-1.5 text-emerald-700">· Posted {formatRelativeTime(trip.createdAt)}</span> : null}
+            {/* Always show the "Posted X ago" age — fresh window (<5 min) uses the emerald
+             *  highlight, anything older stays in the muted secondary tone. */}
+            <span className={cn('ml-1.5', fresh ? 'text-emerald-700' : 'text-secondary/80')}>
+              · Posted {formatRelativeTime(trip.createdAt)}
+            </span>
           </span>
           <div className="flex items-center gap-1.5">
             {hasInvites ? (

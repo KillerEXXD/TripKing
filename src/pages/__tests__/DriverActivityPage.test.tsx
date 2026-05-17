@@ -178,6 +178,23 @@ describe('DriverActivityPage', () => {
     expect(screen.getByText('Vellore → Salem')).toBeInTheDocument();
   });
 
+  // Regression: user reported the newest-posted trip was landing at the bottom of the Posted
+  // tab because the server returns trips ordered by pickup_at ASC. Sort client-side by
+  // createdAt DESC for "my posts" so a just-posted trip pops to the top.
+  it('the Posted tab sorts newest-posted first (createdAt DESC)', () => {
+    setUp({ posted: tripsState({ data: [
+      makeTrip({ id: 'p-old',    toCity: city('co', 'OldDest'),    createdAt: '2026-05-10T08:00:00.000Z' }),
+      makeTrip({ id: 'p-newest', toCity: city('cn', 'NewestDest'), createdAt: '2026-05-18T08:00:00.000Z' }),
+      makeTrip({ id: 'p-mid',    toCity: city('cm', 'MidDest'),    createdAt: '2026-05-14T08:00:00.000Z' }),
+    ] }) });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /posted by me/i }));
+    const rendered = screen.getAllByText(/vellore → /i).map((el) => el.textContent ?? '');
+    // First headline must be the newest trip; the oldest must come last.
+    expect(rendered[0]).toMatch(/newestdest/i);
+    expect(rendered[rendered.length - 1]).toMatch(/olddest/i);
+  });
+
   it('empty states — no assigned trips; no applications (with a Browse CTA)', () => {
     setUp();
     renderPage();
