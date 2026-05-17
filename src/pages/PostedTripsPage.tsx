@@ -328,7 +328,14 @@ export function PostedTripsPage() {
                   key={t.id}
                   trip={t}
                   onShare={() => setShareTrip(t)}
-                  linkFromPath={scope ? `/posted-trips?scope=${scope}${from && from !== '/' ? `&from=${from}` : '&from=/'}` : undefined}
+                  linkFromPath={
+                    scope
+                      ? `/posted-trips?scope=${scope}${from && from !== '/' ? `&from=${from}` : '&from=/'}`
+                      // No scope → still encode the current filter chip so the trip detail
+                      // Back arrow returns to the same filter (Open / Cancelled / Invited / …),
+                      // not the default Open tab.
+                      : filter === 'open' ? '/posted-trips' : `/posted-trips?status=${filter}`
+                  }
                 />
           ))
         )}

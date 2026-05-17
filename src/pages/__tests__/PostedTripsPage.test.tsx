@@ -120,7 +120,9 @@ describe('PostedTripsPage', () => {
     renderPosted();
     // Default filter is "Open"; the has_applicants trip lives under "Has applicants"
     fireEvent.click(screen.getByRole('button', { name: /^has applicants/i }));
-    expect(screen.getByRole('link', { name: /review applicants/i })).toHaveAttribute('href', '/trips/t1/applicants');
+    // PostedTripsPage now always passes linkFromPath so the trip-detail Back arrow returns
+    // to the same filter chip — href carries a `?from=/posted-trips?status=…` breadcrumb.
+    expect(screen.getByRole('link', { name: /review applicants/i }).getAttribute('href')).toMatch(/^\/trips\/t1\/applicants\?from=%2Fposted-trips%3Fstatus%3Dhas_applicants/);
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
     expect(screen.getByText('share modal')).toBeInTheDocument();
   });
@@ -130,7 +132,7 @@ describe('PostedTripsPage', () => {
     renderPosted();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
     expect(screen.getByText(/3 invited/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /view invites/i })).toHaveAttribute('href', '/trips/t1/invitations');
+    expect(screen.getByRole('link', { name: /view invites/i }).getAttribute('href')).toMatch(/^\/trips\/t1\/invitations\?from=%2Fposted-trips%3Fstatus%3Dinvited/);
   });
 
   it('hides the invited badge when there are no pending invitations', () => {

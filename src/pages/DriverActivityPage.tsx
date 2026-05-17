@@ -229,6 +229,7 @@ function TripList({
   emptyMessage,
   onShare,
   errorTitle,
+  linkFromPath,
 }: {
   /** Drives the loading + error UI. Either pass `query` alone (data flows from query.data), or pass
    *  `query` + `trips` for a client-side-filtered sub-view of that query (loading/error still flow
@@ -239,6 +240,10 @@ function TripList({
   emptyMessage: string;
   errorTitle: string;
   onShare: (t: Trip) => void;
+  /** Breadcrumb passed to each PostedTripCard so the trip detail's Back arrow returns to
+   *  THIS exact list (preserving the current `?tab=`). Without it, Back falls back to the
+   *  default `/my-trips` (driving tab). */
+  linkFromPath?: string;
 }) {
   if (query) {
     if (query.isPending) return <LoadingSkeleton rows={4} />;
@@ -249,7 +254,7 @@ function TripList({
   return (
     <div className="space-y-3">
       {trips.map((t) => (
-        <PostedTripCard key={t.id} trip={t} onShare={() => onShare(t)} />
+        <PostedTripCard key={t.id} trip={t} onShare={() => onShare(t)} linkFromPath={linkFromPath} />
       ))}
     </div>
   );
@@ -262,7 +267,7 @@ interface AllEntry { tripId: string; trip: Trip; bucket: AllBucket; application?
 /** Renders the union "All" view — each trip appears once, bucketed by the most-progressed lifecycle role
  *  the driver has on it (assigned wins over invited wins over applied). Applied bucket uses `ApplicationRow`
  *  to preserve acceptance-status badges; everything else uses `PostedTripCard`. */
-function AllList({ entries, onShare }: { entries: AllEntry[]; onShare: (t: Trip) => void }) {
+function AllList({ entries, onShare, linkFromPath }: { entries: AllEntry[]; onShare: (t: Trip) => void; linkFromPath?: string }) {
   if (entries.length === 0) {
     return (
       <EmptyState
@@ -282,7 +287,7 @@ function AllList({ entries, onShare }: { entries: AllEntry[]; onShare: (t: Trip)
         e.bucket === 'applied' && e.application ? (
           <ApplicationRow key={e.tripId} app={e.application} />
         ) : (
-          <PostedTripCard key={e.tripId} trip={e.trip} onShare={() => onShare(e.trip)} />
+          <PostedTripCard key={e.tripId} trip={e.trip} onShare={() => onShare(e.trip)} linkFromPath={linkFromPath} />
         ),
       )}
     </div>
@@ -425,8 +430,11 @@ export function DriverActivityPage() {
         ))}
       </div>
 
+      {/* Breadcrumb URL passed to every trip card below — so the trip-detail Back arrow
+       *  returns to the SAME tab the user came from (not the default `/my-trips` driving
+       *  tab). `tab=driving` is the default → drop the param to keep URLs clean. */}
       <div className="space-y-3 p-4">
-        {tab === 'all' && <AllList entries={allEntries} onShare={setShareTrip} />}
+        {tab === 'all' && <AllList entries={allEntries} onShare={setShareTrip} linkFromPath="/my-trips" />}
         {tab === 'driving' && (
           <TripList
             query={drivingQuery}
@@ -435,6 +443,7 @@ export function DriverActivityPage() {
             emptyTitle="No trips assigned to you yet"
             emptyMessage="When a trip manager picks you for a trip, it shows up here — once you accept (or one's in progress)."
             onShare={setShareTrip}
+            linkFromPath="/my-trips"
           />
         )}
         {tab === 'selected' && (
@@ -445,6 +454,7 @@ export function DriverActivityPage() {
             emptyTitle="No trips waiting on your accept"
             emptyMessage="When a trip manager picks you, this is where you confirm — accept within the 15-min window."
             onShare={setShareTrip}
+            linkFromPath="/my-trips?tab=selected"
           />
         )}
         {tab === 'completed' && (
@@ -455,6 +465,7 @@ export function DriverActivityPage() {
             emptyTitle="No completed trips yet"
             emptyMessage="Your completed trips will show up here with the route, fare and your earnings."
             onShare={setShareTrip}
+            linkFromPath="/my-trips?tab=completed"
           />
         )}
         {tab === 'cancelled' && (
@@ -465,9 +476,10 @@ export function DriverActivityPage() {
             emptyTitle="No cancelled trips"
             emptyMessage="If a trip you were assigned to gets cancelled, you'll see it here for your records."
             onShare={setShareTrip}
+            linkFromPath="/my-trips?tab=cancelled"
           />
         )}
-        {tab === 'invited' && <InvitedList query={invitedQuery} onShare={setShareTrip} />}
+        {tab === 'invited' && <InvitedList query={invitedQuery} onShare={setShareTrip} linkFromPath="/my-trips?tab=invited" />}
         {tab === 'posted' && (
           <TripList
             query={postedQuery}
@@ -479,6 +491,7 @@ export function DriverActivityPage() {
             emptyTitle="You haven't posted any trips"
             emptyMessage="Posted a trip you can't run yourself? It'll appear here with its status and applicants."
             onShare={setShareTrip}
+            linkFromPath="/my-trips?tab=posted"
           />
         )}
         {tab === 'applied' && <AppliedList query={appliedQuery} />}
