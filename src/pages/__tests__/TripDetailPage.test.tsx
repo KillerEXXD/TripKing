@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+
+function LocationProbe() {
+  const loc = useLocation();
+  return <div data-testid="probe-search">{loc.search}</div>;
+}
 import { TripDetailPage } from '@/pages/TripDetailPage';
 import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
@@ -461,6 +466,37 @@ describe('TripDetailPage', () => {
     setTrip({ data: makeTrip() });
     renderDetail();
     expect(screen.queryByRole('button', { name: /decline invitation/i })).toBeNull();
+  });
+
+  // Regression: user reported that declining from trip detail (after entering via the home
+  // "Invites received" card → scoped list → trip card) was bouncing them to plain /my-trips
+  // (tabbed view) instead of back to /my-trips?scope=invites-received (where they came from).
+  // Confirms that `returnTo = ?from` correctly preserves the nested query string.
+  it('after declining, navigates BACK to the scoped Invites Received list (preserves ?scope=)', async () => {
+    setTrip({ data: makeTrip({ invitationId: 'inv-1', invitationStatus: 'pending' }) });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // Mirror the URL the home → scoped list → trip card chain produces.
+    const fromPath = '/my-trips?scope=invites-received&from=/';
+    const entry = `/trips/t1?from=${encodeURIComponent(fromPath)}`;
+    render(
+      <MemoryRouter initialEntries={[entry]}>
+        <Routes>
+          <Route path="/trips/:id" element={<TripDetailPage />} />
+          <Route
+            path="/my-trips"
+            element={
+              <LocationProbe />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /decline invitation/i }));
+    await waitFor(() => expect(declineInviteMutateAsync).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByTestId('probe-search').textContent).toBe('?scope=invites-received&from=/'),
+    );
+    confirmSpy.mockRestore();
   });
 
   it('shows the multi-vehicle dropdown when the driver has more than one active vehicle', () => {
