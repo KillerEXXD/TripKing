@@ -1,5 +1,5 @@
 import { ApiTransformError } from '@/lib/api/transforms/base';
-import type { User, UserRole } from '@/types';
+import type { FeatureFlags, User, UserRole } from '@/types';
 
 export type UserTransformErrorCode = 'MISSING_ID' | 'MISSING_ROLE' | 'BAD_ROLE' | 'MISSING_PHONE';
 
@@ -18,6 +18,14 @@ export interface ApiUser {
   preferred_language?: string | null;
   is_active?: boolean;
   can_report_bugs?: boolean;
+  /** Server-evaluated feature flags. May be absent on older deploys — defaults to all-false. */
+  feature_flags?: { design_previews?: boolean } | null;
+}
+
+function transformFeatureFlags(api: ApiUser['feature_flags']): FeatureFlags {
+  return {
+    designPreviews: api?.design_previews === true,
+  };
 }
 
 export function transformUser(api: ApiUser): User {
@@ -36,5 +44,6 @@ export function transformUser(api: ApiUser): User {
     preferredLanguage: api.preferred_language ?? 'en',
     isActive: api.is_active ?? true,
     canReportBugs: api.can_report_bugs === true,
+    featureFlags: transformFeatureFlags(api.feature_flags),
   };
 }

@@ -24,7 +24,8 @@ type SectionId =
   | 'fraud-settings'
   | 'referral-tiers'
   | 'fraud-action-rules'
-  | 'notification-templates';
+  | 'notification-templates'
+  | 'design-preview-allowlist';
 
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'general', label: 'General settings' },
@@ -42,6 +43,7 @@ const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'referral-tiers', label: 'Referral tiers' },
   { id: 'fraud-action-rules', label: 'Fraud action rules' },
   { id: 'notification-templates', label: 'Notification templates' },
+  { id: 'design-preview-allowlist', label: 'Design preview allowlist' },
 ];
 
 const WALLET_PINNED = ['driver_platform_fee_paise', 'agent_platform_fee_paise', 'driver_signup_promo_credit_paise', 'agent_signup_promo_credit_paise'];
@@ -111,6 +113,16 @@ export function AdminConfigPage() {
         )}
         {section === 'notification-templates' && (
           <AdminListEditor listKey="notification-templates" itemNoun="template" columns={['type', 'locale', 'channel', 'title', 'body', 'sort_order']} />
+        )}
+        {section === 'design-preview-allowlist' && (
+          // Phones added here see the "Design previews" tile on Home. Toggle is_active to
+          // keep the row (for re-enable later) while hiding the tile from that user.
+          // Phone format: +91XXXXXXXXXX (must match the value in public.users.phone exactly).
+          <AdminListEditor
+            listKey="design-preview-allowlist"
+            itemNoun="phone"
+            columns={['phone', 'note', 'is_active', 'sort_order']}
+          />
         )}
       </Card>
     </main>

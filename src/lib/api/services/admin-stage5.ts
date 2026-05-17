@@ -21,8 +21,8 @@ export const getSingletonSettings = (key: SingletonKey): Promise<Row> =>
 export const updateSingletonSettings = (key: SingletonKey, patch: Row): Promise<Row> =>
   apiClient.patch<Row>(`/admin/${key}`, patch).then((r) => unwrap(r.data));
 
-// ── List resources (referral-tiers, fraud-action-rules, notification-templates) ─
-export type AdminListKey = 'referral-tiers' | 'fraud-action-rules' | 'notification-templates';
+// ── List resources (referral-tiers, fraud-action-rules, notification-templates, design-preview-allowlist) ─
+export type AdminListKey = 'referral-tiers' | 'fraud-action-rules' | 'notification-templates' | 'design-preview-allowlist';
 
 export const listAdminRows = (key: AdminListKey, opts?: { includeInactive?: boolean }): Promise<Row[]> =>
   apiClient.get<Row[]>(`/admin/${key}`, opts?.includeInactive ? { include_inactive: true } : undefined).then((r) => r.data ?? []);

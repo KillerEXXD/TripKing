@@ -74,7 +74,31 @@ async function publicUser(db: Db, id: string) {
     .eq('id', id)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data;
+  if (!data) return data;
+  // Stamp server-evaluated feature flags so the frontend doesn't need a second round-trip
+  // to know what's enabled for this user. Cheap: each flag is at most one indexed query.
+  const flags = await computeFeatureFlags(db, data.phone as string | null);
+  return { ...data, feature_flags: flags };
+}
+
+/**
+ * Server-side feature-flag evaluation for the /auth/me response. Add new flags here as
+ * they're introduced. Returns null-safe — every flag defaults to `false` if the check
+ * errors out (cache failures, missing table on a stale deploy, etc. never break auth).
+ */
+async function computeFeatureFlags(db: Db, phone: string | null): Promise<Record<string, boolean>> {
+  const flags: Record<string, boolean> = { design_previews: false };
+  if (!phone) return flags;
+  try {
+    const { data } = await db
+      .from('design_preview_allowlist')
+      .select('id')
+      .eq('phone', phone)
+      .eq('is_active', true)
+      .maybeSingle();
+    if (data) flags.design_previews = true;
+  } catch { /* swallow — feature flag failures must never break /auth/me */ }
+  return flags;
 }
 
 const handler = withTiming('auth', async (req: Request): Promise<Response> => {

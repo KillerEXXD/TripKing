@@ -92,6 +92,8 @@ const LISTS: Record<string, ListCfg> = {
   'referral-tiers':         { table: 'referral_tiers',         pk: 'id', orderBy: 'sort_order', reorderable: true,  filters: ['applies_to_role'] },
   'fraud-action-rules':     { table: 'fraud_action_rules',     pk: 'id', orderBy: 'sort_order', reorderable: true,  filters: ['flag_type', 'severity'] },
   'notification-templates': { table: 'notification_templates', pk: 'id', orderBy: 'sort_order', reorderable: true,  filters: ['type', 'locale'] },
+  // migration 056 — phone allowlist for the in-app Design Previews tile (collects feedback from selected teammates).
+  'design-preview-allowlist': { table: 'design_preview_allowlist', pk: 'id', orderBy: 'sort_order', reorderable: true, filters: [] },
 };
 
 // Singleton settings tables (single row, id=1) handled by a generic block below.
