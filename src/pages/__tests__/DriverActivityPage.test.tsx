@@ -423,4 +423,31 @@ describe('DriverActivityPage', () => {
     expect(btnCard).not.toBeNull();
     expect(btnCard).toBe(routeCard);
   });
+
+  // Regression for user-reported "after decline it sends me to /my-trips instead of staying
+  // on Invites Received". Confirms the Decline action on the scoped list card does NOT
+  // navigate — the URL keeps `?scope=invites-received`, so the page stays in the scoped view.
+  it('?scope=invites-received — Declining from the list card stays on the scoped URL (does not navigate to plain /my-trips)', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    setUp({
+      invited: tripsState({ data: [
+        makeTrip({ id: 'inv-stay', toCity: city('cS', 'Stay-to'), invitationId: 'i-stay', invitationStatus: 'pending' }),
+        makeTrip({ id: 'inv-other', toCity: city('cO', 'Other-to'), invitationId: 'i-other', invitationStatus: 'pending' }),
+      ] }),
+    });
+    vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync, isPending: false } as never);
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage('/my-trips?scope=invites-received&from=/');
+    // Snapshot the scoped header presence before decline.
+    expect(screen.getByText('Invites received')).toBeInTheDocument();
+    const declineBtns = screen.getAllByRole('button', { name: /decline invitation/i });
+    fireEvent.click(declineBtns[0]);
+    await Promise.resolve();
+    expect(mutateAsync).toHaveBeenCalled();
+    // The scoped header is STILL present — proving the page didn't navigate away from the
+    // scoped view (the plain `/my-trips` tabbed view doesn't render this header).
+    expect(screen.getByText('Invites received')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/');
+    confirmSpy.mockRestore();
+  });
 });
