@@ -1,65 +1,79 @@
 ---
-description: Run Playwright E2E on demand. Usage — `/e2e full` (all 34 specs, ~5 min) or `/e2e smoke` (6 happy-path tests, ~90s).
+description: Trigger the cloud Playwright E2E run (GitHub Actions → Qase). Usage — `/e2e full` (all 34 specs, ~5 min) or `/e2e smoke` (6 happy-path tests, ~90s). Default: full.
 ---
 
-Run the TripKing Playwright E2E suite on demand. The argument selects scope:
+Dispatch the `e2e-qase.yml` GitHub Actions workflow on `KillerEXXD/TripKing` with the requested scope, then watch it to completion and report the result. **All runs are cloud-side** — results post to Qase TRIPKINGAP and any failure auto-creates a Qase Defect that mirrors into `/administration/bugs` within ~5 min. Never run Playwright locally from this skill.
 
-- **`/e2e full`** — every spec in `/e2e` (34 tests across 10 files, mobile project). ~3–5 min wall clock. Use before merging a risky branch or when investigating a regression.
-- **`/e2e smoke`** — only the linear happy path through the J* journey suite (J1, J3, J5, J6, J7, J13 — sign-in → apply → accept → start → complete → cancel). ~60–90s. Use for a fast sanity check.
+Argument:
+- **`/e2e full`** (default) — runs all 34 specs across 10 files, mobile project. ~3–5 min.
+- **`/e2e smoke`** — runs only J1/J3/J5/J6/J7/J13 (linear happy path). ~60–90s.
 
-If no argument is passed, default to **smoke** and tell the user so.
+If no argument is passed, default to **full** and tell the user.
 
-## Step 1 — Run
+## Step 1 — Dispatch the workflow
 
-The E2E suite hits the deployed Supabase functions (real API per [docs/TEST_POLICY.md](docs/TEST_POLICY.md)), so no dev server is needed — but `playwright.config.ts` still spins one up to satisfy navigation specs. The runs are independent (each spec mints fresh e2e-* users), so the suite parallelises safely.
+Use the github MCP (`mcp__github__list_workflow_runs` + the run-workflow endpoint). The repo is `KillerEXXD/TripKing`, workflow file is `e2e-qase.yml`, ref is `main`. Inputs:
+- `scope`: `full` or `smoke` (from the argument)
+- `project`: `mobile` (default)
+- `post_to_qase`: `true`
 
-**Full:**
-```bash
-npx playwright test --project=mobile --reporter=list
-```
+If the github MCP exposes a `run_workflow` / `workflow_dispatch` tool, use it. Otherwise fall back to telling the user to click "Run workflow" in the Actions UI with the scope they wanted, and skip to Step 3 once they confirm it ran.
 
-**Smoke:**
-```bash
-npx playwright test --project=mobile --reporter=list \
-  --grep "J1 ·|J3 —|J5 —|J6 —|J7 —|J13 —"
-```
+Capture the new run's `id` and `html_url` immediately after dispatch (the new run shows up in `list_workflow_runs` within ~5s of triggering).
 
-(The grep matches the Qase-prefixed titles in [e2e/journeys-critical.spec.ts](e2e/journeys-critical.spec.ts). If a J* title gets renamed and the grep stops matching, fall back to running the full file: `--grep "J(1|3|5|6|7|13)"`.)
+## Step 2 — Watch to completion
 
-If the run takes more than 6 minutes, abort and re-run with `--workers=4` to parallelise more aggressively.
-
-## Step 2 — Report
+Poll `mcp__github__list_workflow_runs` (or the specific run's status) every 30–45s until `status` is `completed`. Show the user a one-line tick on each poll so they know it's still running:
 
 ```
-## TripKing E2E — [date] · scope=[full|smoke]
+[14:32:10] queued → in_progress
+[14:32:55] in_progress (90s elapsed)
+[14:33:40] in_progress (135s elapsed)
+[14:34:25] completed → success
+```
+
+Don't poll faster than every 30s — GH Actions API rate-limits aggressive polling. If the run exceeds **8 minutes** (full) or **3 minutes** (smoke), keep waiting but flag it as "slower than expected — possible flake".
+
+## Step 3 — Report
+
+Once `completed`, pull the run's test summary. The job's annotations (`mcp__github__list_workflow_run_artifacts` + the playwright-report artifact, or the run logs) carry the per-test pass/fail counts.
+
+```
+## TripKing E2E (cloud) — [date] · scope=[full|smoke]
 
 | Result | Count |
 |--------|-------|
+| Conclusion | success / failure |
 | ✅ Passed | X |
 | ❌ Failed | X |
 | ⏭️  Skipped | X |
 | ⏱️  Duration | Xm Xs |
 
-### Failures (if any)
-For each failure: test title · file:line · error message (1–2 lines) · likely cause + suggested fix.
+🎯 Qase run: https://app.qase.io/run/TRIPKINGAP
+🔗 GH run: <html_url>
 
-### Skipped tests
-List skipped J* tests with the reason from the test.skip() call so the user remembers why (e.g. J9/J10 = needs 20-trip promo-exhaust loop).
+### Failures (if any)
+- <test title> · <file>:<line>
+  Error: <1-line message>
+  Likely cause: <best guess from the assertion + recent commits>
+
+### Auto-created Qase Defects
+- For each failure, a Qase Defect is created within ~5 min and the bug-pipeline mirrors it into /administration/bugs (or the cron-qase-poll fallback if the webhook didn't fire). Tell the user to check `/administration/bugs` for a fresh row tagged `qase-defect`.
 ```
 
-If everything's green: "All E2E green — Xm Xs."
+If everything's green: "All E2E green — Xm Xs. Results posted to Qase."
 
-## Step 3 — On failure
+## Step 4 — On failure
 
-For each failed test:
-1. Look at the assertion + the error stack from the Playwright output.
-2. Check if it's a real regression (a recent commit broke a flow) vs a known flake (Supabase auth rate limit on the mint sequence — J2 has this issue).
-3. If it's a flake, suggest: "Re-run just this spec: `npx playwright test --grep '<title>' --retries=2`".
-4. If it's a real regression, identify the recent commit (`git log --oneline -10 origin/main -- src/`) most likely responsible and suggest the fix.
+For each failing test:
+1. Pull the run's failure annotation (test title + assertion line).
+2. Cross-reference recent commits (`mcp__github__list_commits` on `main`, last 10) for a likely cause — a flow-touching change in the same area.
+3. Suggest the next step: "Re-run just this spec via `/e2e smoke`" or "this looks like a real regression in <commit hash> — read the diff first".
 
-Don't auto-create Qase Defects from these local runs — that's the GitHub Actions path's job (via `playwright-qase-reporter` with `QASE_TESTOPS_API_TOKEN`). Local runs are for the developer's feedback loop.
+Never re-dispatch automatically on failure — let the user decide.
 
 ## Notes
 
-- The scheduled cloud runs (02:30 UTC + 14:30 UTC via `e2e-qase.yml`) post results to Qase TRIPKINGAP and auto-create Defects on failure. This skill is the on-demand equivalent — fastest feedback, no Qase posting.
-- The smoke set deliberately skips: J2 (auto-invite, flakey on rate limit), J4 (handshake phase 2 — covered by J5), J8 (insufficient-wallet, slow setup), J9/J10 (20-trip accrual loop), J11/J12 (fresh-driver guards), J14/J15 (edge cases). Reach for `/e2e full` when those matter.
+- The scheduled runs (02:30 UTC + 14:30 UTC) call this same workflow with no `scope` input → defaults to the full suite. Cloud-side every time, results in Qase every time.
+- The `QASE_TESTOPS_API_TOKEN` repo secret is what makes the Qase posting work; if it's missing, the workflow still runs but results don't reach Qase. Surface that as WARNING in the report if observed.
+- There is no "local-only" path — this skill is exclusively cloud. The old `npx playwright test` muscle memory still works on the developer's box but is intentionally not what `/e2e` invokes.

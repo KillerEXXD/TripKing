@@ -267,7 +267,7 @@ Pre-push (Husky) auto-runs `tsc --noEmit` → `npm run test:run` → `npm run bu
 | Command | What |
 |---|---|
 | `/fullstatus` | full health check — runs `/metrics` + `/dbperf` + `/smokeall` + `/sentry` + `/posthog` + the Vercel deploy status + the latest scheduled E2E run + GitHub health, then a unified action summary |
-| `/e2e [full\|smoke]` | run Playwright E2E on demand — `full` = all 34 specs (~5 min), `smoke` = 6 happy-path J* tests (~90s). Default: smoke. |
+| `/e2e [full\|smoke]` | dispatch the cloud E2E run (`e2e-qase.yml`) — `full` (default) = all 34 specs (~5 min), `smoke` = 6 happy-path J* tests (~90s). Always cloud, always posts to Qase, auto-creates Defects on failure. |
 | `/metrics [hours]` | API perf from `api_metrics` (via `get_api_metrics_summary`) — per-endpoint avg/p95/errors, slowest requests, instrumentation gaps, GitHub health |
 | `/dbperf` | DB health — `supabase inspect db` (cache hits, slow queries, seq scans, unused indexes, table sizes) + the housekeeping-table sizes + the cron jobs + an `ANALYZE` reminder |
 | `/smokeall` | run every `scripts/test-*.cjs` against the deployed edge functions; report pass/fail + diagnose failures |
