@@ -9,7 +9,7 @@ const APPLY_STATUSES: TripStatus[] = ['open', 'has_applicants'];
 
 /**
  * v7 Simple Mode — trips list. One big card per trip with route arrow,
- * BIG money number, and ONE green "I can do this" button. No filters,
+ * BIG money number, and ONE green "I want this trip" button. No filters,
  * no chips, no clutter.
  */
 export function SimpleTripsListPage() {
@@ -23,8 +23,8 @@ export function SimpleTripsListPage() {
           <ChevronLeft className="size-6" />
         </Link>
         <div>
-          <div className="text-[22px] font-bold">டிரிப்கள்</div>
-          <div className="text-[14px] text-muted-foreground">Trips you can do</div>
+          <div className="text-[22px] font-bold">Trips you can drive</div>
+          <div className="text-[14px] text-muted-foreground">Pick one to start</div>
         </div>
       </header>
 
@@ -34,7 +34,7 @@ export function SimpleTripsListPage() {
         ) : query.isError ? (
           <ErrorState message="Could not load trips. Tap to try again." onRetry={() => query.refetch()} />
         ) : trips.length === 0 ? (
-          <EmptyState title="டிரிப்கள் இல்லை · No trips now" message="Check again in 10 minutes." />
+          <EmptyState title="No trips now" message="Check again in 10 minutes." />
         ) : (
           trips.map((t) => <TripCard key={t.id} trip={t} />)
         )}
@@ -42,7 +42,6 @@ export function SimpleTripsListPage() {
 
       <footer className="sticky bottom-0 mt-auto bg-page p-4">
         <div className="rounded-card border-2 border-primary bg-[var(--skin-simple-go-bg)] p-3 text-center text-[15px]">
-          <span className="font-bold text-[var(--skin-simple-go)]">பச்சை</span> பட்டனை அழுத்தவும் ·
           Tap the <span className="font-bold text-[var(--skin-simple-go)]">green button</span> to take a trip
         </div>
       </footer>
@@ -64,7 +63,7 @@ function TripCard({ trip }: { trip: Trip }) {
       </div>
 
       <div className="mt-3 rounded-control border-2 border-warning bg-[var(--skin-simple-wait-bg)] p-3 text-center">
-        <div className="text-[12px] uppercase tracking-wide text-muted-foreground">நீங்கள் பெறுவது · You get</div>
+        <div className="text-[12px] uppercase tracking-wide text-muted-foreground">You get paid</div>
         <div className="text-[36px] font-extrabold leading-none">{formatINR(trip.driverPayout)}</div>
         <div className="mt-1 text-[12px] text-muted-foreground">{Math.round(trip.expectedDistanceKm)} km</div>
       </div>
@@ -73,7 +72,7 @@ function TripCard({ trip }: { trip: Trip }) {
         to={`/v7/trips/${trip.id}`}
         className="mt-3 flex h-16 w-full items-center justify-center gap-2 rounded-control bg-[var(--skin-simple-go)] text-[20px] font-bold text-white"
       >
-        இந்த டிரிப் வேண்டும் · I want this trip
+        I want this trip
       </Link>
     </article>
   );
