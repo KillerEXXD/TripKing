@@ -117,6 +117,16 @@ const V3FieldScenariosPage = lazyWithRetry(() => import('@/pages/v2/field-compan
 const V4PipelineScenariosPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/HomeScenariosPage'));
 const V5EditorialScenariosPage = lazyWithRetry(() => import('@/pages/v2/editorial/HomeScenariosPage'));
 const V6BharatScenariosPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/HomeScenariosPage'));
+const V7SimpleHomePage = lazyWithRetry(() => import('@/pages/v2/simple-mode/HomePage'));
+const V7SimpleTripsListPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/TripsListPage'));
+const V7SimpleTripDetailPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/TripDetailPage'));
+const V7SimpleProfilePage = lazyWithRetry(() => import('@/pages/v2/simple-mode/ProfilePage'));
+const V7SimpleMyTripsPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/MyTripsPage'));
+const V7SimpleNotificationsPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/NotificationsPage'));
+const V7SimplePostTripPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/PostTripPage'));
+const V7SimpleReferralsPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/ReferralsPage'));
+const V7SimpleWalletPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/WalletPage'));
+const V7SimpleScenariosPage = lazyWithRetry(() => import('@/pages/v2/simple-mode/HomeScenariosPage'));
 
 function PageFallback() {
   return (
@@ -249,6 +259,16 @@ export function AppRoutes() {
             <Route path="/v4/scenarios" element={<V4PipelineScenariosPage />} />
             <Route path="/v5/scenarios" element={<V5EditorialScenariosPage />} />
             <Route path="/v6/scenarios" element={<V6BharatScenariosPage />} />
+            <Route path="/v7" element={<V7SimpleHomePage />} />
+            <Route path="/v7/trips" element={<V7SimpleTripsListPage />} />
+            <Route path="/v7/trips/:id" element={<V7SimpleTripDetailPage />} />
+            <Route path="/v7/trips/new" element={<V7SimplePostTripPage />} />
+            <Route path="/v7/profile" element={<V7SimpleProfilePage />} />
+            <Route path="/v7/my-trips" element={<V7SimpleMyTripsPage />} />
+            <Route path="/v7/notifications" element={<V7SimpleNotificationsPage />} />
+            <Route path="/v7/referrals" element={<V7SimpleReferralsPage />} />
+            <Route path="/v7/wallet" element={<V7SimpleWalletPage />} />
+            <Route path="/v7/scenarios" element={<V7SimpleScenariosPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>

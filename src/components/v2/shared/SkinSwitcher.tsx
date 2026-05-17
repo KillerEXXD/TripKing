@@ -13,6 +13,7 @@ const SKINS: Skin[] = [
   { path: '/v4', label: 'v4', hint: 'Pipeline Board' },
   { path: '/v5', label: 'v5', hint: 'Editorial' },
   { path: '/v6', label: 'v6', hint: 'Bharat-Native' },
+  { path: '/v7', label: 'v7', hint: 'Simple Mode' },
 ];
 
 /**
