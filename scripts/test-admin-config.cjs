@@ -47,6 +47,30 @@ async function signInFull(role) {
   check('GET /admin/car-types → 200 + array', list.status === 200 && Array.isArray(list.json?.data), `status=${list.status}`);
   const settings = await j('GET', '/admin/app-settings');
   check('GET /admin/app-settings → 200 + object', settings.status === 200 && settings.json?.data && typeof settings.json.data.min_vehicle_year === 'number', `status=${settings.status}`);
+
+  // ── ETag / 304 conditional GET (PR #241 — okCached wires Cache-Control + ETag on every cached read) ──
+  // The first request stamps an ETag header; a follow-up request with If-None-Match: <etag>
+  // must short-circuit to 304 with no body. Saves ~98% of bandwidth on repeat requests.
+  async function fetchHead(path, ifNoneMatch) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (ifNoneMatch) headers['If-None-Match'] = ifNoneMatch;
+    const res = await fetch(`${BASE}${path}`, { method: 'GET', headers });
+    return { status: res.status, etag: res.headers.get('etag'), cacheControl: res.headers.get('cache-control'), body: await res.text() };
+  }
+  const first = await fetchHead('/admin/car-types');
+  check('GET /admin/car-types → emits ETag header (PR #241)', !!first.etag && first.etag.startsWith('W/"'), `etag=${first.etag}`);
+  check('GET /admin/car-types → emits Cache-Control: public, max-age=', first.cacheControl && /public,\s*max-age=\d+/.test(first.cacheControl), `cc=${first.cacheControl}`);
+  if (first.etag) {
+    const second = await fetchHead('/admin/car-types', first.etag);
+    check('GET /admin/car-types with If-None-Match → 304 + empty body', second.status === 304 && (!second.body || second.body.length === 0), `status=${second.status} bodyLen=${second.body?.length}`);
+    check('304 response preserves ETag header (so browser cache keeps the marker)', second.etag === first.etag, `prev=${first.etag} now=${second.etag}`);
+  }
+  const tiers = await fetchHead('/referrals/tiers');
+  // /referrals/tiers is Bearer-required so a no-auth call 401s; the ETag check is best-effort here.
+  // The real coverage is via the bearer-authed call in the referrals test path; this just confirms
+  // the endpoint exists post-PR #241 (was an unwrapped SELECT before).
+  check('GET /referrals/tiers exists (wrapped in shared cache by PR #241)', tiers.status === 200 || tiers.status === 401, `status=${tiers.status}`);
+
   const filtered = await j('GET', '/admin/review-tags?category=manager_to_driver');
   check('GET /admin/review-tags?category= → 200', filtered.status === 200, `status=${filtered.status}`);
   const unknown = await j('GET', '/admin/not-a-list');

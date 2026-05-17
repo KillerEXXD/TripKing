@@ -260,9 +260,18 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
     check('GET /trips?near=<far away> → does not contain it', far.status === 200 && !(far.json?.data || []).some((x) => x.id === t2.id), `len=${far.json?.data?.length}`);
   }
 
-  const notifs = await j('GET', '/notifications', { token: alertToken });
-  const matched = (notifs.json?.data || []).find((n) => n && n.type === 'alert_match' && n.payload_json && n.payload_json.trip_id === t2?.id);
-  check('POST /trips inside a saved alert\'s radius → alert_match notification fired for the alert owner', notifs.status === 200 && !!matched, `notifs=${JSON.stringify((notifs.json?.data || []).map((n) => ({ t: n?.type, p: n?.payload_json })))}`);
+  // PR #229 deferred `match_alerts_for_trip` to a background microtask after the POST /trips
+  // response, so the alert_match notification arrives asynchronously (typically <500ms). Poll
+  // for up to 3s before asserting — long enough for the deferred work, short enough that a
+  // real regression still fails fast. The same pattern applies to upsert_passenger_from_trip.
+  let notifs, matched;
+  for (let i = 0; i < 6; i++) {
+    notifs = await j('GET', '/notifications', { token: alertToken });
+    matched = (notifs.json?.data || []).find((n) => n && n.type === 'alert_match' && n.payload_json && n.payload_json.trip_id === t2?.id);
+    if (matched) break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  check('POST /trips inside a saved alert\'s radius → alert_match notification fired for the alert owner (deferred via PR #229)', notifs.status === 200 && !!matched, `notifs=${JSON.stringify((notifs.json?.data || []).map((n) => ({ t: n?.type, p: n?.payload_json })))}`);
 
   // ── deactivation: a deactivated driver can't apply, and can't be assigned ──────────────────────
   const newTrip = async (extra) => (await j('POST', '/trips', { token, body: { ...baseTrip, hide_passenger_phone: false, passenger_count: 1, pickup_at: futureIso(3), ...(extra || {}) } })).json?.data?.id;
