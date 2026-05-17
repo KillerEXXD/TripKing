@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,8 +9,9 @@ import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { ScopedPageHeader } from '@/components/layout';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
-import { formatINR, formatKmAndDuration } from '@/lib/utils';
-import type { TripInvitation, TripInvitationStatus } from '@/types';
+import { PostedTripCard } from '@/pages/PostedTripsPage';
+import { ShareTripModal } from '@/components/share/ShareTripModal';
+import type { Trip, TripInvitation, TripInvitationStatus } from '@/types';
 
 const STATUS_BADGE: Record<TripInvitationStatus, { label: string; variant: 'success' | 'warning' | 'info' | 'muted' }> = {
   pending: { label: 'Awaiting driver', variant: 'info' },
@@ -106,6 +108,11 @@ export function TripInvitationsPage() {
   // `?from=` overrides the default back target so the home-card → trip-invitations path
   // walks back to home, not to /posted-trips. Matches the pattern TripDetailPage uses.
   const backTarget = searchParams.get('from') ?? '/posted-trips';
+  const [shareTrip, setShareTrip] = useState<Trip | null>(null);
+  // Breadcrumb passed to the top trip-summary card so its "View details" link → trip detail
+  // walks back HERE on the Back arrow. Preserve any existing `?from=` so the chain continues
+  // all the way back to home (or wherever the agent entered the page from).
+  const linkFromPath = `/trips/${id}/invitations${searchParams.get('from') ? `?from=${encodeURIComponent(searchParams.get('from') ?? '')}` : ''}`;
   const { user } = useAuth();
   const tripQuery = useTrip(id);
   const trip = tripQuery.data;
@@ -150,12 +157,15 @@ export function TripInvitationsPage() {
           <Card><p className="text-sm text-secondary">Only the trip poster can see the invitations sent for this trip.</p></Card>
         ) : (
           <>
-            <Card className="gap-1">
-              <div className="font-bold">{trip.fromCity.name} → {trip.toCity.name}</div>
-              <div className="text-xs text-secondary">
-                {formatKmAndDuration(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · {formatINR(trip.driverPayout)} driver payout
-              </div>
-            </Card>
+            {/* Top trip summary — use the rich PostedTripCard (same affordances the agent sees
+             *  on /posted-trips): pickup time, status badge, applicant + pending-invite counts,
+             *  Share, and "View details" → /trips/:id. Parity with the Driver "Invites received"
+             *  card. */}
+            <PostedTripCard
+              trip={trip}
+              onShare={() => setShareTrip(trip)}
+              linkFromPath={linkFromPath}
+            />
             {invitesQuery.isPending ? (
               <LoadingSkeleton rows={3} />
             ) : invitesQuery.isError ? (
@@ -201,6 +211,7 @@ export function TripInvitationsPage() {
           </>
         )}
       </div>
+      {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
     </div>
   );
 }
