@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentType, type SVGProps } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ClipboardList, Home, Plus } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
@@ -76,6 +76,18 @@ export function BottomNav() {
   const { pathname } = useLocation();
   const navRef = useRef<HTMLElement | null>(null);
 
+  // Debug overlay — set `?navdbg=1` in the URL (or localStorage.navdbg=1) to
+  // render a live measurement panel so we can compare Driver vs Agent without
+  // opening the console. Triggered by query param so non-dev users never see it.
+  const debugOn = typeof window !== 'undefined' && (
+    new URLSearchParams(window.location.search).get('navdbg') === '1'
+    || window.localStorage?.getItem('navdbg') === '1'
+  );
+  const [dbg, setDbg] = useState<{
+    role: string; innerH: number; vvH: number; vvTop: number; offset: number;
+    navTop: number; navBottom: number; navHeight: number; ts: number;
+  } | null>(null);
+
   // `position: fixed; bottom: 0` anchors to the LAYOUT viewport. Mobile
   // browsers (and Chrome DevTools' device emulator) inflate the layout
   // viewport by their bottom chrome (URL bar, etc.), so the nav can sit
@@ -91,15 +103,34 @@ export function BottomNav() {
     const update = () => {
       const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
       nav.style.bottom = `${offset}px`;
+      if (debugOn) {
+        // Read AFTER the bottom update lands so the rect reflects new position
+        requestAnimationFrame(() => {
+          const r = nav.getBoundingClientRect();
+          setDbg({
+            role,
+            innerH: window.innerHeight,
+            vvH: Math.round(vv.height * 100) / 100,
+            vvTop: Math.round(vv.offsetTop * 100) / 100,
+            offset,
+            navTop: Math.round(r.top * 100) / 100,
+            navBottom: Math.round(r.bottom * 100) / 100,
+            navHeight: Math.round(r.height * 100) / 100,
+            ts: Date.now(),
+          });
+        });
+      }
     };
     update();
     vv.addEventListener('resize', update);
     vv.addEventListener('scroll', update);
+    window.addEventListener('resize', update);
     return () => {
       vv.removeEventListener('resize', update);
       vv.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
     };
-  }, []);
+  }, [debugOn, role]);
 
   if (HIDE_NAV.test(pathname)) return null;
   const items = role === 'admin' ? ADMIN_NAV : role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
@@ -137,6 +168,40 @@ export function BottomNav() {
   };
 
   return (
+    <>
+      {debugOn && dbg ? (
+        <div
+          aria-hidden
+          style={{
+            position: 'fixed',
+            top: 8,
+            left: 8,
+            zIndex: 9999,
+            background: 'rgba(15,23,42,0.92)',
+            color: '#fff',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            fontSize: '11px',
+            lineHeight: 1.35,
+            padding: '8px 10px',
+            borderRadius: 6,
+            maxWidth: 240,
+            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
+            pointerEvents: 'none',
+            whiteSpace: 'pre',
+          }}
+        >
+{`nav-dbg [${dbg.role}]
+innerH      ${dbg.innerH}
+vv.height   ${dbg.vvH}
+vv.offsetTop ${dbg.vvTop}
+→ bottom    ${dbg.offset}px
+navRect.top    ${dbg.navTop}
+navRect.bottom ${dbg.navBottom}
+navRect.h      ${dbg.navHeight}
+clipped?    ${dbg.navBottom > dbg.vvH + dbg.vvTop ? `YES (+${(dbg.navBottom - dbg.vvH - dbg.vvTop).toFixed(1)}px)` : 'no'}
+url         ${typeof window !== 'undefined' ? window.location.pathname : ''}`}
+        </div>
+      ) : null}
     <nav
       ref={navRef}
       aria-label="Primary"
@@ -205,6 +270,7 @@ export function BottomNav() {
         );
       })}
     </nav>
+    </>
   );
 }
 
