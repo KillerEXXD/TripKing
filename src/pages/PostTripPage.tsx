@@ -705,7 +705,13 @@ export function PostTripPage() {
         )}
       </StickyFooterCTA>
 
-      {postedTrip ? <ShareTripModal trip={postedTrip} onClose={() => navigate(`/trips/${postedTrip.id}`)} /> : null}
+      {postedTrip ? (
+        <ShareTripModal
+          trip={postedTrip}
+          onClose={() => navigate(isDriver ? '/my-trips?tab=posted' : '/posted-trips')}
+          onViewTrip={() => navigate(`/trips/${postedTrip.id}`)}
+        />
+      ) : null}
     </div>
   );
 }

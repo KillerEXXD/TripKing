@@ -168,4 +168,22 @@ describe('PostedTripsPage', () => {
     expect(cards[1]).toHaveTextContent(/^invited-from/i);
     expect(cards[2]).toHaveTextContent(/^cancelled-from/i);
   });
+
+  it('shows a NEW badge + "Posted just now" on trips created within the last 5 minutes', () => {
+    const fresh = new Date(Date.now() - 5_000).toISOString(); // 5s ago → "just now"
+    setTrips({ data: [makeTrip({ id: 't-fresh', createdAt: fresh })] });
+    const { container } = renderPosted();
+    expect(screen.getByText('NEW')).toBeInTheDocument();
+    // The "Posted just now" line is split across text nodes (· Posted + relative time). Match on
+    // the concatenated body text instead of one node.
+    expect(container.textContent).toMatch(/Posted just now/i);
+  });
+
+  it('drops the NEW badge once the trip is older than 5 minutes', () => {
+    const old = new Date(Date.now() - 6 * 60_000).toISOString(); // 6 min ago
+    setTrips({ data: [makeTrip({ id: 't-old', createdAt: old })] });
+    renderPosted();
+    expect(screen.queryByText('NEW')).toBeNull();
+    expect(screen.queryByText(/Posted/i)).toBeNull();
+  });
 });

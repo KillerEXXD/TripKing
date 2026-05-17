@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronRight, Plus, Send, Share2, Users } from 'lucide-react';
+import { ChevronRight, Plus, Send, Share2, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
@@ -10,8 +10,26 @@ import { Badge, Button, Card, FilterBar, FilterPill } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { BadgeProps } from '@/components/ui';
-import { cn, formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
+import { cn, formatINR, formatKmAndDuration, formatPickupDateTime, formatRelativeTime, isWithinMinutes } from '@/lib/utils';
 import type { Trip, TripStatus } from '@/types';
+
+/** 5-minute fresh-trip window — flips the `NEW` badge off automatically after the
+ *  window closes without needing a navigation. Re-evaluates once per minute while the
+ *  trip is still inside the window, then stops. */
+const FRESH_TRIP_MINUTES = 5;
+function useIsFresh(createdAt: string | null | undefined): boolean {
+  const [fresh, setFresh] = useState(() => isWithinMinutes(createdAt, FRESH_TRIP_MINUTES));
+  useEffect(() => {
+    if (!fresh) return;
+    const id = window.setInterval(() => {
+      const stillFresh = isWithinMinutes(createdAt, FRESH_TRIP_MINUTES);
+      setFresh(stillFresh);
+      if (!stillFresh) window.clearInterval(id);
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [createdAt, fresh]);
+  return fresh;
+}
 
 type StatusBadgeVariant = NonNullable<BadgeProps['variant']>;
 
@@ -71,13 +89,30 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
   const reviewable = hasApplicants && trip.status === 'has_applicants';
   const shareable = trip.status === 'open' || trip.status === 'has_applicants';
   const dest = reviewable ? `/trips/${trip.id}/applicants` : `/trips/${trip.id}`;
+  // Trips posted within the last 5 minutes wear a sparkle NEW badge + "Posted Xm ago"
+  // line. Pure client-side derived from `trip.createdAt` — no URL param needed; the
+  // listing already sorts newest-first so the fresh card is at the top.
+  const fresh = useIsFresh(trip.createdAt);
   return (
-    <Card className={cn('gap-0 p-0', reviewable && 'border-amber-200 bg-amber-50/40')}>
+    <Card
+      className={cn(
+        'gap-0 p-0',
+        reviewable && 'border-amber-200 bg-amber-50/40',
+        fresh && 'border-emerald-300 bg-emerald-50/30 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]',
+      )}
+    >
       <Link to={dest} className="block space-y-2 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate font-bold">
-              {trip.fromCity.name} → {trip.toCity.name}
+            <div className="flex items-center gap-1.5">
+              <div className="truncate font-bold">
+                {trip.fromCity.name} → {trip.toCity.name}
+              </div>
+              {fresh ? (
+                <Badge variant="success" aria-label="Newly posted trip" className="shrink-0">
+                  <Sparkles className="size-3" aria-hidden /> NEW
+                </Badge>
+              ) : null}
             </div>
             <div className="truncate text-xs text-secondary">
               {formatKmAndDuration(trip.expectedDistanceKm)} · {formatINR(trip.ratePerKm)}/km · {formatINR(trip.totalFare)} fare · +{formatINR(trip.driverBata)} bata
@@ -88,7 +123,10 @@ export function PostedTripCard({ trip, onShare }: { trip: Trip; onShare: () => v
           </Badge>
         </div>
         <div className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-secondary">Pickup: {formatPickupDateTime(trip.pickupAt)}</span>
+          <span className="text-secondary">
+            Pickup: {formatPickupDateTime(trip.pickupAt)}
+            {fresh ? <span className="ml-1.5 text-emerald-700">· Posted {formatRelativeTime(trip.createdAt)}</span> : null}
+          </span>
           <div className="flex items-center gap-1.5">
             {hasInvites ? (
               <Badge variant="info">
