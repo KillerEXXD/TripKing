@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, Wallet, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
 import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -670,6 +670,35 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAcceptedBar) && 'pb-40')}>
       {viewer.isAssignedDriver && trip.status === 'selected' ? <SelectedDriverCard trip={trip} /> : null}
       {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
+      {/* Agent-side "your driver declined" banner — fires when the trip's most recent driver
+       *  decision was 'declined' AND the trip has been bumped back to open / has_applicants.
+       *  Re-assigning a new driver resets driverAcceptanceStatus → 'pending' so the banner
+       *  auto-clears the moment they pick someone else. */}
+      {viewer.isPoster &&
+       trip.driverAcceptanceStatus === 'declined' &&
+       (trip.status === 'open' || trip.status === 'has_applicants') ? (
+        <Card className="border-amber-300 bg-amber-50/80">
+          <div className="flex items-start gap-2">
+            <UserX className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-semibold text-amber-900">Your selected driver declined this trip</div>
+              <div className="mt-0.5 text-xs text-amber-800">
+                {trip.applicantCount > 0
+                  ? `Pick another driver — ${trip.applicantCount} applicant${trip.applicantCount === 1 ? '' : 's'} still waiting.`
+                  : 'Invite drivers below to keep this trip moving.'}
+              </div>
+              {trip.applicantCount > 0 ? (
+                <Link
+                  to={`/trips/${trip.id}/applicants`}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-control bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
+                >
+                  Review applicants
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </Card>
+      ) : null}
       {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
       {showApplyBar && myApplication ? (
         myApplication.withdrawnAt ? (
