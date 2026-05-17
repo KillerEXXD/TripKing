@@ -7,6 +7,7 @@ import { AppSettingsForm } from '@/components/admin/AppSettingsForm';
 import { CancelReasonsEditor, CitiesEditor, LanguagesEditor, MakesModelsEditor, ReviewTagsEditor, SeatOptionsEditor } from '@/components/admin/extraEditors';
 import { SingletonSettingsForm } from '@/components/admin/SingletonSettingsForm';
 import { AdminListEditor } from '@/components/admin/AdminListEditor';
+import { DesignPreviewAllowlistEditor } from '@/components/admin/DesignPreviewAllowlistEditor';
 import { carTypeHooks, fuelTypeHooks } from '@/hooks/useAdminConfig';
 
 type SectionId =
@@ -115,14 +116,10 @@ export function AdminConfigPage() {
           <AdminListEditor listKey="notification-templates" itemNoun="template" columns={['type', 'locale', 'channel', 'title', 'body', 'sort_order']} />
         )}
         {section === 'design-preview-allowlist' && (
-          // Phones added here see the "Design previews" tile on Home. Toggle is_active to
-          // keep the row (for re-enable later) while hiding the tile from that user.
-          // Phone format: +91XXXXXXXXXX (must match the value in public.users.phone exactly).
-          <AdminListEditor
-            listKey="design-preview-allowlist"
-            itemNoun="phone"
-            columns={['phone', 'note', 'is_active', 'sort_order']}
-          />
+          // Bespoke editor (not the generic AdminListEditor): 10-digit numeric phone input,
+          // Yes/No active toggle defaulting to Yes, sort_order hidden. Phone is stored as
+          // +91XXXXXXXXXX so the /auth/me allowlist lookup matches public.users.phone exactly.
+          <DesignPreviewAllowlistEditor />
         )}
       </Card>
     </main>
