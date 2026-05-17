@@ -112,6 +112,11 @@ const V3FieldWalletPage = lazyWithRetry(() => import('@/pages/v2/field-companion
 const V4PipelineWalletPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/WalletPage'));
 const V5EditorialWalletPage = lazyWithRetry(() => import('@/pages/v2/editorial/WalletPage'));
 const V6BharatWalletPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/WalletPage'));
+const V2OperatorScenariosPage = lazyWithRetry(() => import('@/pages/v2/operator-console/HomeScenariosPage'));
+const V3FieldScenariosPage = lazyWithRetry(() => import('@/pages/v2/field-companion/HomeScenariosPage'));
+const V4PipelineScenariosPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/HomeScenariosPage'));
+const V5EditorialScenariosPage = lazyWithRetry(() => import('@/pages/v2/editorial/HomeScenariosPage'));
+const V6BharatScenariosPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/HomeScenariosPage'));
 
 function PageFallback() {
   return (
@@ -239,6 +244,11 @@ export function AppRoutes() {
             <Route path="/v4/wallet" element={<V4PipelineWalletPage />} />
             <Route path="/v5/wallet" element={<V5EditorialWalletPage />} />
             <Route path="/v6/wallet" element={<V6BharatWalletPage />} />
+            <Route path="/v2/scenarios" element={<V2OperatorScenariosPage />} />
+            <Route path="/v3/scenarios" element={<V3FieldScenariosPage />} />
+            <Route path="/v4/scenarios" element={<V4PipelineScenariosPage />} />
+            <Route path="/v5/scenarios" element={<V5EditorialScenariosPage />} />
+            <Route path="/v6/scenarios" element={<V6BharatScenariosPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>

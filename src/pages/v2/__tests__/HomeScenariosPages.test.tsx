@@ -12,6 +12,25 @@ function Wrap({ children }: { children: React.ReactNode }) {
   return <MemoryRouter>{children}</MemoryRouter>;
 }
 
+/**
+ * Regression: PR #243 shipped the page files but the AppRoutes.tsx wiring
+ * was missing from the same commit — every /vN/scenarios URL 404'd on
+ * production. This test asserts the routes ARE registered.
+ */
+describe('AppRoutes registration for /vN/scenarios', () => {
+  it('declares a route entry for each of v2..v6 scenarios', async () => {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const url = await import('node:url');
+    const dir = path.dirname(url.fileURLToPath(import.meta.url));
+    const routesPath = path.resolve(dir, '../../../AppRoutes.tsx');
+    const src = await fs.readFile(routesPath, 'utf8');
+    for (const p of ['/v2/scenarios', '/v3/scenarios', '/v4/scenarios', '/v5/scenarios', '/v6/scenarios']) {
+      expect(src, `AppRoutes.tsx should register ${p}`).toContain(`path="${p}"`);
+    }
+  });
+});
+
 describe('v2 home-scenarios pages', () => {
   it('Operator: renders all 7 scenario sections', () => {
     render(<Wrap><OperatorHomeScenariosPage /></Wrap>);
