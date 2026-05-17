@@ -178,15 +178,25 @@ class ApiClient {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refresh_token: refreshToken }),
         });
-        if (!res.ok) return false;
+        if (!res.ok) {
+          // Refresh-token rejected (typically 401). Clear tokens immediately so the next
+          // request — which is usually a 401 + reactive-refresh from `request()` — sees an
+          // empty refresh token and short-circuits instead of firing a second doomed POST.
+          this.clearTokens();
+          return false;
+        }
         const json = (await res.json()) as ApiResponse<{ access_token?: string; refresh_token?: string }>;
         const token = json.data?.access_token;
         if (json.success && token) {
           this.setTokens(token, json.data?.refresh_token ?? undefined);
           return true;
         }
+        // 200 response but envelope said `success:false` or no token — treat same as a 401.
+        this.clearTokens();
         return false;
       } catch {
+        // Network error during refresh — don't clear tokens (they may still be valid; the
+        // user is just offline). The reactive 401 path will retry on the next attempt.
         return false;
       } finally {
         this.refreshPromise = null;
