@@ -389,7 +389,16 @@ export function DriverActivityPage() {
           icon={<Mail className="size-4" aria-hidden />}
         />
         <div className="space-y-3 p-4">
-          <InvitedList query={invitedQuery} trips={scopedInvites} onShare={setShareTrip} />
+          {/* Breadcrumb — when the driver taps a trip in this scoped list, the trip
+              detail's Back arrow walks back HERE (and from here on back to wherever the
+              user came from, encoded in fromParam). Without this, Back would default to
+              the plain `/my-trips` tabbed view. */}
+          <InvitedList
+            query={invitedQuery}
+            trips={scopedInvites}
+            onShare={setShareTrip}
+            linkFromPath={`/my-trips?scope=invites-received${fromParam && fromParam !== '/' ? `&from=${encodeURIComponent(fromParam)}` : '&from=/'}`}
+          />
         </div>
         {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
       </div>
@@ -513,6 +522,7 @@ function InvitedList({
   query,
   trips: tripsOverride,
   onShare,
+  linkFromPath,
 }: {
   query: ReturnType<typeof useTrips>;
   /** Caller-supplied filtered list — overrides `query.data` so callers (e.g. the
@@ -520,6 +530,10 @@ function InvitedList({
    *  keeping the loading / error UI driven by the shared query. */
   trips?: Trip[];
   onShare: (t: Trip) => void;
+  /** Breadcrumb path — passed to each PostedTripCard so the trip detail's Back arrow
+   *  returns to THIS list (not the generic /my-trips fallback). Mirrors the pattern
+   *  PostedTripsPage uses for its `?scope=invites-sent` chain. */
+  linkFromPath?: string;
 }) {
   const declineMutation = useDeclineTripInvite();
   if (query.isPending) return <LoadingSkeleton rows={4} />;
@@ -545,28 +559,34 @@ function InvitedList({
   }
   return (
     <div className="space-y-3">
-      {trips.map((t) => (
-        <div key={t.id} className="space-y-1.5">
-          <PostedTripCard trip={t} onShare={() => onShare(t)} />
-          {t.invitationStatus === 'pending' && t.invitationId ? (
-            // Outline-destructive button beats the old "tiny red text-link" — Decline is the
-            // primary affordance on an invite they can't take and needs to land at the same
-            // visual weight as Share / View invites / View details on the card above.
-            <button
-              type="button"
-              onClick={() => void onDecline(t)}
-              disabled={declineMutation.isPending}
-              className={cn(
-                'flex w-full items-center justify-center gap-1.5 rounded-control border border-red-200 bg-red-50/50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors',
-                'hover:border-red-300 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50',
-              )}
-            >
-              <XCircle className="size-4" aria-hidden />
-              {declineMutation.isPending ? 'Declining…' : 'Decline invitation'}
-            </button>
-          ) : null}
-        </div>
-      ))}
+      {trips.map((t) => {
+        // Render Decline INSIDE the card via PostedTripCard's footerSlot. Visually unified
+        // with the trip row; full-width red preserves the deliberate-tap weight of a
+        // destructive action vs. a compact icon next to "Share / View details".
+        const declineFooter = t.invitationStatus === 'pending' && t.invitationId ? (
+          <button
+            type="button"
+            onClick={() => void onDecline(t)}
+            disabled={declineMutation.isPending}
+            className={cn(
+              'flex w-full items-center justify-center gap-1.5 bg-red-50/50 px-3 py-2.5 text-sm font-semibold text-red-700 transition-colors',
+              'hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50',
+            )}
+          >
+            <XCircle className="size-4" aria-hidden />
+            {declineMutation.isPending ? 'Declining…' : 'Decline invitation'}
+          </button>
+        ) : undefined;
+        return (
+          <PostedTripCard
+            key={t.id}
+            trip={t}
+            onShare={() => onShare(t)}
+            linkFromPath={linkFromPath}
+            footerSlot={declineFooter}
+          />
+        );
+      })}
     </div>
   );
 }

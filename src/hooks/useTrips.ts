@@ -74,7 +74,17 @@ export function isTripLive(status: TripStatus | undefined): boolean {
  *   when `enabled` flips false, which kills the residue from a poll that started
  *   just before the auth-failure handler nulled `user`.
  */
-export function useTrips(params?: TripsQueryParams, options?: { enabled?: boolean }) {
+export function useTrips(
+  params?: TripsQueryParams,
+  options?: {
+    enabled?: boolean;
+    /** Force a refetch every time the component mounts. Off by default (React Query honours
+     *  staleTime). On for scoped invitation/applied lists where the user expects the list
+     *  to reflect any status change made on the detail page they're returning from —
+     *  refetchOnWindowFocus doesn't fire on SPA back-navigation. */
+    alwaysRefetchOnMount?: boolean;
+  },
+) {
   const enabled = options?.enabled ?? true;
   return useQuery({
     queryKey: ['trips', params ?? {}],
@@ -93,6 +103,7 @@ export function useTrips(params?: TripsQueryParams, options?: { enabled?: boolea
       return Math.min(...intervals);
     },
     refetchOnWindowFocus: true,
+    refetchOnMount: options?.alwaysRefetchOnMount ? 'always' : true,
   });
 }
 export function useTrip(id: string | undefined) {
@@ -135,7 +146,9 @@ export function useTripApplicants(tripId: string | undefined, enabled = true) {
     refetchOnWindowFocus: true,
   });
 }
-/** The caller's own trip applications (`GET /trips/applied`) — "my applications"; `[]` if they have no driver profile. */
+/** The caller's own trip applications (`GET /trips/applied`) — "my applications"; `[]` if they have no driver profile.
+ *  Always-refetch-on-mount for the same reason as useInvitedTrips: scoped list views should
+ *  reflect status changes the user made on the trip detail they just returned from. */
 export function useMyApplications() {
   return useQuery({
     queryKey: ['trips', 'applied'],
@@ -144,6 +157,7 @@ export function useMyApplications() {
     // Driver's "Applied" tab — needs to flip into 'selected' fast when the agent picks them.
     refetchInterval: 10_000,
     refetchOnWindowFocus: true,
+    refetchOnMount: 'always',
   });
 }
 
@@ -283,9 +297,12 @@ export function useTripInvites(tripId: string | undefined, enabled = true) {
   });
 }
 
-/** Driver's "Invited" tab — trips the caller has been invited to (pre-reveal exception applies). */
+/** Driver's "Invited" tab — trips the caller has been invited to (pre-reveal exception applies).
+ *  alwaysRefetchOnMount keeps the list fresh when the driver returns from a trip detail page
+ *  (the Back-arrow path). React Query's refetchOnWindowFocus doesn't fire on same-window SPA
+ *  navigation, so we lean on the explicit mount refetch instead. */
 export function useInvitedTrips() {
-  return useTrips({ invited: 'me' });
+  return useTrips({ invited: 'me' }, { alwaysRefetchOnMount: true });
 }
 
 export function useInviteDrivers() {

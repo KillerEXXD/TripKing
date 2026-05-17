@@ -180,4 +180,17 @@ describe('TripInvitationsPage', () => {
       expect.any(Object),
     );
   });
+
+  it('renders the page header with the blue tile-accent (matches the home InvitesSentCard)', () => {
+    setAuth(agent);
+    setTrip({ data: makeTrip() });
+    setInvites({ data: [makeInvite({ status: 'pending' })] });
+    const { container } = renderPage();
+    // ScopedPageHeader tone="blue" applies `bg-blue-50` to the header band. Asserting on the
+    // class (not the rendered colour) is enough — if a future refactor reroutes the page back
+    // to a plain header or picks a different tone, this guard trips.
+    const blueBand = container.querySelector('.bg-blue-50');
+    expect(blueBand).not.toBeNull();
+    expect(screen.getByText('Invitations sent')).toBeInTheDocument();
+  });
 });
