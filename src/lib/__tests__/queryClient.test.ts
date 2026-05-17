@@ -14,13 +14,13 @@ import { ApiError } from '@/lib/api/client';
 const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 describe('queryClient — defaults', () => {
-  it('uses the spec defaults — staleTime live (30s) so new hooks fail safe to fresh data, gcTime 30m, no refetch-on-focus, retry 1', () => {
+  it('uses the spec defaults — staleTime live (60s) so new hooks fail safe to fresh data, gcTime 30m, no refetch-on-focus, retry 1', () => {
     const q = queryClient.getDefaultOptions().queries;
-    // The default is the LIVE tier (30s), not the master tier (15min). Reference/lookup hooks
-    // must opt UP explicitly to `STALE.master` — silently inheriting a 15min stale window for
-    // a live query is the regression this assertion guards against.
+    // The default is the LIVE tier (60s, bumped from 30s 2026-05-17), not the master tier
+    // (15min). Reference/lookup hooks must opt UP explicitly to `STALE.master` — silently
+    // inheriting a 15min stale window for a live query is the regression this guards against.
     expect(q?.staleTime).toBe(STALE.live);
-    expect(q?.staleTime).toBe(30_000);
+    expect(q?.staleTime).toBe(60_000);
     expect(q?.gcTime).toBe(30 * 60_000);
     expect(q?.refetchOnWindowFocus).toBe(false);
     expect(q?.retry).toBe(1);
@@ -28,7 +28,7 @@ describe('queryClient — defaults', () => {
 
   it('exposes per-resource staleTime tiers', () => {
     expect(STALE.immutable).toBe(Infinity);
-    expect(STALE.live).toBe(30_000);
+    expect(STALE.live).toBe(60_000);
     // Bumped 5min → 15min in Phase 5 once server-side withCache invalidates admin:* on every write.
     expect(STALE.master).toBe(15 * 60_000);
     expect(STALE.profile).toBe(60_000);
