@@ -6,6 +6,10 @@ import type { AssignedDriver, Trip } from '@/types';
 
 vi.mock('@/hooks/useTrips', () => ({ useTripByOtp: vi.fn() }));
 import { useTripByOtp } from '@/hooks/useTrips';
+// Stub the reviews hook — PassengerPage calls useReviews on completed trips to detect a
+// prior passenger rating. Tests don't want to instantiate a QueryClient just for that.
+vi.mock('@/hooks/useReviews', () => ({ useReviews: vi.fn(() => ({ data: undefined, isPending: false, isError: false, refetch: vi.fn() })) }));
+vi.mock('@/components/reviews/PassengerReviewCard', () => ({ PassengerReviewCard: () => <div>passenger review card</div> }));
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 const driver: AssignedDriver = { id: 'd1', fullName: 'Ravi Kumar', displayHandle: 'A1B2C3D', phone: '+918888888888', profilePhotoUrl: '', ratingAvg: 4.7, ratingCount: 12, totalTripsCompleted: 30 };

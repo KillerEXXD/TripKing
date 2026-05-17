@@ -33,7 +33,14 @@ import { setCacheControl } from '../_shared/httpCache.ts';
 // hit-rate ceiling stays high despite the broad invalidation. Bump epoch on response-shape changes.
 // v2 (2026-05-16): bumped after QA-data reset wipe.
 // v3 (2026-05-16): bumped to flush any stuck entries after the silent-409 / stale-score report.
-const CACHE_EPOCH = 'v3';
+// v4 (2026-05-18): bumped after passenger-OTP review path landed (rater_user_id can now be NULL).
+const CACHE_EPOCH = 'v4';
+
+/** SHA-256 hex digest — matches what `trips/index.ts` does to verify the passenger OTP at /start. */
+async function sha256Hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 const pgFail = (e: { code?: string; message: string }) =>
   pgFailShared(e, { dupMessage: 'A review for this trip and direction already exists' });
@@ -108,15 +115,15 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
   }
 
   // ── POST /reviews (the rater) ────────────────────────────────────────────
+  //
+  // Two auth paths:
+  //   • Bearer token — driver_to_manager / manager_to_driver / admin moderation.
+  //   • Passenger-OTP — the public passenger portal. No login; the passenger proves
+  //     they were the passenger on this trip by sending the `passenger_otp` they
+  //     received from the agent (the same OTP they hand the driver at pickup).
+  //     Only `direction='passenger_to_driver'` is accepted on this path; rater_user_id
+  //     is NULL and rater_role is 'passenger'.
   if (!id && req.method === 'POST') {
-    if (!u) return fail('UNAUTHORIZED', 'Sign in to leave a review', 401);
-    if (!(await rateLimitOk(db, `post-review:${u.id}`, 30, 60))) return fail('RATE_LIMITED', 'Too many reviews — try again shortly', 429);
-    // a deactivated driver / agent can't leave reviews — the is_active flag must be honoured everywhere
-    if (u.role === 'driver' || u.role === 'trip_manager') {
-      const profTable = u.role === 'driver' ? 'drivers' : 'trip_managers';
-      const { data: prof } = await db.from(profTable).select('is_active').eq('user_id', u.id).maybeSingle();
-      if (prof?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your account has been deactivated — contact support.', 403);
-    }
     const b = await readBody(req);
     const tripId = strOrNull(b.trip_id);
     const direction = strOrNull(b.direction);
@@ -130,9 +137,42 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
       throw e;
     }
 
-    const { data: trip } = await db.from('trips').select('id, status, posted_by_user_id, assigned_driver_id').eq('id', tripId).maybeSingle();
+    const passengerOtp = strOrNull(b.passenger_otp);
+    const isPassengerPath = !u && passengerOtp;
+
+    if (!u && !isPassengerPath) return fail('UNAUTHORIZED', 'Sign in to leave a review (or pass passenger_otp for the passenger path)', 401);
+    if (isPassengerPath && direction !== 'passenger_to_driver') {
+      return fail('FORBIDDEN', 'passenger_otp authenticates only the passenger_to_driver review path', 403);
+    }
+    if (u && direction === 'passenger_to_driver') {
+      // The passenger flow is intentionally anonymous (no Bearer). Drivers/agents/admins
+      // hitting this direction would defeat the OTP gate that ties the review to the actual passenger.
+      return fail('FORBIDDEN', 'passenger_to_driver reviews are submitted from the passenger portal, not from a signed-in account', 403);
+    }
+
+    // Rate-limit: by user id when signed in, by trip id when on the passenger path
+    // (so a stolen OTP can't spam reviews on other trips).
+    const rlKey = u ? `post-review:${u.id}` : `post-review:passenger:${tripId}`;
+    if (!(await rateLimitOk(db, rlKey, 30, 60))) return fail('RATE_LIMITED', 'Too many reviews — try again shortly', 429);
+
+    // a deactivated driver / agent can't leave reviews — the is_active flag must be honoured everywhere
+    if (u && (u.role === 'driver' || u.role === 'trip_manager')) {
+      const profTable = u.role === 'driver' ? 'drivers' : 'trip_managers';
+      const { data: prof } = await db.from(profTable).select('is_active').eq('user_id', u.id).maybeSingle();
+      if (prof?.is_active === false) return fail('ACCOUNT_SUSPENDED', 'Your account has been deactivated — contact support.', 403);
+    }
+
+    const { data: trip } = await db.from('trips').select('id, status, posted_by_user_id, assigned_driver_id, passenger_otp_hash').eq('id', tripId).maybeSingle();
     if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
     if (trip.status !== 'completed') return fail('VALIDATION', `Trip is "${trip.status}" — reviews can only be left on completed trips`, 422);
+
+    // Passenger-path: verify the supplied OTP matches the trip's stored hash.
+    if (isPassengerPath) {
+      const expected = trip.passenger_otp_hash as string | null;
+      if (!expected) return fail('FORBIDDEN', 'This trip has no passenger OTP on record', 403);
+      const got = await sha256Hex(passengerOtp!);
+      if (got !== expected) return fail('FORBIDDEN', 'OTP does not match this trip', 403);
+    }
 
     // derive ratee_user_id if not provided
     let rateeUserId = strOrNull(b.ratee_user_id);
@@ -147,8 +187,8 @@ const handler = withTiming('reviews', async (req: Request): Promise<Response> =>
 
     const insert = {
       trip_id: tripId,
-      rater_user_id: u.id,
-      rater_role: u.role === 'admin' || u.role === 'trip_manager' || u.role === 'driver' ? u.role : 'passenger',
+      rater_user_id: u ? u.id : null,
+      rater_role: u ? (u.role === 'admin' || u.role === 'trip_manager' || u.role === 'driver' ? u.role : 'passenger') : 'passenger',
       ratee_user_id: rateeUserId,
       direction,
       score,

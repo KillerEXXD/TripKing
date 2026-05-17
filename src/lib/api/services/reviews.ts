@@ -22,6 +22,27 @@ export function getReviews(params?: ReviewsQueryParams): Promise<Review[]> {
 export function createReview(input: ReviewInput): Promise<Review> {
   return apiClient.post<Api>('/reviews', toApiReview(input)).then((r) => transformReview(unwrap(r.data)));
 }
+
+/** Passenger-portal review submission — anonymous (no Bearer). Authenticates by sending the
+ *  passenger OTP the agent shared with them; the backend verifies it against the trip's
+ *  stored hash. Always `direction='passenger_to_driver'`. */
+export function createPassengerReview(input: {
+  tripId: string;
+  passengerOtp: string;
+  score: number;
+  comment?: string;
+  tagIds?: string[];
+}): Promise<Review> {
+  const body: Record<string, unknown> = {
+    trip_id: input.tripId,
+    direction: 'passenger_to_driver',
+    score: input.score,
+    comment: input.comment ?? '',
+    tag_ids: input.tagIds ?? [],
+    passenger_otp: input.passengerOtp,
+  };
+  return apiClient.post<Api>('/reviews', body).then((r) => transformReview(unwrap(r.data)));
+}
 export function reportReview(id: string, reason?: string): Promise<void> {
   return apiClient.post<unknown>(`/reviews/${id}/report`, { flag_reason: reason ?? null }).then(() => undefined);
 }

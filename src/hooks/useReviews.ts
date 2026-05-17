@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
-import { createReview, getReviews, moderateReview, reportReview } from '@/lib/api/services/reviews';
+import { createPassengerReview, createReview, getReviews, moderateReview, reportReview } from '@/lib/api/services/reviews';
 import type { ReviewInput, ReviewsQueryParams } from '@/types';
 
 export function useReviews(params?: ReviewsQueryParams) {
@@ -26,6 +26,17 @@ export function useCreateReview() {
     onSuccess: (_d, v) => {
       void qc.invalidateQueries({ queryKey: ['reviews'] });
       if (v.rateeUserId) void qc.invalidateQueries({ queryKey: ['driver', v.rateeUserId] });
+    },
+  });
+}
+
+/** Passenger portal — anonymous review submission (OTP-gated). */
+export function useCreatePassengerReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { tripId: string; passengerOtp: string; score: number; comment?: string; tagIds?: string[] }) => createPassengerReview(input),
+    onSuccess: (_d, v) => {
+      void qc.invalidateQueries({ queryKey: ['reviews', { tripId: v.tripId }] });
     },
   });
 }
