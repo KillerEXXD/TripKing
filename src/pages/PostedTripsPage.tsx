@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Plus, Send, Share2, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,7 +79,12 @@ function isFilter(v: string | null): v is Filter {
   return !!v && (FILTERS as string[]).includes(v);
 }
 
-export function PostedTripCard({ trip, onShare, linkFromPath }: { trip: Trip; onShare: () => void; linkFromPath?: string }) {
+export function PostedTripCard({ trip, onShare, linkFromPath, footerSlot }: { trip: Trip; onShare: () => void; linkFromPath?: string;
+  /** Optional bottom action row rendered INSIDE the card (separated by a divider). Used by
+   *  the Driver's Invites Received list to embed a destructive "Decline invitation" button
+   *  within the same card surface — keeps the affordance visually unified with the trip row
+   *  instead of orphaned below it. */
+  footerSlot?: ReactNode }) {
   // Fallback to a muted "raw status" label if the server sends a value we don't
   // have a mapping for (e.g. a new lifecycle state shipped before the client rebuild).
   // Prevents `Cannot read properties of undefined (reading 'variant')` crashes.
@@ -166,6 +171,7 @@ export function PostedTripCard({ trip, onShare, linkFromPath }: { trip: Trip; on
           </Link>
         </div>
       </div>
+      {footerSlot ? <div className="border-t">{footerSlot}</div> : null}
     </Card>
   );
 }

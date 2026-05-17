@@ -378,4 +378,49 @@ describe('DriverActivityPage', () => {
     expect(screen.queryByText(/vellore → alreadyApplied-to/i)).toBeNull();
     expect(screen.queryByText(/vellore → declined-to/i)).toBeNull();
   });
+
+  it('?scope=invites-received — each trip-detail Link carries ?from=/my-trips?scope=invites-received so Back returns to the scoped list', () => {
+    setUp({
+      invited: tripsState({ data: [
+        makeTrip({ id: 'inv-x', toCity: city('cX', 'InvitedX-to'), invitationId: 'i-x', invitationStatus: 'pending' }),
+      ] }),
+    });
+    renderPage('/my-trips?scope=invites-received&from=/');
+    // The PostedTripCard renders TWO links to the same destination (the headline card area
+    // + the "View details" link in the footer). Both must carry the breadcrumb.
+    const detailLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/trips/inv-x'));
+    expect(detailLinks.length).toBeGreaterThan(0);
+    for (const link of detailLinks) {
+      const href = link.getAttribute('href') ?? '';
+      // Encoded by encodeURIComponent — `/my-trips?scope=invites-received&from=/` becomes
+      // `%2Fmy-trips%3Fscope%3Dinvites-received%26from%3D%2F`. Asserting on the decoded form
+      // would miss an encoding regression, so check the raw href.
+      expect(href).toMatch(/[?&]from=%2Fmy-trips%3Fscope%3Dinvites-received/);
+    }
+  });
+
+  it('?scope=invites-received — Decline button is rendered INSIDE the PostedTripCard, not as a separate sibling element', () => {
+    setUp({
+      invited: tripsState({ data: [
+        makeTrip({ id: 'inv-d', toCity: city('cD', 'InvitedD-to'), invitationId: 'i-d', invitationStatus: 'pending' }),
+      ] }),
+    });
+    renderPage('/my-trips?scope=invites-received&from=/');
+    // Decline button exists, and its nearest Card ancestor is the SAME Card that contains
+    // the trip route — proves it's inside the card surface (footerSlot), not a sibling.
+    const declineBtn = screen.getByRole('button', { name: /decline invitation/i });
+    const routeNode = screen.getByText(/vellore → invitedD-to/i);
+    const findCardAncestor = (el: HTMLElement | null): HTMLElement | null => {
+      let cur: HTMLElement | null = el;
+      while (cur) {
+        if (cur.dataset?.slot === 'card' || cur.className?.toString().includes('rounded-card')) return cur;
+        cur = cur.parentElement;
+      }
+      return null;
+    };
+    const btnCard = findCardAncestor(declineBtn);
+    const routeCard = findCardAncestor(routeNode);
+    expect(btnCard).not.toBeNull();
+    expect(btnCard).toBe(routeCard);
+  });
 });

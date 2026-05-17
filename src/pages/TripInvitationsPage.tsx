@@ -1,10 +1,11 @@
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, X } from 'lucide-react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { ChevronRight, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrip, useTripInvites, useWithdrawTripInvite } from '@/hooks/useTrips';
 import { Badge, Button, Card } from '@/components/ui';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
+import { ScopedPageHeader } from '@/components/layout';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
 import { formatINR, formatKmAndDuration } from '@/lib/utils';
@@ -101,7 +102,6 @@ function InvitationCard({
  */
 export function TripInvitationsPage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // `?from=` overrides the default back target so the home-card → trip-invitations path
   // walks back to home, not to /posted-trips. Matches the pattern TripDetailPage uses.
@@ -126,26 +126,18 @@ export function TripInvitationsPage() {
     );
   }
 
+  // Tinted-blue header matches the home `InvitesSentCard` tile (border-l-blue-accent +
+  // bg-blue-accent-light). Tap the blue card → land on a blue-banded page; same continuity
+  // the other home-card → scoped-page chains already use (see DriverActivityPage indigo).
   return (
     <div className="mx-auto max-w-md">
-      <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-        <button
-          type="button"
-          aria-label="Back"
-          onClick={() => navigate(backTarget)}
-          className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted"
-        >
-          <ArrowLeft className="size-5" aria-hidden />
-        </button>
-        <div className="min-w-0">
-          <h1 className="truncate text-base font-semibold">Invitations sent</h1>
-          {trip ? (
-            <div className="truncate text-xs text-secondary">
-              {trip.fromCity.name} → {trip.toCity.name} · {trip.pendingInvitationCount} pending
-            </div>
-          ) : null}
-        </div>
-      </header>
+      <ScopedPageHeader
+        title="Invitations sent"
+        subtitle={trip ? `${trip.fromCity.name} → ${trip.toCity.name} · ${trip.pendingInvitationCount} pending` : undefined}
+        backTo={backTarget}
+        tone="blue"
+        icon={<Send className="size-4" aria-hidden />}
+      />
 
       <div className="space-y-3 p-4">
         {notFound ? (
