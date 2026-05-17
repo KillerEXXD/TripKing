@@ -1,4 +1,4 @@
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -102,6 +102,10 @@ function InvitationCard({
 export function TripInvitationsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // `?from=` overrides the default back target so the home-card → trip-invitations path
+  // walks back to home, not to /posted-trips. Matches the pattern TripDetailPage uses.
+  const backTarget = searchParams.get('from') ?? '/posted-trips';
   const { user } = useAuth();
   const tripQuery = useTrip(id);
   const trip = tripQuery.data;
@@ -127,8 +131,8 @@ export function TripInvitationsPage() {
       <header className="sticky top-0 z-10 flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
         <button
           type="button"
-          aria-label="Back to your posted trips"
-          onClick={() => navigate('/posted-trips')}
+          aria-label="Back"
+          onClick={() => navigate(backTarget)}
           className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted"
         >
           <ArrowLeft className="size-5" aria-hidden />

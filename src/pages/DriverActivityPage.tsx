@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
@@ -13,6 +13,14 @@ import { Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatClockTime, formatINR, formatKmAndDuration, formatPickupDateTime, formatShortDate } from '@/lib/utils';
 import type { AcceptanceStatus, MyApplication, Trip, TripStatus, Vacancy } from '@/types';
+
+/** Drill-down scope (the home "Invites received" priority card lands here).
+ *  Hides the tab strip, swaps the header to a back-arrow + title, renders just the
+ *  scoped list. Mirrors the PostedTripsPage `?scope=` mode used by the Agent home cards. */
+type Scope = 'invites-received';
+function isScope(v: string | null): v is Scope {
+  return v === 'invites-received';
+}
 
 type Tab = 'all' | 'driving' | 'invited' | 'applied' | 'selected' | 'completed' | 'cancelled' | 'available' | 'posted';
 const TABS: { id: Tab; label: string }[] = [
@@ -291,6 +299,9 @@ export function DriverActivityPage() {
   // Tab selection is URL-backed so /my-trips?tab=available can be deep-linked
   // (the driver-home "I'm available" tile + post-vacancy success redirect both rely on this).
   const [searchParams, setSearchParams] = useSearchParams();
+  const urlScope = searchParams.get('scope');
+  const scope: Scope | null = isScope(urlScope) ? urlScope : null;
+  const fromParam = searchParams.get('from') ?? '/';
   const urlTab = searchParams.get('tab');
   const tab: Tab = isTab(urlTab) ? urlTab : 'driving';
   const setTab = (next: Tab) => {
@@ -353,6 +364,29 @@ export function DriverActivityPage() {
     available: availableQuery.data?.length,
     posted: postedQuery.data?.length,
   };
+
+  // Scoped drill-down — render a focused list with a back arrow + scoped title and skip
+  // the tab strip entirely. Triggered by `?scope=invites-received` from the home card.
+  if (scope === 'invites-received') {
+    const inviteCount = invitedQuery.data?.length ?? 0;
+    return (
+      <div className="mx-auto max-w-md">
+        <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3 shadow-header">
+          <Link to={fromParam} aria-label="Back" className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+            <ArrowLeft className="size-5" aria-hidden />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-base font-semibold leading-tight">Invites received</h1>
+            <p className="text-xs text-secondary">{invitedQuery.data ? `${inviteCount} trip${inviteCount === 1 ? '' : 's'} waiting for your decision` : 'Loading invitations…'}</p>
+          </div>
+        </header>
+        <div className="space-y-3 p-4">
+          <InvitedList query={invitedQuery} onShare={setShareTrip} />
+        </div>
+        {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-md">

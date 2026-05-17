@@ -64,10 +64,10 @@ describe('InvitesReceivedCard', () => {
     expect(link).toHaveTextContent(/accept or decline/i);
   });
 
-  it('links to /my-trips?tab=invited when multiple invitations are pending', () => {
+  it('links to the scoped /my-trips?scope=invites-received view when 2+ invitations are pending', () => {
     renderCard([makeTrip({ id: 'a' }), makeTrip({ id: 'b' }), makeTrip({ id: 'c' })]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/my-trips?tab=invited');
+    expect(link).toHaveAttribute('href', '/my-trips?scope=invites-received&from=/');
     expect(link).toHaveTextContent(/3 trips invited you to drive/i);
   });
 });
