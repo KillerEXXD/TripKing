@@ -111,6 +111,25 @@ const DESIGNS: Design[] = [
       { label: 'காட்சிகள் · Scenarios + tracking', to: '/v6/scenarios' },
     ],
   },
+  {
+    path: '/v7',
+    name: 'Simple Mode',
+    tagline: 'Built for clarity — high-contrast colors, Tamil-first labels, one decision per screen.',
+    optimizedFor: 'Low-literacy users — drivers and agents new to apps',
+    swatchClass: 'bg-[#16a34a]',
+    routes: [
+      { label: 'Home (4 icon tiles)', to: '/v7' },
+      { label: 'Trips (big cards + green CTA)', to: '/v7/trips' },
+      { label: 'Trip detail (3-step ladder)', to: '/v7/trips' },
+      { label: 'Profile (big tiles)', to: '/v7/profile' },
+      { label: 'My trips (status icons)', to: '/v7/my-trips' },
+      { label: 'Notifications', to: '/v7/notifications' },
+      { label: 'Post trip (1 question per screen)', to: '/v7/trips/new' },
+      { label: 'Friend money (referrals)', to: '/v7/referrals' },
+      { label: 'My money (wallet)', to: '/v7/wallet' },
+      { label: 'Examples (scenarios + tracking)', to: '/v7/scenarios' },
+    ],
+  },
 ];
 
 /**

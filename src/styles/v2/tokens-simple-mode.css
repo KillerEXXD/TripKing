@@ -1,0 +1,55 @@
+/**
+ * Simple Mode — "Built for someone who can't read."
+ * High-contrast traffic-light colors, large type, generous touch targets,
+ * Tamil-first typography. Every screen has ONE primary action and a
+ * persistent help line at the bottom telling the user what to tap.
+ */
+.v2-simple-mode {
+  --color-page: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-muted-foreground: #475569;
+  --color-border: #cbd5e1;
+
+  /* Traffic-light semantics. Primary is GREEN (do it). */
+  --color-primary: #16a34a;
+  --color-primary-foreground: #ffffff;
+  --color-success: #16a34a;
+  --color-warning: #facc15;
+  --color-destructive: #dc2626;
+
+  /* Bigger radii — feels softer, easier to tap accurately. */
+  --radius-card: 18px;
+  --radius-control: 16px;
+  --radius-pill: 999px;
+
+  /* Strong borders carry meaning; subtle shadows. */
+  --shadow-card: 0 2px 0 rgba(15, 23, 42, 0.06);
+
+  /* Big type scale — body 18px, headers larger. */
+  --text-header: 24px;
+  --text-section-label: 14px;
+  --text-body: 18px;
+  --text-micro: 14px;
+
+  /* Simple-mode-specific accent tokens. */
+  --skin-simple-go: #16a34a;
+  --skin-simple-go-bg: #dcfce7;
+  --skin-simple-stop: #dc2626;
+  --skin-simple-stop-bg: #fee2e2;
+  --skin-simple-wait: #f59e0b;
+  --skin-simple-wait-bg: #fef3c7;
+}
+
+/* Tamil leads the font stack inside Simple Mode. */
+.v2-simple-mode {
+  font-family:
+    'Noto Sans Tamil', 'Noto Sans Devanagari', 'Inter', system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+/* Numerals tabular + slightly heavier — money/distance are universal. */
+.v2-simple-mode {
+  font-feature-settings: 'tnum' 1;
+}

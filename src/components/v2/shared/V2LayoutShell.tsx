@@ -7,6 +7,7 @@ import '@/styles/v2/tokens-field-companion.css';
 import '@/styles/v2/tokens-pipeline-board.css';
 import '@/styles/v2/tokens-editorial.css';
 import '@/styles/v2/tokens-bharat-native.css';
+import '@/styles/v2/tokens-simple-mode.css';
 
 /** Map a /vN route to its token-scope wrapper class. */
 function scopeClassFor(pathname: string): string {
@@ -17,6 +18,7 @@ function scopeClassFor(pathname: string): string {
     { prefix: '/v4', cls: 'v2-pipeline-board' },
     { prefix: '/v5', cls: 'v2-editorial' },
     { prefix: '/v6', cls: 'v2-bharat-native' },
+    { prefix: '/v7', cls: 'v2-simple-mode' },
   ];
   for (const { prefix, cls } of map) {
     if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
