@@ -57,7 +57,11 @@ jobs:
         run: npm ci --no-audit --no-fund
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps ${{ inputs.project == 'mobile' && 'webkit' || 'chromium' }}
+        # Defaults must match the test step's `--project=${{ inputs.project || 'mobile' }}`.
+        # Scheduled runs have no inputs at all → mobile is the default → webkit must be installed.
+        # An empty inputs.project on a dispatch also falls back to mobile/webkit. Only an
+        # explicit choice of `chromium` switches the install.
+        run: npx playwright install --with-deps ${{ inputs.project == 'chromium' && 'chromium' || 'webkit' }}
 
       - name: Run Playwright (headless)
         run: |
