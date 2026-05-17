@@ -179,12 +179,14 @@ describe('PostedTripsPage', () => {
     expect(container.textContent).toMatch(/Posted just now/i);
   });
 
-  it('drops the NEW badge once the trip is older than 5 minutes', () => {
+  it('drops the NEW badge once the trip is older than 5 minutes but keeps showing the "Posted X ago" age line', () => {
     const old = new Date(Date.now() - 6 * 60_000).toISOString(); // 6 min ago
     setTrips({ data: [makeTrip({ id: 't-old', createdAt: old })] });
     renderPosted();
     expect(screen.queryByText('NEW')).toBeNull();
-    expect(screen.queryByText(/Posted/i)).toBeNull();
+    // User asked for the age to show on every card, not just fresh ones — guard against
+    // regressing back to "only fresh trips show their post time".
+    expect(screen.getByText(/Posted 6m ago/i)).toBeInTheDocument();
   });
 
   // ── ?scope=invites-sent (drill-down view from the home "Invites sent" card) ────

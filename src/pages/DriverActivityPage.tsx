@@ -471,6 +471,10 @@ export function DriverActivityPage() {
         {tab === 'posted' && (
           <TripList
             query={postedQuery}
+            // Sort newest-posted first so a just-posted trip appears at the top, not at the
+            // bottom (the server's default order is `pickup_at` ascending — fine for browse,
+            // wrong for "my posts").
+            trips={postedQuery.data ? [...postedQuery.data].sort((a, b) => b.createdAt.localeCompare(a.createdAt)) : undefined}
             errorTitle="Couldn't load your posts"
             emptyTitle="You haven't posted any trips"
             emptyMessage="Posted a trip you can't run yourself? It'll appear here with its status and applicants."
