@@ -39,31 +39,19 @@ function Wrap({ children, path }: { children: React.ReactNode; path?: string }) 
 
 function mockTrip() {
   vi.mocked(th.useTrip).mockReturnValue({
-    data: TRIP_FIXTURES[1],
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
+    data: TRIP_FIXTURES[1], isLoading: false, isError: false, refetch: vi.fn(),
   } as unknown as ReturnType<typeof th.useTrip>);
   vi.mocked(th.useTrips).mockReturnValue({
-    data: TRIP_FIXTURES,
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
+    data: TRIP_FIXTURES, isLoading: false, isError: false, refetch: vi.fn(),
   } as unknown as ReturnType<typeof th.useTrips>);
   vi.mocked(th.useMyApplications).mockReturnValue({
-    data: APPLICATION_FIXTURES,
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
+    data: APPLICATION_FIXTURES, isLoading: false, isError: false, refetch: vi.fn(),
   } as unknown as ReturnType<typeof th.useMyApplications>);
 }
 
 function mockNotifications() {
   vi.mocked(nh.useNotifications).mockReturnValue({
-    data: NOTIFICATION_FIXTURES,
-    isLoading: false,
-    isError: false,
-    refetch: vi.fn(),
+    data: NOTIFICATION_FIXTURES, isLoading: false, isError: false, refetch: vi.fn(),
   } as unknown as ReturnType<typeof nh.useNotifications>);
 }
 
@@ -92,19 +80,21 @@ function mockWallet() {
 beforeEach(() => vi.clearAllMocks());
 
 describe('v7 Simple Mode pages', () => {
-  it('Home: bilingual welcome + 4 big icon tiles', () => {
+  it('Home: Welcome heading + 4 big icon tiles in English', () => {
     render(<Wrap><SimpleHomePage /></Wrap>);
-    expect(screen.getByText(/வணக்கம்/)).toBeInTheDocument();
+    expect(screen.getByText(/Welcome/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Find a trip/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /My trips/i })).toBeInTheDocument();
   });
 
-  it('Trips list: bilingual heading + big green I-can-do CTA per card', () => {
+  it('Trips list: heading + green "I want this trip" CTA per card', () => {
     mockTrip();
     render(<Wrap><SimpleTripsListPage /></Wrap>);
+    expect(screen.getByText(/Trips you can drive/i)).toBeInTheDocument();
     expect(screen.getAllByText(/I want this trip/i).length).toBeGreaterThan(0);
   });
 
-  it('Trip detail: 3-step ladder + green accept + red refuse', () => {
+  it('Trip detail: 3-step ladder + green Yes + red No', () => {
     mockTrip();
     render(
       <Wrap path="/v7/trips/t2">
@@ -113,54 +103,65 @@ describe('v7 Simple Mode pages', () => {
         </Routes>
       </Wrap>,
     );
+    expect(screen.getByText('Pick up from')).toBeInTheDocument();
+    expect(screen.getByText('Drop here')).toBeInTheDocument();
+    expect(screen.getByText('You get paid')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Yes, I will do it/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /No, refuse/i })).toBeInTheDocument();
   });
 
-  it('Profile: name initial + 3 big tiles + sign-out', () => {
+  it('Profile: avatar + name + 3 big tiles + sign-out', () => {
     render(<Wrap><SimpleProfilePage /></Wrap>);
     expect(screen.getByText(/Karthik M/)).toBeInTheDocument();
+    expect(screen.getByText(/My phone number/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Sign out/i })).toBeInTheDocument();
   });
 
-  it('My trips: bilingual status icons per application', () => {
+  it('My trips: plain-English status labels per application', () => {
     mockTrip();
     render(<Wrap><SimpleMyTripsPage /></Wrap>);
-    expect(screen.getAllByText(/காத்திருக்கிறது|ஏற்கப்பட்டது|நடவடிக்கை/).length).toBeGreaterThan(0);
+    // Fixtures have applied/selected/accepted statuses
+    expect(screen.getAllByText(/Waiting|Action needed|Confirmed/).length).toBeGreaterThan(0);
   });
 
-  it('Notifications: big bilingual heading + items', () => {
+  it('Notifications: Messages heading + items', () => {
     mockNotifications();
     render(<Wrap><SimpleNotificationsPage /></Wrap>);
-    expect(screen.getByText(/Messages for you/i)).toBeInTheDocument();
+    expect(screen.getByText(/Messages/i)).toBeInTheDocument();
+    expect(screen.getByText(/News for you/i)).toBeInTheDocument();
   });
 
-  it('Post trip: wizard step 1 + big Next CTA', () => {
+  it('Post trip: wizard step 1 with English question + Next CTA', () => {
     render(<Wrap><SimplePostTripPage /></Wrap>);
+    expect(screen.getByText(/Where do you start\?/i)).toBeInTheDocument();
     expect(screen.getByText(/1 \/ 5/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Next/i })).toBeInTheDocument();
   });
 
-  it('Referrals: big yellow earnings card + WhatsApp CTA', () => {
+  it('Referrals: Friend money heading + share buttons', () => {
     mockReferral();
     render(<Wrap><SimpleReferralsPage /></Wrap>);
+    expect(screen.getByText(/Friend money/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Send on WhatsApp/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Call a friend/i })).toBeInTheDocument();
   });
 
-  it('Wallet: big total card + Add money / Take money out CTAs', () => {
+  it('Wallet: My money heading + Add money / Take money out CTAs', () => {
     mockWallet();
     render(<Wrap><SimpleWalletPage /></Wrap>);
+    expect(screen.getByText(/My money/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Add money/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Take money out/i })).toBeInTheDocument();
   });
 
-  it('Scenarios: shows all 7 example sections including Live tracking', () => {
+  it('Scenarios: Examples heading + 7 example sections including Live', () => {
     render(<Wrap><SimpleHomeScenariosPage /></Wrap>);
-    expect(screen.getByText(/நகர்கிறது/)).toBeInTheDocument(); // Moving now (live tracking)
-    expect(screen.getByText(/Book now — wait time/i)).toBeInTheDocument();
+    expect(screen.getByText(/Examples/i)).toBeInTheDocument();
+    expect(screen.getByText(/Moving now/i)).toBeInTheDocument();
+    expect(screen.getByText(/After you say yes/i)).toBeInTheDocument();
   });
 
-  it('Trips list: shows empty-state message when no trips', () => {
+  it('Trips list: empty-state when no trips', () => {
     vi.mocked(th.useTrips).mockReturnValue({
       data: [], isLoading: false, isError: false, refetch: vi.fn(),
     } as unknown as ReturnType<typeof th.useTrips>);
@@ -168,7 +169,7 @@ describe('v7 Simple Mode pages', () => {
     expect(screen.getByText(/No trips now/i)).toBeInTheDocument();
   });
 
-  it('Trips list: shows error state with retry when query fails', () => {
+  it('Trips list: error state with retry', () => {
     vi.mocked(th.useTrips).mockReturnValue({
       data: [], isLoading: false, isError: true, refetch: vi.fn(),
     } as unknown as ReturnType<typeof th.useTrips>);
@@ -176,7 +177,7 @@ describe('v7 Simple Mode pages', () => {
     expect(screen.getByText(/Could not load trips/i)).toBeInTheDocument();
   });
 
-  it('Trip detail: error path renders Try again message', () => {
+  it('Trip detail: error path', () => {
     vi.mocked(th.useTrip).mockReturnValue({
       data: undefined, isLoading: false, isError: true, refetch: vi.fn(),
     } as unknown as ReturnType<typeof th.useTrip>);
@@ -190,7 +191,7 @@ describe('v7 Simple Mode pages', () => {
     expect(screen.getByText(/Could not load/i)).toBeInTheDocument();
   });
 
-  it('My trips: error path renders Try again', () => {
+  it('My trips: error path', () => {
     vi.mocked(th.useMyApplications).mockReturnValue({
       data: [], isLoading: false, isError: true, refetch: vi.fn(),
     } as unknown as ReturnType<typeof th.useMyApplications>);
@@ -222,7 +223,7 @@ describe('v7 Simple Mode pages', () => {
     expect(screen.getByText(/Could not load/i)).toBeInTheDocument();
   });
 
-  it('Post trip: wizard moves to next step and exposes Back', () => {
+  it('Post trip: Next advances to step 2 and Back appears', () => {
     render(<Wrap><SimplePostTripPage /></Wrap>);
     fireEvent.click(screen.getByRole('button', { name: /Next/i }));
     expect(screen.getByText(/2 \/ 5/)).toBeInTheDocument();

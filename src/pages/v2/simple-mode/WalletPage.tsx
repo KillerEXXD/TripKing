@@ -16,8 +16,8 @@ export function SimpleWalletPage() {
           <ChevronLeft className="size-6" />
         </Link>
         <div>
-          <div className="text-[22px] font-bold">என் பணம்</div>
-          <div className="text-[14px] text-muted-foreground">My money</div>
+          <div className="text-[22px] font-bold">My money</div>
+          <div className="text-[14px] text-muted-foreground">What you have</div>
         </div>
       </header>
 
@@ -29,19 +29,18 @@ export function SimpleWalletPage() {
         ) : (
           <>
             <article className="rounded-card border-4 border-[var(--skin-simple-go)] bg-[var(--skin-simple-go-bg)] p-6 text-center">
-              <div className="text-[16px] font-semibold">உங்கள் மொத்த பணம்</div>
-              <div className="text-[14px] text-muted-foreground">Your total money</div>
+              <div className="text-[16px] font-semibold">Your total money</div>
               <div className="mt-3 text-[64px] font-extrabold leading-none text-[var(--skin-simple-go)]">
                 {formatINR((b?.totalPaise ?? 0) / 100)}
               </div>
             </article>
 
             <article className="rounded-card border-2 border-border bg-surface p-4">
-              <div className="text-[13px] text-muted-foreground">இதில் இருந்து · This is made of</div>
+              <div className="text-[13px] text-muted-foreground">This is made of</div>
               <ul className="mt-2 space-y-2 text-[15px]">
-                <li className="flex items-center justify-between"><span>நீங்கள் போட்டது · Cash you put in</span><span className="font-bold">{formatINR((b?.cashPaise ?? 0) / 100)}</span></li>
-                <li className="flex items-center justify-between"><span>நண்பர் பணம் · Friend money</span><span className="font-bold">{formatINR((b?.transferredPaise ?? 0) / 100)}</span></li>
-                <li className="flex items-center justify-between"><span>புரோமோ · Free credit</span><span className="font-bold">{formatINR((b?.promoPaise ?? 0) / 100)}</span></li>
+                <li className="flex items-center justify-between"><span>Cash you put in</span><span className="font-bold">{formatINR((b?.cashPaise ?? 0) / 100)}</span></li>
+                <li className="flex items-center justify-between"><span>From friends</span><span className="font-bold">{formatINR((b?.transferredPaise ?? 0) / 100)}</span></li>
+                <li className="flex items-center justify-between"><span>Free credit</span><span className="font-bold">{formatINR((b?.promoPaise ?? 0) / 100)}</span></li>
               </ul>
             </article>
 
@@ -49,18 +48,17 @@ export function SimpleWalletPage() {
               type="button"
               className="flex h-16 w-full items-center justify-center gap-2 rounded-control bg-[var(--skin-simple-go)] text-[20px] font-bold text-white"
             >
-              <Plus className="size-6" /> பணம் சேர் · Add money
+              <Plus className="size-6" /> Add money
             </button>
             <button
               type="button"
               className="flex h-16 w-full items-center justify-center gap-2 rounded-control border-2 border-primary text-[18px] font-bold text-primary"
             >
-              <ArrowDown className="size-5" /> பணம் எடு · Take money out
+              <ArrowDown className="size-5" /> Take money out
             </button>
 
             <div className="rounded-card border-2 border-warning bg-[var(--skin-simple-wait-bg)] p-3 text-center text-[14px]">
-              <strong>பச்சை</strong> = சேர் &nbsp;·&nbsp; <strong>நீலம்</strong> = எடு<br />
-              <span className="text-muted-foreground">Green = add · Blue = take out</span>
+              <strong>Green</strong> = add money &nbsp;·&nbsp; <strong>Blue</strong> = take money out
             </div>
           </>
         )}

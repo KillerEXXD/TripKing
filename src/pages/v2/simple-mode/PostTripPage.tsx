@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { ChevronLeft, MapPin, Flag, Clock, Car, IndianRupee, Check } from 'lucide-react';
 
 const STEPS = [
-  { key: 'from',    icon: MapPin,       ta: 'எங்கிருந்து?',  en: 'Where do you start?', placeholder: 'e.g. Vellore' },
-  { key: 'to',      icon: Flag,         ta: 'எங்கே போக?',     en: 'Where to go?',         placeholder: 'e.g. Chennai' },
-  { key: 'when',    icon: Clock,        ta: 'எப்போது?',       en: 'When?',                placeholder: 'Tomorrow 2 PM' },
-  { key: 'vehicle', icon: Car,          ta: 'என்ன வாகனம்?',   en: 'What vehicle?',        placeholder: 'Sedan' },
-  { key: 'fare',    icon: IndianRupee,  ta: 'எவ்வளவு பணம்?',  en: 'How much money?',      placeholder: '4000' },
+  { key: 'from',    icon: MapPin,      title: 'Where do you start?', placeholder: 'e.g. Vellore' },
+  { key: 'to',      icon: Flag,        title: 'Where to go?',         placeholder: 'e.g. Chennai' },
+  { key: 'when',    icon: Clock,       title: 'When?',                placeholder: 'Tomorrow 2 PM' },
+  { key: 'vehicle', icon: Car,         title: 'What vehicle?',        placeholder: 'Sedan' },
+  { key: 'fare',    icon: IndianRupee, title: 'How much money?',      placeholder: '4000' },
 ];
 
 /** v7 Simple Mode — post-trip wizard. One question, one big input, big green Next. */
@@ -39,8 +39,8 @@ export function SimplePostTripPage() {
         <div className="mb-4 flex size-20 items-center justify-center rounded-pill bg-[var(--skin-simple-go-bg)] text-[var(--skin-simple-go)]">
           <Icon className="size-10" aria-hidden />
         </div>
-        <h1 className="text-[28px] font-bold leading-tight">{s.ta}</h1>
-        <p className="text-[16px] text-muted-foreground">{s.en}</p>
+        <h1 className="text-[28px] font-bold leading-tight">{s.title}</h1>
+        <p className="mt-1 text-[15px] text-muted-foreground">One question at a time. Take your time.</p>
         <input
           autoFocus
           placeholder={s.placeholder}
@@ -54,7 +54,7 @@ export function SimplePostTripPage() {
           onClick={() => setStep((x) => Math.min(STEPS.length - 1, x + 1))}
           className="flex h-16 w-full items-center justify-center gap-2 rounded-control bg-[var(--skin-simple-go)] text-[20px] font-bold text-white"
         >
-          {last ? <><Check className="size-6" /> முடி · Finish</> : 'அடுத்தது · Next →'}
+          {last ? <><Check className="size-6" /> Finish</> : 'Next →'}
         </button>
         {step > 0 ? (
           <button
@@ -62,12 +62,11 @@ export function SimplePostTripPage() {
             onClick={() => setStep((x) => x - 1)}
             className="h-12 w-full rounded-control border-2 border-border text-[16px] font-bold text-muted-foreground"
           >
-            ← பின்னால் · Back one step
+            ← Back one step
           </button>
         ) : null}
         <div className="mt-2 rounded-card border-2 border-warning bg-[var(--skin-simple-wait-bg)] p-3 text-center text-[14px]">
-          ஒரு கேள்விக்கு பதில் சொல்லவும், அடுத்தது அழுத்தவும் <br />
-          <span className="text-muted-foreground">Answer one question, then tap Next</span>
+          Answer one question, then tap <strong>Next</strong>
         </div>
       </footer>
     </div>

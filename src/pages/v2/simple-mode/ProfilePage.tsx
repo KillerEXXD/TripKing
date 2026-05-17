@@ -14,7 +14,7 @@ export function SimpleProfilePage() {
         <Link to="/v7" aria-label="Back" className="rounded-pill border-2 border-border bg-surface p-2">
           <ChevronLeft className="size-6" />
         </Link>
-        <div className="text-[22px] font-bold">நீங்கள் · You</div>
+        <div className="text-[22px] font-bold">You</div>
       </header>
 
       <section className="px-5">
@@ -32,15 +32,13 @@ export function SimpleProfilePage() {
       <section className="mt-4 space-y-3 px-5">
         <BigTile
           icon={<Phone className="size-7" />}
-          ta="என் ஃபோன் நம்பர்"
-          en="My phone number"
+          label="My phone number"
           value={user?.phone ?? '—'}
         />
         <BigTile
           icon={<BadgeCheck className="size-7" />}
-          ta="ஆவணங்கள் சரிபார்க்கப்பட்டது"
-          en="My documents — verified"
-          value="✓ OK"
+          label="My documents"
+          value="Verified ✓"
           tone="go"
         />
         <Link
@@ -49,8 +47,8 @@ export function SimpleProfilePage() {
         >
           <HelpCircle className="size-7 text-[var(--skin-simple-wait)]" />
           <div className="flex-1">
-            <div className="text-[18px] font-bold">உதவி வேண்டுமா?</div>
-            <div className="text-[13px] text-muted-foreground">Need help? Tap here to call support</div>
+            <div className="text-[18px] font-bold">Need help?</div>
+            <div className="text-[13px] text-muted-foreground">Tap here to call support</div>
           </div>
         </Link>
       </section>
@@ -61,7 +59,7 @@ export function SimpleProfilePage() {
           onClick={() => void logout()}
           className="flex h-14 w-full items-center justify-center gap-2 rounded-control border-2 border-[var(--skin-simple-stop)] text-[18px] font-bold text-[var(--skin-simple-stop)]"
         >
-          <LogOut className="size-5" /> வெளியேறு · Sign out
+          <LogOut className="size-5" /> Sign out
         </button>
       </div>
     </div>
@@ -69,9 +67,9 @@ export function SimpleProfilePage() {
 }
 
 function BigTile({
-  icon, ta, en, value, tone,
+  icon, label, value, tone,
 }: {
-  icon: React.ReactNode; ta: string; en: string; value: string; tone?: 'go';
+  icon: React.ReactNode; label: string; value: string; tone?: 'go';
 }) {
   return (
     <div
@@ -83,8 +81,7 @@ function BigTile({
     >
       <div className="text-primary">{icon}</div>
       <div className="min-w-0 flex-1">
-        <div className="text-[15px] font-semibold">{ta}</div>
-        <div className="text-[12px] text-muted-foreground">{en}</div>
+        <div className="text-[15px] font-semibold">{label}</div>
         <div className="mt-0.5 text-[20px] font-bold">{value}</div>
       </div>
     </div>

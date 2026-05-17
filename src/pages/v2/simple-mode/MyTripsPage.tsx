@@ -5,7 +5,7 @@ import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR } from '@/lib/utils';
 import type { MyApplication } from '@/types';
 
-/** v7 Simple Mode — my trips. Big status icon, plain language status, big payout. */
+/** v7 Simple Mode — my trips. Big status icon, plain status, big payout. */
 export function SimpleMyTripsPage() {
   const query = useMyApplications();
   const apps = query.data ?? [];
@@ -17,8 +17,8 @@ export function SimpleMyTripsPage() {
           <ChevronLeft className="size-6" />
         </Link>
         <div>
-          <div className="text-[22px] font-bold">என் டிரிப்</div>
-          <div className="text-[14px] text-muted-foreground">My trips</div>
+          <div className="text-[22px] font-bold">My trips</div>
+          <div className="text-[14px] text-muted-foreground">Trips you said yes to</div>
         </div>
       </header>
 
@@ -28,7 +28,7 @@ export function SimpleMyTripsPage() {
         ) : query.isError ? (
           <ErrorState message="Could not load. Try again." onRetry={() => query.refetch()} />
         ) : apps.length === 0 ? (
-          <EmptyState title="டிரிப் இல்லை · No trips" message="Find a trip from the home screen." />
+          <EmptyState title="No trips yet" message="Find a trip from the home screen." />
         ) : (
           apps.map((a) => <Row key={a.acceptanceId} app={a} />)
         )}
@@ -37,18 +37,18 @@ export function SimpleMyTripsPage() {
   );
 }
 
-function statusFor(s: MyApplication['status']): { icon: React.ReactNode; color: string; bg: string; ta: string; en: string } {
+function statusFor(s: MyApplication['status']): { icon: React.ReactNode; color: string; bg: string; label: string; hint: string } {
   switch (s) {
     case 'accepted':
-      return { icon: <CircleCheck className="size-10" />, color: 'var(--skin-simple-go)', bg: 'var(--skin-simple-go-bg)', ta: 'ஏற்கப்பட்டது', en: 'Confirmed — drive!' };
+      return { icon: <CircleCheck className="size-10" />, color: 'var(--skin-simple-go)',   bg: 'var(--skin-simple-go-bg)',   label: 'Confirmed', hint: 'Drive this one' };
     case 'selected':
-      return { icon: <CircleAlert className="size-10" />, color: 'var(--skin-simple-wait)', bg: 'var(--skin-simple-wait-bg)', ta: 'நடவடிக்கை தேவை', en: 'Action needed — tap to confirm' };
+      return { icon: <CircleAlert className="size-10" />, color: 'var(--skin-simple-wait)', bg: 'var(--skin-simple-wait-bg)', label: 'Action needed', hint: 'Tap to confirm' };
     case 'applied':
-      return { icon: <Clock className="size-10" />, color: 'var(--skin-simple-wait)', bg: 'var(--skin-simple-wait-bg)', ta: 'காத்திருக்கிறது', en: 'Waiting for the agent' };
+      return { icon: <Clock className="size-10" />,       color: 'var(--skin-simple-wait)', bg: 'var(--skin-simple-wait-bg)', label: 'Waiting', hint: 'The agent is deciding' };
     case 'rejected':
-      return { icon: <CircleAlert className="size-10" />, color: 'var(--skin-simple-stop)', bg: 'var(--skin-simple-stop-bg)', ta: 'மறுக்கப்பட்டது', en: 'Not picked — try another' };
+      return { icon: <CircleAlert className="size-10" />, color: 'var(--skin-simple-stop)', bg: 'var(--skin-simple-stop-bg)', label: 'Not picked', hint: 'Try another trip' };
     default:
-      return { icon: <Clock className="size-10" />, color: 'var(--color-muted-foreground)', bg: 'var(--color-surface-muted)', ta: s, en: s };
+      return { icon: <Clock className="size-10" />,       color: 'var(--color-muted-foreground)', bg: 'var(--color-surface-muted)', label: s, hint: '' };
   }
 }
 
@@ -62,8 +62,8 @@ function Row({ app }: { app: MyApplication }) {
     >
       <div style={{ color: st.color }}>{st.icon}</div>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold" style={{ color: st.color }}>{st.ta}</div>
-        <div className="text-[11px] text-muted-foreground">{st.en}</div>
+        <div className="text-[14px] font-bold" style={{ color: st.color }}>{st.label}</div>
+        <div className="text-[11px] text-muted-foreground">{st.hint}</div>
         <div className="mt-1 text-[18px] font-bold leading-tight">
           {app.trip.fromCity?.name} → {app.trip.toCity?.name}
         </div>

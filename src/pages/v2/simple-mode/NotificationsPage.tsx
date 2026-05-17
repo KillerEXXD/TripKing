@@ -16,8 +16,8 @@ export function SimpleNotificationsPage() {
           <ChevronLeft className="size-6" />
         </Link>
         <div>
-          <div className="text-[22px] font-bold">தகவல்கள்</div>
-          <div className="text-[14px] text-muted-foreground">Messages for you</div>
+          <div className="text-[22px] font-bold">Messages</div>
+          <div className="text-[14px] text-muted-foreground">News for you</div>
         </div>
       </header>
 
@@ -27,7 +27,7 @@ export function SimpleNotificationsPage() {
         ) : query.isError ? (
           <ErrorState message="Could not load. Try again." onRetry={() => query.refetch()} />
         ) : items.length === 0 ? (
-          <EmptyState title="தகவல் இல்லை · Nothing new" message="Come back later." />
+          <EmptyState title="Nothing new" message="Come back later." />
         ) : (
           items.map((n) => <NotificationRow key={n.id} n={n} />)
         )}
@@ -38,12 +38,12 @@ export function SimpleNotificationsPage() {
 
 function iconFor(t: Notification['type']) {
   switch (t) {
-    case 'alert_match':       return { icon: <Bell className="size-8" />,        color: 'var(--skin-simple-wait)', bg: 'var(--skin-simple-wait-bg)' };
-    case 'trip_assigned':     return { icon: <CircleCheck className="size-8" />, color: 'var(--skin-simple-go)',   bg: 'var(--skin-simple-go-bg)'   };
-    case 'trip_cancelled':    return { icon: <CircleAlert className="size-8" />, color: 'var(--skin-simple-stop)', bg: 'var(--skin-simple-stop-bg)' };
-    case 'trip_completed':    return { icon: <CircleCheck className="size-8" />, color: 'var(--skin-simple-go)',   bg: 'var(--skin-simple-go-bg)'   };
-    case 'review_received':   return { icon: <MessageCircle className="size-8" />, color: 'var(--color-primary)',  bg: 'var(--color-surface-muted)' };
-    default:                  return { icon: <Bell className="size-8" />,        color: 'var(--color-muted-foreground)', bg: 'var(--color-surface-muted)' };
+    case 'alert_match':     return { icon: <Bell className="size-8" />,          color: 'var(--skin-simple-wait)', bg: 'var(--skin-simple-wait-bg)' };
+    case 'trip_assigned':   return { icon: <CircleCheck className="size-8" />,   color: 'var(--skin-simple-go)',   bg: 'var(--skin-simple-go-bg)'   };
+    case 'trip_cancelled':  return { icon: <CircleAlert className="size-8" />,   color: 'var(--skin-simple-stop)', bg: 'var(--skin-simple-stop-bg)' };
+    case 'trip_completed':  return { icon: <CircleCheck className="size-8" />,   color: 'var(--skin-simple-go)',   bg: 'var(--skin-simple-go-bg)'   };
+    case 'review_received': return { icon: <MessageCircle className="size-8" />, color: 'var(--color-primary)',    bg: 'var(--color-surface-muted)' };
+    default:                return { icon: <Bell className="size-8" />,          color: 'var(--color-muted-foreground)', bg: 'var(--color-surface-muted)' };
   }
 }
 
