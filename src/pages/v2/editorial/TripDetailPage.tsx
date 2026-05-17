@@ -33,7 +33,7 @@ export function EditorialTripDetailPage() {
   return (
     <div className="mx-auto max-w-md pb-16">
       <Link
-        to="/v5"
+        to="/v5/trips"
         aria-label="Back"
         className="m-3 inline-flex items-center gap-1 rounded-pill bg-surface px-3 py-1.5 text-[11px] uppercase tracking-wide text-muted-foreground shadow-card"
       >
@@ -97,10 +97,10 @@ function RouteHero({ from, to }: { from: string; to: string }) {
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <>
       <dt className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">{label}</dt>
       <dd className="editorial-headline mt-0.5 text-[18px] leading-tight">{value}</dd>
-    </div>
+    </>
   );
 }
 

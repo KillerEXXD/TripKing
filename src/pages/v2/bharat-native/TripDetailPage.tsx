@@ -46,7 +46,7 @@ export function BharatTripDetailPage() {
   return (
     <div className="mx-auto max-w-md pb-12">
       <header className="bg-primary px-4 pb-5 pt-4 text-primary-foreground">
-        <Link to="/v6" aria-label="Back" className="mb-3 inline-flex size-9 items-center justify-center rounded-pill bg-white/15">
+        <Link to="/v6/trips" aria-label="Back" className="mb-3 inline-flex size-9 items-center justify-center rounded-pill bg-white/15">
           <ChevronLeft className="size-5" />
         </Link>
         <div className="text-[22px] font-semibold leading-tight">

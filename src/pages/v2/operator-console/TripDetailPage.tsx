@@ -31,7 +31,7 @@ export function OperatorTripDetailPage() {
   return (
     <div className="mx-auto max-w-md">
       <header className="flex items-center gap-2 border-b border-border bg-surface px-3 py-2 text-[13px]">
-        <Link to="/v2" className="rounded-control p-1 text-muted-foreground hover:bg-surface-muted" aria-label="Back to trips">
+        <Link to="/v2/trips" className="rounded-control p-1 text-muted-foreground hover:bg-surface-muted" aria-label="Back to trips">
           <ChevronLeft className="size-4" />
         </Link>
         <span className="font-mono text-[12px] text-muted-foreground">TRP-{trip.id.slice(0, 7).toUpperCase()}</span>

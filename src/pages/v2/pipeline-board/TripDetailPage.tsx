@@ -36,7 +36,7 @@ export function PipelineTripDetailPage() {
   return (
     <div className="mx-auto max-w-md pb-6">
       <header className="flex items-center gap-2 px-4 pt-3">
-        <Link to="/v4" aria-label="Back to board" className="rounded-control p-1 hover:bg-surface-muted">
+        <Link to="/v4/trips" aria-label="Back to board" className="rounded-control p-1 hover:bg-surface-muted">
           <ChevronLeft className="size-5" />
         </Link>
         <h1 className="text-[16px] font-semibold">{routeChainText(trip)}</h1>

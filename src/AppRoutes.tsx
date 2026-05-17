@@ -76,6 +76,11 @@ const V3FieldTripDetailPage = lazyWithRetry(() => import('@/pages/v2/field-compa
 const V4PipelineTripDetailPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripDetailPage'));
 const V5EditorialTripDetailPage = lazyWithRetry(() => import('@/pages/v2/editorial/TripDetailPage'));
 const V6BharatTripDetailPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/TripDetailPage'));
+const V2OperatorHomePage = lazyWithRetry(() => import('@/pages/v2/operator-console/HomePage'));
+const V3FieldHomePage = lazyWithRetry(() => import('@/pages/v2/field-companion/HomePage'));
+const V4PipelineHomePage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/HomePage'));
+const V5EditorialHomePage = lazyWithRetry(() => import('@/pages/v2/editorial/HomePage'));
+const V6BharatHomePage = lazyWithRetry(() => import('@/pages/v2/bharat-native/HomePage'));
 
 function PageFallback() {
   return (
@@ -157,15 +162,20 @@ export function AppRoutes() {
           </Route>
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
-            <Route path="/v2" element={<V2OperatorTripsPage />} />
+            <Route path="/v2" element={<V2OperatorHomePage />} />
+            <Route path="/v2/trips" element={<V2OperatorTripsPage />} />
             <Route path="/v2/trips/:id" element={<V2OperatorTripDetailPage />} />
-            <Route path="/v3" element={<V3FieldTripsPage />} />
+            <Route path="/v3" element={<V3FieldHomePage />} />
+            <Route path="/v3/trips" element={<V3FieldTripsPage />} />
             <Route path="/v3/trips/:id" element={<V3FieldTripDetailPage />} />
-            <Route path="/v4" element={<V4PipelineTripsPage />} />
+            <Route path="/v4" element={<V4PipelineHomePage />} />
+            <Route path="/v4/trips" element={<V4PipelineTripsPage />} />
             <Route path="/v4/trips/:id" element={<V4PipelineTripDetailPage />} />
-            <Route path="/v5" element={<V5EditorialTripsPage />} />
+            <Route path="/v5" element={<V5EditorialHomePage />} />
+            <Route path="/v5/trips" element={<V5EditorialTripsPage />} />
             <Route path="/v5/trips/:id" element={<V5EditorialTripDetailPage />} />
-            <Route path="/v6" element={<V6BharatTripsPage />} />
+            <Route path="/v6" element={<V6BharatHomePage />} />
+            <Route path="/v6/trips" element={<V6BharatTripsPage />} />
             <Route path="/v6/trips/:id" element={<V6BharatTripDetailPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />

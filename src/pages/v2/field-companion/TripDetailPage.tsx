@@ -31,7 +31,7 @@ export function FieldTripDetailPage() {
   return (
     <div className="min-h-dvh pb-32">
       <header className="flex items-center gap-3 px-5 pt-4">
-        <Link to="/v3" aria-label="Back" className="rounded-pill bg-surface p-2">
+        <Link to="/v3/trips" aria-label="Back" className="rounded-pill bg-surface p-2">
           <ChevronLeft className="size-5" />
         </Link>
         <h1 className="text-[22px] font-bold">Trip</h1>
