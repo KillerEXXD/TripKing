@@ -1,5 +1,5 @@
 ---
-description: TripKing full health check — runs /metrics, /dbperf, /smokeall, /sentry, /posthog, the Vercel deploy status, and GitHub health, then a unified action summary
+description: TripKing full health check — runs /metrics, /dbperf, /smokeall, /sentry, /posthog, the Vercel deploy status, the latest scheduled E2E run, and GitHub health, then a unified action summary
 ---
 
 Run a comprehensive TripKing health check by executing each diagnostic **in full** (the complete report for each, exactly as if run individually — don't abbreviate within a section), then end with a consolidated action summary.
@@ -11,7 +11,8 @@ Output order:
 4. Full `/sentry` report
 5. Full `/posthog` report
 6. Frontend deploy status (Vercel)
-7. Unified action summary
+7. Latest scheduled E2E run (GitHub Actions `e2e-qase.yml`)
+8. Unified action summary
 
 ---
 
@@ -58,7 +59,33 @@ Present:
 
 ---
 
-## Step 7 — Unified action summary
+## Step 7 — Latest scheduled E2E run (GitHub Actions)
+
+The `e2e-qase.yml` workflow runs twice daily (02:30 + 14:30 UTC = 08:00 + 20:00 IST) — full Playwright suite against deployed Supabase, results posted to Qase TRIPKINGAP. This step surfaces the most-recent run so you don't have to hunt the Actions tab.
+
+- Pull the latest run via the `github` MCP (`mcp__github__list_workflow_runs` on `KillerEXXD/TripKing`, workflow `e2e-qase.yml`, `per_page: 3`). Fall back to a public web fetch of `https://github.com/KillerEXXD/TripKing/actions/workflows/e2e-qase.yml` if the MCP is unavailable.
+- From the latest run extract: `conclusion` (success/failure/cancelled), `created_at`, `head_sha` + commit subject, `html_url`, and (if `failure`) the failed-jobs / failed-tests summary from the run logs.
+- If the latest run is `failure`, drill into the run's annotations/logs to surface the failing spec name(s) — at minimum the file + test title — so the action-summary CRITICAL row can name them.
+- If the latest run is older than **18 hours**, that means a scheduled run was missed (cron usually fires every 12h); flag it as WARNING.
+
+Present:
+```
+### E2E (GitHub Actions — e2e-qase.yml, scheduled 08:00 + 20:00 IST)
+| Check | Value | Status |
+|-------|-------|--------|
+| Last run | <conclusion> · <relative-time> · [commit hash + subject] | OK if success/recent / CRITICAL if failure / WARNING if >18h old |
+| Failing specs | <count> (list titles inline if ≤3, else "see [run](url)") | OK if 0 |
+| Qase posting | enabled (TRIPKINGAP) | INFO |
+| Run URL | <html_url> | — |
+
+[If failures: 1-line each of failing test title + the assertion that broke.]
+```
+
+If both the latest scheduled run AND any on-demand `workflow_dispatch` runs in the last 24h exist, prefer the scheduled one (it runs the FULL suite; dispatch may have been grep-filtered).
+
+---
+
+## Step 8 — Unified action summary
 
 ```
 ---
@@ -75,6 +102,7 @@ Present:
 | PostHog (trip-king) | X visitors | Y events | INFO |
 | Speed Insights (Core Web Vitals, 24h) | OK/WARN/CRITICAL | LCP p75 X · INP p75 X · CLS X | poor on any metric = CRITICAL |
 | Frontend (Vercel) | READY/ERROR | built <hash> | OK/CRITICAL |
+| E2E (Playwright nightly) | success/failure | X passed · Y failed · <relative-time> | OK/CRITICAL |
 | GitHub | X PRs, Y issues | Z failed workflows (24h) | … |
 
 ### Action items (need attention — severity-sorted)

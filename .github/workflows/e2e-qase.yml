@@ -26,7 +26,9 @@ on:
         default: true
         type: boolean
   schedule:
-    - cron: '30 2 * * *'  # 02:30 UTC daily
+    # Twice daily — morning + evening India time so regressions are caught within ~12h.
+    - cron: '30 2 * * *'   # 02:30 UTC = 08:00 IST
+    - cron: '30 14 * * *'  # 14:30 UTC = 20:00 IST
 
 permissions:
   contents: read
