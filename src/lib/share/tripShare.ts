@@ -134,10 +134,18 @@ export function buildShareCaption(trip: Trip, opts: { withUrl?: boolean } = { wi
 /** Snapshot a DOM node to a PNG blob (2× for retina; white bg so it's not black on Telegram).
  *  `html-to-image` is dynamically imported — keeps the lib out of the initial chunk for
  *  every page that touches a Trip (RouteChain pulls in `shareVariant`/`VARIANT_LABEL` from
- *  this module on every trip card), avoiding the cssRules SecurityError noise on page load. */
+ *  this module on every trip card), avoiding the cssRules SecurityError noise on page load.
+ *
+ *  `skipFonts: true` — the library otherwise tries to inline every linked stylesheet's
+ *  font-face rules by reading `cssRules` on each `<link>`'s CSSStyleSheet. Google Fonts
+ *  (`fonts.googleapis.com/css2?…`) is cross-origin, so the browser throws SecurityError
+ *  ("Cannot access rules"). The error floods Sentry on every share. Skipping font-
+ *  embedding falls back to the device's installed Inter (or the system sans fallback);
+ *  TripShareCard already uses inline `style={{fontFamily}}` so the rendered text is
+ *  identical to what users see in-app. */
 export async function nodeToPngBlob(node: HTMLElement): Promise<Blob> {
   const { toBlob } = await import('html-to-image');
-  const blob = await toBlob(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true });
+  const blob = await toBlob(node, { pixelRatio: 2, backgroundColor: '#ffffff', cacheBust: true, skipFonts: true });
   if (!blob) throw new Error('html-to-image returned no blob');
   return blob;
 }

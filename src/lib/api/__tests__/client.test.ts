@@ -125,6 +125,30 @@ describe('apiClient', () => {
     expect(retryHeaders['Authorization']).toBe('Bearer fresh-access');
   });
 
+  it('on 401 + refresh-also-401, clears tokens immediately so the next 401-retry short-circuits (no second doomed /auth/refresh)', async () => {
+    apiClient.setTokens('expired-access', 'stale-refresh');
+    const onAuthFail = vi.fn();
+    apiClient.onAuthFailure(onAuthFail);
+    const fetchMock = vi
+      .fn()
+      // 1: original request → 401
+      .mockResolvedValueOnce(jsonResponse({ success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'expired' } }, 401))
+      // 2: POST /auth/refresh → 401 (refresh-token also expired)
+      .mockResolvedValueOnce(jsonResponse({ success: false, data: null, error: { code: 'UNAUTHORIZED', message: 'bad refresh' } }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(apiClient.get<{ id: string }>('/me')).rejects.toThrow();
+
+    // Exactly TWO fetch calls — the original GET and one POST /auth/refresh. The reactive
+    // refresh that the request loop would normally fire on 401 short-circuits because
+    // refreshSession() already cleared the refresh token after the first failure.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain('/auth/refresh');
+    expect(apiClient.getAccessToken()).toBeNull();
+    expect(apiClient.getRefreshToken()).toBeNull();
+    expect(onAuthFail).toHaveBeenCalled();
+  });
+
   it('GET dedup — concurrent identical GETs share one network request', async () => {
     let resolveFetch: (v: Response) => void = () => undefined;
     const fetchMock = vi.fn().mockImplementation(
