@@ -110,6 +110,7 @@ export function tagCacheHit(res: Response, hit: CacheHit): Response {
 }
 
 import { type CacheScope, setCacheControl, maybeNotModified } from './httpCache.ts';
+import { corsHeaders } from './cors.ts';
 
 /**
  * Tag X-Cache + Cache-Control + (conditionally) ETag on a 200 Response in one call.
@@ -129,4 +130,30 @@ export async function tagResponse(
     return await maybeNotModified(req, res, opts.body);
   }
   return res;
+}
+
+/**
+ * One-call replacement for `setCacheControl(tagCacheHit(ok(data), hit), {...})` that ALSO
+ * computes an ETag and short-circuits to 304 when the caller's `If-None-Match` matches.
+ *
+ * Use this for cached `GET` endpoints. Serialises the `{success,data,error}` envelope
+ * exactly once and reuses the string for both the Response body AND the ETag hash, so
+ * there's no extra serialization cost vs. `ok()`.
+ *
+ * For uncached or per-user-mutating responses, keep using `ok()` directly.
+ */
+export async function okCached(
+  req: Request,
+  data: unknown,
+  opts: { hit: CacheHit; ttl: number; scope: CacheScope; meta?: unknown },
+): Promise<Response> {
+  const envelope = opts.meta === undefined
+    ? { success: true, data, error: null }
+    : { success: true, data, meta: opts.meta, error: null };
+  const body = JSON.stringify(envelope);
+  const res = new Response(body, {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+  return await tagResponse(req, res, { hit: opts.hit, ttl: opts.ttl, scope: opts.scope, body });
 }

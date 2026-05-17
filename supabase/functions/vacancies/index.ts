@@ -21,7 +21,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
-import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { withCache, tagCacheHit, okCached } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
@@ -184,7 +184,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       },
     );
     if (!data) return fail('NOT_FOUND', 'Vacancy not found', 404);
-    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.SHORT, scope: 'public' });
+    return await okCached(req, data, { hit, ttl: CacheTTL.SHORT, scope: 'public' });
   }
 
   // ── GET /vacancies (list) — LIVE tier, 30s shared cache (memory + api_cache), public-safe ─

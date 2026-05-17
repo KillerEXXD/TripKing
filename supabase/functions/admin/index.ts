@@ -35,7 +35,7 @@ import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
-import { withCache, tagCacheHit } from '../_shared/withCache.ts';
+import { withCache, tagCacheHit, okCached } from '../_shared/withCache.ts';
 import { CacheTTL } from '../_shared/cache.ts';
 import { sharedCacheInvalidateType } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
@@ -412,7 +412,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
           return data;
         },
       );
-      return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.LONG, scope: 'public' });
+      return await okCached(req, data, { hit, ttl: CacheTTL.LONG, scope: 'public' });
     }
     if (req.method === 'PUT' || req.method === 'PATCH') {
       const a = await requireAdmin(db, req);
@@ -595,7 +595,7 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
         return data ?? [];
       },
     );
-    return setCacheControl(tagCacheHit(ok(data), hit), { ttl: CacheTTL.LONG, scope: 'public' });
+    return await okCached(req, data, { hit, ttl: CacheTTL.LONG, scope: 'public' });
   }
 
   // POST /admin/<list>
