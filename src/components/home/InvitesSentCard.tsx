@@ -18,7 +18,14 @@ import type { Trip } from '@/types';
  * so this is pure presentation — no extra fetch.
  */
 export function InvitesSentCard({ trips }: { trips: Trip[] }) {
-  const tripsWithInvites = trips.filter((t) => (t.pendingInvitationCount ?? 0) > 0);
+  // Count only trips where pending invites are still actionable — once a trip is
+  // selected / accepted / in_progress / completed / cancelled, any leftover invitation
+  // rows are stale (the agent's already decided). The `?scope=invites-sent` page on
+  // /posted-trips applies the same predicate, so this card's count + tripCount agree
+  // with what the user sees after tapping through.
+  const tripsWithInvites = trips.filter(
+    (t) => (t.pendingInvitationCount ?? 0) > 0 && (t.status === 'open' || t.status === 'has_applicants'),
+  );
   if (tripsWithInvites.length === 0) return null;
 
   const total = tripsWithInvites.reduce((sum, t) => sum + (t.pendingInvitationCount ?? 0), 0);

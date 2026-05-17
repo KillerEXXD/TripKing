@@ -80,4 +80,20 @@ describe('InvitesSentCard', () => {
     renderCard([makeTrip({ pendingInvitationCount: 1 })]);
     expect(screen.getByText(/^1 invite awaiting driver$/i)).toBeInTheDocument();
   });
+
+  it('only counts trips whose status is open or has_applicants — stale invites on in_progress/selected/etc trips are ignored', () => {
+    renderCard([
+      makeTrip({ id: 't-open', status: 'open', pendingInvitationCount: 2 }),
+      // Pending-invite rows can linger on these statuses but the agent already
+      // decided, so they're not "awaiting" anyone. Card must agree with the scope
+      // page's filter (`?scope=invites-sent` predicate on PostedTripsPage).
+      makeTrip({ id: 't-in-progress', status: 'in_progress', pendingInvitationCount: 3 }),
+      makeTrip({ id: 't-selected', status: 'selected', pendingInvitationCount: 1 }),
+      makeTrip({ id: 't-completed', status: 'completed', pendingInvitationCount: 4 }),
+    ]);
+    const link = screen.getByRole('link');
+    // Only the `open` trip counts → 2 invites across 1 trip → routes to its detail.
+    expect(link).toHaveAttribute('href', '/trips/t-open/invitations?from=/');
+    expect(link).toHaveTextContent(/2 invites awaiting driver/i);
+  });
 });

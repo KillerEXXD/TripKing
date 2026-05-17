@@ -341,7 +341,10 @@ describe('DriverActivityPage', () => {
 
   it('?scope=invites-received — hides the tab strip, swaps the header to a back arrow + scoped title, renders just the InvitedList', () => {
     setUp({
-      invited: tripsState({ data: [makeTrip({ id: 'inv-a', toCity: city('cA', 'InvitedA-to') }), makeTrip({ id: 'inv-b', toCity: city('cB', 'InvitedB-to') })] }),
+      invited: tripsState({ data: [
+        makeTrip({ id: 'inv-a', toCity: city('cA', 'InvitedA-to'), invitationId: 'i-a', invitationStatus: 'pending' }),
+        makeTrip({ id: 'inv-b', toCity: city('cB', 'InvitedB-to'), invitationId: 'i-b', invitationStatus: 'pending' }),
+      ] }),
     });
     renderPage('/my-trips?scope=invites-received&from=/');
     // Scoped header
@@ -354,5 +357,24 @@ describe('DriverActivityPage', () => {
     // Both invited trips render
     expect(screen.getByText(/vellore → invitedA-to/i)).toBeInTheDocument();
     expect(screen.getByText(/vellore → invitedB-to/i)).toBeInTheDocument();
+  });
+
+  it('?scope=invites-received — count matches the home card (filters out non-pending and already-applied invites)', () => {
+    const pending1 = makeTrip({ id: 't-p1', toCity: city('cp1', 'Pending1-to'), invitationId: 'i-p1', invitationStatus: 'pending' });
+    const pending2 = makeTrip({ id: 't-p2', toCity: city('cp2', 'Pending2-to'), invitationId: 'i-p2', invitationStatus: 'pending' });
+    const alreadyApplied = makeTrip({ id: 't-app', toCity: city('ca', 'AlreadyApplied-to'), invitationId: 'i-app', invitationStatus: 'pending' });
+    const declined = makeTrip({ id: 't-dec', toCity: city('cd', 'Declined-to'), invitationId: 'i-dec', invitationStatus: 'declined' });
+    setUp({
+      invited: tripsState({ data: [pending1, pending2, alreadyApplied, declined] }),
+      // alreadyApplied appears as a separate application — must be filtered out of the
+      // "waiting for your decision" view (same filter the home card applies).
+      applied: appsState({ data: [makeApp({ acceptanceId: 'app-1', status: 'applied', trip: alreadyApplied })] }),
+    });
+    renderPage('/my-trips?scope=invites-received&from=/');
+    expect(screen.getByText(/2 trips waiting for your decision/i)).toBeInTheDocument();
+    expect(screen.getByText(/vellore → pending1-to/i)).toBeInTheDocument();
+    expect(screen.getByText(/vellore → pending2-to/i)).toBeInTheDocument();
+    expect(screen.queryByText(/vellore → alreadyApplied-to/i)).toBeNull();
+    expect(screen.queryByText(/vellore → declined-to/i)).toBeNull();
   });
 });
