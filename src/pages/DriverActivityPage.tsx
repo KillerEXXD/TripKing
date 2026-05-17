@@ -368,7 +368,15 @@ export function DriverActivityPage() {
   // Scoped drill-down — render a focused list with a back arrow + scoped title and skip
   // the tab strip entirely. Triggered by `?scope=invites-received` from the home card.
   if (scope === 'invites-received') {
-    const inviteCount = invitedQuery.data?.length ?? 0;
+    // Match the DriverHomePage filter exactly so the home-card count and the page count agree:
+    // only `invitationStatus === 'pending'` AND the driver hasn't already applied (a re-invite
+    // can rewrite the invitation row back to pending — migration 033 has the FK guard but the
+    // client filter keeps stale ones from leaking into the view).
+    const appliedTripIds = new Set((appliedQuery.data ?? []).map((a) => a.trip.id));
+    const scopedInvites = (invitedQuery.data ?? []).filter(
+      (t) => t.invitationStatus === 'pending' && !appliedTripIds.has(t.id),
+    );
+    const inviteCount = scopedInvites.length;
     return (
       <div className="mx-auto max-w-md">
         <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3 shadow-header">
@@ -381,7 +389,7 @@ export function DriverActivityPage() {
           </div>
         </header>
         <div className="space-y-3 p-4">
-          <InvitedList query={invitedQuery} onShare={setShareTrip} />
+          <InvitedList query={invitedQuery} trips={scopedInvites} onShare={setShareTrip} />
         </div>
         {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
       </div>
@@ -503,15 +511,20 @@ function AppliedList({ query }: { query: ReturnType<typeof useMyApplications> })
  */
 function InvitedList({
   query,
+  trips: tripsOverride,
   onShare,
 }: {
   query: ReturnType<typeof useTrips>;
+  /** Caller-supplied filtered list — overrides `query.data` so callers (e.g. the
+   *  `?scope=invites-received` view) can pre-filter to pending-only invites while
+   *  keeping the loading / error UI driven by the shared query. */
+  trips?: Trip[];
   onShare: (t: Trip) => void;
 }) {
   const declineMutation = useDeclineTripInvite();
   if (query.isPending) return <LoadingSkeleton rows={4} />;
   if (query.isError) return <ErrorState title="Couldn't load your invites" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
-  const trips = query.data ?? [];
+  const trips = tripsOverride ?? query.data ?? [];
   if (trips.length === 0) {
     return (
       <EmptyState
