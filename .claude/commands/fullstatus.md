@@ -12,7 +12,8 @@ Output order:
 5. Full `/posthog` report
 6. Frontend deploy status (Vercel)
 7. Latest scheduled E2E run (GitHub Actions `e2e-qase.yml`)
-8. Unified action summary
+8. Cache effectiveness review (origin + CDN + verdict per endpoint)
+9. Unified action summary
 
 ---
 
@@ -85,7 +86,68 @@ If both the latest scheduled run AND any on-demand `workflow_dispatch` runs in t
 
 ---
 
-## Step 8 — Unified action summary
+## Step 8 — Cache effectiveness review
+
+A dedicated, opinionated read of how caching is performing across all three tiers — produces a verdict per endpoint, not just numbers. Use the data already gathered in Steps 1 + 2 plus a small CDN-tier probe.
+
+### Tier 1 — Origin (`api_metrics.cache_status`)
+
+Already pulled in `/dbperf` Step 2.5. Re-cite the per-endpoint hit rate here; don't re-query.
+
+### Tier 2 — Cloudflare CDN
+
+The CDN intercepts cache hits BEFORE they reach origin, so they don't appear in `api_metrics`. To estimate CDN effectiveness, compare 24h request volume against a known baseline AND probe the live edge:
+
+```bash
+KEY=sb_publishable_PRH2LiqnVjxAN7FYBVVQjA_TOWdFS0U
+for path in admin/cities admin/car-types admin/app-settings admin/languages admin/seat-options; do
+  curl -sD - -o /dev/null "https://api.tripkingapp.com/functions/v1/$path" \
+    -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+    | awk -v p="$path" '
+        /^CF-Cache-Status:/ { cf=$2 }
+        /^Age:/ { age=$2 }
+        END { printf("%-30s cf=%-8s age=%s\n", p, cf, age) }'
+done
+```
+
+Reading the output:
+- **`cf=HIT` + non-zero `age`** → CF is serving the response from edge, request never reached origin. ✅
+- **`cf=MISS`** → first request in this CF data centre; next request should HIT. Run twice if needed.
+- **`cf=DYNAMIC`** + origin returns 200 → origin isn't emitting `Cache-Control: public`. Check the source: should it be using `okCached()` instead of `ok()`?
+- **`cf=BYPASS`** → either the Cloudflare cache rule explicitly excluded this path, or a "bypass authenticated" rule is firing on the `Authorization` header.
+- **`cf=EXPIRED`** → cache had it, TTL elapsed; CF revalidating with origin. Next request should HIT again with `age` reset.
+
+### Tier 3 — Client (React Query `STALE` tiers)
+
+Not directly measurable post-hoc but inferable from request volume per session in PostHog. Skip detailed analysis unless `/metrics` shows a regression in client-driven endpoint volume (e.g. `GET /trips` traffic per active visitor 2× what it should be at 60s `STALE.live`).
+
+### Verdict per endpoint
+
+Build a table grading each endpoint on what's actually going on. Use these categories (don't make up new ones):
+
+| Verdict | Meaning |
+|---|---|
+| ✅ **Healthy** | Origin hit rate ≥ 50% on `tier:'shared'` endpoints OR `tier:'memory'` endpoint with consistent timing — working as designed |
+| ✅ **CDN-served** | CF returns HIT; origin never sees most traffic. Best case. |
+| 🟡 **Structurally low** | `tier:'shared'` but high-cardinality cache key (e.g. `vacancies` per-city-per-driver). Low hit rate by design — not a bug; document, don't fix |
+| 🟡 **Memory-only (intentional)** | `tier:'memory'` per-user keys (e.g. `agents:me`, `analytics:agent`). 0 shared hits is correct. |
+| 🟠 **Regression suspect** | `tier:'shared'` endpoint with high miss + 0 hit — SET path may be broken. Investigate `withCache` callsite. |
+| 🟠 **Unwrapped read-heavy** | Endpoint with 0 cache touches but high GET volume + low mutation rate. Candidate for wrapping. |
+| ❌ **PII leak risk** | CF returned HIT on an endpoint that shouldn't be public-cached. Stop — re-check the cache rule + origin Cache-Control header. |
+
+### Feedback — what would move the needle now
+
+End the section with 1-3 concrete recommendations, ranked by ROI per hour of work. Examples:
+- "Wrap `GET /vehicles` (200 calls / 24h, 0 cache touches, list-style read) — ~20 min, expect 40% hit rate"
+- "`/vacancies` hit rate climbed from 2% → X% after PR #240; structurally limited beyond ~40% — accept and move on"
+- "Three CDN endpoints (X, Y, Z) show DYNAMIC despite being lookups — origin is not emitting Cache-Control. Add `okCached()` wrapper."
+- "No regressions detected; current cache design is right-sized for current traffic. Don't tune."
+
+Don't recommend Cloudflare plan upgrades unless: (a) total daily requests > 100k, OR (b) Tier 2 hit rate < 30% AND Indian-only traffic. At current scale, Free is fine.
+
+---
+
+## Step 9 — Unified action summary
 
 ```
 ---
@@ -103,6 +165,7 @@ If both the latest scheduled run AND any on-demand `workflow_dispatch` runs in t
 | Speed Insights (Core Web Vitals, 24h) | OK/WARN/CRITICAL | LCP p75 X · INP p75 X · CLS X | poor on any metric = CRITICAL |
 | Frontend (Vercel) | READY/ERROR | built <hash> | OK/CRITICAL |
 | E2E (Playwright nightly) | success/failure | X passed · Y failed · <relative-time> | OK/CRITICAL |
+| Cache | Origin X% · CDN Y endpoints HIT · Z regressions | one-line headline from Step 8 verdict | OK if 0 regressions / WARNING if 1-2 / CRITICAL if PII leak |
 | GitHub | X PRs, Y issues | Z failed workflows (24h) | … |
 
 ### Action items (need attention — severity-sorted)
