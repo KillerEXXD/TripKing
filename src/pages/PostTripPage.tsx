@@ -708,7 +708,7 @@ export function PostTripPage() {
       {postedTrip ? (
         <ShareTripModal
           trip={postedTrip}
-          onClose={() => navigate(isDriver ? '/my-trips?tab=posted' : '/posted-trips')}
+          onClose={() => navigate(isDriver ? '/my-trips?tab=posted' : '/posted-trips?status=open')}
           onViewTrip={() => navigate(`/trips/${postedTrip.id}`)}
         />
       ) : null}
