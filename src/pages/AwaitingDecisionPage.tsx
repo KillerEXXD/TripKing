@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Sparkles } from 'lucide-react';
-import { useMyApplications } from '@/hooks/useTrips';
+import { ChevronRight, Sparkles, XCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import { useDeclineTrip, useMyApplications } from '@/hooks/useTrips';
 import { Badge, Button, Card } from '@/components/ui';
 import { QueueListPage } from '@/components/queue/QueueListPage';
-import { formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
+import { ApiError } from '@/lib/api/client';
+import { cn, formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { MyApplication } from '@/types';
 
 /**
@@ -42,6 +44,21 @@ export function AwaitingDecisionPage() {
 
 function SelectedRow({ app }: { app: MyApplication }) {
   const t = app.trip;
+  // Inline Decline lets the driver drop a pick without drilling into the trip detail —
+  // the common "I got picked for two overlapping trips" case. Accept still requires the
+  // trip-detail page because the AcceptTripDialog there handles overlap-withdrawal.
+  const declineMutation = useDeclineTrip();
+  async function onDecline() {
+    if (!window.confirm("Decline this trip? The agent will pick someone else and you won't be re-offered.")) return;
+    try {
+      await declineMutation.mutateAsync({ tripId: t.id });
+      toast.success('Trip declined.');
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 409) toast.error('Too late — this trip is no longer available to you.');
+      else toast.error("Couldn't decline — please try again.");
+    }
+  }
   return (
     <Card className="gap-0 p-0">
       <Link to={`/trips/${t.id}?from=/my-trips/awaiting`} className="block space-y-1.5 p-4 pb-3">
@@ -59,9 +76,21 @@ function SelectedRow({ app }: { app: MyApplication }) {
           {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}
         </div>
       </Link>
-      <div className="flex items-center justify-end border-t px-4 py-2.5 text-xs font-semibold">
-        <Link to={`/trips/${t.id}?from=/my-trips/awaiting`} className="flex items-center text-primary">
-          Accept or Decline
+      <div className="flex items-center gap-2 border-t px-4 py-2.5 text-xs font-semibold">
+        <button
+          type="button"
+          onClick={() => void onDecline()}
+          disabled={declineMutation.isPending}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-control border border-red-200 bg-red-50/50 px-3 py-1.5 text-sm font-semibold text-red-700 transition-colors',
+            'hover:border-red-300 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50',
+          )}
+        >
+          <XCircle className="size-3.5" aria-hidden />
+          {declineMutation.isPending ? 'Declining…' : 'Decline'}
+        </button>
+        <Link to={`/trips/${t.id}?from=/my-trips/awaiting`} className="ml-auto flex items-center text-primary">
+          Accept
           <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
         </Link>
       </div>

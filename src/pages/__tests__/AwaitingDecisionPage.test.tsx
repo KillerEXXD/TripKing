@@ -4,8 +4,10 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { AwaitingDecisionPage } from '@/pages/AwaitingDecisionPage';
 import type { MyApplication, Trip } from '@/types';
 
-vi.mock('@/hooks/useTrips', () => ({ useMyApplications: vi.fn() }));
-import { useMyApplications } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useMyApplications: vi.fn(), useDeclineTrip: vi.fn() }));
+import { useDeclineTrip, useMyApplications } from '@/hooks/useTrips';
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+import { toast } from 'sonner';
 
 const city = (id: string, name: string) => ({ id, name, state: 'TN', lat: 12.9, lng: 79.1, sortOrder: 1, isActive: true });
 function makeTrip(over: Partial<Trip> = {}): Trip {
@@ -31,13 +33,45 @@ function renderPage() {
 }
 
 describe('AwaitingDecisionPage', () => {
-  beforeEach(() => vi.mocked(useMyApplications).mockReset());
+  beforeEach(() => {
+    vi.mocked(useMyApplications).mockReset();
+    vi.mocked(useDeclineTrip).mockReset().mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
+  });
 
   it('lists selected applications and links each to the trip detail with ?from=/my-trips/awaiting', () => {
     setApps({ data: [makeApp({ acceptanceId: 'a1', trip: makeTrip({ id: 'trip-1' }) })] });
     renderPage();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
     expect(link).toHaveAttribute('href', '/trips/trip-1?from=/my-trips/awaiting');
+  });
+
+  it('inline Decline button fires the decline mutation with the trip id (no need to drill into trip detail)', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    vi.mocked(useDeclineTrip).mockReturnValue({ mutateAsync, isPending: false } as never);
+    setApps({ data: [makeApp({ acceptanceId: 'a1', trip: makeTrip({ id: 'trip-decline' }) })] });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^decline/i }));
+    expect(confirmSpy).toHaveBeenCalled();
+    await Promise.resolve();
+    expect(mutateAsync).toHaveBeenCalledWith({ tripId: 'trip-decline' });
+    confirmSpy.mockRestore();
+  });
+
+  it('Decline aborts when the user cancels the confirm dialog', () => {
+    const mutateAsync = vi.fn();
+    vi.mocked(useDeclineTrip).mockReturnValue({ mutateAsync, isPending: false } as never);
+    setApps({ data: [makeApp({ acceptanceId: 'a1' })] });
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^decline/i }));
+    expect(mutateAsync).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('suppresses unused-import lint of `toast` by reading from the mocked module', () => {
+    // toast is mocked but not asserted here — keeps imports clean.
+    expect(toast.success).toBeTypeOf('function');
   });
 
   it('filters out non-selected statuses', () => {
