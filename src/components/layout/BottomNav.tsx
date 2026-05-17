@@ -1,4 +1,4 @@
-import type { ComponentType, SVGProps } from 'react';
+import { useEffect, useRef, type ComponentType, type SVGProps } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ClipboardList, Home, Plus } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
@@ -74,6 +74,33 @@ export function BottomNav() {
   const role = useEffectiveRole();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const navRef = useRef<HTMLElement | null>(null);
+
+  // `position: fixed; bottom: 0` anchors to the LAYOUT viewport. Mobile
+  // browsers (and Chrome DevTools' device emulator) inflate the layout
+  // viewport by their bottom chrome (URL bar, etc.), so the nav can sit
+  // 30–40px below the VISUAL viewport's bottom — clipping labels and the
+  // primary FAB. Measured live: navBottom=967, visualViewport.height=932,
+  // 35px clipped. Track the visual viewport and offset the nav so its
+  // bottom always lands at the visible edge. Also handles the on-screen
+  // keyboard pushing the nav up.
+  useEffect(() => {
+    const nav = navRef.current;
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (!nav || !vv) return;
+    const update = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      nav.style.bottom = `${offset}px`;
+    };
+    update();
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+
   if (HIDE_NAV.test(pathname)) return null;
   const items = role === 'admin' ? ADMIN_NAV : role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
   const activeId = items.find((it) => it.match(pathname))?.id;
@@ -111,6 +138,7 @@ export function BottomNav() {
 
   return (
     <nav
+      ref={navRef}
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between overflow-visible"
       style={navStyle}

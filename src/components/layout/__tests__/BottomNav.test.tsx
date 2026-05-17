@@ -65,6 +65,29 @@ describe('BottomNav', () => {
     expect(nav.style.height).toBe('');
   });
 
+  it('offsets `bottom` by (innerHeight − visualViewport.height) so the nav lands at the visible edge, not the layout edge', async () => {
+    // Regression: `position: fixed; bottom: 0` anchors to the LAYOUT viewport.
+    // Mobile browsers (and Chrome DevTools simulators) inflate the layout
+    // viewport by their bottom chrome, so `bottom: 0` puts the nav 30-40px
+    // BELOW the visible area — measured live as navBottom=967 vs vvHeight=932.
+    // The component now reads visualViewport and sets `bottom` dynamically.
+    const originalVV = window.visualViewport;
+    const originalInner = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 967, configurable: true });
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: { height: 932, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    });
+    setUser(driver);
+    renderNav();
+    const nav = screen.getByRole('navigation', { name: /primary/i });
+    // useEffect runs after paint; flush microtasks
+    await Promise.resolve();
+    expect(nav.style.bottom).toBe('35px');
+    Object.defineProperty(window, 'innerHeight', { value: originalInner, configurable: true });
+    Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
+  });
+
   it('navigates when a tab is tapped', () => {
     setUser(driver);
     render(
