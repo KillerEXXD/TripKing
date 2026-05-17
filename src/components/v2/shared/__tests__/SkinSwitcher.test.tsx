@@ -18,6 +18,16 @@ describe('SkinSwitcher', () => {
     expect(back).toHaveAttribute('href', '/administration/designs');
   });
 
+  it('chip rail wraps to multiple lines so no chip is clipped on narrow viewports', () => {
+    // Regression: on iPhone 14 Pro Max (430px) the page-chip rail (9 items
+    // + Back link) overflowed off-screen with `overflow-x-auto` and
+    // horizontal scroll was unreliable on mobile. The rail must `flex-wrap`.
+    renderAt('/v3/trips?nav=design');
+    const rail = screen.getByRole('navigation', { name: /switch page within this design/i });
+    expect(rail.className).toMatch(/\bflex-wrap\b/);
+    expect(rail.className).not.toMatch(/\boverflow-x-auto\b/);
+  });
+
   it('default (no nav param) renders all 6 version chips with the active one aria-current', () => {
     renderAt('/v4/profile');
     for (const label of ['v2', 'v3', 'v4', 'v5', 'v6', 'v7']) {

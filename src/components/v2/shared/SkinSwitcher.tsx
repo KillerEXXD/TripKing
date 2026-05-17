@@ -59,7 +59,7 @@ export function SkinSwitcher() {
   return (
     <nav
       aria-label={showPageChips ? 'Switch page within this design' : 'Switch prototype skin'}
-      className="sticky top-0 z-40 flex items-center gap-1.5 overflow-x-auto border-b border-border bg-page/95 px-3 py-2 backdrop-blur"
+      className="sticky top-0 z-40 flex flex-wrap items-center gap-1.5 border-b border-border bg-page/95 px-3 py-2 backdrop-blur"
     >
       <Link
         to="/administration/designs"
