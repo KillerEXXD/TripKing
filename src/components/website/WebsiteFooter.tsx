@@ -9,7 +9,7 @@ export function WebsiteFooter({ t }: { t: WebsiteCopy }) {
         <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-sm">
             <div className="flex items-center gap-2">
-              <img src="/logo-mark.svg" alt="" className="h-6 w-auto" />
+              <img src="/logo-mark.svg" alt="" width={28} height={24} className="h-6 w-auto" />
               <span className="text-lg font-extrabold tracking-tight">
                 <span className="text-emerald-600">Trip</span>King
               </span>

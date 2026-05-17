@@ -152,7 +152,7 @@ export function ForAgentsPage() {
       <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md shadow-header">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo-mark.svg" alt="" className="h-6 w-auto" />
+            <img src="/logo-mark.svg" alt="" width={28} height={24} className="h-6 w-auto" />
             <span className="text-lg font-extrabold tracking-tight">
               <span className="text-emerald-600">Trip</span>King
             </span>
