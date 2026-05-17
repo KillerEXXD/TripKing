@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 
 interface Skin {
   path: `/v${number}`;
@@ -36,8 +37,16 @@ export function SkinSwitcher() {
   return (
     <nav
       aria-label="Switch prototype skin"
-      className="sticky top-0 z-40 flex gap-1.5 overflow-x-auto border-b border-border bg-page/95 px-3 py-2 backdrop-blur"
+      className="sticky top-0 z-40 flex items-center gap-1.5 overflow-x-auto border-b border-border bg-page/95 px-3 py-2 backdrop-blur"
     >
+      <Link
+        to="/administration/designs"
+        aria-label="Back to Design previews"
+        className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground"
+      >
+        <ArrowLeft className="size-3" aria-hidden /> Designs
+      </Link>
+      <span aria-hidden className="h-4 w-px shrink-0 bg-border" />
       {SKINS.map((s) => {
         const active = s.path === activePath;
         const target = swapPrefix(location.pathname, activePath, s.path);
