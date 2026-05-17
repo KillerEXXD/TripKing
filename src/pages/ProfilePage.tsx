@@ -303,6 +303,20 @@ export function ProfilePage() {
       <button type="button" onClick={() => navigate(-1)} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Back
       </button>
+      {/* Header shell from useAuth() — paints the LCP element immediately instead of
+          waiting on useMyDriver/useMyAgent (~1.3-1.4s). When the profile query lands,
+          DriverProfile/AgentProfile renders with the full data and replaces the shell. */}
+      {(isDriver || isAgent) && q?.isPending ? (
+        <Card className="gap-3">
+          <div className="flex items-start gap-3">
+            <Avatar name={user?.displayName ?? ''} />
+            <div className="min-w-0 flex-1">
+              <h2 className="truncate text-xl font-bold">{user?.displayName || 'Your profile'}</h2>
+              <div className="mt-1 h-4 w-32 animate-pulse rounded bg-muted" aria-hidden />
+            </div>
+          </div>
+        </Card>
+      ) : null}
       {!isDriver && !isAgent ? (
         <>
           <Card className="gap-2">
@@ -325,7 +339,8 @@ export function ProfilePage() {
           </Button>
         </Card>
       ) : q?.isPending ? (
-        <LoadingSkeleton rows={6} />
+        // The header shell above is already painted. Below-the-fold skeleton fills the rest.
+        <LoadingSkeleton rows={5} />
       ) : q?.isError ? (
         <ErrorState title="Couldn't load your profile" message="Check your connection and try again." onRetry={() => void q.refetch()} />
       ) : isDriver && driverQuery.data ? (
