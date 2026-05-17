@@ -17,18 +17,19 @@ import type { Place, PostVacancyInput } from '@/types';
 
 const selectClass = 'h-11 w-full rounded-control border border-input bg-background px-3 text-base';
 const HOUR_MS = 3_600_000;
-const MIN_HOURS = 0.5;
+const MIN_HOURS = 1;
 const MAX_HOURS = 24;
 const DEFAULT_HOURS = 4;
+const STEP_HOURS = 1; // PostHog logged 21 rage clicks on the "+" stepper in 7d — 0.5h steps were too many taps
 
 /** A `Date` → the value an `<input type="datetime-local">` expects: `YYYY-MM-DDTHH:mm` in local time. */
 function toDatetimeLocalValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-/** Clamp to [MIN_HOURS, MAX_HOURS], rounded to the nearest half hour. */
+/** Clamp to [MIN_HOURS, MAX_HOURS], rounded to the nearest whole hour (STEP_HOURS). */
 function clampHours(h: number): number {
-  return Math.min(MAX_HOURS, Math.max(MIN_HOURS, Math.round(h * 2) / 2));
+  return Math.min(MAX_HOURS, Math.max(MIN_HOURS, Math.round(h)));
 }
 /** "4 hrs" / "1 hr" / "0.5 hrs" */
 function formatHours(h: number): string {
@@ -214,7 +215,7 @@ export function PostVacancyPage() {
                   type="button"
                   aria-label="Fewer hours"
                   disabled={hours <= MIN_HOURS}
-                  onClick={() => setHours((h) => clampHours(h - 0.5))}
+                  onClick={() => setHours((h) => clampHours(h - STEP_HOURS))}
                   className="flex size-9 items-center justify-center rounded-lg border border-input text-lg leading-none disabled:opacity-40"
                 >
                   −
@@ -226,7 +227,7 @@ export function PostVacancyPage() {
                   type="button"
                   aria-label="More hours"
                   disabled={hours >= MAX_HOURS}
-                  onClick={() => setHours((h) => clampHours(h + 0.5))}
+                  onClick={() => setHours((h) => clampHours(h + STEP_HOURS))}
                   className="flex size-9 items-center justify-center rounded-lg border border-input text-lg leading-none disabled:opacity-40"
                 >
                   +
