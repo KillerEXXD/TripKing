@@ -66,6 +66,7 @@ const PHASES = [
   { code: 'P8', title: 'P8 · Notifications & inbox',      description: 'Bell badge, deep-link per type, mark-read.' },
   { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on start or window close.' },
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
+  { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
 ];
 
 // Each scenario: { phase, id, title, preconditions?, steps[{action, expected}] }
@@ -469,6 +470,92 @@ const SCENARIOS = [
     { action: 'PATCH /admin/referrals/{link_id}/status { status: "suspended" }.', expected: 'Link status manually flipped. Audit log entry.' },
     { action: 'POST /admin/referrals/{link_id}/reverse-earnings { reason }.', expected: 'reverse_referral_earnings stored proc inserts a NEGATIVE ledger entry equal to the link\'s net positive accrued. Link status → suspended. R\'s withdrawable drops to 0; lifetime stays unchanged (reversal is its own row, not a delete).' },
     { action: 'PATCH /admin/users/{id}/risk { is_high_risk: true, note: "..." }.', expected: 'users.is_high_risk=true. Audit log entry. (Withdrawal-hold extension per spec is future work but the flag is now set.)' },
+  ]},
+
+  // ── N (Navigation & Breadcrumbs — PR #263) ───────────────────────────
+  // Universal rule: a card on Home that leads to a list of trips → tap a trip → land on
+  // the trip detail. The detail page's BACK arrow MUST return to the list the user came
+  // from (with the same filter applied), not the generic /my-trips or /posted-trips. The
+  // list MUST refetch on mount so any status change made on the detail page is reflected
+  // immediately. Applies to BOTH driver and agent.
+  { phase: 'N', id: 'N1', title: 'Driver: Home → Review invitations → trip → Back lands on Invites Received list (not /my-trips)',
+    preconditions: 'Signed in as a driver with ≥2 pending invitations. Home shows "Invitations waiting" purple card with "Review invitations" button.',
+    steps: [
+    { action: 'On Home, tap the "Review invitations" button on the purple Invitations Waiting card.', expected: 'URL becomes /my-trips?scope=invites-received&from=/. Page header is purple-banded with title "Invites received" + subtitle "N trips waiting for your decision". No bottom tab strip.' },
+    { action: 'Tap any trip in the list.', expected: 'Lands on /trips/{id}?from=%2Fmy-trips%3Fscope%3Dinvites-received%26from%3D%2F (the `from` query param is URL-encoded). Trip detail renders normally.' },
+    { action: 'Tap the Back arrow on the trip detail.', expected: 'Lands back on /my-trips?scope=invites-received&from=/ — the SAME scoped list, not the plain /my-trips tabbed page. The list shows the same trips you came from.' },
+    { action: 'Tap the Back arrow on the Invites Received page.', expected: 'Lands on / (the driver home). The breadcrumb walks back one step at a time.' },
+  ]},
+  { phase: 'N', id: 'N2', title: 'Driver: status change on trip detail → Back → list reflects the change (auto-refresh on mount)',
+    preconditions: 'Through N1: on the scoped Invites Received list, tap any trip.',
+    steps: [
+    { action: 'On the trip detail, take an action that changes status (e.g. tap Decline or Apply).', expected: 'Action succeeds (toast). Trip status flips.' },
+    { action: 'Tap Back to return to the Invites Received list.', expected: 'The trip you acted on either DROPS OUT of the list (if declined / withdrew) or its row reflects the new status without a manual refresh. The list automatically refetched on mount (PR #263 `alwaysRefetchOnMount` on `useInvitedTrips`).' },
+  ]},
+  { phase: 'N', id: 'N3', title: 'Driver: passive visit to trip detail → Back → list unchanged (no false drops)',
+    preconditions: 'Same setup as N1.',
+    steps: [
+    { action: 'On the scoped Invites Received list, tap a trip. On the trip detail, do NOT take any action — just read.', expected: 'Detail loads normally.' },
+    { action: 'Tap Back.', expected: 'Returns to the Invites Received list with the SAME trips visible in the SAME order. No phantom drops. Refetch on mount fired but data was identical.' },
+  ]},
+  { phase: 'N', id: 'N4', title: 'Driver: Decline button is rendered INSIDE the trip card on the Invites Received list (not as an orphan sibling)',
+    preconditions: 'Through N1: on the scoped Invites Received list. ≥1 pending invitation visible.',
+    steps: [
+    { action: 'Inspect a trip row.', expected: 'The red "Decline invitation" button sits inside the trip card surface, separated from the trip info by a thin border-t divider. Card has a single rounded outline that contains both the trip info AND the Decline button. There is no standalone red button BELOW the card.' },
+    { action: 'Tap "Decline invitation".', expected: 'Confirm dialog → on confirm, mutation succeeds → trip drops out of the list. No regression vs prior behaviour.' },
+  ]},
+  { phase: 'N', id: 'N5', title: 'Driver: direct navigation to /my-trips?scope=invites-received (no home-card hop) → trip → Back returns to the scoped list',
+    preconditions: 'Signed-in driver. Paste the scoped URL directly into the address bar (or via a notification deep-link).',
+    steps: [
+    { action: 'Navigate to /my-trips?scope=invites-received directly.', expected: 'Scoped Invites Received page loads. The header back arrow points to / (default `from`).' },
+    { action: 'Tap a trip, then tap Back on the detail.', expected: 'Returns to /my-trips?scope=invites-received (the scope param survives even without the home-card hop). Deep-linking + share-link survive the breadcrumb correctly.' },
+  ]},
+  { phase: 'N', id: 'N6', title: 'Driver: Home → "View invitations" (Invitations Sent single-trip card) → /trips/{id}/invitations → Back returns to Home',
+    preconditions: 'Signed-in driver who has posted ONE trip with ≥1 pending invite. Home shows the blue "Invitations sent" card with "View invitations" button.',
+    steps: [
+    { action: 'Tap "View invitations" on the blue Invitations Sent card.', expected: 'Lands on /trips/{id}/invitations?from=/. The page HEADER is blue-banded (matches the home card\'s blue accent — PR #263). Title "Invitations sent" + subtitle "from → to · N pending".' },
+    { action: 'Tap the Back arrow.', expected: 'Lands on / (driver home).' },
+  ]},
+  { phase: 'N', id: 'N7', title: 'Agent: Home → Invitations Sent (multi) → posted-trips list → trip → Back returns to the scoped list',
+    preconditions: 'Signed in as an agent who has posted ≥2 trips with pending invites. Home shows the blue Invitations Sent card with "View N invitations".',
+    steps: [
+    { action: 'Tap "View N invitations" on the blue Invitations Sent card.', expected: 'Lands on /posted-trips?scope=invites-sent&from=/. Page header blue-banded; only trips with pending invites visible.' },
+    { action: 'Tap a trip → tap Back on the trip detail.', expected: 'Returns to /posted-trips?scope=invites-sent&from=/. The scoped list, not the plain /posted-trips tabbed page.' },
+    { action: 'Tap Back again on the scoped list.', expected: 'Lands on / (agent home).' },
+  ]},
+  { phase: 'N', id: 'N8', title: 'Agent: Home → Needs-action queue → trip detail → Back returns to /queue/needs-action',
+    preconditions: 'Signed-in agent with ≥1 trip needing action (e.g. status=has_applicants needing a driver pick). Home shows the orange Needs Action priority card.',
+    steps: [
+    { action: 'Tap the Needs Action card on Home.', expected: 'Lands on /queue/needs-action. Page header orange/amber-banded. Trips listed.' },
+    { action: 'Tap a trip → tap Back on the detail (or applicants page).', expected: 'Returns to /queue/needs-action (the trip-card Link passes ?from=/queue/needs-action — verified already correct, no regression in PR #263).' },
+  ]},
+  { phase: 'N', id: 'N9', title: 'Agent: Home → In-progress queue → trip detail → Back returns to /queue/in-progress',
+    preconditions: 'Signed-in agent with ≥1 trip in_progress. Home shows the teal In-progress priority card.',
+    steps: [
+    { action: 'Tap the In Progress card on Home.', expected: 'Lands on /queue/in-progress. Page header teal-banded. Trips listed.' },
+    { action: 'Tap a trip → tap Back on the detail.', expected: 'Returns to /queue/in-progress. Breadcrumb preserved.' },
+  ]},
+  { phase: 'N', id: 'N10', title: 'Visual: scoped page headers match the colour of the home card that linked to them',
+    preconditions: 'Driver + agent home pages should each visually demonstrate the rule. Take screenshots if reporting a mismatch.',
+    steps: [
+    { action: 'Driver Home → purple "Invitations waiting" card → Review invitations. Compare card colour with page header.', expected: 'Both purple/indigo. Continuity preserved.' },
+    { action: 'Driver Home → blue "Invitations sent" card → View invitations. Compare card colour with /trips/{id}/invitations page header.', expected: 'Both blue. PR #263 specifically fixed this — the page used to have a plain white header.' },
+    { action: 'Agent Home → blue Invitations Sent card → /posted-trips?scope=invites-sent. Compare.', expected: 'Both blue.' },
+    { action: 'Agent Home → orange Needs Action card → /queue/needs-action. Compare.', expected: 'Both orange/amber.' },
+    { action: 'Agent Home → teal In Progress card → /queue/in-progress. Compare.', expected: 'Both teal.' },
+  ]},
+  { phase: 'N', id: 'N11', title: 'Refresh on mount catches another user\'s out-of-band change',
+    preconditions: 'Two tabs: same driver in tab A on the scoped Invites Received list; same driver in tab B on a trip detail. (Or simulate via an admin acting in another tool.)',
+    steps: [
+    { action: 'In tab B (or via admin), perform an action on one of the listed trips that would remove it from the "pending invitations" filter (e.g. agent withdraws the invitation; admin marks the trip cancelled).', expected: 'No visible change in tab A yet (no live socket).' },
+    { action: 'In tab A, tap a different trip → tap Back to return to the list.', expected: 'The trip that was removed elsewhere is now GONE from the list. Refetch-on-mount surfaced the out-of-band change without needing a manual reload. Confirms PR #263\'s `alwaysRefetchOnMount` not the optimistic-update path is what catches this.' },
+  ]},
+  { phase: 'N', id: 'N12', title: 'Non-card direct navigation: /my-trips with NO ?scope= still works (no regression to the tabbed view)',
+    preconditions: 'Signed-in driver. Sanity check that the plain (un-scoped) /my-trips page is unchanged.',
+    steps: [
+    { action: 'Navigate to /my-trips with no query params.', expected: 'Renders the tabbed "My trips" page (All / Driving / Invited / Applied / Posted etc.) — NOT the scoped Invites Received header. Same as today.' },
+    { action: 'On the Invited tab, tap a trip → tap Back.', expected: 'Returns to /my-trips on the Invited tab. The tabbed view is the default fallback when no `?from=` is in the URL.' },
+    { action: 'Plain /posted-trips (agent equivalent) behaves the same way.', expected: 'Tabbed view, no scoped header, Back returns to the tabbed view.' },
   ]},
 ];
 
