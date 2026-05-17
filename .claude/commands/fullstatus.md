@@ -147,6 +147,45 @@ Don't recommend Cloudflare plan upgrades unless: (a) total daily requests > 100k
 
 ---
 
+## Step 8.5 — Auto-fixes performed this run
+
+While running the checks above, take these safe automatic remediation actions and log them under a dedicated section. **Never** take destructive actions silently — these are only the well-known recoveries TournamentPro's `/fullstatus` has been doing for months:
+
+- **Vacuum bloated tables.** Any public-schema table with dead-row ratio > 10% from Step 2 → call the Supabase Management API to `VACUUM ANALYZE <table>` (runs OUTSIDE a transaction so big tables don't lock up). The Supabase MCP `execute_sql` or `node scripts/db.cjs` can drive it. Skip `pg_*` system tables, skip anything < 1MB.
+- **Resolve clearly synthetic Sentry issues.** Title contains `smoke test` / `synthetic` / `safe to delete` → `PUT https://sentry.io/api/0/organizations/hudr/issues/?id=<id>` with `{"status":"resolved"}`.
+- **Resolve stale-fix Sentry issues** (per Step 4's existing rule — see `/sentry`'s Step 3 stale-fix cross-check).
+- **Auto-resolve user-error 4xx issues** that snuck past the queryClient/apiClient filter — 401/403/404/409/422/429 are known user errors.
+- **Clean orphaned notifications** — rows whose `recipient_user_id` no longer exists in `users` (FK dangle), or `trip_id` no longer exists in `trips`. DELETE in a single transaction, capped at 1,000 rows per run.
+
+For each, print one line: `✅ Vacuumed trips (2,341 dead rows cleaned)` / `✅ Resolved 3 stale Sentry issues (TRIP-KING-X, ...) — fix commits cited in comments`. If nothing fired: `No automatic remediation needed this run.`
+
+This section runs even on dry-state systems — the act of CHECKING is the value (confirms nothing's drifting).
+
+## Step 8.6 — Snapshot + trends (vs previous run)
+
+TournamentPro stores `performance_snapshots` and shows deltas across runs. TripKing doesn't have the table yet — until it does, this step is best-effort:
+
+1. **If table `public.fullstatus_snapshots` exists:**
+   - Insert a row of today's key metrics: `created_at`, `api_avg_ms`, `api_p95_ms`, `api_error_pct`, `cache_origin_hit_pct`, `db_table_cache_hit_pct`, `sentry_live_issues`, `lcp_p75`, `cls_p75`.
+   - SELECT the previous row, compute deltas, render a small `### Trends vs last run` table.
+2. **If the table doesn't exist:** print `Snapshots not configured — create migration to add public.fullstatus_snapshots and re-run to capture trends.`. Stop, don't auto-create (DDL needs an explicit migration PR).
+
+If snapshots exist, present:
+```
+### Trends vs last run (2026-05-XX → 2026-05-YY)
+| Metric | Previous | Current | Δ |
+|---|---:|---:|---:|
+| API avg (ms) | … | … | ↑/↓/→ |
+| API p95 (ms) | … | … | ↑/↓/→ |
+| API error rate | … | … | ↑/↓/→ |
+| Cache origin hit % | … | … | ↑/↓/→ |
+| Sentry live issues | … | … | ↑/↓/→ |
+| LCP p75 (ms) | … | … | ↑/↓/→ |
+```
+Flag any metric with > 20% degradation as WARNING.
+
+---
+
 ## Step 9 — Unified action summary
 
 ```
@@ -157,8 +196,9 @@ Don't recommend Cloudflare plan upgrades unless: (a) total daily requests > 100k
 ### Health Dashboard
 | System | Grade / State | Key metric | Status |
 |--------|---------------|------------|--------|
+| **Overall** | **A+ to F** | derived: -1 grade per CRITICAL, -0.3 per WARNING, +0.2 per "no action" green | — |
 | API (api_metrics, 24h) | OK/WARN/CRITICAL | Avg Xms · Errors X% · p95 Xms | … |
-| Database | OK/WARN/CRITICAL | Cache X% · api_metrics N rows · rate_limits N | … |
+| Database | **A+ to F** + OK/WARN | Cache X% · Dead-row peak X% · api_metrics N rows · rate_limits N | grade: cache <95 = B-, <90 = C, <85 = D; dead rows >10% on any table demotes one grade |
 | Edge-function smokes | X/12 green | [failing suites] | OK if 12/12 |
 | Sentry (trip-king) | X real issues | Y events, Z users | OK if 0 real |
 | PostHog (trip-king) | X visitors | Y events | INFO |
@@ -173,8 +213,13 @@ Don't recommend Cloudflare plan upgrades unless: (a) total daily requests > 100k
 2. [WARNING] … (degrading p95, rising error rate, api_metrics with no cleanup cron and growing, stale main not yet deployed, a data/parse Sentry issue → an API contract mismatch)
 3. [INFO] … (housekeeping — ANALYZE after a migration, an unused index, a synthetic Sentry issue to delete, etc.)
 
-### Done this run
-[anything fixed proactively — re-deployed a stale edge fn, re-ran a flaky smoke that then passed, auto-resolved a synthetic/transient Sentry issue]
+### Auto-Fixed This Run
+[Re-quote the per-line output from Step 8.5 here for easy scanning. Each line one of:]
+- ✅ Vacuumed X tables (Y dead rows cleaned)
+- ✅ Resolved X synthetic + Y stale-fix + Z user-error Sentry issues (with IDs + fix-commit refs)
+- ✅ Cleaned X orphaned notifications
+- ✅ Re-deployed a stale edge fn / re-ran a flaky smoke that then passed
+(or "No automatic remediation needed this run." if nothing fired.)
 
 ### Reminders / known TODOs
 - The one remaining Phase-6 backend item: real SMS + `auth_otps` for `/auth` (needs a provider decision) — `/auth` is a dev placeholder (`otp:'12345'`, dev-only `role:'admin'` self-signup).
