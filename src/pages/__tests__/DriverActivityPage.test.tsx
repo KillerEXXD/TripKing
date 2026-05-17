@@ -201,7 +201,8 @@ describe('DriverActivityPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
+    // Button label is now "Decline invitation" (full button) — matches the more visible affordance.
+    fireEvent.click(screen.getByRole('button', { name: /decline invitation/i }));
     expect(confirmSpy).toHaveBeenCalled();
     await Promise.resolve();
     expect(mutateAsync).toHaveBeenCalledWith({ tripId: 'i-1', inviteId: 'inv-1' });
@@ -234,7 +235,7 @@ describe('DriverActivityPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /decline invitation/i }));
     await Promise.resolve();
     await Promise.resolve();
     expect(mutateAsync).toHaveBeenCalled();
@@ -248,7 +249,7 @@ describe('DriverActivityPage', () => {
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^decline$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /decline invitation/i }));
     expect(mutateAsync).not.toHaveBeenCalled();
     confirmSpy.mockRestore();
   });
@@ -260,7 +261,7 @@ describe('DriverActivityPage', () => {
     ] }) });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
-    expect(screen.queryByRole('button', { name: /^decline$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /decline invitation/i })).toBeNull();
   });
 
   it('surfaces an error on the Driving tab', () => {

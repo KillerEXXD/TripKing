@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Mail, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Mail, MapPin, Plus, Trash2, XCircle } from 'lucide-react';
 import { ScopedPageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -549,16 +549,21 @@ function InvitedList({
         <div key={t.id} className="space-y-1.5">
           <PostedTripCard trip={t} onShare={() => onShare(t)} />
           {t.invitationStatus === 'pending' && t.invitationId ? (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => void onDecline(t)}
-                disabled={declineMutation.isPending}
-                className="text-xs font-semibold text-destructive hover:underline disabled:opacity-40"
-              >
-                {declineMutation.isPending ? 'Declining…' : 'Decline'}
-              </button>
-            </div>
+            // Outline-destructive button beats the old "tiny red text-link" — Decline is the
+            // primary affordance on an invite they can't take and needs to land at the same
+            // visual weight as Share / View invites / View details on the card above.
+            <button
+              type="button"
+              onClick={() => void onDecline(t)}
+              disabled={declineMutation.isPending}
+              className={cn(
+                'flex w-full items-center justify-center gap-1.5 rounded-control border border-red-200 bg-red-50/50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors',
+                'hover:border-red-300 hover:bg-red-50 disabled:pointer-events-none disabled:opacity-50',
+              )}
+            >
+              <XCircle className="size-4" aria-hidden />
+              {declineMutation.isPending ? 'Declining…' : 'Decline invitation'}
+            </button>
           ) : null}
         </div>
       ))}
