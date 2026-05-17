@@ -1,0 +1,38 @@
+/**
+ * Pipeline Board — "Trello for trip lifecycle"
+ * White base + soft pastel column tints; indigo primary action.
+ */
+.v2-pipeline-board {
+  --color-page: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-muted-foreground: #64748b;
+  --color-border: #e2e8f0;
+
+  --color-primary: #4f46e5;
+  --color-primary-foreground: #ffffff;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-destructive: #ef4444;
+
+  --radius-card: 12px;
+  --radius-control: 10px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.08);
+
+  --text-header: 16px;
+  --text-section-label: 11px;
+  --text-body: 14px;
+  --text-micro: 11px;
+}
+
+/* Soft pastel column tints — one per trip-pipeline state.
+   Consumed by KanbanColumn via data-tint="…". */
+.v2-pipeline-board [data-tint='open']          { background-color: #f1f5f9; }
+.v2-pipeline-board [data-tint='has_applicants']{ background-color: #fff1e8; }
+.v2-pipeline-board [data-tint='assigned']      { background-color: #ecfdf5; }
+.v2-pipeline-board [data-tint='in_progress']   { background-color: #eef2ff; }
+.v2-pipeline-board [data-tint='completed']     { background-color: #f5f3ff; }
+.v2-pipeline-board [data-tint='cancelled']     { background-color: #fef2f2; }

@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminRoute } from '@/components/auth/AdminRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { V2LayoutShell } from '@/components/v2/shared/V2LayoutShell';
 import { LoadingSkeleton, RouteErrorBoundary } from '@/components/feedback';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 
@@ -57,6 +58,7 @@ const AdminReferralsPage = lazyWithRetry(() => import('@/pages/administration/Ad
 const AdminReferralFlagsPage = lazyWithRetry(() => import('@/pages/administration/AdminReferralFlagsPage'));
 const AdminDriversPage = lazyWithRetry(() => import('@/pages/administration/AdminDriversPage'));
 const BugsPage = lazyWithRetry(() => import('@/pages/administration/BugsPage'));
+const AdminDesignsPage = lazyWithRetry(() => import('@/pages/administration/AdminDesignsPage'));
 const AdminAgentsPage = lazyWithRetry(() => import('@/pages/administration/AdminAgentsPage'));
 const PassengersPage = lazyWithRetry(() => import('@/pages/administration/PassengersPage'));
 // Public marketing pages — no auth, no app layout.
@@ -64,6 +66,37 @@ const WebsitePage = lazyWithRetry(() => import('@/pages/WebsitePage'));
 const ForAgentsPage = lazyWithRetry(() => import('@/pages/ForAgentsPage'));
 // Public passenger portal — the trip OTP is the credential, no login.
 const PassengerPage = lazyWithRetry(() => import('@/pages/PassengerPage'));
+// v2..v6 prototype skins — one design per top-level prefix. v1 routes untouched.
+const V2OperatorTripsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/TripsListPage'));
+const V3FieldTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/TripsListPage'));
+const V4PipelineTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripsListPage'));
+const V5EditorialTripsPage = lazyWithRetry(() => import('@/pages/v2/editorial/TripsListPage'));
+const V6BharatTripsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/TripsListPage'));
+const V2OperatorTripDetailPage = lazyWithRetry(() => import('@/pages/v2/operator-console/TripDetailPage'));
+const V3FieldTripDetailPage = lazyWithRetry(() => import('@/pages/v2/field-companion/TripDetailPage'));
+const V4PipelineTripDetailPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/TripDetailPage'));
+const V5EditorialTripDetailPage = lazyWithRetry(() => import('@/pages/v2/editorial/TripDetailPage'));
+const V6BharatTripDetailPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/TripDetailPage'));
+const V2OperatorHomePage = lazyWithRetry(() => import('@/pages/v2/operator-console/HomePage'));
+const V3FieldHomePage = lazyWithRetry(() => import('@/pages/v2/field-companion/HomePage'));
+const V4PipelineHomePage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/HomePage'));
+const V5EditorialHomePage = lazyWithRetry(() => import('@/pages/v2/editorial/HomePage'));
+const V6BharatHomePage = lazyWithRetry(() => import('@/pages/v2/bharat-native/HomePage'));
+const V2OperatorProfilePage = lazyWithRetry(() => import('@/pages/v2/operator-console/ProfilePage'));
+const V3FieldProfilePage = lazyWithRetry(() => import('@/pages/v2/field-companion/ProfilePage'));
+const V4PipelineProfilePage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/ProfilePage'));
+const V5EditorialProfilePage = lazyWithRetry(() => import('@/pages/v2/editorial/ProfilePage'));
+const V6BharatProfilePage = lazyWithRetry(() => import('@/pages/v2/bharat-native/ProfilePage'));
+const V2OperatorMyTripsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/MyTripsPage'));
+const V3FieldMyTripsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/MyTripsPage'));
+const V4PipelineMyTripsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/MyTripsPage'));
+const V5EditorialMyTripsPage = lazyWithRetry(() => import('@/pages/v2/editorial/MyTripsPage'));
+const V6BharatMyTripsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/MyTripsPage'));
+const V2OperatorNotificationsPage = lazyWithRetry(() => import('@/pages/v2/operator-console/NotificationsPage'));
+const V3FieldNotificationsPage = lazyWithRetry(() => import('@/pages/v2/field-companion/NotificationsPage'));
+const V4PipelineNotificationsPage = lazyWithRetry(() => import('@/pages/v2/pipeline-board/NotificationsPage'));
+const V5EditorialNotificationsPage = lazyWithRetry(() => import('@/pages/v2/editorial/NotificationsPage'));
+const V6BharatNotificationsPage = lazyWithRetry(() => import('@/pages/v2/bharat-native/NotificationsPage'));
 
 function PageFallback() {
   return (
@@ -142,6 +175,40 @@ export function AppRoutes() {
             <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
             <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
+            <Route path="/administration/designs" element={<AdminRoute><AdminDesignsPage /></AdminRoute>} />
+          </Route>
+          {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
+          <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
+            <Route path="/v2" element={<V2OperatorHomePage />} />
+            <Route path="/v2/trips" element={<V2OperatorTripsPage />} />
+            <Route path="/v2/trips/:id" element={<V2OperatorTripDetailPage />} />
+            <Route path="/v3" element={<V3FieldHomePage />} />
+            <Route path="/v3/trips" element={<V3FieldTripsPage />} />
+            <Route path="/v3/trips/:id" element={<V3FieldTripDetailPage />} />
+            <Route path="/v4" element={<V4PipelineHomePage />} />
+            <Route path="/v4/trips" element={<V4PipelineTripsPage />} />
+            <Route path="/v4/trips/:id" element={<V4PipelineTripDetailPage />} />
+            <Route path="/v5" element={<V5EditorialHomePage />} />
+            <Route path="/v5/trips" element={<V5EditorialTripsPage />} />
+            <Route path="/v5/trips/:id" element={<V5EditorialTripDetailPage />} />
+            <Route path="/v6" element={<V6BharatHomePage />} />
+            <Route path="/v6/trips" element={<V6BharatTripsPage />} />
+            <Route path="/v6/trips/:id" element={<V6BharatTripDetailPage />} />
+            <Route path="/v2/profile" element={<V2OperatorProfilePage />} />
+            <Route path="/v3/profile" element={<V3FieldProfilePage />} />
+            <Route path="/v4/profile" element={<V4PipelineProfilePage />} />
+            <Route path="/v5/profile" element={<V5EditorialProfilePage />} />
+            <Route path="/v6/profile" element={<V6BharatProfilePage />} />
+            <Route path="/v2/my-trips" element={<V2OperatorMyTripsPage />} />
+            <Route path="/v3/my-trips" element={<V3FieldMyTripsPage />} />
+            <Route path="/v4/my-trips" element={<V4PipelineMyTripsPage />} />
+            <Route path="/v5/my-trips" element={<V5EditorialMyTripsPage />} />
+            <Route path="/v6/my-trips" element={<V6BharatMyTripsPage />} />
+            <Route path="/v2/notifications" element={<V2OperatorNotificationsPage />} />
+            <Route path="/v3/notifications" element={<V3FieldNotificationsPage />} />
+            <Route path="/v4/notifications" element={<V4PipelineNotificationsPage />} />
+            <Route path="/v5/notifications" element={<V5EditorialNotificationsPage />} />
+            <Route path="/v6/notifications" element={<V6BharatNotificationsPage />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </SentryRoutes>

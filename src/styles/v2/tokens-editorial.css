@@ -1,0 +1,44 @@
+/**
+ * Editorial Travel — "Airbnb meets a travel logbook"
+ * Warm cream + ink, serif display, generous whitespace.
+ */
+.v2-editorial {
+  --color-page: #faf7f2;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f3ede1;
+  --color-foreground: #1a1a1a;
+  --color-muted-foreground: #6b6657;
+  --color-border: #e6dfd0;
+
+  --color-primary: #0f766e;
+  --color-primary-foreground: #ffffff;
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-destructive: #be123c;
+
+  --radius-card: 4px;
+  --radius-control: 4px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 1px 2px rgba(26, 26, 26, 0.06);
+
+  --text-header: 26px;
+  --text-section-label: 11px;
+  --text-body: 15px;
+  --text-micro: 12px;
+
+  /* Travel-poster accent pair tokens used by EditorialTripCard chips. */
+  --skin-editorial-terracotta: #c2410c;
+  --skin-editorial-terracotta-bg: #fff1e8;
+  --skin-editorial-mustard: #a16207;
+  --skin-editorial-mustard-bg: #fefce8;
+}
+
+.v2-editorial h1,
+.v2-editorial h2,
+.v2-editorial .editorial-headline {
+  font-family: 'Fraunces', 'Source Serif Pro', 'Iowan Old Style', Georgia, serif;
+  font-style: italic;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
