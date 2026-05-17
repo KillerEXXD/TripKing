@@ -32,6 +32,7 @@ const DESIGNS: Design[] = [
       { label: 'Post trip (form)', to: '/v2/trips/new' },
       { label: 'Referrals', to: '/v2/referrals' },
       { label: 'Wallet', to: '/v2/wallet' },
+      { label: 'Home cards + live tracking', to: '/v2/scenarios' },
     ],
   },
   {
@@ -50,6 +51,7 @@ const DESIGNS: Design[] = [
       { label: 'Post trip (wizard)', to: '/v3/trips/new' },
       { label: 'Referrals', to: '/v3/referrals' },
       { label: 'Wallet', to: '/v3/wallet' },
+      { label: 'Home cards + live tracking', to: '/v3/scenarios' },
     ],
   },
   {
@@ -68,6 +70,7 @@ const DESIGNS: Design[] = [
       { label: 'Post trip (card stack)', to: '/v4/trips/new' },
       { label: 'Referrals (4 columns)', to: '/v4/referrals' },
       { label: 'Wallet', to: '/v4/wallet' },
+      { label: 'Home cards + live tracking', to: '/v4/scenarios' },
     ],
   },
   {
@@ -86,6 +89,7 @@ const DESIGNS: Design[] = [
       { label: 'File a submission (form)', to: '/v5/trips/new' },
       { label: "Patron's column (referrals)", to: '/v5/referrals' },
       { label: 'Your purse (wallet)', to: '/v5/wallet' },
+      { label: 'Scenes from today (cards + tracking)', to: '/v5/scenarios' },
     ],
   },
   {
@@ -104,6 +108,7 @@ const DESIGNS: Design[] = [
       { label: 'Post trip (bilingual form)', to: '/v6/trips/new' },
       { label: 'Refer a friend', to: '/v6/referrals' },
       { label: 'Wallet', to: '/v6/wallet' },
+      { label: 'காட்சிகள் · Scenarios + tracking', to: '/v6/scenarios' },
     ],
   },
 ];
