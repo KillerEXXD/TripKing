@@ -23,7 +23,25 @@ describe('transformUser', () => {
       preferredLanguage: 'ta',
       isActive: true,
       canReportBugs: true,
+      featureFlags: { designPreviews: false },
     });
+  });
+
+  it('maps feature_flags.design_previews to featureFlags.designPreviews (migration 056)', () => {
+    const enabled = transformUser({
+      id: 'u3', role: 'driver', phone: '+919900112233',
+      feature_flags: { design_previews: true },
+    });
+    expect(enabled.featureFlags).toEqual({ designPreviews: true });
+
+    // Absent block → defaults to all-false (older deploys / first-time payloads).
+    const missing = transformUser({ id: 'u4', role: 'driver', phone: '+919900112244' });
+    expect(missing.featureFlags).toEqual({ designPreviews: false });
+
+    // Strict: only `true` enables.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const truthy = transformUser({ id: 'u5', role: 'driver', phone: '+91', feature_flags: { design_previews: 'true' as any } });
+    expect(truthy.featureFlags?.designPreviews).toBe(false);
   });
 
   it('defaults optional fields (email→undefined, displayName→"", lang→en, active→true, canReportBugs→false)', () => {

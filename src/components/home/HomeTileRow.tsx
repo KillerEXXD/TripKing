@@ -1,9 +1,10 @@
 import { useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { BarChart3, Check, Copy, Gift, Wallet } from 'lucide-react';
+import { BarChart3, Check, Copy, Gift, Palette, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useReferral, type ReferralRole } from '@/hooks/useReferral';
 import { useAgentAnalytics, useDriverAnalytics } from '@/hooks/useAnalytics';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn, formatINR } from '@/lib/utils';
 
 /**
@@ -26,11 +27,20 @@ import { cn, formatINR } from '@/lib/utils';
 export function HomeTileRow({ role }: { role: ReferralRole }) {
   const referral = useReferral(role);
 
+  const { user } = useAuth();
+  // Server-evaluated feature flag — true iff the user's phone is in
+  // public.design_preview_allowlist (admin-managed at /administration/config →
+  // "Design preview allowlist"). Hidden by default for everyone else.
+  const showDesignPreviews = user?.featureFlags?.designPreviews === true;
+
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <EarningsTile role={role} />
-      <AnalyticsTile role={role} />
-      <ReferralTile code={referral.data?.code} link={referral.data?.link} />
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        <EarningsTile role={role} />
+        <AnalyticsTile role={role} />
+        <ReferralTile code={referral.data?.code} link={referral.data?.link} />
+      </div>
+      {showDesignPreviews ? <DesignPreviewsTile /> : null}
     </div>
   );
 }
@@ -212,5 +222,38 @@ function ReferralTile({ code, link }: { code?: string; link?: string }) {
       sub={hasCode ? undefined : 'Code generating…'}
       ariaLabel="Refer and earn"
     />
+  );
+}
+
+/**
+ * Full-width tile, shown ONLY to phones in `public.design_preview_allowlist`. Lets allowed
+ * teammates jump straight to the design tour site to leave feedback on in-flight redesigns.
+ * Toggle on/off per phone at /administration/config → "Design preview allowlist".
+ *
+ * Renders OUTSIDE the 3-up grid so the layout doesn't shift to a 4-up for the small
+ * subset of users who see this. Amber accent keeps it visually distinct from the
+ * primary green/blue/purple production tiles.
+ */
+function DesignPreviewsTile() {
+  return (
+    <a
+      href="https://trip-king-tour.vercel.app/"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open design previews — feedback site"
+      className={cn(
+        'flex min-w-0 items-center gap-3 rounded-card border border-l-4 border-black/5 p-3 shadow-card transition-shadow hover:shadow-md',
+        'border-l-amber-500 bg-amber-50',
+      )}
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+        <Palette className="size-4" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Design previews</div>
+        <div className="truncate text-sm font-medium text-foreground">Review the new designs &amp; leave feedback</div>
+      </div>
+      <span className="shrink-0 text-xs font-medium text-amber-700">Open →</span>
+    </a>
   );
 }
