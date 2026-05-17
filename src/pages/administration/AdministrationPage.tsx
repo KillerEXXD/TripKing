@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard,
-  ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon,
+  Palette, ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, Card } from '@/components/ui';
@@ -36,6 +36,7 @@ const OPERATIONS_TILES: AdminSectionTile[] = [
   { to: '/administration/reviews',      title: 'Reviews moderation',         desc: 'Flagged reviews — publish, hide, clear flags',                  Icon: AlertTriangle,   tone: 'red'     },
   { to: '/administration/translations', title: 'Translation manager',        desc: 'Per-language string coverage and overrides',                   Icon: Languages,       tone: 'amber'   },
   { to: '/administration/bugs',         title: 'Bug tracker',                 desc: 'Triage submitted bugs — status, comments, attachments',         Icon: Bug,             tone: 'red'     },
+  { to: '/administration/designs',      title: 'Design previews',             desc: 'Preview the 5 alternate UI directions — /v2 through /v6',      Icon: Palette,         tone: 'purple'  },
 ];
 
 const TONE: Record<AdminSectionTile['tone'], string> = {

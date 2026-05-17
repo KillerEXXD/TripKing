@@ -58,6 +58,7 @@ const AdminReferralsPage = lazyWithRetry(() => import('@/pages/administration/Ad
 const AdminReferralFlagsPage = lazyWithRetry(() => import('@/pages/administration/AdminReferralFlagsPage'));
 const AdminDriversPage = lazyWithRetry(() => import('@/pages/administration/AdminDriversPage'));
 const BugsPage = lazyWithRetry(() => import('@/pages/administration/BugsPage'));
+const AdminDesignsPage = lazyWithRetry(() => import('@/pages/administration/AdminDesignsPage'));
 const AdminAgentsPage = lazyWithRetry(() => import('@/pages/administration/AdminAgentsPage'));
 const PassengersPage = lazyWithRetry(() => import('@/pages/administration/PassengersPage'));
 // Public marketing pages — no auth, no app layout.
@@ -174,6 +175,7 @@ export function AppRoutes() {
             <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
             <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
+            <Route path="/administration/designs" element={<AdminRoute><AdminDesignsPage /></AdminRoute>} />
           </Route>
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
