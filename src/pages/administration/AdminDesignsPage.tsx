@@ -29,6 +29,9 @@ const DESIGNS: Design[] = [
       { label: 'Profile', to: '/v2/profile' },
       { label: 'My trips', to: '/v2/my-trips' },
       { label: 'Notifications', to: '/v2/notifications' },
+      { label: 'Post trip (form)', to: '/v2/trips/new' },
+      { label: 'Referrals', to: '/v2/referrals' },
+      { label: 'Wallet', to: '/v2/wallet' },
     ],
   },
   {
@@ -44,6 +47,9 @@ const DESIGNS: Design[] = [
       { label: 'Profile', to: '/v3/profile' },
       { label: 'My trips', to: '/v3/my-trips' },
       { label: 'Notifications', to: '/v3/notifications' },
+      { label: 'Post trip (wizard)', to: '/v3/trips/new' },
+      { label: 'Referrals', to: '/v3/referrals' },
+      { label: 'Wallet', to: '/v3/wallet' },
     ],
   },
   {
@@ -59,6 +65,9 @@ const DESIGNS: Design[] = [
       { label: 'Profile', to: '/v4/profile' },
       { label: 'My applications (board)', to: '/v4/my-trips' },
       { label: 'Notifications', to: '/v4/notifications' },
+      { label: 'Post trip (card stack)', to: '/v4/trips/new' },
+      { label: 'Referrals (4 columns)', to: '/v4/referrals' },
+      { label: 'Wallet', to: '/v4/wallet' },
     ],
   },
   {
@@ -74,6 +83,9 @@ const DESIGNS: Design[] = [
       { label: 'Profile (the contributor)', to: '/v5/profile' },
       { label: 'My trips (in progress)', to: '/v5/my-trips' },
       { label: 'Dispatches', to: '/v5/notifications' },
+      { label: 'File a submission (form)', to: '/v5/trips/new' },
+      { label: "Patron's column (referrals)", to: '/v5/referrals' },
+      { label: 'Your purse (wallet)', to: '/v5/wallet' },
     ],
   },
   {
@@ -89,6 +101,9 @@ const DESIGNS: Design[] = [
       { label: 'Profile', to: '/v6/profile' },
       { label: 'My trips', to: '/v6/my-trips' },
       { label: 'Notifications', to: '/v6/notifications' },
+      { label: 'Post trip (bilingual form)', to: '/v6/trips/new' },
+      { label: 'Refer a friend', to: '/v6/referrals' },
+      { label: 'Wallet', to: '/v6/wallet' },
     ],
   },
 ];
@@ -153,9 +168,9 @@ export function AdminDesignsPage() {
       </ul>
 
       <p className="rounded-card border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-        <strong>Note:</strong> the prototype currently covers 6 screens per direction (home, trips list,
-        trip detail, profile, my-trips, notifications). Other v1 routes (post-trip form, vacancies,
-        wallet, KYC, admin pages, etc.) still render in v1. Pick a direction and we expand it.
+        <strong>Note:</strong> 9 screens per direction (home, trips list, trip detail, profile,
+        my-trips, notifications, post-trip form, referrals, wallet). Other v1 routes (vacancies,
+        alerts, KYC, admin pages, marketing, etc.) still render in v1. Pick a direction and we expand it.
       </p>
     </main>
   );
