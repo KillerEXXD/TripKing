@@ -54,7 +54,7 @@ describe('AgentNeedsActionQueuePage', () => {
   it('back button goes to Home', () => {
     setTrips({ data: [makeTrip({ id: 't1' })] });
     renderQ();
-    fireEvent.click(screen.getByRole('button', { name: /back to home/i }));
+    fireEvent.click(screen.getByRole('link', { name: /back/i }));
     expect(screen.getByText('home page')).toBeInTheDocument();
   });
 });

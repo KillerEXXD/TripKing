@@ -5,7 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { AgentInProgressTripCard } from '@/components/trip/AgentInProgressTripCard';
-import { PageHeader, PageShell } from '@/components/layout';
+import { PageHeader, PageShell, ScopedPageHeader } from '@/components/layout';
 import { Badge, Button, Card, FilterBar, FilterPill } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -246,20 +246,29 @@ export function PostedTripsPage() {
 
   return (
     <PageShell>
-      <PageHeader
-        title={scope ? SCOPE_META[scope].title : <span className="inline-flex items-center gap-2">My posts <LiveDot /></span>}
-        subtitle={subtitle}
-        backTo={scope ? from : undefined}
-        right={
-          !scope ? (
+      {scope ? (
+        // Scoped drill-down — tinted header matches the blue tone of the home
+        // "Invitations sent" card so the click-through reads as continuous.
+        <ScopedPageHeader
+          title={SCOPE_META[scope].title}
+          subtitle={subtitle}
+          backTo={from}
+          tone="blue"
+          icon={<Send className="size-4" aria-hidden />}
+        />
+      ) : (
+        <PageHeader
+          title={<span className="inline-flex items-center gap-2">My posts <LiveDot /></span>}
+          subtitle={subtitle}
+          right={
             <Button asChild size="sm" className="gap-1.5">
               <Link to="/trips/new">
                 <Plus className="size-4" aria-hidden /> Post
               </Link>
             </Button>
-          ) : undefined
-        }
-      />
+          }
+        />
+      )}
 
       {!scope ? (
         <FilterBar ariaLabel="Filter trips by status" wrap className="mb-3">

@@ -49,7 +49,8 @@ describe('AwaitingDecisionPage', () => {
   it('back button goes to Home', () => {
     setApps({ data: [makeApp()] });
     renderPage();
-    fireEvent.click(screen.getByRole('button', { name: /back to home/i }));
+    // ScopedPageHeader renders the back arrow as a <Link aria-label="Back">.
+    fireEvent.click(screen.getByRole('link', { name: /back/i }));
     expect(screen.getByText('home page')).toBeInTheDocument();
   });
 

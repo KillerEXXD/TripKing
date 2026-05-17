@@ -21,7 +21,8 @@ export function AwaitingDecisionPage() {
     <QueueListPage
       title="Awaiting your decision"
       subtitle={awaiting.length > 0 ? `${awaiting.length} trip${awaiting.length === 1 ? '' : 's'} waiting on you` : undefined}
-      icon={<Sparkles className="size-4 text-blue-700" />}
+      icon={<Sparkles className="size-4" />}
+      tone="indigo"
       items={awaiting}
       getKey={(a) => a.acceptanceId}
       renderItem={(a) => <SelectedRow app={a} />}

@@ -36,7 +36,8 @@ export function AgentInProgressQueuePage() {
     <QueueListPage
       title="Trips in progress"
       subtitle={trips.length > 0 ? `${trips.length} trip${trips.length === 1 ? '' : 's'} on the road` : undefined}
-      icon={<Navigation className="size-4 text-emerald-700" />}
+      icon={<Navigation className="size-4" />}
+      tone="emerald"
       items={trips}
       getKey={(t) => t.id}
       renderItem={(t) => <TripRow trip={t} />}

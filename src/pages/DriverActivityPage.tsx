@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Mail, MapPin, Plus, Trash2 } from 'lucide-react';
+import { ScopedPageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
@@ -379,15 +380,14 @@ export function DriverActivityPage() {
     const inviteCount = scopedInvites.length;
     return (
       <div className="mx-auto max-w-md">
-        <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3 shadow-header">
-          <Link to={fromParam} aria-label="Back" className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
-            <ArrowLeft className="size-5" aria-hidden />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-base font-semibold leading-tight">Invites received</h1>
-            <p className="text-xs text-secondary">{invitedQuery.data ? `${inviteCount} trip${inviteCount === 1 ? '' : 's'} waiting for your decision` : 'Loading invitations…'}</p>
-          </div>
-        </header>
+        {/* Indigo tint mirrors the home "Invitations waiting" card's tone. */}
+        <ScopedPageHeader
+          title="Invites received"
+          subtitle={invitedQuery.data ? `${inviteCount} trip${inviteCount === 1 ? '' : 's'} waiting for your decision` : 'Loading invitations…'}
+          backTo={fromParam}
+          tone="indigo"
+          icon={<Mail className="size-4" aria-hidden />}
+        />
         <div className="space-y-3 p-4">
           <InvitedList query={invitedQuery} trips={scopedInvites} onShare={setShareTrip} />
         </div>
