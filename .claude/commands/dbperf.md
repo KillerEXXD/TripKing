@@ -94,16 +94,51 @@ Note: TripKing applies migrations with `node scripts/db.cjs --file …` (the Man
 | rate_limits | … | … | WARN if >few hundred (cron may be stuck) |
 | admin_audit_log | … | … | INFO |
 
-### API cache hit rates (24h)
-| Endpoint | Hits | Misses | Unwrapped | Hit % | Status |
-| trips | … | … | … | … | OK if shared hits > 0 |
-| vacancies | … | … | … | … | OK if shared hits > 0 |
-| notifications | … | … | … | … | OK if shared hits > 0 |
-| alerts | … | … | … | … | OK if hits+misses present (low volume) |
-| reviews | … | … | … | … | OK if hits+misses present |
+### API cache hit rates (24h) — origin tier (api_metrics)
+| Endpoint | Hits (mem+shared) | Misses | Unwrapped | Hit % | Verdict |
+| trips | … | … | … | … | ✅ Healthy / 🟡 Structurally low / 🟠 Regression |
+| vacancies | … | … | … | … | … |
+| notifications | … | … | … | … | … |
+| alerts | … | … | … | … | … |
+| reviews | … | … | … | … | … |
 | <other> | … | … | … | … | INFO |
 
-Flag any endpoint where `hits + misses == 0` AND it used to be wrapped (regression / orphaned cache wrapper — see PR #143).
+### CDN cache (Cloudflare — probe a few known-cached endpoints)
+Single-shot probe to confirm CF is doing its job for the admin lookups that should be edge-cached:
+
+```bash
+KEY=sb_publishable_PRH2LiqnVjxAN7FYBVVQjA_TOWdFS0U
+for path in admin/cities admin/car-types admin/app-settings admin/languages; do
+  curl -sD - -o /dev/null "https://api.tripkingapp.com/functions/v1/$path" \
+    -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+    | awk -v p="$path" '/^CF-Cache-Status:/{cf=$2} /^Age:/{age=$2} END{printf("%-25s cf=%-8s age=%s\n", p, cf, age)}'
+done
+```
+
+Reading: `cf=HIT + age>0` = ✅ working · `cf=MISS` once, then HIT = ✅ warming · `cf=DYNAMIC` on a 200 = 🟠 origin missing `Cache-Control: public` (use `okCached()`) · `cf=BYPASS` = check cache-rule conflict.
+
+### Verdict matrix
+Apply when assigning a verdict per endpoint:
+
+| Verdict | Trigger |
+|---|---|
+| ✅ Healthy | shared+memory hits ≥ 50% of cached requests OR CF=HIT consistently |
+| 🟡 Structurally low | `tier:'shared'` w/ high-cardinality key (e.g. `vacancies` per-city-per-driver) |
+| 🟡 Memory-only intentional | `tier:'memory'` per-user key (e.g. `agents:me`); 0 shared hits is correct |
+| 🟠 Regression suspect | `tier:'shared'` w/ 0 hits + non-trivial misses → SET path may be broken |
+| 🟠 Unwrapped read-heavy | 0 cache touches + high GET volume + low mutation rate → wrap candidate |
+| ❌ PII leak risk | CF returns HIT on an authed/PII endpoint → stop, re-check rule + Cache-Control |
+
+Flag endpoints where `hits + misses == 0` AND it used to be wrapped (regression / orphaned wrapper — see PR #143).
+
+### Cache feedback — 1-3 concrete next actions
+End the cache section with ROI-ranked recommendations. Examples:
+- "Wrap `GET /vehicles` (200 calls / 24h, 0 cache touches) — ~20 min, expect 40% hit rate"
+- "`/vacancies` hit rate climbed to X% after PR #240; structurally limited beyond ~40% — accept"
+- "Three CDN endpoints (X/Y/Z) show DYNAMIC despite being lookups — add `okCached()`"
+- "No regressions detected; current cache design is right-sized for current traffic"
+
+**Don't recommend Cloudflare plan upgrades** unless (a) total daily requests > 100k OR (b) origin hit rate < 30% on shared-tier endpoints with high request volume. At current scale, Free is fine.
 
 ### Cron jobs
 | jobid | name | schedule | active |
