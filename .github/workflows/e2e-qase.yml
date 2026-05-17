@@ -10,10 +10,12 @@ name: Playwright E2E (Qase-reported)
 on:
   workflow_dispatch:
     inputs:
-      grep:
-        description: 'Test name filter (substring). Empty = run all specs. Try "referral-qase-demo".'
-        required: false
-        default: 'referral-qase-demo'
+      scope:
+        description: 'Test scope. full = all 34 specs (~5 min). smoke = J1/J3/J5/J6/J7/J13 happy path (~90s).'
+        required: true
+        default: 'full'
+        type: choice
+        options: [full, smoke]
       project:
         description: 'Playwright project to run.'
         required: true
@@ -59,8 +61,13 @@ jobs:
 
       - name: Run Playwright (headless)
         run: |
-          npx playwright test \
-            ${{ inputs.grep && format('--grep "{0}"', inputs.grep) || '' }} \
+          # Scheduled runs (inputs.scope empty) → full suite. Dispatch with scope=smoke → grep
+          # the linear J* happy path. Dispatch with scope=full → no grep (whole /e2e).
+          GREP=""
+          if [ "${{ inputs.scope }}" = "smoke" ]; then
+            GREP='--grep "J(1|3|5|6|7|13) ?[·—]"'
+          fi
+          eval npx playwright test $GREP \
             --project=${{ inputs.project || 'mobile' }} \
             --reporter=list,html
         env:
@@ -88,7 +95,7 @@ jobs:
         run: |
           echo "### Playwright E2E run" >> $GITHUB_STEP_SUMMARY
           echo "- Project: \`${{ inputs.project || 'mobile' }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- Filter:  \`${{ inputs.grep || '(all)' }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Scope:   \`${{ inputs.scope || 'full (scheduled)' }}\`" >> $GITHUB_STEP_SUMMARY
           echo "- Qase posting: \`${{ (inputs.post_to_qase != false) && 'enabled' || 'skipped' }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "📊 [Playwright HTML report (artifact above)](#)" >> $GITHUB_STEP_SUMMARY
