@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Bell, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard, ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon } from 'lucide-react';
+import { AlertTriangle, Bell, Briefcase, Bug, Car, ChevronRight, Languages, LayoutDashboard, Palette, ShieldCheck, SlidersHorizontal, UserCheck, Users, Video, type LucideIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Card, SectionLabel } from '@/components/ui';
@@ -29,6 +29,7 @@ const ADMIN_TILES: AdminTile[] = [
   { to: '/administration/reviews',     title: 'Reviews moderation',desc: 'Flagged reviews — publish, hide, clear flags',                                  Icon: AlertTriangle,     tone: 'red'     },
   { to: '/administration/translations',title: 'Translation manager',desc: 'Per-language string coverage and overrides',                                  Icon: Languages,         tone: 'amber'   },
   { to: '/administration/bugs',        title: 'Bug tracker',       desc: 'Triage submitted bugs — status, comments, attachments',                        Icon: Bug,               tone: 'red'     },
+  { to: '/administration/designs',     title: 'Design previews',   desc: 'Preview the 5 alternate UI directions — /v2 through /v6',                      Icon: Palette,           tone: 'purple'  },
 ];
 
 const TONE: Record<AdminTile['tone'], string> = {

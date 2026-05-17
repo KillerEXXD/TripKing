@@ -42,6 +42,7 @@ describe('HomePage (admin home)', () => {
       [/reviews moderation/i, '/administration/reviews'],
       [/translation manager/i, '/administration/translations'],
       [/bug tracker/i, '/administration/bugs'],
+      [/design previews/i, '/administration/designs'],
     ];
     for (const [name, href] of expected) {
       const link = screen.getByRole('link', { name });
