@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, Car, KeyRound, MapPin, MessageCircle, Phone, ShieldCheck, Wallet } from 'lucide-react';
 import { useTripByOtp } from '@/hooks/useTrips';
+import { useReviews } from '@/hooks/useReviews';
 import { TripTracking } from '@/components/trip/TripTracking';
+import { PassengerReviewCard } from '@/components/reviews/PassengerReviewCard';
 import { Avatar, AvatarFallback, Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR, formatKm, formatKmAndDuration, formatPickupDateTime, initials } from '@/lib/utils';
@@ -67,6 +69,10 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
   const driver = trip.assignedDriver;
   const status = STATUS_LABEL[trip.status] ?? { label: 'Confirmed', variant: 'success' as const };
   const firstName = trip.passengerName.trim().split(/\s+/)[0] || 'there';
+  // De-dup: pull this trip's published reviews so a returning passenger sees their existing rating
+  // instead of the form. /reviews is a public-readable list filtered to is_published=true for anon.
+  const reviewsQuery = useReviews(trip.status === 'completed' ? { tripId: trip.id, direction: 'passenger_to_driver' } : undefined);
+  const existingPassengerReview = reviewsQuery.data?.find((r) => r.direction === 'passenger_to_driver') ?? null;
 
   return (
     <div className="space-y-4 p-4">
@@ -161,6 +167,15 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
           </>
         )}
       </Card>
+
+      {trip.status === 'completed' ? (
+        <PassengerReviewCard
+          trip={trip}
+          passengerOtp={otp}
+          existingReview={existingPassengerReview ? { score: existingPassengerReview.score, comment: existingPassengerReview.comment } : null}
+          onSubmitted={() => void reviewsQuery.refetch()}
+        />
+      ) : null}
 
       <p className="pt-1 text-center text-[11px] italic text-secondary">Need help? Call your trip manager — they&apos;re your support contact.</p>
     </div>
