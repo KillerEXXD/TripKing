@@ -9,6 +9,12 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- API origin — preconnect cuts the DNS+TLS handshake off the first /auth/me call
+         (~150-300ms on 4G), shrinking the LCP path for every authed page. The CDN domain
+         (api.tripkingapp.com) and the direct Supabase host are both included since the env
+         decides which we hit at runtime. -->
+    <link rel="preconnect" href="https://api.tripkingapp.com" crossorigin />
+    <link rel="preconnect" href="https://saxcbebqxgatiktsebxw.supabase.co" crossorigin />
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+Tamil:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap"
       rel="stylesheet"
