@@ -65,51 +65,34 @@ describe('BottomNav', () => {
     expect(nav.style.height).toBe('');
   });
 
-  it('offsets `bottom` by (innerHeight − visualViewport.height) so the nav lands at the visible edge, not the layout edge', async () => {
-    // Regression: `position: fixed; bottom: 0` anchors to the LAYOUT viewport.
-    // Mobile browsers (and Chrome DevTools simulators) inflate the layout
-    // viewport by their bottom chrome, so `bottom: 0` puts the nav 30-40px
-    // BELOW the visible area — measured live as navBottom=967 vs vvHeight=932.
-    // The component now reads visualViewport and sets `bottom` dynamically.
-    const originalVV = window.visualViewport;
-    const originalInner = window.innerHeight;
-    Object.defineProperty(window, 'innerHeight', { value: 967, configurable: true });
-    Object.defineProperty(window, 'visualViewport', {
-      configurable: true,
-      value: { height: 932, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() },
-    });
+  it('is NOT position: fixed — sits in natural flow under AppLayout\'s flex column so dvh tracks the visual viewport (the permanent fix that replaced 5 visualViewport-tracking band-aids)', () => {
+    // Regression: `position: fixed; bottom: 0` anchors to the LAYOUT viewport,
+    // which mobile browsers inflate by their bottom chrome. That left the nav
+    // 30-40px below the VISIBLE viewport edge, clipping labels and the FAB.
+    // The previous attempt tracked window.visualViewport in a useEffect with
+    // rAF + setTimeout + pathname-keyed re-measurement; none of it held in
+    // every browser × keyboard × URL-bar combination. The fix is to drop
+    // fixed positioning entirely and let AppLayout's h-dvh flex column place
+    // the nav at the visible bottom edge via natural flow.
     setUser(driver);
     renderNav();
     const nav = screen.getByRole('navigation', { name: /primary/i });
-    // useEffect runs after paint; flush microtasks
-    await Promise.resolve();
-    expect(nav.style.bottom).toBe('35px');
-    Object.defineProperty(window, 'innerHeight', { value: originalInner, configurable: true });
-    Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
+    expect(nav.className).not.toMatch(/\bfixed\b/);
+    expect(nav.className).not.toMatch(/\bbottom-0\b/);
+    expect(nav.className).not.toMatch(/\binset-x-0\b/);
+    // No JS-set inline bottom either — that was the visualViewport band-aid.
+    expect(nav.style.bottom).toBe('');
+    expect(nav.style.position).toBe('');
   });
 
-  it('re-measures after first paint to catch visualViewport calibrating late (no resize event ever fires)', async () => {
-    // Regression: on initial load Chrome reports vv.height === innerHeight
-    // (i.e. no chrome overlay) until layout calibrates a frame or two later,
-    // and crucially no resize event fires when it does. Without a scheduled
-    // re-measure the nav sticks at bottom: 0 and labels get clipped.
-    const originalVV = window.visualViewport;
-    const originalInner = window.innerHeight;
-    Object.defineProperty(window, 'innerHeight', { value: 967, configurable: true });
-    // Start uncalibrated (vv.height === innerHeight); flip to the real value
-    // before the rAF callback fires so the second update() sees the change.
-    const vvObj = { height: 967, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() };
-    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vvObj });
+  it('preserves the safe-area inset for the iOS home-indicator zone via padding-bottom', () => {
+    // The container moved out of `position: fixed`, but the nav still needs
+    // to clear the home-indicator zone on real iOS — that's why
+    // padding-bottom keeps the `env(safe-area-inset-bottom)` term.
     setUser(driver);
     renderNav();
     const nav = screen.getByRole('navigation', { name: /primary/i });
-    await Promise.resolve();
-    expect(nav.style.bottom).toBe('0px'); // first measurement: uncalibrated
-    vvObj.height = 932; // late calibration happens silently
-    await new Promise((r) => setTimeout(r, 150)); // rAF + setTimeout(100) both fire
-    expect(nav.style.bottom).toBe('35px'); // second measurement caught it
-    Object.defineProperty(window, 'innerHeight', { value: originalInner, configurable: true });
-    Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
+    expect(nav.style.paddingBottom).toMatch(/safe-area-inset-bottom/);
   });
 
   it('navigates when a tab is tapped', () => {
