@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ComponentType, type SVGProps } from 'react';
+import { type ComponentType, type SVGProps } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ClipboardList, Home, Plus } from 'lucide-react';
 import { useEffectiveRole } from '@/stores/roleViewStore';
@@ -61,100 +61,34 @@ const ADMIN_NAV: NavItem[] = [
 const HIDE_NAV = /^\/(trips\/(new|[^/]+)|drivers\/[^/]+|alerts\/(new|[^/]+)|vacancies\/new)$|^\/trips\/[^/]+\/applicants$/;
 
 /**
- * The app's bottom navigation — fixed to the viewport bottom on tab screens.
+ * The app's bottom navigation — a NATURAL-FLOW sibling beneath the
+ * scrollable `<main>` inside `AppLayout`. NOT `position: fixed`.
+ *
+ * Why not fixed: `position: fixed; bottom: 0` anchors to the LAYOUT viewport,
+ * which mobile browsers (and Chrome DevTools' device emulator) inflate by
+ * their bottom chrome. That left the nav 30-40px below the VISUAL viewport,
+ * clipping labels and the primary FAB. We tried five band-aids — last one
+ * tracked `window.visualViewport` and set `bottom` dynamically with rAF +
+ * timeout cascades + pathname-keyed re-measurement. None held in every
+ * combination of browser × on-screen-keyboard × URL-bar state.
+ *
+ * The permanent fix: AppLayout is a `h-dvh flex flex-col` column. `<main>` is
+ * the scroll container; this nav is its sibling. `dvh` tracks the visual
+ * viewport, so the column always equals the visible viewport height, and the
+ * flex layout always positions the nav last — at the visible bottom edge.
+ * No JS, no `env(safe-area-inset-*)` chasing on the container, no race
+ * conditions. The home-indicator zone on real iOS is still cleared by the
+ * `padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px))` below.
+ *
  * Visual spec (frozen design): translucent white surface with a 24px backdrop
  * blur, layered double shadow, each item rendered as a stacked icon + label.
  * The active tab lifts into a soft-green pill; the Post-Trip slot is a
  * gradient green square (no circle, no translateY).
- *
- * Routing logic + per-role tab sets are unchanged from the previous version —
- * this is a styling-only refactor.
  */
 export function BottomNav() {
   const role = useEffectiveRole();
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const navRef = useRef<HTMLElement | null>(null);
-
-  // Debug overlay — set `?navdbg=1` in the URL (or localStorage.navdbg=1) to
-  // render a live measurement panel so we can compare Driver vs Agent without
-  // opening the console. Triggered by query param so non-dev users never see it.
-  const debugOn = typeof window !== 'undefined' && (
-    new URLSearchParams(window.location.search).get('navdbg') === '1'
-    || window.localStorage?.getItem('navdbg') === '1'
-  );
-  const [dbg, setDbg] = useState<{
-    role: string; innerH: number; vvH: number; vvTop: number; offset: number;
-    navTop: number; navBottom: number; navHeight: number; ts: number;
-  } | null>(null);
-
-  // `position: fixed; bottom: 0` anchors to the LAYOUT viewport. Mobile
-  // browsers (and Chrome DevTools' device emulator) inflate the layout
-  // viewport by their bottom chrome (URL bar, etc.), so the nav can sit
-  // 30–40px below the VISUAL viewport's bottom — clipping labels and the
-  // primary FAB. Measured live: navBottom=967, visualViewport.height=932,
-  // 35px clipped. Track the visual viewport and offset the nav so its
-  // bottom always lands at the visible edge. Also handles the on-screen
-  // keyboard pushing the nav up.
-  useEffect(() => {
-    const nav = navRef.current;
-    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-    if (!nav || !vv) return;
-    const update = () => {
-      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      nav.style.bottom = `${offset}px`;
-      if (debugOn) {
-        // Read AFTER the bottom update lands so the rect reflects new position
-        requestAnimationFrame(() => {
-          const r = nav.getBoundingClientRect();
-          setDbg({
-            role,
-            innerH: window.innerHeight,
-            vvH: Math.round(vv.height * 100) / 100,
-            vvTop: Math.round(vv.offsetTop * 100) / 100,
-            offset,
-            navTop: Math.round(r.top * 100) / 100,
-            navBottom: Math.round(r.bottom * 100) / 100,
-            navHeight: Math.round(r.height * 100) / 100,
-            ts: Date.now(),
-          });
-        });
-      }
-    };
-    // visualViewport.height isn't always settled when the effect first runs —
-    // on initial load Chrome reports vv.height === innerHeight until layout
-    // calibrates a frame or two later, and no resize event fires. Without a
-    // re-measure the nav stays at bottom: 0 and labels get clipped (the
-    // exact bug shipping the original fix didn't fully solve). Re-measure
-    // after first paint (rAF), and again on a short timeout fallback for
-    // browsers that paint before vv calibrates.
-    update();
-    const raf1 = requestAnimationFrame(() => {
-      update();
-      requestAnimationFrame(update);
-    });
-    const t1 = window.setTimeout(update, 100);
-    const t2 = window.setTimeout(update, 500);
-    vv.addEventListener('resize', update);
-    vv.addEventListener('scroll', update);
-    window.addEventListener('resize', update);
-    window.addEventListener('orientationchange', update);
-    return () => {
-      cancelAnimationFrame(raf1);
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-      vv.removeEventListener('resize', update);
-      vv.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-      window.removeEventListener('orientationchange', update);
-    };
-    // Depend on `pathname` so the cascade re-runs on every SPA navigation.
-    // BottomNav stays mounted across routes (it lives outside the <Outlet>),
-    // so without this dep the mount-time measurement persists indefinitely
-    // and goes stale when a new page changes the visual viewport (different
-    // body height, scroll position, etc.). Re-running on pathname change
-    // re-schedules the rAF + timeout cascade, picking up any new vv state.
-  }, [debugOn, role, pathname]);
 
   if (HIDE_NAV.test(pathname)) return null;
   const items = role === 'admin' ? ADMIN_NAV : role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
@@ -164,14 +98,9 @@ export function BottomNav() {
   // 4 attempts at fixing label-clipping via .bottom-nav rules and something in
   // the Tailwind v4 + workbox + Vercel chain keeps interfering. Inline styles
   // bypass ALL of that — they win every specificity battle and can't be cached
-  // separately from the JSX. Visual + layout intent stays identical.
+  // separately from the JSX.
   // minHeight (not height) lets the nav grow to fit its content rather than
-  // clip labels. The recurring "labels cut off" reports (5+ fixes in git
-  // history) all stemmed from a fixed height + items-center: any pixel growth
-  // in icon size, active-pill padding, or safe-area inset pushed the bottom
-  // label row past the nav's hard bottom. minHeight removes the clip while
-  // preserving the visual baseline; the extra 4px of bottom padding gives
-  // labels predictable clearance from any home-indicator zone underneath.
+  // clip labels if the active-pill padding or icon sizes grow.
   const navStyle = {
     background: 'rgba(255, 255, 255, 0.98)',
     backdropFilter: 'blur(24px)',
@@ -192,44 +121,9 @@ export function BottomNav() {
   };
 
   return (
-    <>
-      {debugOn && dbg ? (
-        <div
-          aria-hidden
-          style={{
-            position: 'fixed',
-            top: 8,
-            left: 8,
-            zIndex: 9999,
-            background: 'rgba(15,23,42,0.92)',
-            color: '#fff',
-            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            fontSize: '11px',
-            lineHeight: 1.35,
-            padding: '8px 10px',
-            borderRadius: 6,
-            maxWidth: 240,
-            boxShadow: '0 4px 14px rgba(0,0,0,0.4)',
-            pointerEvents: 'none',
-            whiteSpace: 'pre',
-          }}
-        >
-{`nav-dbg [${dbg.role}]
-innerH      ${dbg.innerH}
-vv.height   ${dbg.vvH}
-vv.offsetTop ${dbg.vvTop}
-→ bottom    ${dbg.offset}px
-navRect.top    ${dbg.navTop}
-navRect.bottom ${dbg.navBottom}
-navRect.h      ${dbg.navHeight}
-clipped?    ${dbg.navBottom > dbg.vvH + dbg.vvTop ? `YES (+${(dbg.navBottom - dbg.vvH - dbg.vvTop).toFixed(1)}px)` : 'no'}
-url         ${typeof window !== 'undefined' ? window.location.pathname : ''}`}
-        </div>
-      ) : null}
     <nav
-      ref={navRef}
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between overflow-visible"
+      className="z-40 flex items-center justify-between overflow-visible"
       style={navStyle}
     >
       {items.map((it) => {
@@ -294,7 +188,6 @@ url         ${typeof window !== 'undefined' ? window.location.pathname : ''}`}
         );
       })}
     </nav>
-    </>
   );
 }
 
