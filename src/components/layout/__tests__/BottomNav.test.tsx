@@ -112,6 +112,43 @@ describe('BottomNav', () => {
     Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
   });
 
+  it('re-runs the viewport measurement on SPA navigation (BottomNav stays mounted across routes — stale bottom was leaving a gap below the nav)', async () => {
+    // Regression: BottomNav lives in AppLayout outside <Outlet>, so navigating
+    // doesn't unmount it. The mount-time bottom value (set from /trips' vv
+    // state) persisted on /home, where vv had calibrated to a different
+    // height — leaving a gap below the nav. Now the effect deps include
+    // pathname so the cascade re-fires on every route change.
+    const originalVV = window.visualViewport;
+    const originalInner = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { value: 967, configurable: true });
+    const vvObj = { height: 932, offsetTop: 0, addEventListener: vi.fn(), removeEventListener: vi.fn() };
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: vvObj });
+    setUser(driver);
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/trips']}>
+        <Routes>
+          <Route path="*" element={<BottomNav />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const nav = screen.getByRole('navigation', { name: /primary/i });
+    await Promise.resolve();
+    expect(nav.style.bottom).toBe('35px'); // /trips measurement
+    // simulate the visual viewport recalibrating between routes (no event fires)
+    vvObj.height = 967;
+    rerender(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="*" element={<BottomNav />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await new Promise((r) => setTimeout(r, 150));
+    expect(nav.style.bottom).toBe('0px'); // re-measured on / with new vv
+    Object.defineProperty(window, 'innerHeight', { value: originalInner, configurable: true });
+    Object.defineProperty(window, 'visualViewport', { value: originalVV, configurable: true });
+  });
+
   it('navigates when a tab is tapped', () => {
     setUser(driver);
     render(

@@ -148,7 +148,13 @@ export function BottomNav() {
       window.removeEventListener('resize', update);
       window.removeEventListener('orientationchange', update);
     };
-  }, [debugOn, role]);
+    // Depend on `pathname` so the cascade re-runs on every SPA navigation.
+    // BottomNav stays mounted across routes (it lives outside the <Outlet>),
+    // so without this dep the mount-time measurement persists indefinitely
+    // and goes stale when a new page changes the visual viewport (different
+    // body height, scroll position, etc.). Re-running on pathname change
+    // re-schedules the rAF + timeout cascade, picking up any new vv state.
+  }, [debugOn, role, pathname]);
 
   if (HIDE_NAV.test(pathname)) return null;
   const items = role === 'admin' ? ADMIN_NAV : role === 'trip_manager' ? AGENT_NAV : DRIVER_NAV;
