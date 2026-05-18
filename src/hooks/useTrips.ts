@@ -11,7 +11,9 @@ import {
   completeTrip,
   declineTrip,
   declineTripInvite,
+  getEndOdoUploadUrl,
   getMyApplications,
+  getStartOdoUploadUrl,
   getTrip,
   getTripApplicants,
   getTripByOtp,
@@ -31,7 +33,7 @@ import {
 import type { ApplyToTripInput, PostTripInput, TripInvitation, TripsQueryParams, TripStatus, UpdateTripDetailsInput, UpdateTripPassengerInput } from '@/types';
 
 type StartInput = { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number };
-type CompleteInput = { endOdoUrl?: string; endOdoReading?: number; driverNotes?: string };
+type CompleteInput = { endOdoUrl?: string; endOdoReading?: number; tollPaidByDriver?: number; driverNotes?: string; driverReviewNote?: string };
 
 function staleForStatus(status?: TripStatus | TripStatus[]): number {
   const arr = Array.isArray(status) ? status : status ? [status] : [];
@@ -271,6 +273,12 @@ export function useRejectApplicant() {
     mutationFn: ({ tripId, acceptanceId, note }: { tripId: string; acceptanceId: string; note?: string }) => rejectApplicant(tripId, acceptanceId, note),
     onSuccess: (_d, v) => invalidate(v.tripId),
   });
+}
+export function useStartOdoUploadUrl() {
+  return useMutation({ mutationFn: ({ tripId }: { tripId: string }) => getStartOdoUploadUrl(tripId) });
+}
+export function useEndOdoUploadUrl() {
+  return useMutation({ mutationFn: ({ tripId }: { tripId: string }) => getEndOdoUploadUrl(tripId) });
 }
 export function useStartTrip() {
   const invalidate = useInvalidateTrips();

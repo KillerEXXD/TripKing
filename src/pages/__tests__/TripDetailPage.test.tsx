@@ -21,9 +21,20 @@ vi.mock('@/hooks/useNotifications', () => ({
 import { useNotifications } from '@/hooks/useNotifications';
 vi.mock('@/hooks/useTrips', () => {
   const noOverlap = Object.freeze({ isPending: false, isSuccess: true, data: Object.freeze([]) });
-  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useDeclineTripInvite: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
+  return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useStartOdoUploadUrl: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue({ bucket: 'trip-executions-photos', path: 't1/start_odo', signedUrl: 'https://x', token: 'tok' }), isPending: false })), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useDeclineTripInvite: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
 });
 import { useTrip, useApplyToTrip, useWithdrawApplication, useStartTrip, useCompleteTrip, useCancelTrip, useUpdateTripPassenger, useAcceptTrip, useDeclineTrip, useDeclineTripInvite, useCancelAssignment } from '@/hooks/useTrips';
+// FileUpload is replaced with a stub that exposes a single "complete upload" button so
+// tests can simulate a successful photo upload without driving the real File-API path.
+vi.mock('@/components/form', async () => {
+  const actual = await vi.importActual<typeof import('@/components/form')>('@/components/form');
+  return {
+    ...actual,
+    FileUpload: ({ label, onUploaded }: { label: string; onUploaded: (path: string) => void }) => (
+      <button type="button" onClick={() => onUploaded('t1/start_odo')}>{`mock-upload:${label}`}</button>
+    ),
+  };
+});
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(() => ({ data: null, isFetching: false, isSuccess: false })), isLookupablePhone: vi.fn(() => false) }));
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useUpdateDriverLocation: vi.fn() }));
 import { useMyDriver, useUpdateDriverLocation } from '@/hooks/useDrivers';
@@ -404,15 +415,16 @@ describe('TripDetailPage', () => {
     expect(screen.queryByText(/your selected driver declined/i)).toBeNull();
   });
 
-  it('lets the assigned driver start the trip with the passenger OTP + odometer reading', async () => {
+  it('lets the assigned driver start the trip with the photo + odometer reading + passenger OTP', async () => {
     setTrip({ data: makeTrip({ status: 'accepted', assignedDriverId: 'd1' }) });
     renderDetail();
     expect(screen.getByText(/you're driving this trip/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
-    fireEvent.change(screen.getByLabelText(/passenger otp/i), { target: { value: '654321' } });
+    fireEvent.click(screen.getByRole('button', { name: /mock-upload:starting odometer photo/i }));
     fireEvent.change(screen.getByLabelText(/start odometer reading/i), { target: { value: '42000' } });
+    fireEvent.change(screen.getByLabelText(/passenger otp/i), { target: { value: '654321' } });
     fireEvent.click(screen.getByRole('button', { name: /start the trip/i }));
-    await waitFor(() => expect(startMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { passengerOtp: '654321', startOdoReading: 42000 } }));
+    await waitFor(() => expect(startMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { passengerOtp: '654321', startOdoReading: 42000, startOdoUrl: 't1/start_odo' } }));
   });
 
   it('lets the assigned driver complete an in-progress trip', async () => {

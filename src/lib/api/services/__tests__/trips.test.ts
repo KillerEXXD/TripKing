@@ -6,7 +6,9 @@ import {
   assignDriver,
   cancelTrip,
   completeTrip,
+  getEndOdoUploadUrl,
   getMyApplications,
+  getStartOdoUploadUrl,
   getTrip,
   getTripApplicants,
   getTripByOtp,
@@ -106,16 +108,50 @@ describe('trips service', () => {
     expect(post).toHaveBeenCalledWith('/trips/t1/assign', { acceptance_id: 'a1' });
   });
 
+  it('getStartOdoUploadUrl → POST /trips/:id/start-odo-upload-url + camelCase transform', async () => {
+    const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ bucket: 'trip-executions-photos', path: 't1/start_odo', signed_url: 'https://x', token: 'tok' }) as never);
+    const r = await getStartOdoUploadUrl('t1');
+    expect(post).toHaveBeenCalledWith('/trips/t1/start-odo-upload-url', {});
+    expect(r.bucket).toBe('trip-executions-photos');
+    expect(r.signedUrl).toBe('https://x');
+    expect(r.path).toBe('t1/start_odo');
+  });
+
+  it('getEndOdoUploadUrl → POST /trips/:id/end-odo-upload-url', async () => {
+    const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ bucket: 'trip-executions-photos', path: 't1/end_odo', signed_url: 'https://y', token: 'tok' }) as never);
+    const r = await getEndOdoUploadUrl('t1');
+    expect(post).toHaveBeenCalledWith('/trips/t1/end-odo-upload-url', {});
+    expect(r.path).toBe('t1/end_odo');
+  });
+
   it('startTrip → POST /trips/:id/start with snake_case OTP + odo fields', async () => {
     const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ id: 't1' }) as never);
     await startTrip('t1', { passengerOtp: '1234', startOdoUrl: 'u', startOdoReading: 50000 });
     expect(post).toHaveBeenCalledWith('/trips/t1/start', { passenger_otp: '1234', start_odo_url: 'u', start_odo_reading: 50000 });
   });
 
-  it('completeTrip → POST /trips/:id/complete with nulls when no input', async () => {
+  it('completeTrip → POST /trips/:id/complete with nulls + toll=0 when no input', async () => {
     const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ id: 't1' }) as never);
     await completeTrip('t1');
-    expect(post).toHaveBeenCalledWith('/trips/t1/complete', { end_odo_url: null, end_odo_reading: null, driver_notes: null });
+    expect(post).toHaveBeenCalledWith('/trips/t1/complete', {
+      end_odo_url: null,
+      end_odo_reading: null,
+      toll_paid_by_driver: 0,
+      driver_notes: null,
+      driver_review_note: null,
+    });
+  });
+
+  it('completeTrip → POST /trips/:id/complete forwards toll + review note', async () => {
+    const post = vi.spyOn(apiClient, 'post').mockReturnValue(ok({ id: 't1' }) as never);
+    await completeTrip('t1', { endOdoUrl: 'u', endOdoReading: 50125, tollPaidByDriver: 75, driverNotes: 'all good', driverReviewNote: 'pays on time' });
+    expect(post).toHaveBeenCalledWith('/trips/t1/complete', {
+      end_odo_url: 'u',
+      end_odo_reading: 50125,
+      toll_paid_by_driver: 75,
+      driver_notes: 'all good',
+      driver_review_note: 'pays on time',
+    });
   });
 
   it('cancelTrip → POST /trips/:id/cancel { cancel_reason_id }', async () => {
