@@ -68,6 +68,7 @@ const PHASES = [
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
   { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
   { code: 'M',  title: 'M · Multi-way trips',             description: 'Migration 024 trip_type=multi_way — itineraries with ≥3 waypoints (pickup, ≥1 intermediate stop, final destination which may equal the pickup for a city-loop). Covers the POST /trips body-shape contract (server-side validation: ≥3 waypoints, strictly monotonic arrive_at, last-may-equal-first), the form-level Multi-way tab UI, and the full trip lifecycle (post → apply → assign → accept → start → complete) to prove multi-way trips behave identically to one-way trips for the trip-acceptance endpoints. Mirrored 1:1 by e2e/trip-types.spec.ts M1-M5 + the existing tab test.' },
+  { code: 'O',  title: 'O · Trip edit & applicant-conflict', description: 'PR #291 — agent can edit a posted trip after applicants exist; backend fans out a trip_updated notification to every applicant + pending invitee with a field-level diff. Frontend surfaces: Edit button on the home "Waiting for your decision" card (gated on 0 applicants), edit-mode on PostTripPage (heading flips, Update CTA), pre-submit conflict banner (applicants arrived mid-edit), diff confirm modal (lists each before → after), driver-side "Trip details changed" chip on the Applied tab, and the TripUpdatedDiffBanner on the trip-detail page with Keep / Withdraw CTAs. Backend gate: status ∈ {open, has_applicants}; selected/accepted/in_progress/completed/cancelled return 409.' },
 ];
 
 // Each scenario: { phase, id, title, preconditions?, steps[{action, expected}] }
@@ -603,6 +604,63 @@ const SCENARIOS = [
     { action: 'Driver POST /trips/{id}/start with passenger_otp.', expected: 'Trip status → in_progress.' },
     { action: 'Driver POST /trips/{id}/complete.', expected: '200. Trip status → completed.' },
     { action: 'GET /trips/{id}. Verify trip_type preserved.', expected: 'trip_type === "multi_way" still. Lifecycle endpoints (apply/assign/accept/start/complete) do NOT have multi-way-specific branches that could regress — this test guards against a future refactor introducing one.' },
+  ]},
+
+  // ── O · Trip edit & applicant-conflict ─────────────────────────────────
+  { phase: 'O', id: 'O.1', title: 'Agent: home "Waiting for your decision" card shows Edit chip when trip has 0 applicants + 0 invitees', preconditions: 'Agent is signed in. They have ONE posted trip with status=open and 0 applicants and 0 pending invitations.', steps: [
+    { action: 'Open / (Home). Locate the amber "Waiting for your decision" card.', expected: 'Card shows the trip route, payout, pickup. Below the stat row, an "Edit trip" pill is visible.' },
+    { action: 'Tap the Edit trip chip.', expected: 'Route changes to /trips/{id}/edit. PostTripPage renders in edit mode (heading "Edit trip · where & when").' },
+  ]},
+  { phase: 'O', id: 'O.2', title: 'Agent: Edit chip is HIDDEN on a trip with ≥1 applicant or invitee', steps: [
+    { action: 'Have 1 driver apply to your open trip. Refresh / (Home).', expected: 'The "Waiting for your decision" card now reads "1 driver applied · pick one". The Edit trip pill is NOT rendered.' },
+    { action: 'Withdraw the application (or have an admin clear it).', expected: 'After refresh, the Edit pill reappears (applicantCount back to 0).' },
+  ]},
+  { phase: 'O', id: 'O.3', title: 'Edit page hydrates every field from the existing trip', preconditions: 'Posted trip with non-default values: rate ₹16/km, bata ₹500, GST ₹120, SUV, 7 seats, AC off, pickup tomorrow 10am, driver instructions "Call before pickup".', steps: [
+    { action: 'Open /trips/{id}/edit.', expected: 'Form pre-populates: From/To cities, pickup date+time, distance, car type=SUV, seats=7, AC unchecked, rate=16, bata=500, GST=120, driver instructions present.' },
+    { action: 'Tap Next.', expected: 'Step 2 renders with all commercial fields filled. CTA reads "Update trip" (not "Post trip").' },
+  ]},
+  { phase: 'O', id: 'O.4', title: 'Update with NO changes is a no-op (server returns 200, no notifications)', steps: [
+    { action: 'Open /trips/{id}/edit. Without touching any field, tap Next, then Update trip.', expected: 'Toast "Trip updated" (no "N applicants notified" suffix). Land on /trips/{id}.' },
+    { action: 'As any applicant (if one exists), check /notifications.', expected: 'No new trip_updated entry.' },
+  ]},
+  { phase: 'O', id: 'O.5', title: 'Update with pickup-time change + ≥1 applicant fires the diff confirm modal', preconditions: 'Trip has 1 applicant.', steps: [
+    { action: 'Open /trips/{id}/edit. Change pickup to a date 2 days later.', expected: 'Form accepts the change.' },
+    { action: 'Tap Next then Update trip.', expected: 'Modal "Send this update?" opens. Body shows "1 driver who applied or was invited will be notified." Diff list shows "Pickup: <old date> → <new date>".' },
+    { action: 'Tap Send update.', expected: 'Modal closes, PATCH fires, toast "Trip updated — 1 applicant notified". Route to /trips/{id}.' },
+  ]},
+  { phase: 'O', id: 'O.6', title: 'Cancel on the diff modal returns to the edit form unchanged', steps: [
+    { action: 'In the diff modal from O.5, tap Cancel.', expected: 'Modal closes. Edit form still on screen with the (unsaved) changes intact. No PATCH fired. Applicants get NO notification.' },
+  ]},
+  { phase: 'O', id: 'O.7', title: 'Update with only commercial-field change (rate) on a trip with applicants fires diff modal', steps: [
+    { action: 'On a trip with 1 applicant, open /trips/{id}/edit. Step 2: change rate from ₹14 → ₹16. Tap Update.', expected: 'Modal lists "Rate / km: ₹14 → ₹16". Send update → PATCH → toast confirms applicant notified.' },
+  ]},
+  { phase: 'O', id: 'O.8', title: 'Pre-submit conflict banner: applicants arrived mid-edit', preconditions: 'Use two devices/tabs. Agent on Device A opens /trips/{id}/edit (0 applicants). On Device B, a driver applies to the trip. Both pages stay open.', steps: [
+    { action: 'On Device A, change pickup time. Tap Update.', expected: 'No diff modal yet — instead an amber banner appears at the top of step 2: "1 driver applied or was invited while you were editing — review above before continuing." Toast "1 new driver applied while you were editing."' },
+    { action: 'Tap "Review applicants" inside the banner.', expected: 'Routes to /trips/{id}/applicants. The edit is abandoned (no PATCH fired).' },
+  ]},
+  { phase: 'O', id: 'O.9', title: 'Continue update after seeing the conflict banner', steps: [
+    { action: 'Reproduce the O.8 setup. Instead of Review, tap Update trip a second time.', expected: 'Diff modal opens (since pickup changed AND there\'s now an applicant). Send update → notification fires.' },
+  ]},
+  { phase: 'O', id: 'O.10', title: 'PATCH 409 when trip status changes mid-edit (driver got selected)', steps: [
+    { action: 'Open /trips/{id}/edit. Have another tab assign a driver — trip status flips to "selected".', expected: 'On the edit tab, tap Update. PATCH returns 409 "Trip details can only be edited until a driver is selected". Toast "Couldn\'t update the trip — try again."' },
+  ]},
+  { phase: 'O', id: 'O.11', title: 'Driver: "Trip details changed" chip appears on the Applied tab card', preconditions: 'Driver has applied to a trip. Agent then edits that trip (changes pickup time per O.5).', steps: [
+    { action: 'As the driver, open /my-trips → Applied tab.', expected: 'The card for that trip shows an amber chip "Trip details changed — tap to review" above the pickup line.' },
+  ]},
+  { phase: 'O', id: 'O.12', title: 'Driver: trip-detail page shows the TripUpdatedDiffBanner with Keep + Withdraw', steps: [
+    { action: 'From the chip in O.11, tap the trip card to open /trips/{id}.', expected: 'Top of page: amber Card "The trip manager updated this trip" with a strikethrough-old → bold-new diff line per change. Two buttons: "Keep my application" and "Withdraw".' },
+    { action: 'Tap Keep my application.', expected: 'Banner stays (no re-render trigger) but the notification is marked read. Returning to Applied tab: chip is gone on next mount.' },
+  ]},
+  { phase: 'O', id: 'O.13', title: 'Driver: Withdraw from the diff banner clears the application', steps: [
+    { action: 'Reproduce O.12. Instead of Keep, tap Withdraw → confirm.', expected: 'Toast "Application withdrawn". Application disappears from Applied tab. Trip detail no longer shows the "You\'ve applied" pill. Notification marked read.' },
+  ]},
+  { phase: 'O', id: 'O.14', title: 'Pending invitee (not yet applied) also receives the trip_updated notification', preconditions: 'Agent has INVITED a driver to a trip (status=pending). Driver has not accepted or applied yet.', steps: [
+    { action: 'Agent edits the trip (changes the rate). Send update.', expected: 'Driver receives a trip_updated notification (visible in /notifications and on the bell).' },
+    { action: 'Driver opens the trip detail.', expected: 'TripUpdatedDiffBanner renders. Since they have not applied, only the "Got it" button is visible — no Withdraw.' },
+  ]},
+  { phase: 'O', id: 'O.15', title: 'Notification bell + /notifications entry deep-links to the trip', steps: [
+    { action: 'Driver receives a trip_updated notification (O.11 / O.14). Open /notifications.', expected: 'Row shows the FileEdit icon, title "A trip you applied to has been updated", and a body matching the diff summary (e.g. "Pickup date & time changed").' },
+    { action: 'Tap the row.', expected: 'Routes to /trips/{id}. Diff banner visible at top. Notification marked read.' },
   ]},
 ];
 
