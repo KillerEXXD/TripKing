@@ -235,6 +235,18 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('Passenger P · 2 pax')).toBeInTheDocument();
   });
 
+  it('surfaces the pending-invitation count in the header so an invited driver knows they are not alone', () => {
+    setTrip({ data: makeTrip({ pendingInvitationCount: 5 }) });
+    renderDetail();
+    expect(screen.getByText(/5 invited/i)).toBeInTheDocument();
+  });
+
+  it('hides the invited badge when there are no pending invitations', () => {
+    setTrip({ data: makeTrip({ pendingInvitationCount: 0 }) });
+    renderDetail();
+    expect(screen.queryByText(/ invited/i)).toBeNull();
+  });
+
   it('shows the review section on a completed trip', () => {
     setTrip({ data: makeTrip({ status: 'completed' }) });
     renderDetail();
@@ -252,7 +264,7 @@ describe('TripDetailPage', () => {
     setTrip({ data: makeTrip() });
     renderDetail();
     fireEvent.click(screen.getByRole('button', { name: /apply for this trip/i }));
-    await waitFor(() => expect(applyMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { vehicleId: 'v1', quotedRatePerKm: undefined, message: undefined } }));
+    await waitFor(() => expect(applyMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { vehicleId: 'v1' } }));
     await waitFor(() => expect(storeState.recordApplication).toHaveBeenCalledWith(expect.objectContaining({ tripId: 't1', acceptanceId: 'a1' })));
   });
 
@@ -441,13 +453,6 @@ describe('TripDetailPage', () => {
   });
 
   // ── ApplyBar variants ────────────────────────────────────────────────────
-
-  it('shows the rate/note inputs when the driver toggles "Quote a different rate"', () => {
-    setTrip({ data: makeTrip() });
-    renderDetail();
-    fireEvent.click(screen.getByRole('button', { name: /quote a different rate/i }));
-    expect(screen.getByPlaceholderText(/short note to the manager/i)).toBeInTheDocument();
-  });
 
   it('shows a Decline invitation button to an invited driver and fires the decline mutation on confirm', async () => {
     setTrip({ data: makeTrip({ invitationId: 'inv-1', invitationStatus: 'pending' }) });

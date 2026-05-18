@@ -251,7 +251,7 @@ describe('PostVacancyPage', () => {
     const updateAsync = vi.fn().mockResolvedValue(existing);
     vi.mocked(useUpdateVacancy).mockReturnValue({ mutateAsync: updateAsync, isPending: false, isError: false } as never);
     renderEdit('v77');
-    expect(await screen.findByRole('heading', { name: /edit your availability/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /edit your vacancy/i })).toBeInTheDocument();
     await waitFor(() => expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('c1'));
     expect(screen.getByDisplayValue('18')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^save changes$/i }));
