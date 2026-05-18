@@ -29,6 +29,20 @@ registerSW({
   },
 });
 
+// When a new SW takes control of this client (after deploy + skipWaiting + clientsClaim),
+// reload so the open tab picks up the new JS bundle instead of running the old one until
+// the user manually refreshes. Without this, users see stale routing / stale code after a
+// deploy until they close the tab. The `refreshing` guard prevents reload loops on browsers
+// that fire `controllerchange` more than once during activation.
+if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+}
+
 const rootEl = document.getElementById('root');
 if (!rootEl) {
   throw new Error('Root element #root not found');
