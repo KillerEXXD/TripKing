@@ -122,6 +122,14 @@ async function applyAssignAccept(agentToken, driverToken, tripId) {
   check('trip #1 posted', !!trip1?.id, `trip=${JSON.stringify(trip1)}`);
   if (!trip1?.id || !vac1?.id) process.exit(1);
 
+  // Pre-warm the agent-search cache (Qase D5 regression): the public /vacancies list has
+  // a 90s shared-cache TTL. Without invalidation in syncVacanciesForTrip, the post-accept
+  // re-fetch would serve the stale 'active' row for up to a minute. Hit it once *before*
+  // the accept so the cache is populated with vac1 visible.
+  const prewarm = await j('GET', `/vacancies?current_city_id=${cityFrom}`);
+  const prewarmHit = (prewarm.json?.data || []).some((v) => v.id === vac1.id);
+  check('pre-warm: vacancy #1 visible in agent search before accept', prewarmHit, `prewarmHit=${prewarmHit}`);
+
   const { accept: accept1 } = await applyAssignAccept(agentToken, driverToken, trip1.id);
   check('driver accepts trip #1 → 200', accept1.status === 200 && accept1.json?.data?.status === 'accepted', `status=${accept1.status} ${JSON.stringify(accept1.json?.error || '')}`);
 
