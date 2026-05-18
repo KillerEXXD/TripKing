@@ -822,6 +822,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // Guard the null/empty case so the 50 default actually kicks in.
     const limitRaw = url.searchParams.get('limit');
     const limit = Math.min(limitRaw && Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : 50, 100);
+    const offsetRaw = url.searchParams.get('offset');
+    const offset = Math.max(0, offsetRaw && Number.isFinite(Number(offsetRaw)) ? Math.floor(Number(offsetRaw)) : 0);
 
     // Cache eligibility — only skip when the caller explicitly asks for in_progress trips,
     // because those rows carry the driver's live position (`current_lat/lng/at`) which a 30s
@@ -865,8 +867,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         distEntries = list.map((r) => [r.id, toKm(Number(r.distance_m))]);
         q = q.in('id', list.map((r) => r.id));
       }
-      q = q.limit(limit);
-      if (!near) q = q.order('pickup_at', { ascending: true });
+      // Near path: order by distance is applied JS-side after the SQL — fetch enough rows
+      // to slice the requested page there. Non-near path: SQL .range() applies offset/limit
+      // efficiently. Either way, the cache key auto-includes the offset+limit query params.
+      if (!near) {
+        q = q.order('pickup_at', { ascending: true }).range(offset, offset + limit - 1);
+      } else {
+        q = q.limit(Math.min(limit + offset, 200));
+      }
       const { data, error } = await q;
       if (error) throw new Error(error.message);
       const rows = (data ?? []) as Record<string, unknown>[];
@@ -896,6 +904,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
             near_lng: near ? near.lng.toFixed(3) : '',
             radius_m: near ? near.radiusM : '',
             limit,
+            offset,
           }),
           ttl: CacheTTL.SHORT,
           tier: 'shared',
@@ -948,7 +957,8 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     }));
     if (distById) {
       rows = rows.map((r) => ({ ...r, distance_km: distById.get(r.id as string) ?? null }))
-                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+                 .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity))
+                 .slice(offset, offset + limit);
     }
     // /trips list is varies-by-viewer: NEVER public — CDN must not cache (see CACHE_BASELINE §4).
     return setCacheControl(tagCacheHit(ok(rows), hit), { ttl: CacheTTL.SHORT, scope: 'private' });

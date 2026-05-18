@@ -28,6 +28,7 @@ export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
   }
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
+  if (params?.offset != null && params.offset > 0) q.offset = params.offset;
   if (params?.sort) q.sort = params.sort;
   return apiClient.get<Api[]>('/trips', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformTrip));
 }
@@ -35,6 +36,16 @@ export function getTrips(params?: TripsQueryParams): Promise<Trip[]> {
 /** The caller's own trip applications (`GET /trips/applied`) — each a trip_acceptance with its joined (browse-safe) trip. Empty if the caller has no driver profile. */
 export function getMyApplications(): Promise<MyApplication[]> {
   return apiClient.get<Api[]>('/trips/applied').then((r) => (r.data ?? []).map(transformMyApplication));
+}
+
+/** Paginated variant for `useInfiniteTrips`. Returns the page + a `hasMore` hint
+ *  inferred from `items.length === limit`. */
+export function getTripsPage(params: Omit<TripsQueryParams, 'offset' | 'limit'>, offset: number, limit: number): Promise<{ items: Trip[]; hasMore: boolean; nextOffset: number }> {
+  return getTrips({ ...params, offset, limit }).then((items) => ({
+    items,
+    hasMore: items.length === limit,
+    nextOffset: offset + items.length,
+  }));
 }
 
 export function getTrip(id: string): Promise<Trip> {

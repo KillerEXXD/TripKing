@@ -4,3 +4,4 @@ export * from './ErrorState';
 export * from './EmptyState';
 export * from './ErrorBoundary';
 export * from './RouteErrorBoundary';
+export * from './InfiniteScrollSentinel';

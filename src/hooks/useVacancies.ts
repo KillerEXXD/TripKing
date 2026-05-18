@@ -1,11 +1,24 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
-import { cancelVacancy, getVacancies, getVacancy, patchVacancy, postVacancy } from '@/lib/api/services/vacancies';
+import { cancelVacancy, getVacancies, getVacanciesPage, getVacancy, patchVacancy, postVacancy } from '@/lib/api/services/vacancies';
 import type { PostVacancyInput, VacanciesQueryParams } from '@/types';
 
 export function useVacancies(params?: VacanciesQueryParams) {
   return useQuery({ queryKey: ['vacancies', params ?? {}], queryFn: () => getVacancies(params), placeholderData: keepPreviousData, staleTime: STALE.live });
+}
+
+/** Infinite-scroll variant of `useVacancies`: pages of `limit` (default 10) starting at
+ *  offset 0. `data.pages[i].items` is the row array for page i+1. The agent browse
+ *  (`/vacancies`) uses this so we don't dump the entire 50/100/200 result on first paint. */
+export function useInfiniteVacancies(params: Omit<VacanciesQueryParams, 'offset' | 'limit'> = {}, limit = 10) {
+  return useInfiniteQuery({
+    queryKey: ['vacancies', 'infinite', { ...params, limit }],
+    queryFn: ({ pageParam }) => getVacanciesPage(params, pageParam as number, limit),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.hasMore ? last.nextOffset : undefined),
+    staleTime: STALE.live,
+  });
 }
 export function useVacancy(id: string | undefined) {
   return useQuery({ queryKey: ['vacancy', id], queryFn: () => getVacancy(id as string), enabled: !!id, staleTime: STALE.live });

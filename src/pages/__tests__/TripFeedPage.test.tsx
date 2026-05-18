@@ -4,8 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { TripFeedPage } from '@/pages/TripFeedPage';
 import type { Trip } from '@/types';
 
-vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn() }));
-import { useTrips } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({ useInfiniteTrips: vi.fn() }));
+import { useInfiniteTrips } from '@/hooks/useTrips';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(() => ({ data: undefined, isPending: false, isError: false })) }));
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, carTypeHooks: { useList: vi.fn() } }));
 import { carTypeHooks, cityHooks } from '@/hooks/useAdminConfig';
@@ -48,9 +48,24 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
   };
 }
 
-type TripsState = { isPending?: boolean; isError?: boolean; isSuccess?: boolean; data?: Trip[]; refetch?: () => void };
+type TripsState = { isPending?: boolean; isError?: boolean; isSuccess?: boolean; data?: Trip[]; refetch?: () => void; hasNextPage?: boolean };
+/** Wraps the trip array into the useInfiniteQuery shape — `data.pages[0].items` — so the
+ *  page can flatten it without changing the existing test fixtures. */
 function setTrips(state: TripsState) {
-  vi.mocked(useTrips).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...state } as never);
+  const items = state.data ?? [];
+  const isError = state.isError ?? false;
+  const isPending = state.isPending ?? false;
+  const pages = !isError && !isPending ? [{ items, hasMore: !!state.hasNextPage, nextOffset: items.length }] : [];
+  vi.mocked(useInfiniteTrips).mockReturnValue({
+    isPending,
+    isError,
+    isSuccess: !isPending && !isError,
+    data: pages.length ? { pages, pageParams: [0] } : undefined,
+    hasNextPage: !!state.hasNextPage,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: state.refetch ?? vi.fn(),
+  } as never);
 }
 
 function renderFeed() {
@@ -63,7 +78,7 @@ function renderFeed() {
 
 describe('TripFeedPage', () => {
   beforeEach(() => {
-    vi.mocked(useTrips).mockReset();
+    vi.mocked(useInfiniteTrips).mockReset();
     vi.mocked(cityHooks.useList).mockReset().mockReturnValue({ data: [city('c1', 'Vellore'), city('c2', 'Chennai')] } as never);
     vi.mocked(carTypeHooks.useList).mockReset().mockReturnValue({ data: [{ id: 'ct1', label: 'Sedan', sortOrder: 1, isActive: true }] } as never);
   });

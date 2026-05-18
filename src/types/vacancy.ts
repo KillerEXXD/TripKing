@@ -93,5 +93,7 @@ export interface VacanciesQueryParams {
   near?: NearRadius;
   page?: number;
   limit?: number;
+  /** Offset into the result set (0-based). Pair with `limit` for infinite-scroll pagination. */
+  offset?: number;
   sort?: string;
 }

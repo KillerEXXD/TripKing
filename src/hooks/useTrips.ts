@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { STALE } from '@/lib/queryClient';
 import { createInvalidator } from '@/lib/hooks/createInvalidator';
 import {
@@ -18,6 +18,7 @@ import {
   getTripInvites,
   getTripMatchPreview,
   getTrips,
+  getTripsPage,
   inviteDrivers,
   postTrip,
   rejectApplicant,
@@ -106,6 +107,19 @@ export function useTrips(
     refetchOnMount: options?.alwaysRefetchOnMount ? 'always' : true,
   });
 }
+/** Infinite-scroll variant of `useTrips`: pages of `limit` (default 10) starting at
+ *  offset 0. `data.pages[i].items` is the row array for page i+1. The driver browse
+ *  (`/trips`) uses this so we don't dump the whole 50/100 result on first paint. */
+export function useInfiniteTrips(params: Omit<TripsQueryParams, 'offset' | 'limit'> = {}, limit = 10) {
+  return useInfiniteQuery({
+    queryKey: ['trips', 'infinite', { ...params, limit }],
+    queryFn: ({ pageParam }) => getTripsPage(params, pageParam as number, limit),
+    initialPageParam: 0,
+    getNextPageParam: (last) => (last.hasMore ? last.nextOffset : undefined),
+    staleTime: staleForStatus(params.status),
+  });
+}
+
 export function useTrip(id: string | undefined) {
   return useQuery({
     queryKey: ['trip', id],

@@ -6,11 +6,12 @@ import { formatClockTime } from '@/lib/utils';
 import type { Vacancy } from '@/types';
 
 vi.mock('@/hooks/useVacancies', () => ({
-  useVacancies: vi.fn(),
+  useInfiniteVacancies: vi.fn(),
   useMyActiveVacancies: vi.fn(),
+  useMyExpiredVacancies: vi.fn(() => ({ isPending: false, isError: false, data: [] })),
   useCancelVacancy: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
-import { useVacancies, useMyActiveVacancies } from '@/hooks/useVacancies';
+import { useInfiniteVacancies, useMyActiveVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() }, useAppSettings: vi.fn() }));
 import { cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
@@ -39,9 +40,25 @@ function makeVacancy(over: Partial<Vacancy> = {}): Vacancy {
   };
 }
 
-type VState = { isPending?: boolean; isError?: boolean; isSuccess?: boolean; data?: Vacancy[]; refetch?: () => void };
+type VState = { isPending?: boolean; isError?: boolean; isSuccess?: boolean; data?: Vacancy[]; refetch?: () => void; hasNextPage?: boolean };
+/** Wraps the data array into the `useInfiniteQuery` shape — `data.pages[0].items` — so the
+ *  page can flatten it without breaking the existing test fixtures. */
 function setVacancies(s: VState) {
-  vi.mocked(useVacancies).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...s } as never);
+  const items = s.data ?? [];
+  const isError = s.isError ?? false;
+  const isPending = s.isPending ?? false;
+  const pages = !isError && !isPending ? [{ items, hasMore: !!s.hasNextPage, nextOffset: items.length }] : [];
+  vi.mocked(useInfiniteVacancies).mockReturnValue({
+    isPending,
+    isError,
+    isSuccess: !isPending && !isError,
+    // Pending / Error states leave `data` undefined like the real hook would.
+    data: pages.length ? { pages, pageParams: [0] } : undefined,
+    hasNextPage: !!s.hasNextPage,
+    isFetchingNextPage: false,
+    fetchNextPage: vi.fn(),
+    refetch: s.refetch ?? vi.fn(),
+  } as never);
 }
 
 function renderVacancies() {
@@ -54,7 +71,7 @@ function renderVacancies() {
 
 describe('VacanciesPage', () => {
   beforeEach(() => {
-    vi.mocked(useVacancies).mockReset();
+    vi.mocked(useInfiniteVacancies).mockReset();
     vi.mocked(useMyActiveVacancies).mockReset().mockReturnValue({ isPending: false, data: [] } as never);
     vi.mocked(cityHooks.useList).mockReset().mockReturnValue({ data: [city('c1', 'Vellore'), city('c2', 'Chennai')] } as never);
     vi.mocked(useAppSettings).mockReset().mockReturnValue({ data: { maxActiveVacanciesPerDriver: 2 } } as never);
@@ -107,9 +124,9 @@ describe('VacanciesPage', () => {
   it('always requests active vacancies and re-requests when a city filter changes', () => {
     setVacancies({ data: [] });
     renderVacancies();
-    expect(useVacancies).toHaveBeenCalledWith({ status: 'active', currentCityId: undefined, destinationCityId: undefined });
+    expect(useInfiniteVacancies).toHaveBeenCalledWith({ status: 'active', currentCityId: undefined, destinationCityId: undefined });
     fireEvent.change(screen.getByLabelText(/where the driver is/i), { target: { value: 'c1' } });
-    expect(useVacancies).toHaveBeenLastCalledWith({ status: 'active', currentCityId: 'c1', destinationCityId: undefined });
+    expect(useInfiniteVacancies).toHaveBeenLastCalledWith({ status: 'active', currentCityId: 'c1', destinationCityId: undefined });
   });
 
   it('renders the "Near me" filter; a near-list card shows the distance', () => {
