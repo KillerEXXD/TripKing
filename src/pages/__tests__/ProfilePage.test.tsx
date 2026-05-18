@@ -99,6 +99,34 @@ describe('ProfilePage', () => {
     expect(screen.getByText(/Toyota Innova 2021/)).toBeInTheDocument();
   });
 
+  // Regression: user reported the apply screen said "Insurance has expired" but the profile
+  // showed no expiry data — so the driver couldn't tell what was wrong. The vehicle row now
+  // surfaces both expiry dates inline + a red Papers-expired badge when past.
+  it('the vehicle row shows insurance expiry and flags it red when expired', () => {
+    setMyDriver({ data: makeDriver() });
+    vi.mocked(useDriverVehicles).mockReturnValue({ isPending: false, isError: false, data: [{
+      id: 'v1', makeLabel: 'Toyota', modelName: 'Etios', year: 2024, carTypeLabel: 'Sedan', seats: 4, ac: true,
+      isPrimary: true, driverId: 'd1', carTypeId: 'ct1',
+      insuranceExpiry: '1930-06-30', // the 1930 typo case
+    }] } as never);
+    renderProfile();
+    expect(screen.getByText(/Insurance expires 1930-06-30/i)).toBeInTheDocument();
+    expect(screen.getByText(/expired — please fix/i)).toBeInTheDocument();
+    expect(screen.getByText(/papers expired/i)).toBeInTheDocument();
+  });
+
+  it('the vehicle row shows insurance expiry plainly when it is in the future', () => {
+    setMyDriver({ data: makeDriver() });
+    vi.mocked(useDriverVehicles).mockReturnValue({ isPending: false, isError: false, data: [{
+      id: 'v1', makeLabel: 'Toyota', modelName: 'Etios', year: 2024, carTypeLabel: 'Sedan', seats: 4, ac: true,
+      isPrimary: true, driverId: 'd1', carTypeId: 'ct1',
+      insuranceExpiry: '2099-12-31',
+    }] } as never);
+    renderProfile();
+    expect(screen.getByText(/Insurance expires 2099-12-31/i)).toBeInTheDocument();
+    expect(screen.queryByText(/papers expired/i)).toBeNull();
+  });
+
   it('prompts to onboard when the user has no driver profile (404)', () => {
     setMyDriver({ isError: true, error: new ApiError('No profile for this user', 404) });
     renderProfile();

@@ -25,6 +25,16 @@ const VEHICLE_URL: Record<VehiclePhotoSlot, keyof Vehicle> = {
 };
 const REQUIRED: VehiclePhotoSlot[] = ['front', 'back', 'left', 'right', 'plate', 'rc', 'insurance'];
 
+/** Today's date as `YYYY-MM-DD` in the browser's local TZ — used as the `min` attribute
+ *  on the insurance/permit date inputs so a typo can't land the year at 1930. */
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function Header({ onBack }: { onBack: () => void }) {
   return <PageHeader title="Vehicle photos & papers" onBack={onBack} />;
 }
@@ -54,6 +64,20 @@ export function VehiclePhotosPage() {
     <FileUpload key={slot} label={label} hint={opts?.hint} required={opts?.required} allowPdf={opts?.allowPdf} value={valueFor(slot) || undefined} getUploadUrl={uploadUrlFor(slot)} onUploaded={onUploaded(slot)} />
   );
 
+  // Save guard: rejects past dates even if the user keyboard-typed past the picker's
+  // `min` attribute (some mobile browsers don't enforce it). Empty string clears the
+  // value (permit is optional); a past date toasts + skips the save.
+  function onExpiryChange(label: 'Insurance' | 'Permit', field: 'insuranceExpiry' | 'permitExpiry', value: string) {
+    if (value && value < todayIso()) {
+      toast.error(`${label} expiry can't be in the past.`);
+      return;
+    }
+    updateVehicle.mutate(
+      { id: vehicle.id, patch: { [field]: value || null } },
+      { onError: () => toast.error('Could not save the expiry date') },
+    );
+  }
+
   return (
     <div>
       <Header onBack={() => navigate(-1)} />
@@ -81,8 +105,13 @@ export function VehiclePhotosPage() {
             <Input
               id="insx"
               type="date"
+              // `min=today` blocks the browser date picker from accepting a past date —
+              // without it a typo like "30" lands the year at 1930 and the apply-to-trip
+              // gate then says "Insurance has expired". The save handler below also
+              // guards against direct keyboard entry.
+              min={todayIso()}
               defaultValue={vehicle.insuranceExpiry ?? ''}
-              onChange={(e) => updateVehicle.mutate({ id: vehicle.id, patch: { insuranceExpiry: e.target.value || null } }, { onError: () => toast.error('Could not save the expiry date') })}
+              onChange={(e) => onExpiryChange('Insurance', 'insuranceExpiry', e.target.value)}
             />
           </div>
           {photoTile('permit', 'Commercial permit (optional)', { allowPdf: true })}
@@ -91,8 +120,9 @@ export function VehiclePhotosPage() {
             <Input
               id="permx"
               type="date"
+              min={todayIso()}
               defaultValue={vehicle.permitExpiry ?? ''}
-              onChange={(e) => updateVehicle.mutate({ id: vehicle.id, patch: { permitExpiry: e.target.value || null } }, { onError: () => toast.error('Could not save the expiry date') })}
+              onChange={(e) => onExpiryChange('Permit', 'permitExpiry', e.target.value)}
             />
           </div>
         </Card>

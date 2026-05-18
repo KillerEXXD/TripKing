@@ -174,6 +174,9 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
           <div className="space-y-2">
             {(vehiclesQuery.data ?? []).map((v) => {
               const photosDone = !!v.photoFrontUrl && !!v.photoBackUrl && !!v.photoLeftUrl && !!v.photoRightUrl && !!v.photoPlateUrl && !!v.rcBookUrl && !!v.insuranceUrl;
+              const today = new Date().toISOString().slice(0, 10);
+              const insExpired = !!v.insuranceExpiry && v.insuranceExpiry < today;
+              const permExpired = !!v.permitExpiry && v.permitExpiry < today;
               return (
                 <div key={v.id} className="rounded-lg border px-3 py-2">
                   <div className="flex items-center gap-2 text-sm">
@@ -182,9 +185,28 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
                     {v.isPrimary ? <Badge variant="muted">primary</Badge> : null}
                   </div>
                   <div className="mt-0.5 text-xs text-secondary">{v.carTypeLabel ?? 'Car'} · {v.seats} seats · {v.ac ? 'AC' : 'Non-AC'}{v.fuelTypeLabel ? ` · ${v.fuelTypeLabel}` : ''}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}</div>
-                  <div className="mt-1.5 flex items-center gap-3 text-xs">
+                  {/* Surface insurance/permit expiry on the profile row so drivers can spot a
+                   *  bad date (e.g. typo'd 1930) and tap Edit to fix — instead of guessing at
+                   *  "Insurance has expired" on the apply screen. Red badge when past. */}
+                  {v.insuranceExpiry || v.permitExpiry ? (
+                    <div className="mt-1 text-xs text-secondary">
+                      {v.insuranceExpiry ? (
+                        <span className={insExpired ? 'text-red-700' : ''}>
+                          Insurance expires {v.insuranceExpiry}{insExpired ? ' · expired — please fix' : ''}
+                        </span>
+                      ) : null}
+                      {v.insuranceExpiry && v.permitExpiry ? <span> · </span> : null}
+                      {v.permitExpiry ? (
+                        <span className={permExpired ? 'text-red-700' : ''}>
+                          Permit expires {v.permitExpiry}{permExpired ? ' · expired' : ''}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                     <Badge variant={photosDone ? 'success' : 'warning'}>{photosDone ? 'Photos complete' : 'Photos needed'}</Badge>
-                    <Link to={`/vehicles/${v.id}/photos`} className="font-medium text-primary hover:underline">{photosDone ? 'View photos' : 'Add photos'}</Link>
+                    {insExpired || permExpired ? <Badge variant="destructive">Papers expired</Badge> : null}
+                    <Link to={`/vehicles/${v.id}/photos`} className="font-medium text-primary hover:underline">{photosDone && !insExpired ? 'View photos' : 'Update papers'}</Link>
                     <Link to={`/vehicles/${v.id}/edit`} className="font-medium text-primary hover:underline">Edit</Link>
                   </div>
                 </div>
