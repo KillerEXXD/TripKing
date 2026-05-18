@@ -15,8 +15,8 @@ vi.mock('@/stores/myApplicationsStore', async () => {
 import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
-vi.mock('@/hooks/useVacancies', () => ({ useMyActiveVacancies: vi.fn(), useCancelVacancy: vi.fn() }));
-import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
+vi.mock('@/hooks/useVacancies', () => ({ useMyActiveVacancies: vi.fn(), useMyExpiredVacancies: vi.fn(), useCancelVacancy: vi.fn() }));
+import { useCancelVacancy, useMyActiveVacancies, useMyExpiredVacancies } from '@/hooks/useVacancies';
 vi.mock('@/components/share/ShareTripModal', () => ({ ShareTripModal: () => <div>share modal</div> }));
 
 const user: User = { id: 'u1', role: 'driver', phone: '+91', displayName: 'Ravi', preferredLanguage: 'en', isActive: true, canReportBugs: false };
@@ -70,6 +70,7 @@ function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsS
   vi.mocked(useMyApplications).mockReturnValue(applied as never);
   vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, data: { id: 'd1' }, refetch: vi.fn() } as never);
   vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn() } as never);
+  vi.mocked(useMyExpiredVacancies).mockReturnValue({ isPending: false, isError: false, data: [], refetch: vi.fn() } as never);
   vi.mocked(useCancelVacancy).mockReturnValue({ mutate: vi.fn(), isPending: false } as never);
   vi.mocked(useWithdrawApplication).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
   vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
@@ -87,6 +88,7 @@ describe('DriverActivityPage', () => {
     vi.mocked(useMyApplications).mockReset();
     vi.mocked(useMyDriver).mockReset();
     vi.mocked(useMyActiveVacancies).mockReset();
+    vi.mocked(useMyExpiredVacancies).mockReset();
     vi.mocked(useCancelVacancy).mockReset();
     vi.mocked(useWithdrawApplication).mockReset();
     vi.mocked(useDeclineTripInvite).mockReset();
@@ -481,5 +483,29 @@ describe('DriverActivityPage', () => {
     expect(screen.getByText('Invites received')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/');
     confirmSpy.mockRestore();
+  });
+
+  // Regression: user reported stale vacancies still showed in /vacancies. The backend now
+  // expires open-ended ones after 24h (migration 057); the driver's own /my-trips?tab=available
+  // view shows expired rows in a separate red-tinted section so they can delete or repost.
+  it('the I’m vacant tab renders expired vacancies in a separate Expired section with a red badge', () => {
+    const city2 = city('cV', 'Vellore');
+    const vacancy = (id: string, status: 'active' | 'expired') => ({
+      id, driverId: 'd1', status,
+      currentCity: city2, currentPlace: null,
+      destinationCities: [city('cC', 'Chennai')], destinationPlaces: [],
+      availableFrom: '2026-05-17T15:00:00.000Z',
+      availableUntil: null, minRatePerKm: null, notes: id,
+      createdAt: '2026-05-17T15:00:00.000Z', updatedAt: '2026-05-17T15:00:00.000Z',
+    } as never);
+    setUp();
+    vi.mocked(useMyActiveVacancies).mockReturnValue({ isPending: false, isError: false, data: [vacancy('active-1', 'active')], refetch: vi.fn() } as never);
+    vi.mocked(useMyExpiredVacancies).mockReturnValue({ isPending: false, isError: false, data: [vacancy('expired-1', 'expired')], refetch: vi.fn() } as never);
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /i'm vacant/i }));
+    expect(screen.getByText(/expired — please remove or repost/i)).toBeInTheDocument();
+    expect(screen.getByText(/^expired$/i)).toBeInTheDocument(); // the badge
+    // Both vacancies render (active one + the expired one)
+    expect(screen.getAllByText(/vellore/i).length).toBeGreaterThan(1);
   });
 });
