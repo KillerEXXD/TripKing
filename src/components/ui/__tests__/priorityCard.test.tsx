@@ -13,7 +13,7 @@ describe('PriorityCard', () => {
     render(
       withRouter(
         <PriorityCard
-          to="/trips/abc"
+          to="/app/trips/abc"
           tone="emerald"
           icon={<Navigation className="size-3.5" aria-hidden />}
           label="Driving now"
@@ -25,7 +25,7 @@ describe('PriorityCard', () => {
       ),
     );
     const link = screen.getByRole('link', { name: /open trip vellore to chennai/i });
-    expect(link).toHaveAttribute('href', '/trips/abc');
+    expect(link).toHaveAttribute('href', '/app/trips/abc');
     expect(link).toHaveTextContent(/driving now/i);
     expect(link).toHaveTextContent(/vellore → chennai/i);
     expect(link).toHaveTextContent(/140 km · ₹2,200 payout/i);

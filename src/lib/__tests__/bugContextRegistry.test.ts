@@ -6,8 +6,8 @@ beforeEach(() => __clearBugContextForTests());
 describe('bugContextRegistry', () => {
   it('returns whatever every registered getter produces, keyed by name', () => {
     registerBugContext('auth', () => ({ userId: 'u1' }));
-    registerBugContext('route', () => '/trips/42');
-    expect(getBugContext()).toEqual({ auth: { userId: 'u1' }, route: '/trips/42' });
+    registerBugContext('route', () => '/app/trips/42');
+    expect(getBugContext()).toEqual({ auth: { userId: 'u1' }, route: '/app/trips/42' });
   });
 
   it('catches throws from a getter and records the error', () => {

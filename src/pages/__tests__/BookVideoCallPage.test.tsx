@@ -28,7 +28,7 @@ function setUser(u: User) {
   vi.mocked(useAuth).mockReturnValue({ user: u, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
 }
 function renderPage() {
-  return render(<MemoryRouter initialEntries={['/verify/video-call']}><BookVideoCallPage /></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={['/app/verify/video-call']}><BookVideoCallPage /></MemoryRouter>);
 }
 
 describe('BookVideoCallPage', () => {

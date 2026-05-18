@@ -27,7 +27,7 @@ function makeBug(overrides: Partial<BugReport> = {}): BugReport {
     reporterPhone: '+91',
     reporterName: 'Ravi',
     pageUrl: 'https://x',
-    route: '/trips',
+    route: '/app/trips',
     browserInfo: {},
     appVersion: '0.1.0',
     consoleLogs: 'LOG hi',
@@ -43,14 +43,14 @@ function makeBug(overrides: Partial<BugReport> = {}): BugReport {
   };
 }
 
-function setup(initialUrl = '/administration/bugs') {
+function setup(initialUrl = '/app/administration/bugs') {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   function Wrap({ children }: { children: ReactNode }) {
     return (
       <QueryClientProvider client={qc}>
         <MemoryRouter initialEntries={[initialUrl]}>
           <Routes>
-            <Route path="/administration/bugs" element={children} />
+            <Route path="/app/administration/bugs" element={children} />
           </Routes>
         </MemoryRouter>
       </QueryClientProvider>

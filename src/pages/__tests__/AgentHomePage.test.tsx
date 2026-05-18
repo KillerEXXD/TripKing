@@ -47,7 +47,7 @@ function renderHome() {
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<AgentHomePage />} />
-        <Route path="/onboarding" element={<div>onboarding page</div>} />
+        <Route path="/app/onboarding" element={<div>onboarding page</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -85,7 +85,7 @@ describe('AgentHomePage', () => {
     expect(screen.queryByText(/no trips in progress/i)).toBeNull();
     expect(screen.queryByText(/no applicants waiting/i)).toBeNull();
     // The agent CTA — equivalent to the driver's "I'm vacant" — is always visible.
-    expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
+    expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/app/trips/new');
     expect(screen.getByText(/your reputation/i)).toBeInTheDocument();
     // The "Your analytics" PriorityCard was replaced by <HomeTileRow> (stubbed
     // here as "home tile row"); analytics still surface but inside the compact
@@ -95,7 +95,7 @@ describe('AgentHomePage', () => {
     // jump to /posted-trips via the bottom-nav "My Posts" tab. Don't expect
     // the empty-state copy anymore.
     expect(screen.queryByText(/haven't posted a trip yet/i)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
+    expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/app/profile');
   });
 
   it('hides the Driving-now card when no trips are in progress', () => {
@@ -122,7 +122,7 @@ describe('AgentHomePage', () => {
     setTrips({ data: [makeTrip({ id: 'only-1', status: 'in_progress', passengerCount: 2 })] });
     renderHome();
     const link = screen.getByRole('link', { name: /open trip vellore to chennai/i });
-    expect(link).toHaveAttribute('href', '/trips/only-1');
+    expect(link).toHaveAttribute('href', '/app/trips/only-1');
     // Rich inline details are visible on the home card.
     expect(screen.getByText(/2 pax/i)).toBeInTheDocument();
     expect(screen.getByText(/140 km/i)).toBeInTheDocument();
@@ -135,14 +135,14 @@ describe('AgentHomePage', () => {
     ] });
     renderHome();
     const link = screen.getByRole('link', { name: /2 trips in progress/i });
-    expect(link).toHaveAttribute('href', '/queue/in-progress');
+    expect(link).toHaveAttribute('href', '/app/queue/in-progress');
   });
 
   it('Review card: 1 trip needs a driver → rich card linking to the trip\'s applicants page', () => {
     setTrips({ data: [makeTrip({ id: 'pick-me', status: 'has_applicants', applicantCount: 3 })] });
     renderHome();
     const link = screen.getByRole('link', { name: /review applicants for vellore to chennai/i });
-    expect(link).toHaveAttribute('href', '/trips/pick-me/applicants');
+    expect(link).toHaveAttribute('href', '/app/trips/pick-me/applicants');
     expect(screen.getByText(/3 drivers applied/i)).toBeInTheDocument();
   });
 
@@ -153,7 +153,7 @@ describe('AgentHomePage', () => {
     ] });
     renderHome();
     const link = screen.getByRole('link', { name: /2 trips need a driver/i });
-    expect(link).toHaveAttribute('href', '/queue/needs-action');
+    expect(link).toHaveAttribute('href', '/app/queue/needs-action');
   });
 
   it('shows the Get verified banner while the agent is not yet verified', () => {

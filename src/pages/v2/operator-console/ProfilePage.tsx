@@ -25,8 +25,8 @@ export function OperatorProfilePage() {
       </dl>
 
       <nav aria-label="Account actions" className="mt-2">
-        <LinkRow to="/profile">Open v1 profile</LinkRow>
-        <LinkRow to="/administration">Administration</LinkRow>
+        <LinkRow to="/app/profile">Open v1 profile</LinkRow>
+        <LinkRow to="/app/administration">Administration</LinkRow>
         <button
           type="button"
           onClick={() => void logout()}

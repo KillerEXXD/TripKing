@@ -54,7 +54,7 @@ function Row({ w, onPatch, busy }: { w: Withdrawal; onPatch: (outcome: 'approved
 }
 
 /**
- * `/administration/withdrawals` (Stage 7) — admin queue. Filter by status,
+ * `/app/administration/withdrawals` (Stage 7) — admin queue. Filter by status,
  * approve / mark paid (with UTR) / reject (with reason). Razorpay payout
  * automation arrives later — today admins manage payouts manually.
  */
@@ -73,7 +73,7 @@ export function AdminWithdrawalsPage() {
 
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Withdrawals</h1>

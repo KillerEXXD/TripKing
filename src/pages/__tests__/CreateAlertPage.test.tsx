@@ -39,10 +39,10 @@ function setCreate(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPend
 
 function renderCreate() {
   return render(
-    <MemoryRouter initialEntries={['/alerts/new']}>
+    <MemoryRouter initialEntries={['/app/alerts/new']}>
       <Routes>
-        <Route path="/alerts/new" element={<CreateAlertPage />} />
-        <Route path="/alerts" element={<div>alerts list</div>} />
+        <Route path="/app/alerts/new" element={<CreateAlertPage />} />
+        <Route path="/app/alerts" element={<div>alerts list</div>} />
       </Routes>
     </MemoryRouter>,
   );

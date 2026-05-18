@@ -29,7 +29,7 @@ describe('AdminAppWalletPage', () => {
     });
     render(<Wrap><AdminAppWalletPage /></Wrap>);
     await waitFor(() => expect(screen.getByRole('link', { name: 'trip' })).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'trip' })).toHaveAttribute('href', '/trips/t1');
+    expect(screen.getByRole('link', { name: 'trip' })).toHaveAttribute('href', '/app/trips/t1');
     expect(screen.getByText('fee_credit')).toBeInTheDocument();
   });
 

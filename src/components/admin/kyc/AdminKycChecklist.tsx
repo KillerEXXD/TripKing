@@ -1,7 +1,7 @@
 /**
  * The admin "verification checklist" card — used both on the dedicated KYC review
- * page (`/administration/kyc/:kind/:id`) and embedded on the public profile pages
- * (`/drivers/:id` and `/agents/:id`) when the viewer is an admin. Five steps for
+ * page (`/app/administration/kyc/:kind/:id`) and embedded on the public profile pages
+ * (`/app/drivers/:id` and `/app/agents/:id`) when the viewer is an admin. Five steps for
  * drivers / three for agents, each expandable to show its evidence inline (docs
  * thumbnails via 5-min signed URLs, vehicle info, vehicle photos grid, video
  * verification with an admin status override).
@@ -252,7 +252,7 @@ function VideoPanel({ vv }: { vv?: { id: string; status: VideoVerificationStatus
         </a>
       ) : null}
       <div>
-        <Link to="/administration/video-calls" className="text-xs font-medium text-primary hover:underline">Open Video Call Console →</Link>
+        <Link to="/app/administration/video-calls" className="text-xs font-medium text-primary hover:underline">Open Video Call Console →</Link>
       </div>
 
       <div className="border-t pt-2">

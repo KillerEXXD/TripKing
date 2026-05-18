@@ -10,7 +10,7 @@ import type { Trip } from '@/types';
  *
  * 1 trip with invites → straight to that trip's `/invitations` view (with `?from=/`
  *   so its back arrow returns to home).
- * ≥2                  → a scoped view at `/posted-trips?scope=invites-sent`
+ * ≥2                  → a scoped view at `/app/posted-trips?scope=invites-sent`
  *   (filter strip hidden, back arrow → home). NOT the filtered /posted-trips
  *   page — the user shouldn't have to know what the "Invited" chip means.
  *
@@ -31,8 +31,8 @@ export function InvitesSentCard({ trips }: { trips: Trip[] }) {
   const total = tripsWithInvites.reduce((sum, t) => sum + (t.pendingInvitationCount ?? 0), 0);
   const tripCount = tripsWithInvites.length;
   const to = tripCount === 1
-    ? `/trips/${tripsWithInvites[0].id}/invitations?from=/`
-    : '/posted-trips?scope=invites-sent&from=/';
+    ? `/app/trips/${tripsWithInvites[0].id}/invitations?from=/`
+    : '/app/posted-trips?scope=invites-sent&from=/';
   const subtitle = tripCount === 1
     ? `for ${tripsWithInvites[0].fromCity.name} → ${tripsWithInvites[0].toCity.name}`
     : `across ${tripCount} trips`;

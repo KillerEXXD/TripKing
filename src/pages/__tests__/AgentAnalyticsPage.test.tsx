@@ -53,7 +53,7 @@ describe('AgentAnalyticsPage', () => {
     setQ({ data: { ...ANALYTICS, tripsPosted: 0, monthly: [] } });
     renderPage();
     expect(screen.getByText(/no trips yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/trips/new');
+    expect(screen.getByRole('link', { name: /post a trip/i })).toHaveAttribute('href', '/app/trips/new');
     expect(screen.queryByTestId('trips-chart')).toBeNull();
   });
 

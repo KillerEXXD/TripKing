@@ -219,7 +219,7 @@ function DriverDetail({ driver }: { driver: Driver }) {
   );
 }
 
-/** `/drivers/:id` — a driver's public marketplace profile (rating, tags, vehicles). Read via `useDriver`. */
+/** `/app/drivers/:id` — a driver's public marketplace profile (rating, tags, vehicles). Read via `useDriver`. */
 export function DriverProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

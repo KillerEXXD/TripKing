@@ -47,10 +47,10 @@ function setUpdate() {
 }
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/vehicles/veh-1/photos']}>
+    <MemoryRouter initialEntries={['/app/vehicles/veh-1/photos']}>
       <Routes>
-        <Route path="/vehicles/:id/photos" element={<VehiclePhotosPage />} />
-        <Route path="/profile" element={<div>profile page</div>} />
+        <Route path="/app/vehicles/:id/photos" element={<VehiclePhotosPage />} />
+        <Route path="/app/profile" element={<div>profile page</div>} />
       </Routes>
     </MemoryRouter>,
   );

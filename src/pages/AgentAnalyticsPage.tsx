@@ -49,7 +49,7 @@ function Body({ a }: { a: AgentAnalytics }) {
         message="Once you post (and run) trips, your analytics — fare totals, applicants, the monthly trend — show up here."
         action={
           <Button asChild variant="full" size="sm">
-            <Link to="/trips/new">Post a trip</Link>
+            <Link to="/app/trips/new">Post a trip</Link>
           </Button>
         }
       />
@@ -83,7 +83,7 @@ function Body({ a }: { a: AgentAnalytics }) {
 }
 
 /**
- * `/analytics` — the signed-in user's trip-posting analytics (the `/analytics/agent` blob for the
+ * `/app/analytics` — the signed-in user's trip-posting analytics (the `/app/analytics/agent` blob for the
  * caller). Primarily for trip managers; a driver who's posted trips sees the same. Linked from the
  * agent home and the agent profile.
  */

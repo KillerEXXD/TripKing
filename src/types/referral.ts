@@ -21,7 +21,7 @@ export interface ReferralSummary {
   withdrawablePaise: number;
 }
 
-/** The `referral` block on `/drivers/me` / `/agents/me`. */
+/** The `referral` block on `/app/drivers/me` / `/app/agents/me`. */
 export interface ReferralBlock {
   code: string;
   /** The user who referred *this* user (if any) — set once at signup, immutable. */
@@ -29,7 +29,7 @@ export interface ReferralBlock {
   summary: ReferralSummary;
 }
 
-// ── Dashboard endpoints (`/referrals/*` — Stage 4 backend) ───────────────────
+// ── Dashboard endpoints (`/app/referrals/*` — Stage 4 backend) ───────────────────
 
 export type ReferralLinkStatus =
   | 'signed_up'

@@ -1,5 +1,5 @@
 /**
- * `/administration/kyc/:kind/:id` — admin KYC detail. One expandable section per
+ * `/app/administration/kyc/:kind/:id` — admin KYC detail. One expandable section per
  * checklist step (5 for drivers, 3 for agents), each with the evidence inline:
  * docs (signed URL thumbnails), vehicle + photos (driver only), and the video
  * verification (with an admin status-override control). A sticky decision bar
@@ -166,7 +166,7 @@ export function KycDetailPage() {
         <StatusBanner tone="success" icon={<ShieldCheck />} title="Approved — the applicant can apply to and post trips." />
       ) : null}
 
-      <Link to={kind === 'driver' ? `/drivers/${subject.id}` : `/agents/${subject.id}`} className="block text-xs font-medium text-primary hover:underline">
+      <Link to={kind === 'driver' ? `/app/drivers/${subject.id}` : `/app/agents/${subject.id}`} className="block text-xs font-medium text-primary hover:underline">
         Open public profile →
       </Link>
     </main>

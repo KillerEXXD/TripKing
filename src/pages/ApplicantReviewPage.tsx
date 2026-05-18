@@ -58,13 +58,13 @@ function ApplicantCard({
   return (
     <Card className={`gap-3 ${acceptance.status === 'accepted' || acceptance.status === 'selected' ? 'border-emerald-300 bg-emerald-50/40' : isNegative ? 'border-red-200 bg-red-50/70' : ''}`}>
       <div className="flex items-start gap-3">
-        <Link to={`/drivers/${acceptance.driverId}`} aria-label={`${d?.fullName || 'driver'} profile`}>
+        <Link to={`/app/drivers/${acceptance.driverId}`} aria-label={`${d?.fullName || 'driver'} profile`}>
           <Avatar className="size-11">
             <AvatarFallback>{initials(d?.fullName || '?')}</AvatarFallback>
           </Avatar>
         </Link>
         <div className="min-w-0 flex-1">
-          <Link to={`/drivers/${acceptance.driverId}`} className="font-bold underline-offset-2 hover:underline">
+          <Link to={`/app/drivers/${acceptance.driverId}`} className="font-bold underline-offset-2 hover:underline">
             {d?.fullName || 'A driver'}
           </Link>
           {d ? (
@@ -222,7 +222,7 @@ function Applicants({ trip, isPoster, from }: { trip: Trip; isPoster: boolean; f
             // Forward `?from=` so the fill flow can return the agent to their queue.
             toast.success('Driver selected — add the passenger details to complete the booking.');
             const fwd = from ? `&from=${encodeURIComponent(from)}` : '';
-            navigate(`/trips/${trip.id}?fillPassenger=1${fwd}`);
+            navigate(`/app/trips/${trip.id}?fillPassenger=1${fwd}`);
           } else {
             toast.success(from ? 'Driver selected — back to your queue.' : 'Driver selected — share the trip link with the passenger.');
             if (updated.passengerOtp) {
@@ -278,7 +278,7 @@ function Applicants({ trip, isPoster, from }: { trip: Trip; isPoster: boolean; f
 }
 
 /**
- * `/trips/:id/applicants` — the poster's view of who applied to a trip, with
+ * `/app/trips/:id/applicants` — the poster's view of who applied to a trip, with
  * Select (= assign the driver, which generates the passenger OTP) and Reject.
  * Read via `useTripApplicants`; actions via `useAssignDriver` / `useRejectApplicant`.
  * Non-posters see the list read-only.
@@ -288,11 +288,11 @@ export function ApplicantReviewPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   // `?from=<path>` — set when the agent entered from a Home-tab work queue
-  // (e.g. `/queue/needs-action`). Used to override the back button + post-
+  // (e.g. `/app/queue/needs-action`). Used to override the back button + post-
   // assignment navigation so the agent returns to the queue, not the
   // generic /posted-trips hub.
   const from = params.get('from');
-  const backTo = from || '/posted-trips';
+  const backTo = from || '/app/posted-trips';
   const { user } = useAuth();
   const tripQuery = useTrip(id);
   const notFound = !id || (tripQuery.isError && tripQuery.error instanceof ApiError && tripQuery.error.status === 404);

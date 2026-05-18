@@ -49,7 +49,7 @@ function PassengerRow({ p }: { p: Passenger }) {
 const PAGE_SIZE = 50;
 
 /**
- * `/administration/passengers` — passenger directory (admin-only). Server-paginated via
+ * `/app/administration/passengers` — passenger directory (admin-only). Server-paginated via
  * `useInfinitePassengers` (50/page), IntersectionObserver auto-fetches the next page,
  * header shows the server total. The search box narrows the loaded set client-side.
  */
@@ -79,7 +79,7 @@ export function PassengersPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <div className="flex items-baseline justify-between gap-2">

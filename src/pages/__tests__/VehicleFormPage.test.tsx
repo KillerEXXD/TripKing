@@ -22,11 +22,11 @@ function setQuery(mock: ReturnType<typeof vi.fn>, v: Partial<{ isPending: boolea
 
 function renderNew() {
   return render(
-    <MemoryRouter initialEntries={['/vehicles/new']}>
+    <MemoryRouter initialEntries={['/app/vehicles/new']}>
       <Routes>
-        <Route path="/vehicles/new" element={<VehicleFormPage />} />
-        <Route path="/vehicles/:id/photos" element={<div>photos page</div>} />
-        <Route path="/profile" element={<div>profile page</div>} />
+        <Route path="/app/vehicles/new" element={<VehicleFormPage />} />
+        <Route path="/app/vehicles/:id/photos" element={<div>photos page</div>} />
+        <Route path="/app/profile" element={<div>profile page</div>} />
       </Routes>
     </MemoryRouter>,
   );

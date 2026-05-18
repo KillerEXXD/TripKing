@@ -9,7 +9,7 @@ import { cn, formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/
 import type { MyApplication } from '@/types';
 
 /**
- * `/my-trips/awaiting` — the driver's work-queue of trips an agent has *selected*
+ * `/app/my-trips/awaiting` — the driver's work-queue of trips an agent has *selected*
  * them for, pending the driver's Accept / Decline. One card per application →
  * tap opens the trip detail (where the `<AcceptTripDialog>` lives). Built on
  * `<QueueListPage>` so back returns to Home and the page auto-bounces home
@@ -35,7 +35,7 @@ export function AwaitingDecisionPage() {
       emptyMessage="When a trip manager picks you for one of your applications, it'll appear here so you can Accept or Decline."
       emptyAction={
         <Button asChild variant="outline" size="sm">
-          <Link to="/my-trips?tab=applied">View all applications</Link>
+          <Link to="/app/my-trips?tab=applied">View all applications</Link>
         </Button>
       }
     />
@@ -61,7 +61,7 @@ function SelectedRow({ app }: { app: MyApplication }) {
   }
   return (
     <Card className="gap-0 p-0">
-      <Link to={`/trips/${t.id}?from=/my-trips/awaiting`} className="block space-y-1.5 p-4 pb-3">
+      <Link to={`/app/trips/${t.id}?from=/my-trips/awaiting`} className="block space-y-1.5 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">{t.fromCity.name} → {t.toCity.name}</div>
@@ -89,7 +89,7 @@ function SelectedRow({ app }: { app: MyApplication }) {
           <XCircle className="size-3.5" aria-hidden />
           {declineMutation.isPending ? 'Declining…' : 'Decline'}
         </button>
-        <Link to={`/trips/${t.id}?from=/my-trips/awaiting`} className="ml-auto flex items-center text-primary">
+        <Link to={`/app/trips/${t.id}?from=/my-trips/awaiting`} className="ml-auto flex items-center text-primary">
           Accept
           <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
         </Link>

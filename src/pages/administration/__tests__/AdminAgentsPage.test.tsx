@@ -68,8 +68,8 @@ describe('AdminAgentsPage', () => {
     expect(screen.getByText('Suresh P')).toBeInTheDocument();
     expect(screen.getByText('Pending', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
     const rowKycLinks = screen.getAllByRole('link', { name: /kyc →/i });
-    expect(rowKycLinks[0]).toHaveAttribute('href', '/administration/kyc?agentId=a1');
-    expect(rowKycLinks[1]).toHaveAttribute('href', '/administration/kyc?agentId=a2');
+    expect(rowKycLinks[0]).toHaveAttribute('href', '/app/administration/kyc?agentId=a1');
+    expect(rowKycLinks[1]).toHaveAttribute('href', '/app/administration/kyc?agentId=a2');
   });
 
   it('shows the server total in the header', () => {

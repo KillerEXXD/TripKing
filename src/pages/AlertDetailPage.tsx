@@ -32,7 +32,7 @@ function AlertDetail({ alert }: { alert: Alert }) {
     try {
       await del.mutateAsync(alert.id);
       toast.success('Alert deleted');
-      navigate('/alerts');
+      navigate('/app/alerts');
     } catch {
       toast.error("Couldn't delete the alert — try again.");
     }
@@ -77,7 +77,7 @@ function AlertDetail({ alert }: { alert: Alert }) {
   );
 }
 
-/** `/alerts/:id` — one saved-search alert: criteria, pause/resume, delete. */
+/** `/app/alerts/:id` — one saved-search alert: criteria, pause/resume, delete. */
 export function AlertDetailPage() {
   const { id } = useParams<{ id: string }>();
   const alertQuery = useAlert(id);
@@ -85,7 +85,7 @@ export function AlertDetailPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <PageHeader title="Alert" backTo="/alerts" />
+      <PageHeader title="Alert" backTo="/app/alerts" />
 
       <div className="space-y-4 p-4">
         {notFound ? (

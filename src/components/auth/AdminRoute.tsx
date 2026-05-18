@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoadingSkeleton, ErrorState } from '@/components/feedback';
 
-/** Gate an admin route — 403s a signed-in non-admin, bounces an anonymous user to `/signin`. */
+/** Gate an admin route — 403s a signed-in non-admin, bounces an anonymous user to `/app/signin`. */
 export function AdminRoute({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
 

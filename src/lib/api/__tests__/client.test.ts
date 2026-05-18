@@ -40,11 +40,11 @@ describe('apiClient', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: [{ id: 't1' }], error: null }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const res = await apiClient.get<{ id: string }[]>('/trips', { status: 'open', limit: 20, ids: ['a', 'b'] });
+    const res = await apiClient.get<{ id: string }[]>('/app/trips', { status: 'open', limit: 20, ids: ['a', 'b'] });
 
     expect(res.data).toEqual([{ id: 't1' }]);
     const calledUrl = fetchMock.mock.calls[0][0] as string;
-    expect(calledUrl).toContain('/trips?');
+    expect(calledUrl).toContain('/app/trips?');
     expect(calledUrl).toContain('status=open');
     expect(calledUrl).toContain('limit=20');
     expect(calledUrl).toContain('ids=a');
@@ -56,7 +56,7 @@ describe('apiClient', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ success: true, data: { id: 'x' }, error: null }, 201));
     vi.stubGlobal('fetch', fetchMock);
 
-    await apiClient.post('/trips', { from_city_id: 'c1' });
+    await apiClient.post('/app/trips', { from_city_id: 'c1' });
 
     const init = fetchMock.mock.calls[0][1] as RequestInit;
     expect(init.method).toBe('POST');
@@ -94,7 +94,7 @@ describe('apiClient', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(apiClient.get('/trips/nope')).rejects.toMatchObject({
+    await expect(apiClient.get('/app/trips/nope')).rejects.toMatchObject({
       name: 'ApiError',
       status: 404,
       code: 'NOT_FOUND',
@@ -156,9 +156,9 @@ describe('apiClient', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    const a = apiClient.get<{ id: string }>('/trips', { status: 'open' });
-    const b = apiClient.get<{ id: string }>('/trips', { status: 'open' });
-    const c = apiClient.get<{ id: string }>('/trips', { status: 'open' });
+    const a = apiClient.get<{ id: string }>('/app/trips', { status: 'open' });
+    const b = apiClient.get<{ id: string }>('/app/trips', { status: 'open' });
+    const c = apiClient.get<{ id: string }>('/app/trips', { status: 'open' });
 
     // Single in-flight fetch despite 3 callers.
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -171,7 +171,7 @@ describe('apiClient', () => {
 
     // After settle, a new GET runs the fetcher again (no permanent share).
     fetchMock.mockResolvedValueOnce(jsonResponse({ success: true, data: { id: 't2' }, error: null }));
-    const d = await apiClient.get<{ id: string }>('/trips', { status: 'open' });
+    const d = await apiClient.get<{ id: string }>('/app/trips', { status: 'open' });
     expect(d.data).toEqual({ id: 't2' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

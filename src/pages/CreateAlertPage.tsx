@@ -23,7 +23,7 @@ function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) {
 }
 
 /**
- * `/alerts/new` — create a saved-search alert. Pickup city + radius are required;
+ * `/app/alerts/new` — create a saved-search alert. Pickup city + radius are required;
  * destination, min ₹/km, car types and notify channels are optional. Dropdowns
  * come from `useAdminConfig`; the default radius from app-settings. On success
  * we go back to the alerts list.
@@ -80,7 +80,7 @@ export function CreateAlertPage() {
     try {
       await createAlert.mutateAsync(input);
       toast.success('Alert created');
-      navigate('/alerts');
+      navigate('/app/alerts');
     } catch {
       toast.error("Couldn't create the alert — try again.");
     }
@@ -89,7 +89,7 @@ export function CreateAlertPage() {
   if (citiesQuery.isPending || carTypesQuery.isPending) {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader title="New alert" onBack={() => navigate('/alerts')} />
+        <FlowHeader title="New alert" onBack={() => navigate('/app/alerts')} />
         <div className="p-4">
           <LoadingSkeleton rows={5} />
         </div>
@@ -99,7 +99,7 @@ export function CreateAlertPage() {
   if (citiesQuery.isError || carTypesQuery.isError) {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader title="New alert" onBack={() => navigate('/alerts')} />
+        <FlowHeader title="New alert" onBack={() => navigate('/app/alerts')} />
         <div className="p-4">
           <ErrorState title="Couldn't load the form" message="We need the city + car-type lists to create an alert." onRetry={() => { void citiesQuery.refetch(); void carTypesQuery.refetch(); }} />
         </div>
@@ -112,7 +112,7 @@ export function CreateAlertPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <FlowHeader title="New alert" onBack={() => navigate('/alerts')} />
+      <FlowHeader title="New alert" onBack={() => navigate('/app/alerts')} />
       <div className="space-y-3 p-4">
       <Card className="gap-3">
         <label className="block space-y-1">
@@ -196,7 +196,7 @@ export function CreateAlertPage() {
 
       {createAlert.isError ? <p className="text-sm text-red-700">Couldn&apos;t create the alert — please try again.</p> : null}
       <div className="flex gap-3">
-        <Button type="button" variant="outline" onClick={() => navigate('/alerts')} disabled={createAlert.isPending}>
+        <Button type="button" variant="outline" onClick={() => navigate('/app/alerts')} disabled={createAlert.isPending}>
           Cancel
         </Button>
         <Button type="button" variant="full" onClick={() => void onSubmit()} disabled={!canSubmit}>

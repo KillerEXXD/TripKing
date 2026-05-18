@@ -1,5 +1,5 @@
 /**
- * `/vehicles/:id/photos` — step 4 of the driver "Get verified" checklist. Photos of the car
+ * `/app/vehicles/:id/photos` — step 4 of the driver "Get verified" checklist. Photos of the car
  * (front / back / left / right / number-plate close-up, + optional interior) plus the RC book and
  * insurance (with expiry); an optional commercial permit too. Each upload PUTs straight to Storage
  * and the resulting object path is saved on the vehicle.
@@ -133,7 +133,7 @@ export function VehiclePhotosPage() {
           <p className="text-xs text-secondary">Still needed: {missing.map((s) => s).join(', ')}.</p>
         )}
 
-        <Button variant="full" size="lg" onClick={() => navigate('/profile')}>Done</Button>
+        <Button variant="full" size="lg" onClick={() => navigate('/app/profile')}>Done</Button>
       </div>
     </div>
   );

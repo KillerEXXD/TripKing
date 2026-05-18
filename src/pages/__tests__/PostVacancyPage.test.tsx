@@ -55,11 +55,11 @@ function setMyDriver(kycStatus: string | undefined = 'approved') {
 
 function renderPost() {
   return render(
-    <MemoryRouter initialEntries={['/vacancies/new']}>
+    <MemoryRouter initialEntries={['/app/vacancies/new']}>
       <Routes>
         <Route path="/" element={<div>home page</div>} />
-        <Route path="/vacancies/new" element={<PostVacancyPage />} />
-        <Route path="/vacancies" element={<div>vacancy feed</div>} />
+        <Route path="/app/vacancies/new" element={<PostVacancyPage />} />
+        <Route path="/app/vacancies" element={<div>vacancy feed</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -67,10 +67,10 @@ function renderPost() {
 
 function renderEdit(id: string) {
   return render(
-    <MemoryRouter initialEntries={[`/vacancies/${id}/edit`]}>
+    <MemoryRouter initialEntries={[`/app/vacancies/${id}/edit`]}>
       <Routes>
-        <Route path="/vacancies/:id/edit" element={<PostVacancyPage />} />
-        <Route path="/vacancies" element={<div>vacancy feed</div>} />
+        <Route path="/app/vacancies/:id/edit" element={<PostVacancyPage />} />
+        <Route path="/app/vacancies" element={<div>vacancy feed</div>} />
       </Routes>
     </MemoryRouter>,
   );

@@ -26,7 +26,7 @@ export function PipelineProfilePage() {
 
       <section aria-label="Quick links" className="mt-4 grid grid-cols-1 gap-2">
         <CardLink to="/v4/trips" title="Open the board" body="See your trips by stage" />
-        <CardLink to="/profile" title="Full v1 profile" body="KYC, wallet, settings — everything" />
+        <CardLink to="/app/profile" title="Full v1 profile" body="KYC, wallet, settings — everything" />
       </section>
 
       <button

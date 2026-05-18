@@ -25,7 +25,7 @@ export function GetVerifiedBanner({ verification, steps = DRIVER_VERIFICATION_ST
       : !next
         ? 'Your documents are with our team for review.'
         : null;
-  const to = '/profile#get-verified';
+  const to = '/app/profile#get-verified';
   const pct = stepsTotal ? Math.round((stepsDone / stepsTotal) * 100) : 0;
 
   return (

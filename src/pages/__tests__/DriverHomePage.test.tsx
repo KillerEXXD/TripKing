@@ -63,9 +63,9 @@ function renderHome() {
     <MemoryRouter initialEntries={['/']}>
       <Routes>
         <Route path="/" element={<DriverHomePage />} />
-        <Route path="/onboarding" element={<div>onboarding page</div>} />
-        <Route path="/trips" element={<div>trips feed</div>} />
-        <Route path="/trips/:id/complete" element={<div data-testid="complete-trip-route">wizard</div>} />
+        <Route path="/app/onboarding" element={<div>onboarding page</div>} />
+        <Route path="/app/trips" element={<div>trips feed</div>} />
+        <Route path="/app/trips/:id/complete" element={<div data-testid="complete-trip-route">wizard</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -122,7 +122,7 @@ describe('DriverHomePage', () => {
     // browse via the bottom-nav "Find Trips" tab instead. Don't expect the
     // empty-state copy anymore.
     expect(screen.queryByText(/no open trips/i)).toBeNull();
-    expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
+    expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/app/profile');
   });
 
   it('Driving-now card: rich details + End trip routes into the wizard + Continue when a trip is in progress', async () => {
@@ -141,7 +141,7 @@ describe('DriverHomePage', () => {
     expect(screen.getByText(/3 pax/i)).toBeInTheDocument();
     const endBtn = screen.getByRole('button', { name: /end trip/i });
     expect(endBtn).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /^continue$/i })).toHaveAttribute('href', '/trips/in-progress-1');
+    expect(screen.getByRole('link', { name: /^continue$/i })).toHaveAttribute('href', '/app/trips/in-progress-1');
     // Home "End trip" now sends the driver into the routed completion wizard — same path
     // as TripDetailPage's "Complete the trip" CTA. No native window.confirm any more.
     fireEvent.click(endBtn);
@@ -156,7 +156,7 @@ describe('DriverHomePage', () => {
     });
     renderHome();
     const card = screen.getByRole('link', { name: /invitation to drive vellore to bangalore/i });
-    expect(card).toHaveAttribute('href', '/trips/inv-9?from=/');
+    expect(card).toHaveAttribute('href', '/app/trips/inv-9?from=/');
     expect(card).toHaveTextContent(/accept or decline/i);
   });
 
@@ -211,7 +211,7 @@ describe('DriverHomePage', () => {
     const link = screen.getByRole('link', { name: /trip you posted has applicants/i });
     // Trip detail only shows a tiny inline "Review N applicants →" link; user expected
     // the dedicated review page — matches the "Review applicants" CTA on the card.
-    expect(link.getAttribute('href')).toBe('/trips/p-one/applicants?from=/');
+    expect(link.getAttribute('href')).toBe('/app/trips/p-one/applicants?from=/');
   });
 
   it('the applicants-prompt card routes to /posted-trips?status=has_applicants when 2+ posted trips have applicants', () => {
@@ -221,6 +221,6 @@ describe('DriverHomePage', () => {
     ] }]);
     renderHome();
     const link = screen.getByRole('link', { name: /trips you posted have applicants/i });
-    expect(link.getAttribute('href')).toBe('/posted-trips?status=has_applicants&from=/');
+    expect(link.getAttribute('href')).toBe('/app/posted-trips?status=has_applicants&from=/');
   });
 });

@@ -26,7 +26,7 @@ function roleFor(userRole: string | undefined): ReferralRole {
 }
 
 /**
- * `/referrals` — driver / agent referral dashboard. Sections match the
+ * `/app/referrals` — driver / agent referral dashboard. Sections match the
  * tour prototype 1:1, top-to-bottom:
  *   1. PageHeader
  *   2. ReferralCodeBlock  — hero code + share + invite CTAs

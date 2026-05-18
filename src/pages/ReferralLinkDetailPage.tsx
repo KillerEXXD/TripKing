@@ -11,7 +11,7 @@ function rupees(paise: number): string {
 }
 
 /**
- * `/referrals/:linkId` — drilldown for one referred user. Their per-trip
+ * `/app/referrals/:linkId` — drilldown for one referred user. Their per-trip
  * contribution to your earnings (date, route, fee source, your accrual).
  */
 export function ReferralLinkDetailPage() {
@@ -21,7 +21,7 @@ export function ReferralLinkDetailPage() {
   const referredName = q.data?.link.referredUser?.displayName ?? 'Referred user';
   return (
     <PageShell>
-      <PageHeader title={referredName} backTo="/referrals" />
+      <PageHeader title={referredName} backTo="/app/referrals" />
 
       {q.isPending ? (
         <LoadingSkeleton rows={5} />
@@ -69,7 +69,7 @@ export function ReferralLinkDetailPage() {
                         <td className="px-2 py-1.5 text-xs uppercase">{e.entryType}</td>
                         <td className="px-2 py-1.5">
                           {e.trip?.id ? (
-                            <Link to={`/trips/${e.trip.id}`} className="text-primary underline">
+                            <Link to={`/app/trips/${e.trip.id}`} className="text-primary underline">
                               {e.trip.fromCityName ?? '—'} → {e.trip.toCityName ?? '—'}
                             </Link>
                           ) : '—'}

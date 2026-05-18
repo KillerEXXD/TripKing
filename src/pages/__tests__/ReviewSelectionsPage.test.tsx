@@ -52,12 +52,12 @@ function setData(data: MyApplication[]) {
 
 function renderAt(state?: { from?: 'home' | 'my-trips' }) {
   return render(
-    <MemoryRouter initialEntries={[{ pathname: '/my-trips/review', state: state ?? null }]}>
+    <MemoryRouter initialEntries={[{ pathname: '/app/my-trips/review', state: state ?? null }]}>
       <Routes>
-        <Route path="/my-trips/review" element={<ReviewSelectionsPage />} />
+        <Route path="/app/my-trips/review" element={<ReviewSelectionsPage />} />
         <Route path="/" element={<div>home page</div>} />
-        <Route path="/my-trips" element={<div>my trips page</div>} />
-        <Route path="/trips/:id" element={<div>trip detail</div>} />
+        <Route path="/app/my-trips" element={<div>my trips page</div>} />
+        <Route path="/app/trips/:id" element={<div>trip detail</div>} />
       </Routes>
     </MemoryRouter>,
   );

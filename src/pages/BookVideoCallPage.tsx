@@ -1,5 +1,5 @@
 /**
- * `/verify/video-call` — the video-verification step of the "Get verified" checklist (drivers and
+ * `/app/verify/video-call` — the video-verification step of the "Get verified" checklist (drivers and
  * trip managers alike). If a call is scheduled, show the time + a Join link + cancel/reschedule;
  * otherwise (once documents are submitted) pick a free 15-min slot to book one. Booking moves
  * `kyc_status` → video_pending; an admin runs the call.
@@ -102,7 +102,7 @@ export function BookVideoCallPage() {
           <Card className="gap-2">
             <div className="text-sm font-medium">Submit your documents first</div>
             <p className="text-sm text-secondary">You can book the video call once your {isAgent ? 'Aadhaar and selfie are' : 'Aadhaar, licence and selfie are'} uploaded.</p>
-            <Button variant="full" asChild><Link to="/verify/documents">Go to documents</Link></Button>
+            <Button variant="full" asChild><Link to="/app/verify/documents">Go to documents</Link></Button>
           </Card>
         )}
 

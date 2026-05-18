@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { LoadingSkeleton, ErrorState } from '@/components/feedback';
 
 /**
- * Gate for `/administration/designs` — the in-app Design Previews index. Allows EITHER:
+ * Gate for `/app/administration/designs` — the in-app Design Previews index. Allows EITHER:
  *   - an admin (`users.role === 'admin'`), OR
  *   - a user whose phone is in the design-preview allowlist
  *     (`feature_flags.design_previews === true` from /auth/me; see migration 056).

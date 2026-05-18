@@ -123,7 +123,7 @@ export interface Trip {
   cancelledAt?: string;
   cancelReasonId?: string;
   applicantCount: number;
-  /** Number of `trip_invitations` rows in status='pending' for this trip — drives the "Invited" chip on `/posted-trips`. Always present (server defaults to 0). */
+  /** Number of `trip_invitations` rows in status='pending' for this trip — drives the "Invited" chip on `/app/posted-trips`. Always present (server defaults to 0). */
   pendingInvitationCount: number;
   /** Only present on the response from POST /trips when auto-invite ran. Drives the success toast. */
   autoInvitedCount?: number;

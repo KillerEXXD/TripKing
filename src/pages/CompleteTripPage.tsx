@@ -1,5 +1,5 @@
 /**
- * `/trips/:id/complete` — driver-only 2-step "Complete the trip" wizard.
+ * `/app/trips/:id/complete` — driver-only 2-step "Complete the trip" wizard.
  *
  * Step 1 of 2 — Trip end & payout:
  *   • upload the ending-odometer photo (signed PUT URL into the trip-executions-photos bucket)
@@ -124,7 +124,7 @@ export function CompleteTripPage() {
         <ErrorState
           title="This trip can't be completed from here"
           message={trip.status !== 'in_progress' ? `The trip is "${trip.status}". Only an in-progress trip can be completed.` : "Only the assigned driver can complete this trip."}
-          onRetry={() => navigate(`/trips/${trip.id}`)}
+          onRetry={() => navigate(`/app/trips/${trip.id}`)}
         />
       </div>
     );
@@ -180,7 +180,7 @@ export function CompleteTripPage() {
         }
       }
       toast.success(`Trip completed · ${formatINR(preview.revisedPayout)} paid out.`);
-      navigate('/my-trips?tab=completed');
+      navigate('/app/my-trips?tab=completed');
     } catch (err) {
       if (err instanceof ApiError && (err.code === 'INSUFFICIENT_WALLET_BALANCE_DRIVER' || err.code === 'INSUFFICIENT_WALLET_BALANCE_AGENT')) {
         toast.error(err.message || "Couldn't charge the platform fee — top up your wallet to complete.");
@@ -196,7 +196,7 @@ export function CompleteTripPage() {
 
   return (
     <div className="mx-auto max-w-md space-y-4 p-4 pb-32">
-      <PageHeader title="Complete the trip" onBack={() => (step === 2 ? setStep(1) : navigate(`/trips/${trip.id}`))} />
+      <PageHeader title="Complete the trip" onBack={() => (step === 2 ? setStep(1) : navigate(`/app/trips/${trip.id}`))} />
 
       {step === 1 ? (
         <Card className="space-y-3">

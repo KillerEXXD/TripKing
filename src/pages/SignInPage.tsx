@@ -40,11 +40,11 @@ function fromOf(state: unknown): string {
 const onlyDigits = (s: string) => s.replace(/\D/g, '');
 
 /**
- * `/signin` — phone-OTP sign-in (the equivalent of the prototype's `/auth`). Talks to the
+ * `/app/signin` — phone-OTP sign-in (the equivalent of the prototype's `/auth`). Talks to the
  * `/auth` edge function. There's no real SMS provider yet (placeholder): any phone number is
  * accepted, the "send OTP" step is best-effort (it just advances to OTP entry), and the dev
  * code is always `123456`. When a real SMS provider lands we'll enforce delivery + validation.
- * On a plain sign-in we send the user to `/onboarding` (name → role → city → create profile);
+ * On a plain sign-in we send the user to `/app/onboarding` (name → role → city → create profile);
  * if they were bounced here from a protected page, we honour that `from` instead.
  */
 export function SignInPage() {
@@ -99,7 +99,7 @@ export function SignInPage() {
       // Admins never need driver/agent onboarding — skip straight to the role-aware home
       // so the RoleSwitcher + bottom nav render. Drivers/agents still pass through
       // /onboarding, which itself bails to / when a profile already exists (3a3e6db).
-      const target = from !== '/' ? from : me.role === 'admin' ? '/' : '/onboarding';
+      const target = from !== '/' ? from : me.role === 'admin' ? '/' : '/app/onboarding';
       navigate(target, { replace: true });
     } catch {
       toast.error("That code didn't work — try again");

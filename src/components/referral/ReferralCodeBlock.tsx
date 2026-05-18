@@ -19,13 +19,13 @@ async function copy(text: string, label: string): Promise<void> {
 }
 
 /**
- * Hero referral block on `/referrals` — mirrors the tour-prototype layout:
+ * Hero referral block on `/app/referrals` — mirrors the tour-prototype layout:
  *   - emerald-tinted hero card with role-coloured avatar + code chip
  *   - 3 share buttons (copy code, WhatsApp, native Share)
  *   - 2 "Invite a Driver / Invite an Agent" CTAs that open WhatsApp pre-filled
  *
  * The code itself comes from `useReferral(role)` which reads `referralCode`
- * off `/drivers/me` or `/agents/me` — no fallback / mock value.
+ * off `/app/drivers/me` or `/app/agents/me` — no fallback / mock value.
  */
 export function ReferralCodeBlock({ role, name }: Props) {
   const { data, isLoading, isError } = useReferral(role);

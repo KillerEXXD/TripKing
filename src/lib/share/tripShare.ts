@@ -36,7 +36,7 @@ export const VARIANT_LABEL: Record<ShareVariant, string> = {
 /** Public deep link to the trip's detail page. */
 export function buildShareUrl(trip: Trip): string {
   const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://trip-king.vercel.app';
-  return `${origin}/trips/${trip.id}`;
+  return `${origin}/app/trips/${trip.id}`;
 }
 
 /** The poster's contact number, if they shared one. */

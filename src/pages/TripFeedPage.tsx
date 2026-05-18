@@ -16,7 +16,7 @@ const FEED_STATUSES: TripStatus[] = ['open', 'has_applicants'];
 
 function TripCard({ trip }: { trip: Trip }) {
   return (
-    <Link to={`/trips/${trip.id}?from=/trips`} className="block">
+    <Link to={`/app/trips/${trip.id}?from=/trips`} className="block">
       <Card className="gap-2 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -55,7 +55,7 @@ function TripCard({ trip }: { trip: Trip }) {
 const chipClass = 'h-8 shrink-0 rounded-pill border border-border bg-surface px-3 text-xs font-medium text-foreground hover:bg-muted';
 
 /**
- * `/trips` — the open-trip feed. Drivers browse trips that are still `open` or
+ * `/app/trips` — the open-trip feed. Drivers browse trips that are still `open` or
  * `has_applicants`, filtered by pickup city / car type / AC; each card links to
  * the trip detail. Data from `useTrips`; filter options from `useAdminConfig`.
  * Prototype layout: a white header strip, a white filter strip, then the cards

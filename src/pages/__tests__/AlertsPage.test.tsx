@@ -68,7 +68,7 @@ describe('AlertsPage', () => {
     renderAlerts();
     expect(screen.getByText('Vellore runs')).toBeInTheDocument();
     expect(screen.getByText(/paused one/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /vellore runs/i })).toHaveAttribute('href', '/alerts/a1');
-    expect(screen.getByRole('link', { name: /paused one/i })).toHaveAttribute('href', '/alerts/a2');
+    expect(screen.getByRole('link', { name: /vellore runs/i })).toHaveAttribute('href', '/app/alerts/a1');
+    expect(screen.getByRole('link', { name: /paused one/i })).toHaveAttribute('href', '/app/alerts/a2');
   });
 });

@@ -73,7 +73,7 @@ export function ReferralCodeCard({ role }: Props) {
               <div className="text-secondary">Earned</div>
             </div>
           </div>
-          <Link to="/referrals" className="text-center text-xs font-medium text-primary hover:underline">View referral details →</Link>
+          <Link to="/app/referrals" className="text-center text-xs font-medium text-primary hover:underline">View referral details →</Link>
         </>
       ) : null}
     </Card>

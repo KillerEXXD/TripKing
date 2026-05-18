@@ -35,7 +35,7 @@ export function BharatProfilePage() {
       </section>
 
       <nav aria-label="Account actions" className="mt-6 px-4">
-        <ActionRow to="/profile" ta="முழு சுயவிவரம்" en="Full profile (v1)" />
+        <ActionRow to="/app/profile" ta="முழு சுயவிவரம்" en="Full profile (v1)" />
         <ActionRow to="/v6/trips" ta="டிரிப்கள்" en="Browse trips" />
       </nav>
 

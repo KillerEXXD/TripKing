@@ -84,12 +84,12 @@ function setMutations() {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/trips/t1/applicants']}>
+    <MemoryRouter initialEntries={['/app/trips/t1/applicants']}>
       <Routes>
-        <Route path="/trips/:id/applicants" element={<ApplicantReviewPage />} />
-        <Route path="/trips/:id" element={<div>trip detail</div>} />
-        <Route path="/posted-trips" element={<div>posted trips list</div>} />
-        <Route path="/drivers/:id" element={<div>driver profile</div>} />
+        <Route path="/app/trips/:id/applicants" element={<ApplicantReviewPage />} />
+        <Route path="/app/trips/:id" element={<div>trip detail</div>} />
+        <Route path="/app/posted-trips" element={<div>posted trips list</div>} />
+        <Route path="/app/drivers/:id" element={<div>driver profile</div>} />
       </Routes>
     </MemoryRouter>,
   );

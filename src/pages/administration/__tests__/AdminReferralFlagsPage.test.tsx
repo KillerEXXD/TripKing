@@ -28,7 +28,7 @@ describe('AdminReferralFlagsPage', () => {
     render(<Wrap><AdminReferralFlagsPage /></Wrap>);
     await waitFor(() => expect(screen.getByText(/duplicate aadhaar/i)).toBeInTheDocument());
     expect(svc.getAdminFraudFlags).toHaveBeenCalledWith({ resolved: false });
-    expect(screen.getByRole('link', { name: /View referral/i })).toHaveAttribute('href', '/referrals/lk1');
+    expect(screen.getByRole('link', { name: /View referral/i })).toHaveAttribute('href', '/app/referrals/lk1');
   });
 
   it('Resolve calls resolveAdminFraudFlag with the entered note', async () => {

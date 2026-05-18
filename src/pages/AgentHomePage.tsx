@@ -18,14 +18,14 @@ import type { Agent, Trip } from '@/types';
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
-    <Link to="/profile" aria-label="Your profile" className="flex size-7 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-[11px] font-bold text-primary hover:ring-2 hover:ring-primary/40">
+    <Link to="/app/profile" aria-label="Your profile" className="flex size-7 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-[11px] font-bold text-primary hover:ring-2 hover:ring-primary/40">
       {photoUrl ? <img src={photoUrl} alt="" className="size-full object-cover" /> : <span>{name ? initials(name) : '?'}</span>}
     </Link>
   );
 }
 function Bellish({ count }: { count: number }) {
   return (
-    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative flex size-7 items-center justify-center rounded-full text-secondary hover:bg-muted">
+    <Link to="/app/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative flex size-7 items-center justify-center rounded-full text-secondary hover:bg-muted">
       <Bell className="size-4" aria-hidden />
       {count > 0 ? <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-destructive" /> : null}
     </Link>
@@ -34,7 +34,7 @@ function Bellish({ count }: { count: number }) {
 /** Top-of-home card — shows the agent how many of their posted trips are actively
  *  running. Caller gates on `trips.length > 0` so the empty placeholder is hidden
  *  (an agent already knows whether their trips are in flight — empty teaches nothing).
- *  1 → straight to that trip's detail. ≥2 → focused work-queue at `/queue/in-progress`. */
+ *  1 → straight to that trip's detail. ≥2 → focused work-queue at `/app/queue/in-progress`. */
 function TripsInProgressCard({ trips }: { trips: Trip[] }) {
   const count = trips.length;
   if (count === 1) {
@@ -42,7 +42,7 @@ function TripsInProgressCard({ trips }: { trips: Trip[] }) {
     const driverName = t.assignedDriver?.fullName ?? (t.assignedDriverHandle ? `Driver ${t.assignedDriverHandle}` : 'Driver');
     return (
       <PriorityCard
-        to={`/trips/${t.id}`}
+        to={`/app/trips/${t.id}`}
         ariaLabel={`Open trip ${t.fromCity.name} to ${t.toCity.name}`}
         tone="emerald"
         icon={<Navigation className="size-3.5" aria-hidden />}
@@ -60,7 +60,7 @@ function TripsInProgressCard({ trips }: { trips: Trip[] }) {
   }
   return (
     <PriorityCard
-      to="/queue/in-progress"
+      to="/app/queue/in-progress"
       tone="emerald"
       icon={<Navigation className="size-3.5" aria-hidden />}
       label="Driving now"
@@ -100,7 +100,7 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
     const canEdit = (t.applicantCount ?? 0) === 0 && (t.pendingInvitationCount ?? 0) === 0;
     return (
       <PriorityCard
-        to={`/trips/${t.id}/applicants`}
+        to={`/app/trips/${t.id}/applicants`}
         ariaLabel={`Review applicants for ${t.fromCity.name} to ${t.toCity.name}`}
         tone="amber"
         icon={<Sparkles className="size-3.5" aria-hidden />}
@@ -117,7 +117,7 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
         {canEdit ? (
           <div className="mt-2 flex justify-end border-t border-amber-200 pt-2">
             <Link
-              to={`/trips/${t.id}/edit`}
+              to={`/app/trips/${t.id}/edit`}
               onClick={(e) => e.stopPropagation()}
               className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-50"
             >
@@ -130,7 +130,7 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
   }
   return (
     <PriorityCard
-      to="/queue/needs-action"
+      to="/app/queue/needs-action"
       tone="amber"
       icon={<Sparkles className="size-3.5" aria-hidden />}
       label="Waiting for your decision"
@@ -182,7 +182,7 @@ function AgentHome({ agent }: { agent: Agent }) {
         <InvitesSentCard trips={myPosts} />
 
         <PriorityCard
-          to="/trips/new"
+          to="/app/trips/new"
           tone="emerald"
           icon={<Plus className="size-3.5" aria-hidden />}
           label="Post a trip"
@@ -192,7 +192,7 @@ function AgentHome({ agent }: { agent: Agent }) {
         />
 
         <PriorityCard
-          to="/profile"
+          to="/app/profile"
           tone="amber"
           icon={<Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />}
           label="Your reputation"
@@ -211,7 +211,7 @@ function AgentHome({ agent }: { agent: Agent }) {
   );
 }
 
-/** Lightweight scaffold rendered while `/agents/me` is in-flight. Mirrors
+/** Lightweight scaffold rendered while `/app/agents/me` is in-flight. Mirrors
  *  HomeChromeFallback on the driver side — gives LCP something fast to paint. */
 function AgentHomeChromeFallback() {
   return (
@@ -241,7 +241,7 @@ export function AgentHomePage() {
         <Card className="gap-2">
           <h1 className="text-lg font-bold">Finish setting up your agent profile</h1>
           <p className="text-sm text-secondary">You're signed in, but you don't have an agent profile yet.</p>
-          <Button variant="full" size="sm" className="w-fit" onClick={() => navigate('/onboarding')}>
+          <Button variant="full" size="sm" className="w-fit" onClick={() => navigate('/app/onboarding')}>
             Set up my profile
           </Button>
         </Card>

@@ -71,7 +71,7 @@ function InvitationCard({
         <p className="text-xs text-secondary">Reason: {invite.declinedReason}</p>
       ) : null}
       <div className="flex items-center justify-between gap-2 border-t pt-2.5 text-xs">
-        <Link to={`/drivers/${invite.driverId}`} className="flex items-center text-primary">
+        <Link to={`/app/drivers/${invite.driverId}`} className="flex items-center text-primary">
           View driver profile <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
         </Link>
         {canWithdraw && invite.status === 'pending' ? (
@@ -87,7 +87,7 @@ function InvitationCard({
           </Button>
         ) : null}
         {reciprocated ? (
-          <Link to={`/trips/${tripId}/applicants`} className="flex items-center text-emerald-700">
+          <Link to={`/app/trips/${tripId}/applicants`} className="flex items-center text-emerald-700">
             Review application <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
           </Link>
         ) : null}
@@ -97,7 +97,7 @@ function InvitationCard({
 }
 
 /**
- * `/trips/:id/invitations` — the poster's view of drivers they invited to a trip
+ * `/app/trips/:id/invitations` — the poster's view of drivers they invited to a trip
  * and each invitation's status (pending / applied / declined / withdrawn / expired).
  * Driver identity stays anonymous (handle + trust signals only) until the driver
  * reciprocates by applying — backend enforces the reveal rule.
@@ -107,12 +107,12 @@ export function TripInvitationsPage() {
   const [searchParams] = useSearchParams();
   // `?from=` overrides the default back target so the home-card → trip-invitations path
   // walks back to home, not to /posted-trips. Matches the pattern TripDetailPage uses.
-  const backTarget = searchParams.get('from') ?? '/posted-trips';
+  const backTarget = searchParams.get('from') ?? '/app/posted-trips';
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
   // Breadcrumb passed to the top trip-summary card so its "View details" link → trip detail
   // walks back HERE on the Back arrow. Preserve any existing `?from=` so the chain continues
   // all the way back to home (or wherever the agent entered the page from).
-  const linkFromPath = `/trips/${id}/invitations${searchParams.get('from') ? `?from=${encodeURIComponent(searchParams.get('from') ?? '')}` : ''}`;
+  const linkFromPath = `/app/trips/${id}/invitations${searchParams.get('from') ? `?from=${encodeURIComponent(searchParams.get('from') ?? '')}` : ''}`;
   const { user } = useAuth();
   const tripQuery = useTrip(id);
   const trip = tripQuery.data;
@@ -191,7 +191,7 @@ export function TripInvitationsPage() {
                     message="Open the trip and invite specific KYC-approved drivers in the pickup city."
                     action={
                       <Button asChild variant="outline" size="sm">
-                        <Link to={`/trips/${id}`}>Open trip</Link>
+                        <Link to={`/app/trips/${id}`}>Open trip</Link>
                       </Button>
                     }
                   />

@@ -22,10 +22,10 @@ function renderQueue(props: Partial<Parameters<typeof QueueListPage>[0]> = {}) {
   };
   const final = { ...defaults, ...props } as Parameters<typeof QueueListPage>[0];
   return render(
-    <MemoryRouter initialEntries={['/queue/test']}>
+    <MemoryRouter initialEntries={['/app/queue/test']}>
       <Routes>
         <Route
-          path="/queue/test"
+          path="/app/queue/test"
           element={
             <>
               <QueueListPage {...final} />
@@ -55,7 +55,7 @@ describe('QueueListPage', () => {
   it('renders the empty state on initial-empty load without redirecting', () => {
     renderQueue({ items: [] });
     expect(screen.getByText('All caught up')).toBeInTheDocument();
-    expect(screen.getByTestId('loc').textContent).toBe('/queue/test');
+    expect(screen.getByTestId('loc').textContent).toBe('/app/queue/test');
   });
 
   it('renders each item via renderItem and dedupes by getKey', () => {
@@ -90,9 +90,9 @@ describe('QueueListPage', () => {
       );
     }
     render(
-      <MemoryRouter initialEntries={['/queue/test']}>
+      <MemoryRouter initialEntries={['/app/queue/test']}>
         <Routes>
-          <Route path="/queue/test" element={<Harness />} />
+          <Route path="/app/queue/test" element={<Harness />} />
           <Route path="/" element={<div>home page</div>} />
         </Routes>
       </MemoryRouter>,

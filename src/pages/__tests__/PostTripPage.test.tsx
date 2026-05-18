@@ -104,13 +104,13 @@ function MyTripsListingStub() {
 
 function renderPost() {
   return render(
-    <MemoryRouter initialEntries={['/trips/new']}>
+    <MemoryRouter initialEntries={['/app/trips/new']}>
       <Routes>
-        <Route path="/trips/new" element={<PostTripPage />} />
+        <Route path="/app/trips/new" element={<PostTripPage />} />
         <Route path="/" element={<div>home</div>} />
-        <Route path="/trips/:id" element={<div>trip detail</div>} />
-        <Route path="/posted-trips" element={<PostedTripsListingStub />} />
-        <Route path="/my-trips" element={<MyTripsListingStub />} />
+        <Route path="/app/trips/:id" element={<div>trip detail</div>} />
+        <Route path="/app/posted-trips" element={<PostedTripsListingStub />} />
+        <Route path="/app/my-trips" element={<MyTripsListingStub />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -375,10 +375,10 @@ describe('PostTripPage', () => {
     };
     vi.mocked(useTrip).mockReturnValue({ data: tripData, isPending: false, isFetching: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: tripData }) } as never);
     render(
-      <MemoryRouter initialEntries={['/trips/t42/edit']}>
+      <MemoryRouter initialEntries={['/app/trips/t42/edit']}>
         <Routes>
-          <Route path="/trips/:id/edit" element={<PostTripPage />} />
-          <Route path="/trips/:id" element={<div>trip detail</div>} />
+          <Route path="/app/trips/:id/edit" element={<PostTripPage />} />
+          <Route path="/app/trips/:id" element={<div>trip detail</div>} />
         </Routes>
       </MemoryRouter>,
     );

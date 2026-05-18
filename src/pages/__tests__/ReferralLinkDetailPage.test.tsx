@@ -8,13 +8,13 @@ vi.mock('@/lib/api/services/referrals');
 import * as svc from '@/lib/api/services/referrals';
 import { ReferralLinkDetailPage } from '@/pages/ReferralLinkDetailPage';
 
-function Wrap({ children, path = '/referrals/lk1' }: { children: ReactNode; path?: string }) {
+function Wrap({ children, path = '/app/referrals/lk1' }: { children: ReactNode; path?: string }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <QueryClientProvider client={qc}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/referrals/:linkId" element={children} />
+          <Route path="/app/referrals/:linkId" element={children} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -41,6 +41,6 @@ describe('ReferralLinkDetailPage', () => {
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Asha' })).toBeInTheDocument());
     expect(screen.getByText('₹200')).toBeInTheDocument(); // earned
     expect(screen.getByText('₹2,300')).toBeInTheDocument(); // cap remaining 230000 paise
-    expect(screen.getByRole('link', { name: /Vellore → Chennai/i })).toHaveAttribute('href', '/trips/t1');
+    expect(screen.getByRole('link', { name: /Vellore → Chennai/i })).toHaveAttribute('href', '/app/trips/t1');
   });
 });

@@ -63,7 +63,7 @@ function NotificationRow({ n, onRead }: { n: Notification; onRead: (id: string) 
           <div className="mt-1.5 flex items-center gap-3 text-xs">
             <span className="text-secondary">{relTime(n.createdAt)}</span>
             {tripId ? (
-              <Link to={`/trips/${tripId}`} className="font-medium text-primary underline" onClick={() => (n.isRead ? undefined : onRead(n.id))}>
+              <Link to={`/app/trips/${tripId}`} className="font-medium text-primary underline" onClick={() => (n.isRead ? undefined : onRead(n.id))}>
                 View trip
               </Link>
             ) : null}
@@ -80,7 +80,7 @@ function NotificationRow({ n, onRead }: { n: Notification; onRead: (id: string) 
 }
 
 /**
- * `/notifications` — the in-app inbox: alert matches, KYC updates, trip
+ * `/app/notifications` — the in-app inbox: alert matches, KYC updates, trip
  * assigned/completed/cancelled, reviews received. Unread items are highlighted;
  * tapping "Mark read" / "Mark all read" calls `useMarkNotificationRead` /
  * `useMarkAllNotificationsRead` (the unread badge elsewhere reflects the change).

@@ -36,9 +36,9 @@ function setAgent(state: AgentState) {
 
 function renderProfile() {
   return render(
-    <MemoryRouter initialEntries={['/agents/a1']}>
+    <MemoryRouter initialEntries={['/app/agents/a1']}>
       <Routes>
-        <Route path="/agents/:id" element={<AgentProfilePage />} />
+        <Route path="/app/agents/:id" element={<AgentProfilePage />} />
       </Routes>
     </MemoryRouter>,
   );

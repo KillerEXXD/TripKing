@@ -1,5 +1,5 @@
 /**
- * `/administration/video-calls` — the admin Video Call Console (admin-only). Lists scheduled KYC
+ * `/app/administration/video-calls` — the admin Video Call Console (admin-only). Lists scheduled KYC
  * video calls; for each, the admin joins the call, ticks the three gates (face match / documents /
  * liveness) and finalizes it. Approving requires all three gates; the subject's `kyc_status` then
  * flips to `approved` (or `rejected` / `resubmit_required`) and a `kyc_status_change` notification fires.
@@ -106,7 +106,7 @@ export function VideoCallConsolePage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Video call console</h1>

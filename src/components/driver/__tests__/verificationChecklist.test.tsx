@@ -27,8 +27,8 @@ describe('VerificationChecklist', () => {
     const items = screen.getAllByRole('listitem');
     expect(items).toHaveLength(3);
     expect(screen.queryByText('Add your vehicle')).toBeNull();
-    expect(screen.getByText('Video verification').closest('a')).toHaveAttribute('href', '/verify/video-call');
-    expect(screen.getByText('Identity documents').closest('a')).toHaveAttribute('href', '/verify/documents');
+    expect(screen.getByText('Video verification').closest('a')).toHaveAttribute('href', '/app/verify/video-call');
+    expect(screen.getByText('Identity documents').closest('a')).toHaveAttribute('href', '/app/verify/documents');
     expect(screen.getByText('scheduled')).toBeInTheDocument();
   });
 

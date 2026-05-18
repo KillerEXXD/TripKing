@@ -20,9 +20,9 @@ describe('SectionCard', () => {
   });
 
   it('renders as a <Link> when `to` is supplied', () => {
-    withRouter(<SectionCard accent="amber" label="X" to="/vacancies">body</SectionCard>);
+    withRouter(<SectionCard accent="amber" label="X" to="/app/vacancies">body</SectionCard>);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/vacancies');
+    expect(link).toHaveAttribute('href', '/app/vacancies');
   });
 
   it('renders as a role="button" when `onClick` is supplied; calls handler on click', () => {

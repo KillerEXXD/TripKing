@@ -152,11 +152,11 @@ function ApplicationRow({ app }: { app: MyApplication }) {
   if (picked) {
     return (
       <Card className="gap-0 p-0">
-        <Link to={`/trips/${t.id}`} className="block">
+        <Link to={`/app/trips/${t.id}`} className="block">
           {summary}
         </Link>
         <div className="flex items-center justify-end border-t px-4 py-2.5 text-xs font-semibold">
-          <Link to={`/trips/${t.id}`} className="flex items-center text-primary">
+          <Link to={`/app/trips/${t.id}`} className="flex items-center text-primary">
             View trip
             <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
           </Link>
@@ -271,7 +271,7 @@ function TripList({
   onShare: (t: Trip) => void;
   /** Breadcrumb passed to each PostedTripCard so the trip detail's Back arrow returns to
    *  THIS exact list (preserving the current `?tab=`). Without it, Back falls back to the
-   *  default `/my-trips` (driving tab). */
+   *  default `/app/my-trips` (driving tab). */
   linkFromPath?: string;
 }) {
   if (query) {
@@ -304,7 +304,7 @@ function AllList({ entries, onShare, linkFromPath }: { entries: AllEntry[]; onSh
         message="Apply to an open trip, get invited, or post your own — they'll all show up here."
         action={
           <Button asChild variant="outline" size="sm">
-            <Link to="/trips">Browse trips</Link>
+            <Link to="/app/trips">Browse trips</Link>
           </Button>
         }
       />
@@ -324,10 +324,10 @@ function AllList({ entries, onShare, linkFromPath }: { entries: AllEntry[]; onSh
 }
 
 /**
- * `/my-trips` — the driver's "My trips" tab: the trips assigned to them (Driving), the trips
+ * `/app/my-trips` — the driver's "My trips" tab: the trips assigned to them (Driving), the trips
  * they've applied to (Applied → `GET /trips/applied`), and the trips they posted themselves
  * (Posted by me). Reuses the posted-trip card; the Posted tab keeps its Share / Review-applicants
- * affordances. (The agent's "My posts" tab keeps the dedicated `/posted-trips` page.)
+ * affordances. (The agent's "My posts" tab keeps the dedicated `/app/posted-trips` page.)
  */
 export function DriverActivityPage() {
   const { user } = useAuth();
@@ -437,12 +437,12 @@ export function DriverActivityPage() {
           {/* Breadcrumb — when the driver taps a trip in this scoped list, the trip
               detail's Back arrow walks back HERE (and from here on back to wherever the
               user came from, encoded in fromParam). Without this, Back would default to
-              the plain `/my-trips` tabbed view. */}
+              the plain `/app/my-trips` tabbed view. */}
           <InvitedList
             query={invitedQuery}
             trips={scopedInvites}
             onShare={setShareTrip}
-            linkFromPath={`/my-trips?scope=invites-received${fromParam && fromParam !== '/' ? `&from=${encodeURIComponent(fromParam)}` : '&from=/'}`}
+            linkFromPath={`/app/my-trips?scope=invites-received${fromParam && fromParam !== '/' ? `&from=${encodeURIComponent(fromParam)}` : '&from=/'}`}
           />
         </div>
         {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
@@ -455,7 +455,7 @@ export function DriverActivityPage() {
       <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3 shadow-header">
         <h1 className="flex-1 text-base font-semibold">My trips</h1>
         <Button asChild size="sm" className="gap-1.5">
-          <Link to="/trips/new">
+          <Link to="/app/trips/new">
             <Plus className="size-4" aria-hidden /> Post a trip
           </Link>
         </Button>
@@ -471,10 +471,10 @@ export function DriverActivityPage() {
       </div>
 
       {/* Breadcrumb URL passed to every trip card below — so the trip-detail Back arrow
-       *  returns to the SAME tab the user came from (not the default `/my-trips` driving
+       *  returns to the SAME tab the user came from (not the default `/app/my-trips` driving
        *  tab). `tab=driving` is the default → drop the param to keep URLs clean. */}
       <div className="space-y-3 p-4">
-        {tab === 'all' && <AllList entries={allEntries} onShare={setShareTrip} linkFromPath="/my-trips" />}
+        {tab === 'all' && <AllList entries={allEntries} onShare={setShareTrip} linkFromPath="/app/my-trips" />}
         {tab === 'driving' && (
           <TripList
             query={drivingQuery}
@@ -483,7 +483,7 @@ export function DriverActivityPage() {
             emptyTitle="No trips assigned to you yet"
             emptyMessage="When a trip manager picks you for a trip, it shows up here — once you accept (or one's in progress)."
             onShare={setShareTrip}
-            linkFromPath="/my-trips"
+            linkFromPath="/app/my-trips"
           />
         )}
         {tab === 'selected' && (
@@ -494,7 +494,7 @@ export function DriverActivityPage() {
             emptyTitle="No trips waiting on your accept"
             emptyMessage="When a trip manager picks you, this is where you confirm — accept within the 15-min window."
             onShare={setShareTrip}
-            linkFromPath="/my-trips?tab=selected"
+            linkFromPath="/app/my-trips?tab=selected"
           />
         )}
         {tab === 'completed' && (
@@ -507,7 +507,7 @@ export function DriverActivityPage() {
           ) : (
             <div className="space-y-3">
               {completedTrips.map((t) => (
-                <CompletedTripCard key={t.id} trip={t} linkFromPath="/my-trips?tab=completed" />
+                <CompletedTripCard key={t.id} trip={t} linkFromPath="/app/my-trips?tab=completed" />
               ))}
             </div>
           )
@@ -520,10 +520,10 @@ export function DriverActivityPage() {
             emptyTitle="No cancelled trips"
             emptyMessage="If a trip you were assigned to gets cancelled, you'll see it here for your records."
             onShare={setShareTrip}
-            linkFromPath="/my-trips?tab=cancelled"
+            linkFromPath="/app/my-trips?tab=cancelled"
           />
         )}
-        {tab === 'invited' && <InvitedList query={invitedQuery} onShare={setShareTrip} linkFromPath="/my-trips?tab=invited" />}
+        {tab === 'invited' && <InvitedList query={invitedQuery} onShare={setShareTrip} linkFromPath="/app/my-trips?tab=invited" />}
         {tab === 'posted' && (
           <TripList
             query={postedQuery}
@@ -535,7 +535,7 @@ export function DriverActivityPage() {
             emptyTitle="You haven't posted any trips"
             emptyMessage="Posted a trip you can't run yourself? It'll appear here with its status and applicants."
             onShare={setShareTrip}
-            linkFromPath="/my-trips?tab=posted"
+            linkFromPath="/app/my-trips?tab=posted"
           />
         )}
         {tab === 'applied' && <AppliedList query={appliedQuery} />}
@@ -558,7 +558,7 @@ function AppliedList({ query }: { query: ReturnType<typeof useMyApplications> })
         message="Browse open trips and apply — the ones you've applied to (and how they went) show up here."
         action={
           <Button asChild variant="outline" size="sm">
-            <Link to="/trips">Browse trips</Link>
+            <Link to="/app/trips">Browse trips</Link>
           </Button>
         }
       />
@@ -577,7 +577,7 @@ function AppliedList({ query }: { query: ReturnType<typeof useMyApplications> })
  * Driver's "Invited" tab — `<PostedTripCard>` per row plus an inline "Decline" action that flips
  * `trip_invitations.status` → 'declined'. The list filters out 'declined' invites server-side
  * (`GET /trips?invited=me`), so on success the row drops out of the queue and the agent's
- * `/trips/:id/invitations` shows the Declined badge.
+ * `/app/trips/:id/invitations` shows the Declined badge.
  */
 function InvitedList({
   query,
@@ -739,7 +739,7 @@ function AvailableList({
         message="Tap I'm vacant so agents can find you for trips going from your city."
         action={
           <Button asChild size="sm">
-            <Link to="/vacancies/new">Post vacant</Link>
+            <Link to="/app/vacancies/new">Post vacant</Link>
           </Button>
         }
       />

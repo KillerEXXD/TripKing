@@ -59,7 +59,7 @@ describe('IAmAvailableCard', () => {
     expect(screen.getByText(/Let agents find you/i)).toBeInTheDocument();
     expect(screen.getByText(/0 \/ 2 active/)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /post vacant/i });
-    expect(link).toHaveAttribute('href', '/vacancies/new');
+    expect(link).toHaveAttribute('href', '/app/vacancies/new');
   });
 
   it('renders 1/2 with the "each posting below is live" subtitle', () => {

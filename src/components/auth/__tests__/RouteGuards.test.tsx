@@ -61,20 +61,20 @@ describe('AdminRoute', () => {
 
   it('renders children for an admin', () => {
     setAuth({ user: admin, isAuthenticated: true, isLoading: false });
-    renderAt('/administration', <AdminRoute><div>admin area</div></AdminRoute>);
+    renderAt('/app/administration', <AdminRoute><div>admin area</div></AdminRoute>);
     expect(screen.getByText('admin area')).toBeInTheDocument();
   });
 
   it('403s a signed-in non-admin', () => {
     setAuth({ user: driver, isAuthenticated: true, isLoading: false });
-    renderAt('/administration', <AdminRoute><div>admin area</div></AdminRoute>);
+    renderAt('/app/administration', <AdminRoute><div>admin area</div></AdminRoute>);
     expect(screen.getByText(/admins only/i)).toBeInTheDocument();
     expect(screen.queryByText('admin area')).toBeNull();
   });
 
   it('bounces an anonymous user to /app/signin', () => {
     setAuth({ user: null, isAuthenticated: false, isLoading: false });
-    renderAt('/administration', <AdminRoute><div>admin area</div></AdminRoute>);
+    renderAt('/app/administration', <AdminRoute><div>admin area</div></AdminRoute>);
     expect(screen.getByText('signin page')).toBeInTheDocument();
   });
 });

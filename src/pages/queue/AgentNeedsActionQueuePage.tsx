@@ -9,7 +9,7 @@ import type { Trip } from '@/types';
 
 function TripRow({ trip }: { trip: Trip }) {
   return (
-    <Link to={`/trips/${trip.id}/applicants?from=/queue/needs-action`} className="block">
+    <Link to={`/app/trips/${trip.id}/applicants?from=/queue/needs-action`} className="block">
       <Card className="gap-1.5 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -28,7 +28,7 @@ function TripRow({ trip }: { trip: Trip }) {
 }
 
 /**
- * `/queue/needs-action` — agent work-queue of posted trips with applicants
+ * `/app/queue/needs-action` — agent work-queue of posted trips with applicants
  * waiting for a driver selection. Reached from the Home "Review" card when
  * there are ≥2 such trips. As the agent picks a driver on each, the trip
  * leaves `has_applicants` status and drops out of the queue (handled by the

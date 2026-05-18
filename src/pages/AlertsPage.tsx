@@ -12,7 +12,7 @@ function routeLabel(a: Alert): string {
 
 function AlertCard({ alert }: { alert: Alert }) {
   return (
-    <Link to={`/alerts/${alert.id}`} className="block">
+    <Link to={`/app/alerts/${alert.id}`} className="block">
       <Card className="gap-2 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -55,10 +55,10 @@ function Section({ title, dotClass, alerts }: { title: string; dotClass: string;
 }
 
 /**
- * `/alerts` — the caller's saved-search alerts (`useMyAlerts`), laid out like the
+ * `/app/alerts` — the caller's saved-search alerts (`useMyAlerts`), laid out like the
  * prototype: a white header strip, then Active / Paused sections of alert cards
  * (route name, radius / ≥₹·km / car types / channels, state badge) each linking
- * to the alert detail (where pause / resume / delete live). New alerts at `/alerts/new`.
+ * to the alert detail (where pause / resume / delete live). New alerts at `/app/alerts/new`.
  */
 export function AlertsPage() {
   const navigate = useNavigate();
@@ -78,7 +78,7 @@ export function AlertsPage() {
           <p className="text-xs text-secondary">{alertsQuery.isSuccess ? `${alerts.length} alert${alerts.length === 1 ? '' : 's'}` : 'Get pinged when a matching trip appears'}</p>
         </div>
         <Button asChild size="sm" className="gap-1.5">
-          <Link to="/alerts/new">
+          <Link to="/app/alerts/new">
             <Plus className="size-4" aria-hidden /> New
           </Link>
         </Button>
@@ -96,7 +96,7 @@ export function AlertsPage() {
             message="Create an alert and we'll notify you when a trip matches it."
             action={
               <Button asChild variant="outline" size="sm">
-                <Link to="/alerts/new">New alert</Link>
+                <Link to="/app/alerts/new">New alert</Link>
               </Button>
             }
           />

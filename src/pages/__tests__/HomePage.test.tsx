@@ -31,18 +31,18 @@ describe('HomePage (admin home)', () => {
   it('shows a tile for every /administration area, linking to it (parity with AdministrationPage)', () => {
     renderHome();
     const expected: [RegExp, string][] = [
-      [/platform dashboard/i, '/administration/dashboard'],
-      [/reference data/i, '/administration/config'],
-      [/kyc review queue/i, '/administration/kyc'],
-      [/search by name, phone, city/i, '/administration/drivers'],
-      [/search by name, phone, business/i, '/administration/agents'],
-      [/search by name, phone, alias/i, '/administration/passengers'],
-      [/video call console/i, '/administration/video-calls'],
-      [/filter by eligibility and expiry/i, '/administration/vehicles'],
-      [/reviews moderation/i, '/administration/reviews'],
-      [/translation manager/i, '/administration/translations'],
-      [/bug tracker/i, '/administration/bugs'],
-      [/design previews/i, '/administration/designs'],
+      [/platform dashboard/i, '/app/administration/dashboard'],
+      [/reference data/i, '/app/administration/config'],
+      [/kyc review queue/i, '/app/administration/kyc'],
+      [/search by name, phone, city/i, '/app/administration/drivers'],
+      [/search by name, phone, business/i, '/app/administration/agents'],
+      [/search by name, phone, alias/i, '/app/administration/passengers'],
+      [/video call console/i, '/app/administration/video-calls'],
+      [/filter by eligibility and expiry/i, '/app/administration/vehicles'],
+      [/reviews moderation/i, '/app/administration/reviews'],
+      [/translation manager/i, '/app/administration/translations'],
+      [/bug tracker/i, '/app/administration/bugs'],
+      [/design previews/i, '/app/administration/designs'],
     ];
     for (const [name, href] of expected) {
       const link = screen.getByRole('link', { name });
@@ -52,14 +52,14 @@ describe('HomePage (admin home)', () => {
 
   it('keeps marketplace shortcuts and a link to the full administration page', () => {
     renderHome();
-    expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/trips');
-    expect(screen.getByRole('link', { name: /full administration page/i })).toHaveAttribute('href', '/administration');
+    expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/app/trips');
+    expect(screen.getByRole('link', { name: /full administration page/i })).toHaveAttribute('href', '/app/administration');
   });
 
   it('has a top-right profile avatar linking to /profile (consistent across roles)', () => {
     renderHome();
     const avatar = screen.getByRole('link', { name: /your profile/i });
-    expect(avatar).toHaveAttribute('href', '/profile');
+    expect(avatar).toHaveAttribute('href', '/app/profile');
     expect(avatar).toHaveTextContent('RS'); // initials of "Ravee Sundar"
   });
 

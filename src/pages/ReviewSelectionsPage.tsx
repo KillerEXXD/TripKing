@@ -13,7 +13,7 @@ function isOrigin(v: unknown): v is Origin {
 }
 
 /**
- * `/my-trips/review` — a driver's dedicated review list. Shows every application
+ * `/app/my-trips/review` — a driver's dedicated review list. Shows every application
  * with `status='selected'` (the agent has picked them; the driver needs to
  * Accept or Decline). The home-page "Review" card sends multi-trip drivers here.
  *
@@ -33,7 +33,7 @@ export function ReviewSelectionsPage() {
 
   function onBack() {
     if (from === 'home') navigate('/');
-    else if (from === 'my-trips') navigate('/my-trips');
+    else if (from === 'my-trips') navigate('/app/my-trips');
     else navigate(-1);
   }
 
@@ -63,7 +63,7 @@ export function ReviewSelectionsPage() {
             message="When an agent picks you for a trip you applied to, it'll appear here so you can Accept or Decline."
             action={
               <Button asChild variant="outline" size="sm">
-                <Link to="/my-trips?tab=applied">View all applications</Link>
+                <Link to="/app/my-trips?tab=applied">View all applications</Link>
               </Button>
             }
           />
@@ -83,7 +83,7 @@ function SelectedTripCard({ app, from }: { app: MyApplication; from: Origin | un
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <Link
-            to={`/trips/${t.id}`}
+            to={`/app/trips/${t.id}`}
             state={state}
             className="font-bold underline-offset-2 hover:underline"
           >
@@ -113,7 +113,7 @@ function SelectedTripCard({ app, from }: { app: MyApplication; from: Origin | un
       ) : null}
       <div className="flex items-center justify-between border-t pt-3 text-sm font-semibold">
         <span className="text-secondary">+ {formatINR(t.driverBata)} bata</span>
-        <Link to={`/trips/${t.id}`} state={state} className="flex items-center text-primary">
+        <Link to={`/app/trips/${t.id}`} state={state} className="flex items-center text-primary">
           Accept or Decline
           <ChevronRight className="ml-0.5 size-4" aria-hidden />
         </Link>

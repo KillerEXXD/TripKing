@@ -29,7 +29,7 @@ function Row({ link, busy, onSetStatus, onReverse }: {
   return (
     <tr className="border-b last:border-0 align-top">
       <td className="px-2 py-2">
-        <Link to={`/referrals/${link.id}`} className="text-sm font-medium text-primary hover:underline">
+        <Link to={`/app/referrals/${link.id}`} className="text-sm font-medium text-primary hover:underline">
           {link.referredUser?.displayName ?? '—'}
         </Link>
         <div className="text-[11px] text-secondary">{link.referredUserRole === 'trip_manager' ? 'Agent' : 'Driver'}</div>
@@ -59,7 +59,7 @@ function Row({ link, busy, onSetStatus, onReverse }: {
   );
 }
 
-/** `/administration/referrals` — Stage 9 admin link queue with suspend / reverse actions. */
+/** `/app/administration/referrals` — Stage 9 admin link queue with suspend / reverse actions. */
 export function AdminReferralsPage() {
   const [filter, setFilter] = useState<ReferralLinkStatus | 'all'>('all');
   const params = filter === 'all' ? undefined : { status: filter };
@@ -84,12 +84,12 @@ export function AdminReferralsPage() {
 
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Referrals</h1>
-        <Link to="/administration/referrals/flags" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+        <Link to="/app/administration/referrals/flags" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
           <ShieldAlert className="size-4" aria-hidden /> Fraud queue →
         </Link>
       </div>

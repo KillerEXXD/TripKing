@@ -23,14 +23,14 @@ import type { Driver, MyApplication, Trip } from '@/types';
 
 function ProfileAvatar({ name, photoUrl }: { name: string; photoUrl?: string }) {
   return (
-    <Link to="/profile" aria-label="Your profile" className="flex size-7 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-[11px] font-bold text-primary hover:ring-2 hover:ring-primary/40">
+    <Link to="/app/profile" aria-label="Your profile" className="flex size-7 items-center justify-center overflow-hidden rounded-full border bg-primary/15 text-[11px] font-bold text-primary hover:ring-2 hover:ring-primary/40">
       {photoUrl ? <img src={photoUrl} alt="" className="size-full object-cover" /> : <span>{name ? initials(name) : '?'}</span>}
     </Link>
   );
 }
 function Bellish({ count }: { count: number }) {
   return (
-    <Link to="/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative flex size-7 items-center justify-center rounded-full text-secondary hover:bg-muted">
+    <Link to="/app/notifications" aria-label={count > 0 ? `${count} unread notifications` : 'Notifications'} className="relative flex size-7 items-center justify-center rounded-full text-secondary hover:bg-muted">
       <Bell className="size-4" aria-hidden />
       {count > 0 ? <span className="absolute right-0.5 top-0.5 size-1.5 rounded-full bg-destructive" /> : null}
     </Link>
@@ -40,7 +40,7 @@ function Bellish({ count }: { count: number }) {
 function ReputationCard({ driver }: { driver: Driver }) {
   return (
     <PriorityCard
-      to={`/drivers/${driver.id}`}
+      to={`/app/drivers/${driver.id}`}
       tone="amber"
       icon={<Star className="size-3.5 fill-amber-500 text-amber-500" aria-hidden />}
       label="Your reputation"
@@ -75,11 +75,11 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
     e.preventDefault();
     // Enter the 2-step completion wizard — the wizard itself is the confirmation;
     // no native window.confirm any more, and only one completion code path.
-    navigate(`/trips/${trip.id}/complete`);
+    navigate(`/app/trips/${trip.id}/complete`);
   }
   return (
     <PriorityCard
-      onClick={() => navigate(`/trips/${trip.id}`)}
+      onClick={() => navigate(`/app/trips/${trip.id}`)}
       ariaLabel={`Open trip ${trip.fromCity.name} to ${trip.toCity.name}`}
       tone="emerald"
       icon={<Navigation className="size-3.5" aria-hidden />}
@@ -92,7 +92,7 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
             End trip
           </Button>
           <Button asChild size="sm" className="bg-emerald-700 text-white hover:bg-emerald-800">
-            <Link to={`/trips/${trip.id}`} onClick={(e) => e.stopPropagation()}>Continue</Link>
+            <Link to={`/app/trips/${trip.id}`} onClick={(e) => e.stopPropagation()}>Continue</Link>
           </Button>
         </div>
       }
@@ -125,7 +125,7 @@ function CurrentTripStat({ icon, label, value }: { icon: React.ReactNode; label:
 function AssignedTripCard({ trip }: { trip: Trip }) {
   return (
     <PriorityCard
-      to={`/trips/${trip.id}`}
+      to={`/app/trips/${trip.id}`}
       tone="amber"
       icon={<CheckCircle2 className="size-3.5" aria-hidden />}
       label="Ready to start"
@@ -147,7 +147,7 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
   const more = apps.length - 1;
   // One trip → land directly on its detail so the driver can Accept / Decline in one tap.
   // Multiple → focused list at /my-trips/review with the rich applicant-style cards.
-  const href = apps.length === 1 ? `/trips/${first.trip.id}` : '/my-trips/review';
+  const href = apps.length === 1 ? `/app/trips/${first.trip.id}` : '/app/my-trips/review';
   return (
     <PriorityCard
       to={href}
@@ -234,7 +234,7 @@ function DriverHome({ driver }: { driver: Driver }) {
             // a small inline "Review N applicants →" link, easy to miss). Two+ →
             // /posted-trips filtered to has_applicants so the driver picks which
             // trip to review.
-            to={postedWithApplicants === 1 ? `/trips/${postsWithApplicants[0].id}/applicants?from=/` : '/posted-trips?status=has_applicants&from=/'}
+            to={postedWithApplicants === 1 ? `/app/trips/${postsWithApplicants[0].id}/applicants?from=/` : '/app/posted-trips?status=has_applicants&from=/'}
             tone="amber"
             icon={<Sparkles className="size-3.5" aria-hidden />}
             label={`${postedWithApplicants > 1 ? 'Trips' : 'Trip'} you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`}
@@ -300,7 +300,7 @@ export function DriverHomePage() {
         <Card className="gap-2">
           <h1 className="text-lg font-bold">Finish setting up your driver profile</h1>
           <p className="text-sm text-secondary">You're signed in, but you don't have a driver profile yet.</p>
-          <Button variant="full" size="sm" className="w-fit" onClick={() => navigate('/onboarding')}>
+          <Button variant="full" size="sm" className="w-fit" onClick={() => navigate('/app/onboarding')}>
             Set up my profile
           </Button>
         </Card>
