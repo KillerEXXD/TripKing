@@ -95,11 +95,11 @@ async function signIn(role, name) {
   const otp = accept.json?.data?.passenger_otp;
   check('POST /trips/:id/accept → 200 + OTP', accept.status === 200 && !!otp, `status=${accept.status}`);
 
-  const start = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp } });
+  const start = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
   check('POST /trips/:id/start → 200, in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status}`);
 
   // 🎯 The big one — completion fires the dual-side fee trigger
-  const complete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: { driver_notes: 'fee-smoke' } });
+  const complete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: { driver_notes: 'fee-smoke', end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
   check('POST /trips/:id/complete → 200, completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} body=${JSON.stringify(complete.json?.error)}`);
 
   // Both wallets should have lost ₹50 from promo
@@ -133,7 +133,7 @@ async function signIn(role, name) {
     `agent=${JSON.stringify(fb?.agent)}`);
 
   // Re-completing must conflict and NOT double-charge
-  const reComplete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: {} });
+  const reComplete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
   check('POST /trips/:id/complete a second time → 409 CONFLICT', reComplete.status === 409, `status=${reComplete.status}`);
   const agentWalletAfterRetry = (await j('GET', '/wallet', { token: agent.token })).json?.data?.balance;
   check('no double-charge after retry (agent balance unchanged)', agentWalletAfterRetry?.promo_paise === 95000);

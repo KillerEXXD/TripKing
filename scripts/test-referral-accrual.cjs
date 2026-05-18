@@ -138,8 +138,8 @@ function execSql(sql) {
     await j('POST', `/trips/${tripId}/assign`, { token: A.token, body: { acceptance_id: aid } });
     const accept = await j('POST', `/trips/${tripId}/accept`, { token: B.token });
     const otp = accept.json?.data?.passenger_otp;
-    await j('POST', `/trips/${tripId}/start`, { token: B.token, body: { passenger_otp: otp } });
-    const complete = await j('POST', `/trips/${tripId}/complete`, { token: B.token, body: {} });
+    await j('POST', `/trips/${tripId}/start`, { token: B.token, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
+    const complete = await j('POST', `/trips/${tripId}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
     check('POST /trips/:id/complete → 200, completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} body=${JSON.stringify(complete.json?.error)}`);
 
     // 8. Both wallets should have lost ₹50 from CASH (not promo)
@@ -191,8 +191,8 @@ function execSql(sql) {
     const apply2 = await j('POST', `/trips/${tid2}/applicants`, { token: B.token, body: {} });
     await j('POST', `/trips/${tid2}/assign`, { token: A.token, body: { acceptance_id: apply2.json?.data?.id } });
     const accept2 = await j('POST', `/trips/${tid2}/accept`, { token: B.token });
-    await j('POST', `/trips/${tid2}/start`, { token: B.token, body: { passenger_otp: accept2.json?.data?.passenger_otp } });
-    await j('POST', `/trips/${tid2}/complete`, { token: B.token, body: {} });
+    await j('POST', `/trips/${tid2}/start`, { token: B.token, body: { passenger_otp: accept2.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 20000 } });
+    await j('POST', `/trips/${tid2}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 20100 } });
 
     const refr3 = (await j('GET', '/referrals/me', { token: R.token })).json?.data;
     check('R lifetime after 2 trips = ₹100', refr3?.summary?.lifetime_earned_paise === 10000, `lifetime=${refr3?.summary?.lifetime_earned_paise}`);

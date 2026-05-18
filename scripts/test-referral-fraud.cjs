@@ -82,8 +82,8 @@ function execSql(sql) {
     const apply = await j('POST', `/trips/${t.json?.data?.id}/applicants`, { token: B.token, body: {} });
     await j('POST', `/trips/${t.json?.data?.id}/assign`, { token: A.token, body: { acceptance_id: apply.json?.data?.id } });
     const acc = await j('POST', `/trips/${t.json?.data?.id}/accept`, { token: B.token });
-    await j('POST', `/trips/${t.json?.data?.id}/start`, { token: B.token, body: { passenger_otp: acc.json?.data?.passenger_otp } });
-    await j('POST', `/trips/${t.json?.data?.id}/complete`, { token: B.token, body: {} });
+    await j('POST', `/trips/${t.json?.data?.id}/start`, { token: B.token, body: { passenger_otp: acc.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
+    await j('POST', `/trips/${t.json?.data?.id}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
 
     const linksRes = await j('GET', `/admin/referrals?referrer_user_id=${R.userId}`, { token: adminToken });
     check('GET /admin/referrals filters by referrer', linksRes.status === 200 && (linksRes.json?.data?.length ?? 0) >= 1, `body=${JSON.stringify(linksRes.json)}`);
@@ -162,8 +162,8 @@ function execSql(sql) {
     const apply2 = await j('POST', `/trips/${t2.json?.data?.id}/applicants`, { token: E.token, body: {} });
     await j('POST', `/trips/${t2.json?.data?.id}/assign`, { token: A2.token, body: { acceptance_id: apply2.json?.data?.id } });
     const acc2 = await j('POST', `/trips/${t2.json?.data?.id}/accept`, { token: E.token });
-    await j('POST', `/trips/${t2.json?.data?.id}/start`, { token: E.token, body: { passenger_otp: acc2.json?.data?.passenger_otp } });
-    await j('POST', `/trips/${t2.json?.data?.id}/complete`, { token: E.token, body: {} });
+    await j('POST', `/trips/${t2.json?.data?.id}/start`, { token: E.token, body: { passenger_otp: acc2.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 20000 } });
+    await j('POST', `/trips/${t2.json?.data?.id}/complete`, { token: E.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 20100 } });
 
     // The accrual fires → status flips to earning_active → fraud detector runs →
     // duplicate_aadhaar flag inserted (3 users share dupMask) → action_taken=suspend_link

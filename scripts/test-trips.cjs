@@ -172,9 +172,10 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   check('GET /trips/by-otp/<no match> → 404', (await j('GET', '/trips/by-otp/000000')).status === 404);
 
   // start: a non-assigned caller and a wrong OTP are rejected; the assigned driver with the right OTP starts it
-  check('POST /trips/:id/start by a non-assigned caller → 403', (await j('POST', `/trips/${tid}/start`, { token, body: { passenger_otp: otp } })).status === 403);
-  check('POST /trips/:id/start (assigned driver, wrong OTP) → 401', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: '000001' } })).status === 401);
-  const start = await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp } });
+  check('POST /trips/:id/start by a non-assigned caller → 403', (await j('POST', `/trips/${tid}/start`, { token, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } })).status === 403);
+  check('POST /trips/:id/start (assigned driver, wrong OTP) → 401', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: '000001', start_odo_url: 'test://odo/start', start_odo_reading: 10000 } })).status === 401);
+  check('POST /trips/:id/start (negative odo reading) → 422', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp, start_odo_reading: -5 } })).status === 422);
+  const start = await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
   check('POST /trips/:id/start (assigned driver, valid OTP) → 200, in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
 
   // driver pings location → only the poster / assigned driver see the live position
@@ -211,7 +212,9 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
     check('GET /trips?assigned_driver_id=<uuid> (authed, non-party) → contains the trip (browse-safe)', drivingById.status === 200 && (drivingById.json?.data || []).some((t) => t.id === tid), `len=${drivingById.json?.data?.length}`);
   }
 
-  const complete = await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { driver_notes: 'smoke' } });
+  check('POST /trips/:id/complete (assigned driver, end <= start) → 422', (await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { end_odo_url: 'test://odo/end', end_odo_reading: 9000 } })).status === 422);
+  check('POST /trips/:id/complete (assigned driver, negative toll) → 422', (await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10120, toll_paid_by_driver: -5 } })).status === 422);
+  const complete = await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { driver_notes: 'smoke', end_odo_url: 'test://odo/end', end_odo_reading: 10120, toll_paid_by_driver: 50, driver_review_note: 'Polite passenger' } });
   check('POST /trips/:id/complete (assigned driver) → 200, completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} ${JSON.stringify(complete.json?.error || '')}`);
   const afterComplete = (await j('GET', `/trips/${tid}`, { token })).json?.data || {};
   check('completed trip no longer carries distance_to_destination_km', afterComplete.distance_to_destination_km === undefined || afterComplete.distance_to_destination_km === null, `got ${afterComplete.distance_to_destination_km}`);
@@ -225,12 +228,12 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
     const hAid = (await j('POST', `/trips/${hTid}/applicants`, { token: dToken, body: {} })).json?.data?.id;
     await j('POST', `/trips/${hTid}/assign`, { token, body: { acceptance_id: hAid } });
     const hOtp = (await j('POST', `/trips/${hTid}/accept`, { token: dToken })).json?.data?.passenger_otp;
-    await j('POST', `/trips/${hTid}/start`, { token: dToken, body: { passenger_otp: hOtp } });
+    await j('POST', `/trips/${hTid}/start`, { token: dToken, body: { passenger_otp: hOtp, start_odo_url: 'test://odo/start', start_odo_reading: 11000 } });
     const hDriverView = (await j('GET', `/trips/${hTid}`, { token: dToken })).json?.data || {};
     check('hide_passenger_phone=true: assigned driver sees passenger_name but NOT passenger_phone', hDriverView.passenger_name === 'Smoke Pax' && !has(hDriverView, 'passenger_phone'), `${JSON.stringify({ n: hDriverView.passenger_name, ph: hDriverView.passenger_phone })}`);
     const hPosterView = (await j('GET', `/trips/${hTid}`, { token })).json?.data || {};
     check('hide_passenger_phone=true: the poster still sees the passenger phone', hPosterView.passenger_phone === '+919999999999', `ph=${hPosterView.passenger_phone}`);
-    await j('POST', `/trips/${hTid}/complete`, { token: dToken, body: {} });
+    await j('POST', `/trips/${hTid}/complete`, { token: dToken, body: { end_odo_url: 'test://odo/end', end_odo_reading: 11100 } });
   }
 
   // ── Phase C-2: from_place_id/to_place_id · Phase D: radius search + alert matching ──

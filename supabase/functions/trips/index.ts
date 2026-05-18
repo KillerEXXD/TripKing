@@ -1192,8 +1192,13 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     sortWaypoints(row);
     const dist = distanceToDest(row);
     if (dist != null) row.distance_to_destination_km = dist;
+    // final_driver_payout is the driver's take-home — never shown to the passenger,
+    // regardless of show_fare_to_passenger (which only gates passenger-facing bill items).
+    delete row.final_driver_payout;
+    delete row.driver_payout;
     if (!row.show_fare_to_passenger) {
-      for (const k of ['total_fare', 'rate_per_km', 'driver_payout', 'commission_pct', 'gst_amount', 'driver_bata']) row[k] = null;
+      for (const k of ['total_fare', 'rate_per_km', 'commission_pct', 'gst_amount', 'driver_bata',
+                       'final_total_fare', 'extra_distance_km', 'extra_km_fare', 'toll_amount']) row[k] = null;
     }
     return ok(row);
   }
@@ -1906,6 +1911,26 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
   }
 
+  // ── POST /trips/trips/:id/start-odo-upload-url ───────────────────────────
+  // Signed PUT URL to upload the start-odometer photo into `trip-executions-photos/<trip_id>/start_odo`
+  // (private bucket — RLS lets the assigned driver write, the agent read). Trip status must be 'accepted'.
+  if ((sub === 'start-odo-upload-url' || sub === 'end-odo-upload-url') && req.method === 'POST') {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    const trip = await loadTrip(tripId);
+    if (!trip) return fail('NOT_FOUND', 'Trip not found', 404);
+    const did = await driverIdFor(u.id);
+    if (trip.assigned_driver_id !== did && !isAdmin(u)) return fail('FORBIDDEN', 'Only the assigned driver can upload odometer photos', 403);
+    const isStart = sub === 'start-odo-upload-url';
+    const wantStatus = isStart ? 'accepted' : 'in_progress';
+    if (trip.status !== wantStatus) return fail('CONFLICT', `Trip is "${trip.status}", not "${wantStatus}"`, 409);
+    const slot = isStart ? 'start_odo' : 'end_odo';
+    const path = `${tripId}/${slot}`;
+    const { data, error } = await db.storage.from('trip-executions-photos').createSignedUploadUrl(path, { upsert: true });
+    if (error || !data) return fail('STORAGE_ERROR', error?.message ?? 'could not create upload url', 500);
+    return ok({ bucket: 'trip-executions-photos', path, signed_url: data.signedUrl, token: data.token });
+  }
+
   // ── POST /trips/trips/:id/start ──────────────────────────────────────────
   if (sub === 'start' && req.method === 'POST') {
     const u = await authUser(db, req);
@@ -1919,10 +1944,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const b = await readBody(req);
     const otpHash = await sha256hex(String(b.passenger_otp ?? ''));
     if (!trip.passenger_otp_hash || otpHash !== trip.passenger_otp_hash) return fail('INVALID_OTP', 'Incorrect passenger OTP', 401);
+    // Odometer capture: optional today (existing clients may omit it); the new wizard always sends
+    // both. Validate shape when supplied — non-negative integer reading + non-empty url. A later
+    // phase will flip these to required once all clients have rolled forward.
+    const startOdoUrl = typeof b.start_odo_url === 'string' && b.start_odo_url ? b.start_odo_url : null;
+    const startOdoReading = b.start_odo_reading == null || b.start_odo_reading === ''
+      ? null
+      : Number.isFinite(Number(b.start_odo_reading)) ? Math.trunc(Number(b.start_odo_reading)) : NaN;
+    if (Number.isNaN(startOdoReading) || (startOdoReading != null && startOdoReading < 0)) {
+      return fail('VALIDATION', 'start_odo_reading must be a non-negative integer', 422);
+    }
     const now = new Date().toISOString();
     await db.from('trips').update({ status: 'in_progress' }).eq('id', tripId);
     await db.from('trip_executions').upsert(
-      { trip_id: tripId, started_at: now, start_odo_url: (b.start_odo_url as string | null) ?? null, start_odo_reading: (b.start_odo_reading as number | null) ?? null, start_odo_at: b.start_odo_url ? now : null },
+      { trip_id: tripId, started_at: now, start_odo_url: startOdoUrl, start_odo_reading: startOdoReading, start_odo_at: startOdoUrl ? now : null },
       { onConflict: 'trip_id' },
     );
     // Migration 039: trip is now consumed → the linked 'on_trip' vacancy expires.
@@ -1941,6 +1976,43 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (trip.status !== 'in_progress') return fail('CONFLICT', `Trip is "${trip.status}", not "in_progress"`, 409);
     const b = await readBody(req);
     const now = new Date().toISOString();
+    // End-odometer capture: optional today (existing clients may omit it); the new wizard sends
+    // both. Validate shape when supplied — non-negative integer + must exceed start_odo_reading
+    // (if a start reading exists). Toll defaults to 0; non-negative when supplied.
+    const endOdoUrl = typeof b.end_odo_url === 'string' && b.end_odo_url ? b.end_odo_url : null;
+    const endOdoReading = b.end_odo_reading == null || b.end_odo_reading === ''
+      ? null
+      : Number.isFinite(Number(b.end_odo_reading)) ? Math.trunc(Number(b.end_odo_reading)) : NaN;
+    if (Number.isNaN(endOdoReading) || (endOdoReading != null && endOdoReading < 0)) {
+      return fail('VALIDATION', 'end_odo_reading must be a non-negative integer', 422);
+    }
+    const tollRaw = b.toll_paid_by_driver;
+    const tollPaid = tollRaw == null || tollRaw === '' ? 0 : Number(tollRaw);
+    if (!Number.isFinite(tollPaid) || tollPaid < 0) return fail('VALIDATION', 'toll_paid_by_driver must be a non-negative number', 422);
+    // Pull the existing start_odo_reading so we can validate end > start.
+    const { data: execRow } = await db.from('trip_executions').select('start_odo_reading').eq('trip_id', tripId).maybeSingle();
+    const startOdo = execRow ? (execRow as { start_odo_reading: number | null }).start_odo_reading : null;
+    if (startOdo != null && endOdoReading != null && endOdoReading <= startOdo) {
+      return fail('VALIDATION', `end_odo_reading (${endOdoReading}) must be greater than start_odo_reading (${startOdo})`, 422);
+    }
+    // Upsert trip_executions FIRST so the compute_trip_final_payout trigger (migration 059)
+    // populates trips.final_* before the wallet trigger fires on the status flip below.
+    const driverNotes = typeof b.driver_notes === 'string' ? b.driver_notes : null;
+    const driverReviewNote = typeof b.driver_review_note === 'string' ? b.driver_review_note : null;
+    await db.from('trip_executions').upsert(
+      {
+        trip_id: tripId,
+        completed_at: now,
+        end_odo_url: endOdoUrl,
+        end_odo_reading: endOdoReading,
+        end_odo_at: endOdoUrl ? now : null,
+        toll_paid_by_driver: tollPaid,
+        driver_notes: driverNotes,
+        driver_review_note: driverReviewNote,
+        end_odo_finalized_at: now,
+      },
+      { onConflict: 'trip_id' },
+    );
     // Status update fires charge_platform_fee_on_complete (migration 044) which charges
     // BOTH the Driver-side and Agent-side platform fees atomically. If either wallet is
     // short, the trigger RAISES and the whole update is rolled back.
@@ -1955,10 +2027,6 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
       return fail('DB_ERROR', msg, 500);
     }
-    await db.from('trip_executions').upsert(
-      { trip_id: tripId, completed_at: now, end_odo_url: (b.end_odo_url as string | null) ?? null, end_odo_reading: (b.end_odo_reading as number | null) ?? null, end_odo_at: b.end_odo_url ? now : null, driver_notes: (b.driver_notes as string | null) ?? null },
-      { onConflict: 'trip_id' },
-    );
     if (trip.assigned_driver_id) {
       const { data: d } = await db.from('drivers').select('total_trips_completed').eq('id', trip.assigned_driver_id).maybeSingle();
       if (d) await db.from('drivers').update({ total_trips_completed: (Number(d.total_trips_completed) || 0) + 1 }).eq('id', trip.assigned_driver_id);

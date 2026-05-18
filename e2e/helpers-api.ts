@@ -348,26 +348,42 @@ export async function acceptTrip(
   return { passengerOtp: res.data.passenger_otp };
 }
 
-/** Driver starts an accepted trip by verifying the passenger OTP. */
+/** Driver starts an accepted trip by verifying the passenger OTP + odometer capture. */
 export async function startTrip(
   req: APIRequestContext,
   driverToken: string,
   tripId: string,
   passengerOtp: string,
+  opts: { startOdoUrl?: string; startOdoReading?: number } = {},
 ): Promise<void> {
-  const res = await call(req, 'POST', `/trips/${tripId}/start`, { token: driverToken, data: { passenger_otp: passengerOtp } });
+  const res = await call(req, 'POST', `/trips/${tripId}/start`, {
+    token: driverToken,
+    data: {
+      passenger_otp: passengerOtp,
+      start_odo_url: opts.startOdoUrl ?? 'test://odo/start',
+      start_odo_reading: opts.startOdoReading ?? 10000,
+    },
+  });
   if (res.status !== 200) throw new Error(`startTrip failed: ${res.status} ${JSON.stringify(res.error)}`);
 }
 
-/** Driver completes an in-progress trip. Triggers the dual-side platform fee charges. */
+/** Driver completes an in-progress trip — fires the wallet trigger + the final-payout recompute. */
 export async function completeTrip(
   req: APIRequestContext,
   driverToken: string,
   tripId: string,
-  opts: { driverNotes?: string } = {},
+  opts: { driverNotes?: string; endOdoUrl?: string; endOdoReading?: number; tollPaidByDriver?: number; driverReviewNote?: string } = {},
 ): Promise<{ status: number; error?: { code?: string; message?: string } | null }> {
-  const res = await call(req, 'POST', `/trips/${tripId}/complete`,
-    { token: driverToken, data: { driver_notes: opts.driverNotes ?? 'e2e' } });
+  const res = await call(req, 'POST', `/trips/${tripId}/complete`, {
+    token: driverToken,
+    data: {
+      driver_notes: opts.driverNotes ?? 'e2e',
+      end_odo_url: opts.endOdoUrl ?? 'test://odo/end',
+      end_odo_reading: opts.endOdoReading ?? 10100,
+      toll_paid_by_driver: opts.tollPaidByDriver ?? 0,
+      ...(opts.driverReviewNote ? { driver_review_note: opts.driverReviewNote } : {}),
+    },
+  });
   return { status: res.status, error: res.error };
 }
 

@@ -139,7 +139,7 @@ async function applyAssignAccept(agentToken, driverToken, tripId) {
 
   // ── Flow 1b: start → vacancy expires ───────────────────────────────────
   const otp = accept1.json?.data?.passenger_otp;
-  const start = await j('POST', `/trips/${trip1.id}/start`, { token: driverToken, body: { passenger_otp: otp } });
+  const start = await j('POST', `/trips/${trip1.id}/start`, { token: driverToken, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
   check('trip #1 starts → in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
   const myListAfterStart = await j('GET', `/vacancies?driver_id=${driverId}&status=active,on_trip,expired,cancelled`);
   const vacAfterStart = (myListAfterStart.json?.data || []).find((v) => v.id === vac1.id);

@@ -102,8 +102,8 @@ function execSql(sql) {
     const apply1 = await j('POST', `/trips/${tid1}/applicants`, { token: B.token, body: {} });
     await j('POST', `/trips/${tid1}/assign`, { token: A.token, body: { acceptance_id: apply1.json?.data?.id } });
     const acc1 = await j('POST', `/trips/${tid1}/accept`, { token: B.token });
-    await j('POST', `/trips/${tid1}/start`, { token: B.token, body: { passenger_otp: acc1.json?.data?.passenger_otp } });
-    const comp1 = await j('POST', `/trips/${tid1}/complete`, { token: B.token, body: {} });
+    await j('POST', `/trips/${tid1}/start`, { token: B.token, body: { passenger_otp: acc1.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
+    const comp1 = await j('POST', `/trips/${tid1}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
     check('Trip 1 completed', comp1.status === 200);
 
     const refRpre = (await j('GET', '/referrals/me', { token: R.token })).json?.data;
@@ -158,9 +158,9 @@ function execSql(sql) {
     const apply2 = await j('POST', `/trips/${tid2}/applicants`, { token: B.token, body: {} });
     await j('POST', `/trips/${tid2}/assign`, { token: R.token, body: { acceptance_id: apply2.json?.data?.id } });
     const acc2 = await j('POST', `/trips/${tid2}/accept`, { token: B.token });
-    await j('POST', `/trips/${tid2}/start`, { token: B.token, body: { passenger_otp: acc2.json?.data?.passenger_otp } });
+    await j('POST', `/trips/${tid2}/start`, { token: B.token, body: { passenger_otp: acc2.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 20000 } });
     // need to top up B again (used 50 in trip 1 → 450 left, plenty)
-    const comp2 = await j('POST', `/trips/${tid2}/complete`, { token: B.token, body: {} });
+    const comp2 = await j('POST', `/trips/${tid2}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 20100 } });
     check('Trip 2 completed (R is agent)', comp2.status === 200, `status=${comp2.status} body=${JSON.stringify(comp2.json)}`);
 
     const trip2View = (await j('GET', `/trips/${tid2}`, { token: R.token })).json?.data;
