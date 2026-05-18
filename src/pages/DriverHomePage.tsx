@@ -236,10 +236,12 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         {postedWithApplicants > 0 ? (
           <PriorityCard
-            // One trip → tap straight into the trip detail page (applicant review
-            // section is embedded with all the trip context). Two+ → /posted-trips
-            // filtered to has_applicants so the driver picks which one to act on.
-            to={postedWithApplicants === 1 ? `/trips/${postsWithApplicants[0].id}?from=/` : '/posted-trips?status=has_applicants&from=/'}
+            // One trip → tap straight into the applicants review page (matches the
+            // card's "Review applicants" CTA — the trip-detail screen only renders
+            // a small inline "Review N applicants →" link, easy to miss). Two+ →
+            // /posted-trips filtered to has_applicants so the driver picks which
+            // trip to review.
+            to={postedWithApplicants === 1 ? `/trips/${postsWithApplicants[0].id}/applicants?from=/` : '/posted-trips?status=has_applicants&from=/'}
             tone="amber"
             icon={<Sparkles className="size-3.5" aria-hidden />}
             label={`${postedWithApplicants > 1 ? 'Trips' : 'Trip'} you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`}
