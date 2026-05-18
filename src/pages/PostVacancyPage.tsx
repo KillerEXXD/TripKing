@@ -202,8 +202,8 @@ export function PostVacancyPage() {
         </div>
 
         <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block space-y-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+            <label className="block min-w-0 space-y-1">
               <span className="text-sm font-medium">Available from</span>
               <DateTimeField value={startLocal} onChange={setStartLocal} />
             </label>
