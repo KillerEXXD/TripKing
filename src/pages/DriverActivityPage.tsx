@@ -10,6 +10,7 @@ import { useMyDriver } from '@/hooks/useDrivers';
 import { useCancelVacancy, useMyActiveVacancies, useMyExpiredVacancies } from '@/hooks/useVacancies';
 import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
 import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
+import { CompletedTripCard } from '@/components/trip/CompletedTripCard';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { Badge, Button, Card, StatusBanner } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -361,7 +362,13 @@ export function DriverActivityPage() {
   const assigned = drivingQuery.data ?? [];
   const drivingTrips   = assigned.filter((t) => t.status === 'in_progress' || t.status === 'accepted');
   const selectedTrips  = assigned.filter((t) => t.status === 'selected');
-  const completedTrips = assigned.filter((t) => t.status === 'completed');
+  // Latest-completed first. `updatedAt` was bumped when the status flipped to 'completed' so
+  // it's a stable proxy for the actual completion timestamp until the transform surfaces
+  // `trip_executions.completed_at`. Ties go to `id` so renders stay deterministic.
+  const completedTrips = assigned
+    .filter((t) => t.status === 'completed')
+    .slice()
+    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '') || a.id.localeCompare(b.id));
   const cancelledTrips = assigned.filter((t) => t.status === 'cancelled');
 
   // "All" — union of every trip the driver has a role on, deduped by trip.id, bucketed by the
@@ -487,15 +494,19 @@ export function DriverActivityPage() {
           />
         )}
         {tab === 'completed' && (
-          <TripList
-            query={drivingQuery}
-            trips={completedTrips}
-            errorTitle="Couldn't load your trips"
-            emptyTitle="No completed trips yet"
-            emptyMessage="Your completed trips will show up here with the route, fare and your earnings."
-            onShare={setShareTrip}
-            linkFromPath="/my-trips?tab=completed"
-          />
+          drivingQuery.isPending ? (
+            <LoadingSkeleton rows={4} />
+          ) : drivingQuery.isError ? (
+            <ErrorState title="Couldn't load your trips" message="Check your connection and try again." onRetry={() => void drivingQuery.refetch()} />
+          ) : completedTrips.length === 0 ? (
+            <EmptyState title="No completed trips yet" message="Your completed trips will show up here with the route, distance driven and what you were paid." />
+          ) : (
+            <div className="space-y-3">
+              {completedTrips.map((t) => (
+                <CompletedTripCard key={t.id} trip={t} linkFromPath="/my-trips?tab=completed" />
+              ))}
+            </div>
+          )
         )}
         {tab === 'cancelled' && (
           <TripList

@@ -74,6 +74,14 @@ export interface Trip {
   driverInstructions?: string;
   /** server-computed (fare − commission − GST + bata) — never recomputed in the client. */
   driverPayout: number;
+  /** Final, post-completion settlement fields (populated by migration 059's
+   *  `compute_trip_final_payout` trigger on completed trips). All nullable on pre-completion
+   *  trips — render only when `status === 'completed'`. */
+  finalTotalFare?: number;
+  extraDistanceKm?: number;
+  extraKmFare?: number;
+  tollAmount?: number;
+  finalDriverPayout?: number;
   /** Empty string means passenger details have not been entered yet. */
   passengerName: string;
   passengerPhone: string;
@@ -119,6 +127,9 @@ export interface Trip {
   /** Only present on `GET /trips/:id` for a driver — the caller's most recent trip_acceptances status. */
   myApplicationStatus?: AcceptanceStatus;
   createdAt: string;
+  /** Bumped whenever the row mutates. Used as a fallback completion timestamp on the Completed
+   *  tab until the transform surfaces `trip_executions.completed_at`. */
+  updatedAt?: string;
   /** The passenger OTP — echoed only to the trip poster / admin (or returned by `POST /trips/:id/assign`). Used to build the passenger-portal link. */
   passengerOtp?: string;
   /** Straight-line km from the `?near_*` centre to the pickup point — present only on a radius-filtered list. */
