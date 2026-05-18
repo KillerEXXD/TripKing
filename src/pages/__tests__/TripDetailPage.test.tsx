@@ -223,6 +223,10 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/payout breakdown/i)).toBeInTheDocument();
     expect(screen.getByText(/driver payout/i)).toBeInTheDocument();
+    // Copy guard: the commission line must read "Commission (10%)" — user asked us
+    // not to say "Platform commission" since it reads like a third-party fee.
+    expect(screen.getByText(/^− Commission \(10%\)$/)).toBeInTheDocument();
+    expect(screen.queryByText(/platform commission/i)).toBeNull();
     // Passenger card is not shown to a browsing driver (PII not visible before assignment)
     expect(screen.queryByText('Passenger P · 2 pax')).toBeNull();
     expect(screen.getByRole('link', { name: /call agent a/i })).toBeInTheDocument();

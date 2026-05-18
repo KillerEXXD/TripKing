@@ -554,7 +554,7 @@ export function PostTripPage() {
                   <span className="text-secondary">Total fare ({distance > 0 ? distance : '—'} km × {formatINR(rate)}/km)</span>
                   <span className="font-bold">{totalFare > 0 ? formatINR(totalFare) : '—'}</span>
                 </div>
-                <p className="mt-1 text-xs text-secondary">Platform commission, GST and the driver payout are calculated by TripKing — you&apos;ll see the final payout on the trip.</p>
+                <p className="mt-1 text-xs text-secondary">Commission, GST and the driver payout are calculated by TripKing — you&apos;ll see the final payout on the trip.</p>
               </div>
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" {...register('extrasPaidByPassenger')} /> Packing / toll / permit extras paid by the passenger

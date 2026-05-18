@@ -860,7 +860,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
       <Card className="gap-2">
         <div className="font-semibold">Payout breakdown</div>
         <Line label={`Trip fare (${formatKm(trip.expectedDistanceKm)} × ${formatINR(trip.ratePerKm)}/km)`} value={formatINR(trip.totalFare)} />
-        <Line label={`− Platform commission (${trip.commissionPct}%)`} value={`− ${formatINR(commissionAmount)}`} muted />
+        <Line label={`− Commission (${trip.commissionPct}%)`} value={`− ${formatINR(commissionAmount)}`} muted />
         <Line label="− GST" value={`− ${formatINR(trip.gstAmount)}`} muted />
         <Line label="+ Driver bata" value={`+ ${formatINR(trip.driverBata)}`} />
         <Line label="Driver payout" value={formatINR(trip.driverPayout)} strong />
