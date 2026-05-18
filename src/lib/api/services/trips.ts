@@ -73,9 +73,18 @@ export function postTrip(input: PostTripInput): Promise<Trip> {
   return apiClient.post<Api>('/trips', toApiPostTrip(input)).then((r) => transformTrip(unwrap(r.data)));
 }
 
-/** Counts-only preview for the trip-post form's auto-invite section. Returns 0/0/5 if the city is unset. */
-export function getTripMatchPreview(fromCityId: string): Promise<TripMatchPreview> {
-  return apiClient.get<Api>('/trips/match-preview', { from_city_id: fromCityId }).then((r) => {
+/** Counts-only preview for the trip-post form's auto-invite section. Returns 0/0/5 if the city is unset.
+ *  `pickupAt` (+ optional `expectedEndAt`) is required for an accurate count — without it the server
+ *  counts every active vacancy in the city regardless of when the driver is actually available. */
+export function getTripMatchPreview(
+  fromCityId: string,
+  pickupAt?: string,
+  expectedEndAt?: string,
+): Promise<TripMatchPreview> {
+  const params: Record<string, string> = { from_city_id: fromCityId };
+  if (pickupAt) params.pickup_at = pickupAt;
+  if (expectedEndAt) params.expected_end_at = expectedEndAt;
+  return apiClient.get<Api>('/trips/match-preview', params).then((r) => {
     const d = (r.data ?? {}) as Api;
     return {
       totalMatches: typeof d.total_matches === 'number' ? d.total_matches : 0,

@@ -180,14 +180,25 @@ const useInvalidateVacanciesFromTrips = createInvalidator('vacancies', 'vacancy'
 
 /**
  * Counts-only auto-invite preview — drives the trip-post form's "N drivers available"
- * helper text and gates the Post button. Re-fires whenever the pickup city changes.
- * Short stale time so a driver coming online in the next minute is reflected.
+ * helper text and gates the Post button. Re-fires whenever the pickup city OR the
+ * pickup time changes. Short stale time so a driver coming online in the next minute
+ * is reflected.
+ *
+ * `pickupAt` is required for an accurate count — vacancies have a [from, until] window
+ * and a trip scheduled outside every active driver's window has zero matches even if
+ * the city looks busy. Don't drop the param "to keep the count high while the user
+ * is still picking a date" — the previous behaviour invited drivers to year-2060 trips.
  */
-export function useTripMatchPreview(fromCityId: string | undefined, enabled = true) {
+export function useTripMatchPreview(
+  fromCityId: string | undefined,
+  pickupAt: string | undefined,
+  expectedEndAt: string | undefined,
+  enabled = true,
+) {
   return useQuery({
-    queryKey: ['trips', 'match-preview', fromCityId ?? null],
-    queryFn: () => getTripMatchPreview(fromCityId as string),
-    enabled: enabled && !!fromCityId,
+    queryKey: ['trips', 'match-preview', fromCityId ?? null, pickupAt ?? null, expectedEndAt ?? null],
+    queryFn: () => getTripMatchPreview(fromCityId as string, pickupAt, expectedEndAt),
+    enabled: enabled && !!fromCityId && !!pickupAt,
     staleTime: 30_000,
     retry: 0,
   });

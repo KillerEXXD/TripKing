@@ -29,10 +29,15 @@ interface Parts {
 
 function parseValue(v: string): Parts {
   if (!v) {
+    // Pre-select today as the draft date so the calendar opens with the current day
+    // highlighted (selected fill, not just the today tint). The user can pick another
+    // day if they want — this just removes a tap when "today" is what they meant anyway.
+    // Commit is still gated on OK so we never silently write the value back to the form.
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const h = now.getHours();
     return {
-      date: undefined,
+      date: today,
       hour12: ((h + 11) % 12) + 1,
       minute: 0,
       meridiem: h >= 12 ? 'PM' : 'AM',

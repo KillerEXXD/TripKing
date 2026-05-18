@@ -142,10 +142,17 @@ export function PostTripPage() {
   }, [carTypesQuery.data, getValues, setValue]);
 
   const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch, autoInviteWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata', 'autoInviteMatches']);
-  // Auto-invite preview — re-runs whenever the pickup city changes. Only meaningful in step 2,
-  // but enabling it as soon as fromCityId is set means the result is usually warm by the time
-  // the agent gets to step 2. The Post button is gated on this query having settled (see submitting).
-  const matchPreview = useTripMatchPreview(fromCityId || undefined, !!fromCityId);
+  // Auto-invite preview — re-runs whenever the pickup city OR the planned interval
+  // changes. The server filters vacancies by [available_from, available_until] against
+  // the trip's [pickupAt, expectedEndAt]; without these the count would be meaningless
+  // (year-2060 trip would have falsely shown "1 driver available"). The Post button is
+  // gated on this query having settled (see submitting).
+  const matchPreview = useTripMatchPreview(
+    fromCityId || undefined,
+    pickupAtWatch || undefined,
+    expectedEndAt || undefined,
+    !!fromCityId && !!pickupAtWatch,
+  );
   const previewSettled = !matchPreview.isFetching && (matchPreview.isSuccess || matchPreview.isError);
   const distance = Number(distanceWatch) || 0;
   const rate = Number(rateWatch) || 0;
