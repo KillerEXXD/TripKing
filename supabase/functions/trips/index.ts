@@ -1231,9 +1231,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     let posterReveal = false;
     const posterUserId = raw.posted_by_user_id as string | undefined;
     let myInvitation: { id: string; status: string } | null = null;
+    let myApplication: { id: string; status: string } | null = null;
     if (myDriverId) {
-      const { data: inv } = await db.from('trip_invitations').select('id, status').eq('trip_id', raw.id as string).eq('driver_id', myDriverId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      const [{ data: inv }, { data: acc }] = await Promise.all([
+        db.from('trip_invitations').select('id, status').eq('trip_id', raw.id as string).eq('driver_id', myDriverId).order('created_at', { ascending: false }).limit(1).maybeSingle(),
+        // Most-recent trip_acceptances row for this (trip, driver). When present, the UI
+        // should render "Applied" (or whatever the row's status is) instead of the Apply
+        // button — POST /trips/:id/applicants returns 409 anyway, but surfacing the state
+        // up-front saves the tap + the confused error message.
+        db.from('trip_acceptances').select('id, status').eq('trip_id', raw.id as string).eq('driver_id', myDriverId).order('applied_at', { ascending: false }).limit(1).maybeSingle(),
+      ]);
       if (inv) myInvitation = { id: inv.id as string, status: inv.status as string };
+      if (acc) myApplication = { id: acc.id as string, status: acc.status as string };
     }
     if (rel === 'browse') {
       if (posterUserId) {
@@ -1255,6 +1264,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (myInvitation) {
       (redacted as Record<string, unknown>).invitation_id = myInvitation.id;
       (redacted as Record<string, unknown>).invitation_status = myInvitation.status;
+    }
+    if (myApplication) {
+      (redacted as Record<string, unknown>).my_application_id = myApplication.id;
+      (redacted as Record<string, unknown>).my_application_status = myApplication.status;
     }
     // After-assignment counterparty verification: poster/admin gets the driver's checklist;
     // the assigned driver gets the poster's. We only attach on GET /trips/:id (detail) — the

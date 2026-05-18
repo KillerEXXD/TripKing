@@ -281,6 +281,36 @@ describe('TripDetailPage', () => {
     await waitFor(() => expect(storeState.markWithdrawn).toHaveBeenCalledWith('t1'));
   });
 
+  // Regression: user reported that re-applying after a fresh login surfaced a generic
+  // "Couldn't apply" toast and the Apply button was still showing — because the local
+  // store had no memory of the prior application. GET /trips/:id now stamps
+  // `my_application_id` + `my_application_status`; the page treats that as authoritative
+  // and renders the same Applied UX as the local-store branch.
+  it('treats trip.myApplicationStatus=applied as Applied even when local store is empty', () => {
+    setStore({}); // empty local store — simulates re-login / new device
+    setTrip({ data: makeTrip({ status: 'has_applicants', applicantCount: 1, myApplicationId: 'srv-app-1', myApplicationStatus: 'applied' }) });
+    renderDetail();
+    expect(screen.getByText(/you've applied/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /apply for this trip/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /withdraw application/i })).toBeInTheDocument();
+  });
+
+  it('the Withdraw button on a server-restored Applied state uses trip.myApplicationId', async () => {
+    setStore({});
+    setTrip({ data: makeTrip({ status: 'has_applicants', applicantCount: 1, myApplicationId: 'srv-app-2', myApplicationStatus: 'applied' }) });
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /withdraw application/i }));
+    await waitFor(() => expect(withdrawMutateAsync).toHaveBeenCalledWith({ tripId: 't1', acceptanceId: 'srv-app-2' }));
+  });
+
+  it('surfaces the API\'s actual error message when apply fails (e.g. 409 already applied)', async () => {
+    setTrip({ data: makeTrip() });
+    applyMutateAsync.mockRejectedValueOnce(new ApiError('You already applied to this trip', 409));
+    renderDetail();
+    fireEvent.click(screen.getByRole('button', { name: /apply for this trip/i }));
+    await waitFor(() => expect(vi.mocked(toast.error)).toHaveBeenCalledWith('You already applied to this trip'));
+  });
+
   it('nudges the driver to add a vehicle when they have none', () => {
     setTrip({ data: makeTrip() });
     setVehicles({ data: [] });

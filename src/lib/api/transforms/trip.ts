@@ -153,6 +153,10 @@ export function transformTrip(api: Api): Trip {
     invitationStatus: typeof api.invitation_status === 'string'
       ? (api.invitation_status as Trip['invitationStatus'])
       : undefined,
+    myApplicationId: str(api.my_application_id),
+    myApplicationStatus: typeof api.my_application_status === 'string'
+      ? (api.my_application_status as Trip['myApplicationStatus'])
+      : undefined,
     createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
     passengerOtp: str(api.passenger_otp),
     distanceKm: numOpt(api.distance_km),
