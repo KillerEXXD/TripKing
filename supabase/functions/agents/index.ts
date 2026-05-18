@@ -22,7 +22,8 @@ import { corsPreflight, ok, fail } from '../_shared/cors.ts';
 import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
-import { cacheDelete } from '../_shared/cache.ts';
+import { cacheDelete, cacheDeletePattern, CacheTTL } from '../_shared/cache.ts';
+import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { revealCache, redactAgent, logPiiReveal } from '../_shared/pii.ts';
 import { authUser as authUserShared, isAdmin } from '../_shared/auth.ts';
@@ -41,6 +42,10 @@ const authUser = (db: Db, req: Request) => authUserShared(db, req, { defaultRole
 const CACHE_EPOCH = 'v4';
 function invalidateAgentMe(userId: string): void {
   cacheDelete(`agents:me:user-${userId}:${CACHE_EPOCH}`);
+}
+async function invalidateAgentDetail(agentId: string): Promise<void> {
+  cacheDeletePattern(`agents:detail:${agentId}:*`);
+  await sharedCacheInvalidateEntity('agent', agentId);
 }
 
 type Db = ReturnType<typeof serviceClient>;
@@ -167,10 +172,26 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
   const id = segs[0];
   const sub = segs[1]; // 'kyc' | 'kyc-docs' | 'kyc-doc-upload-url'
 
+  // Cache the heavy AGENT_SELECT join (users + business_city). The row is identical across
+  // viewers — per-viewer redaction lives in respondAgent AFTER the cache lookup, so this entry
+  // is safe to share across callers.
   async function fetchAgent(agentId: string): Promise<Row | null> {
-    const { data, error } = await db.from('trip_managers').select(AGENT_SELECT).eq('id', agentId).maybeSingle();
-    if (error) throw new Error(error.message);
-    return (data as Row) ?? null;
+    const { data } = await withCache<Row | null>(
+      {
+        key: `agents:detail:${agentId}:${CACHE_EPOCH}`,
+        ttl: CacheTTL.SHORT,
+        tier: 'shared',
+        cacheType: 'profile',
+        entityKind: 'agent',
+        entityId: agentId,
+      },
+      async () => {
+        const { data, error } = await db.from('trip_managers').select(AGENT_SELECT).eq('id', agentId).maybeSingle();
+        if (error) throw new Error(error.message);
+        return (data as Row) ?? null;
+      },
+    );
+    return data;
   }
   async function respondAgent(agentId: string, privileged: boolean, viewer: { id: string; role: string } | null = null): Promise<Response> {
     let data: Row | null;
@@ -382,6 +403,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     if (error) return pgFail(error);
     await maybePromoteToReadyForApproval(db, 'manager', id);
     invalidateAgentMe(ownerId);
+    await invalidateAgentDetail(id);
     return respondAgent(id, true);
   }
 
@@ -409,6 +431,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
       payload_json: { kyc_status: next, kind: 'agent', ...(reason ? { note: reason } : {}) },
     });
     invalidateAgentMe(ownerId);
+    await invalidateAgentDetail(id);
     return respondAgent(id, true);
   }
 
@@ -446,6 +469,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
       payload_json: { is_active: b.is_active, kind: 'agent', ...(reason ? { reason } : {}) },
     });
     invalidateAgentMe(ownerId);
+    await invalidateAgentDetail(id);
     return respondAgent(id, true);
   }
 
@@ -460,6 +484,7 @@ const handler = withTiming('agents', async (req: Request): Promise<Response> => 
     const { error } = await db.from('trip_managers').update(patch).eq('id', id);
     if (error) return pgFail(error);
     invalidateAgentMe(ownerId);
+    await invalidateAgentDetail(id);
     return respondAgent(id, true);
   }
 

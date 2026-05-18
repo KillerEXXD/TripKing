@@ -56,7 +56,10 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
     const target = url.searchParams.get('user_id') ?? u.id;
     if (target !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'You can only view your own analytics', 403);
     const { data, hit } = await withCache<unknown>(
-      { key: `analytics:agent:user-${target}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      // Promoted memory → shared (2026-05-19): per-isolate memory hit-rate was 0% across
+      // 440 calls/24h — Deno Deploy churns isolates fast enough that the warmed copy is
+      // almost never reused for the same user. Shared tier survives across isolates.
+      { key: `analytics:agent:user-${target}:${CACHE_EPOCH}`, ttl: 60, tier: 'shared', cacheType: 'analytics', entityKind: 'analytics', entityId: `agent:${target}` },
       async () => {
         const { data, error } = await db.rpc('get_agent_analytics', { p_user_id: target });
         if (error) throw new Error(error.message);
@@ -71,7 +74,8 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
     const target = url.searchParams.get('user_id') ?? u.id;
     if (target !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'You can only view your own analytics', 403);
     const { data, hit } = await withCache<unknown>(
-      { key: `analytics:driver:user-${target}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      // Promoted memory → shared — same reasoning as /analytics/agent above.
+      { key: `analytics:driver:user-${target}:${CACHE_EPOCH}`, ttl: 60, tier: 'shared', cacheType: 'analytics', entityKind: 'analytics', entityId: `driver:${target}` },
       async () => {
         const { data, error } = await db.rpc('get_driver_analytics', { p_user_id: target });
         if (error) throw new Error(error.message);
@@ -87,7 +91,8 @@ const handler = withTiming('analytics', async (req: Request): Promise<Response> 
     const raw = parseInt(url.searchParams.get('hours') ?? '24', 10);
     const hours = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 720) : 24;
     const { data, hit } = await withCache<unknown>(
-      { key: `analytics:api-metrics:hours-${hours}:${CACHE_EPOCH}`, ttl: 60, tier: 'memory' },
+      // Promoted memory → shared (2026-05-19): see /analytics/agent rationale.
+      { key: `analytics:api-metrics:hours-${hours}:${CACHE_EPOCH}`, ttl: 60, tier: 'shared', cacheType: 'analytics', entityKind: 'analytics', entityId: `api-metrics:${hours}h` },
       async () => {
         const { data, error } = await db.rpc('get_api_metrics_summary', { p_hours: hours });
         if (error) throw new Error(error.message);
