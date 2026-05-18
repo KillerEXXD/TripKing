@@ -32,6 +32,19 @@ export function useMyActiveVacancies(driverId: string | undefined) {
   });
 }
 
+/** The driver's recently-expired vacancies (last 7 days). Shown in /my-trips?tab=available
+ *  with a red "Expired" badge so the driver knows to delete or repost. Kept separate from
+ *  `useMyActiveVacancies` so the X/2 quota counter on `IAmAvailableCard` isn't inflated. */
+export function useMyExpiredVacancies(driverId: string | undefined) {
+  const params: VacanciesQueryParams = { driverId, status: ['expired'] };
+  return useQuery({
+    queryKey: ['vacancies', driverId, 'expired'],
+    queryFn: () => getVacancies(params),
+    enabled: !!driverId,
+    staleTime: STALE.live,
+  });
+}
+
 const useInvalidateVacancies = createInvalidator('vacancies', 'vacancy');
 export function usePostVacancy() {
   const invalidate = useInvalidateVacancies();

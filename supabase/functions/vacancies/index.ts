@@ -219,9 +219,15 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         } else if (!driverId) {
           q = q.in('status', ['active', 'matched']);
           // Also hide rows whose window has already closed — the expire-stale cron
-          // (migration 048) runs every 5 min, this filter covers the gap. Driver's
-          // own list (?driver_id=…) still sees stale rows so they can clean up.
-          q = q.or(`available_until.is.null,available_until.gt.${new Date().toISOString()}`);
+          // (migration 048 + 057's NULL-until grace) runs every 5 min, this filter
+          // covers the gap. Two clauses:
+          //   • available_until > now()   — explicit future window
+          //   • available_until IS NULL AND available_from > now() - 24h  — open-ended
+          //     vacancies are treated as 24h-from-available_from (migration 057's rule).
+          // Driver's own list (?driver_id=…) still sees stale rows so they can clean up.
+          const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const nowIso = new Date().toISOString();
+          q = q.or(`available_until.gt.${nowIso},and(available_until.is.null,available_from.gt.${cutoff})`);
         }
         if (driverId) q = q.eq('driver_id', driverId);
         // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere

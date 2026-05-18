@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
-import { useCancelVacancy, useMyActiveVacancies } from '@/hooks/useVacancies';
+import { useCancelVacancy, useMyActiveVacancies, useMyExpiredVacancies } from '@/hooks/useVacancies';
 import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
 import { PostedTripCard, STATUS_META } from '@/pages/PostedTripsPage';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
@@ -325,6 +325,7 @@ export function DriverActivityPage() {
   const myDriverQuery = useMyDriver();
   const myDriverId = myDriverQuery.data?.id ?? '';
   const availableQuery = useMyActiveVacancies(myDriverId);
+  const expiredVacanciesQuery = useMyExpiredVacancies(myDriverId);
 
   // Sub-buckets carved out of `drivingQuery` (which returns every assigned trip regardless of status).
   // Driving = accepted + in_progress per product-owner decision: both are "trips I'm driving" — pre-start
@@ -495,7 +496,7 @@ export function DriverActivityPage() {
           />
         )}
         {tab === 'applied' && <AppliedList query={appliedQuery} />}
-        {tab === 'available' && <AvailableList query={availableQuery} />}
+        {tab === 'available' && <AvailableList query={availableQuery} expiredQuery={expiredVacanciesQuery} />}
       </div>
 
       {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}
@@ -623,26 +624,34 @@ function VacancyRow({ vacancy }: { vacancy: Vacancy }) {
   const cancel = useCancelVacancy();
   const where = vacancy.currentPlace?.name ?? vacancy.currentCity.name;
   const destinations = vacancy.destinationCities.map((c) => c.name).join(', ');
+  const expired = vacancy.status === 'expired';
 
   function onRemove() {
-    if (!window.confirm(`Remove your availability from ${where}?`)) return;
+    const prompt = expired
+      ? `Remove this expired availability from ${where}?`
+      : `Remove your availability from ${where}?`;
+    if (!window.confirm(prompt)) return;
     cancel.mutate(vacancy.id, {
-      onSuccess: () => toast.success('Removed — agents won’t see this any more.'),
+      onSuccess: () => toast.success(expired ? 'Removed.' : 'Removed — agents won’t see this any more.'),
       onError: () => toast.error('Couldn’t remove that — please try again.'),
     });
   }
 
   return (
-    <Card className="gap-1.5">
+    <Card className={cn('gap-1.5', expired && 'border-red-200 bg-red-50/40')}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 truncate font-bold">
+          <div className={cn('flex items-center gap-1.5 truncate font-bold', expired && 'text-red-900')}>
             <MapPin className="size-4 text-secondary" aria-hidden /> {where}
           </div>
-          <div className="mt-0.5 text-xs text-secondary">{vacancyWindow(vacancy)}</div>
+          <div className={cn('mt-0.5 text-xs', expired ? 'text-red-800/80' : 'text-secondary')}>{vacancyWindow(vacancy)}</div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
+          {expired ? (
+            <Badge variant="destructive">Expired</Badge>
+          ) : vacancy.minRatePerKm ? (
+            <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge>
+          ) : null}
           <button
             type="button"
             onClick={onRemove}
@@ -655,20 +664,32 @@ function VacancyRow({ vacancy }: { vacancy: Vacancy }) {
         </div>
       </div>
       {destinations ? (
-        <div className="text-xs text-secondary">
-          <span className="font-medium text-foreground">Will drive to:</span> {destinations}
+        <div className={cn('text-xs', expired ? 'text-red-800/80' : 'text-secondary')}>
+          <span className={cn('font-medium', expired ? 'text-red-900' : 'text-foreground')}>Will drive to:</span> {destinations}
         </div>
       ) : null}
-      {vacancy.notes ? <p className="text-xs text-secondary">{vacancy.notes}</p> : null}
+      {vacancy.notes ? <p className={cn('text-xs', expired ? 'text-red-800/80' : 'text-secondary')}>{vacancy.notes}</p> : null}
+      {expired ? (
+        <p className="text-xs font-semibold text-red-800">
+          This vacancy expired — agents can’t see it any more. Remove it (and post a fresh one) when you’re ready.
+        </p>
+      ) : null}
     </Card>
   );
 }
 
-function AvailableList({ query }: { query: ReturnType<typeof useMyActiveVacancies> }) {
+function AvailableList({
+  query,
+  expiredQuery,
+}: {
+  query: ReturnType<typeof useMyActiveVacancies>;
+  expiredQuery: ReturnType<typeof useMyExpiredVacancies>;
+}) {
   if (query.isPending) return <LoadingSkeleton rows={3} />;
   if (query.isError) return <ErrorState title="Couldn't load your availability" message="Check your connection and try again." onRetry={() => void query.refetch()} />;
   const vacancies = query.data ?? [];
-  if (vacancies.length === 0) {
+  const expired = expiredQuery.data ?? [];
+  if (vacancies.length === 0 && expired.length === 0) {
     return (
       <EmptyState
         title="You're not listed anywhere yet"
@@ -686,6 +707,16 @@ function AvailableList({ query }: { query: ReturnType<typeof useMyActiveVacancie
       {vacancies.map((v) => (
         <VacancyRow key={v.id} vacancy={v} />
       ))}
+      {expired.length > 0 ? (
+        <>
+          <div className="pt-2 text-xs font-semibold uppercase tracking-wide text-red-700">
+            Expired — please remove or repost
+          </div>
+          {expired.map((v) => (
+            <VacancyRow key={v.id} vacancy={v} />
+          ))}
+        </>
+      ) : null}
     </div>
   );
 }
