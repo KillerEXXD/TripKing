@@ -25,9 +25,12 @@ describe('AdminDesignsPage', () => {
     for (const name of ['Operator Console', 'Field Companion', 'Pipeline Board', 'Editorial', 'Bharat-Native', 'Simple Mode']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
     }
+    // Pull the Open-link set ONCE, then check membership locally. Re-querying inside a loop
+    // re-walks the whole DOM each iteration, which combined with v8 coverage instrumentation
+    // on Windows can push this past the per-test timeout.
+    const openHrefs = new Set(screen.getAllByRole('link', { name: /open/i }).map((a) => a.getAttribute('href')));
     for (const path of ['/v2', '/v3', '/v4', '/v5', '/v6', '/v7']) {
-      const opens = screen.getAllByRole('link', { name: /open/i });
-      expect(opens.some((a) => a.getAttribute('href') === `${path}?nav=design`)).toBe(true);
+      expect(openHrefs.has(`${path}?nav=design`)).toBe(true);
     }
   });
 
