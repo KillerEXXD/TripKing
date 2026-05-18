@@ -65,6 +65,7 @@ function renderHome() {
         <Route path="/" element={<DriverHomePage />} />
         <Route path="/onboarding" element={<div>onboarding page</div>} />
         <Route path="/trips" element={<div>trips feed</div>} />
+        <Route path="/trips/:id/complete" element={<div data-testid="complete-trip-route">wizard</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -124,10 +125,7 @@ describe('DriverHomePage', () => {
     expect(screen.getByRole('link', { name: 'Your profile' })).toHaveAttribute('href', '/profile');
   });
 
-  it('Driving-now card: rich details + End trip + Continue when a trip is in progress', async () => {
-    const completeMutateAsync = vi.fn().mockResolvedValue(undefined);
-    const useTripsMod = await import('@/hooks/useTrips');
-    vi.mocked(useTripsMod.useCompleteTrip).mockReturnValue({ isPending: false, mutateAsync: completeMutateAsync } as never);
+  it('Driving-now card: rich details + End trip routes into the wizard + Continue when a trip is in progress', async () => {
     const inProg = makeTrip({ id: 'in-progress-1', status: 'in_progress', passengerCount: 3 });
     // useTrips is called for nearby, my-posts, AND my-driving — the my-driving call returns this trip.
     let call = 0;
@@ -141,15 +139,13 @@ describe('DriverHomePage', () => {
     expect(screen.getByText('Vellore → Chennai')).toBeInTheDocument();
     expect(screen.getByText(/140 km/i)).toBeInTheDocument();
     expect(screen.getByText(/3 pax/i)).toBeInTheDocument();
-    // Both action buttons are present.
     const endBtn = screen.getByRole('button', { name: /end trip/i });
     expect(endBtn).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /^continue$/i })).toHaveAttribute('href', '/trips/in-progress-1');
-    // End trip wires through to useCompleteTrip with the trip id (confirm via window.confirm stub).
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    // Home "End trip" now sends the driver into the routed completion wizard — same path
+    // as TripDetailPage's "Complete the trip" CTA. No native window.confirm any more.
     fireEvent.click(endBtn);
-    expect(completeMutateAsync).toHaveBeenCalledWith({ tripId: 'in-progress-1' });
-    confirmSpy.mockRestore();
+    expect(screen.getByTestId('complete-trip-route')).toBeInTheDocument();
   });
 
   it('shows the Invitation-waiting card on Home when the driver has a pending received invitation', () => {

@@ -128,6 +128,14 @@ export function transformTrip(api: Api): Trip {
     extrasPaidByPassenger: bool(api.extras_paid_by_passenger, true),
     driverInstructions: str(api.driver_instructions),
     driverPayout: reqNum(api.driver_payout, 'MISSING_PAYOUT', ctx),
+    // Optional final-settlement fields populated by migration 059 once the trip completes.
+    // Pre-completion trips return null; passenger-bill items are nulled when
+    // show_fare_to_passenger=false (server-side, in by-otp redactor).
+    finalTotalFare: numOpt(api.final_total_fare),
+    extraDistanceKm: numOpt(api.extra_distance_km),
+    extraKmFare: numOpt(api.extra_km_fare),
+    tollAmount: numOpt(api.toll_amount),
+    finalDriverPayout: numOpt(api.final_driver_payout),
     passengerName: str(api.passenger_name) ?? '',
     passengerPhone: str(api.passenger_phone) ?? '',
     passengerCount: num(api.passenger_count, 1),
@@ -158,6 +166,7 @@ export function transformTrip(api: Api): Trip {
       ? (api.my_application_status as Trip['myApplicationStatus'])
       : undefined,
     createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
+    updatedAt: str(api.updated_at),
     passengerOtp: str(api.passenger_otp),
     distanceKm: numOpt(api.distance_km),
     // Phase 1 of the two-step handshake (migration 030). Default 15 so trips

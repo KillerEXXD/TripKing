@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, CheckCircle2, Clock, Navigation, Sparkles, Star, Users } from 'lucide-react';
 import { PriorityCard } from '@/components/ui';
-import { toast } from 'sonner';
 import { NearCityPicker } from '@/components/location/NearCityPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyDriver } from '@/hooks/useDrivers';
-import { useCompleteTrip, useMyApplications, useTrips } from '@/hooks/useTrips';
+import { useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
@@ -71,18 +70,12 @@ function ReputationCard({ driver }: { driver: Driver }) {
  */
 function CurrentTripCard({ trip }: { trip: Trip }) {
   const navigate = useNavigate();
-  const completeMutation = useCompleteTrip();
-  const tripId = trip.id;
-  async function onEnd(e: React.MouseEvent) {
+  function onEnd(e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
-    if (!window.confirm('End this trip now? Your payout will be queued.')) return;
-    try {
-      await completeMutation.mutateAsync({ tripId });
-      toast.success('Trip completed — your payout is queued.');
-    } catch {
-      toast.error("Couldn't complete the trip — please try again.");
-    }
+    // Enter the 2-step completion wizard — the wizard itself is the confirmation;
+    // no native window.confirm any more, and only one completion code path.
+    navigate(`/trips/${trip.id}/complete`);
   }
   return (
     <PriorityCard
@@ -95,8 +88,8 @@ function CurrentTripCard({ trip }: { trip: Trip }) {
       subtitle={`${Math.round(trip.expectedDistanceKm)} km · ${formatINR(trip.driverPayout)} payout`}
       rightAction={
         <div className="flex flex-col gap-1.5">
-          <Button size="sm" variant="outline" className="bg-white" onClick={onEnd} disabled={completeMutation.isPending}>
-            {completeMutation.isPending ? 'Ending…' : 'End trip'}
+          <Button size="sm" variant="outline" className="bg-white" onClick={onEnd}>
+            End trip
           </Button>
           <Button asChild size="sm" className="bg-emerald-700 text-white hover:bg-emerald-800">
             <Link to={`/trips/${trip.id}`} onClick={(e) => e.stopPropagation()}>Continue</Link>
