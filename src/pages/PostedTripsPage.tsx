@@ -231,7 +231,7 @@ export function PostedTripsPage() {
         if (pa !== pb) return pa - pb;
         return a.pickupAt.localeCompare(b.pickupAt);
       })
-    : trips.filter((t) => bucketFor(t) === filter);
+    : trips.filter((t) => bucketFor(t) === filter).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const countFor = (f: Filter) => (f === 'all' ? trips.length : trips.filter((t) => bucketFor(t) === f).length);
 
   // Subtitle changes shape per mode.
