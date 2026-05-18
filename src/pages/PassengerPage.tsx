@@ -168,6 +168,35 @@ function TripView({ trip, otp }: { trip: Trip; otp: string }) {
         )}
       </Card>
 
+      {trip.status === 'completed' && trip.showFareToPassenger && trip.finalTotalFare != null ? (
+        <Card className="gap-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-secondary">
+            <Wallet className="size-3.5" aria-hidden /> Your trip cost
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-secondary">Base fare</span>
+            <span className="font-semibold">{formatINR(trip.totalFare)}</span>
+          </div>
+          {trip.extraDistanceKm != null && trip.extraDistanceKm > 0 ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-secondary">Extra distance ({formatKm(trip.extraDistanceKm)} @ {formatINR(trip.ratePerKm)}/km)</span>
+              <span className="font-semibold text-amber-700">+ {formatINR(trip.extraKmFare ?? 0)}</span>
+            </div>
+          ) : null}
+          {trip.tollAmount != null && trip.tollAmount > 0 ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-secondary">Toll</span>
+              <span className="font-semibold text-sky-700">+ {formatINR(trip.tollAmount)}</span>
+            </div>
+          ) : null}
+          <div className="mt-1 flex items-center justify-between border-t pt-2">
+            <span className="font-bold">Total paid</span>
+            <span className="text-2xl font-bold text-emerald-700">{formatINR(trip.finalTotalFare)}</span>
+          </div>
+          <p className="text-[11px] italic text-secondary">This is the final cost after the trip wrapped up.</p>
+        </Card>
+      ) : null}
+
       {trip.status === 'completed' ? (
         <PassengerReviewCard
           trip={trip}

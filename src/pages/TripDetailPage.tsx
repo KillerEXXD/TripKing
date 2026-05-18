@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyApplicationsStore, timeAgo, type MyApplication } from '@/stores/myApplicationsStore';
 import { TripReviewSection } from '@/components/reviews/TripReviewSection';
+import { FinalCostBreakdown } from '@/components/trip/FinalCostBreakdown';
 import { TripTracking } from '@/components/trip/TripTracking';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { EditTripDialog } from '@/components/trip/EditTripDialog';
@@ -1051,6 +1052,10 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
       ) : null}
 
       {canCancel ? <CancelTripCard trip={trip} /> : null}
+
+      {trip.status === 'completed' ? (
+        <FinalCostBreakdown trip={trip} audience={viewer.isAdmin ? 'admin' : viewer.isAssignedDriver ? 'driver' : 'agent'} />
+      ) : null}
 
       {trip.status === 'completed' ? <TripReviewSection trip={trip} /> : null}
 
