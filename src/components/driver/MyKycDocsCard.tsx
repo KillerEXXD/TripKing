@@ -52,13 +52,18 @@ export function MyKycDocsCard({ kind, id }: { kind: 'driver' | 'agent'; id: stri
         {docs.aadhaarBackUrl ? (
           <DocRow url={docs.aadhaarBackUrl} label="Aadhaar — back" />
         ) : null}
-        {docs.driverLicenseUrl ? (
-          <DocRow
-            url={docs.driverLicenseUrl}
-            label="Driver License"
-            note={[docs.driverLicenseNumber, docs.driverLicenseExpiry ? `expires ${docs.driverLicenseExpiry}` : null].filter(Boolean).join(' · ')}
-          />
-        ) : null}
+        {docs.driverLicenseUrl ? (() => {
+          const today = new Date().toISOString().slice(0, 10);
+          const dlExpired = !!docs.driverLicenseExpiry && docs.driverLicenseExpiry < today;
+          return (
+            <DocRow
+              url={docs.driverLicenseUrl}
+              label="Driver License"
+              note={[docs.driverLicenseNumber, docs.driverLicenseExpiry ? `expires ${docs.driverLicenseExpiry}${dlExpired ? ' · EXPIRED — please update' : ''}` : null].filter(Boolean).join(' · ')}
+              noteTone={dlExpired ? 'danger' : undefined}
+            />
+          );
+        })() : null}
         {docs.selfieUrl ? (
           <DocRow url={docs.selfieUrl} label="Selfie" icon="shield" />
         ) : null}
@@ -70,7 +75,7 @@ export function MyKycDocsCard({ kind, id }: { kind: 'driver' | 'agent'; id: stri
   );
 }
 
-function DocRow({ url, label, note, icon = 'doc' }: { url: string; label: string; note?: string | null; icon?: 'doc' | 'shield' }) {
+function DocRow({ url, label, note, icon = 'doc', noteTone }: { url: string; label: string; note?: string | null; icon?: 'doc' | 'shield'; noteTone?: 'danger' }) {
   const Icon = icon === 'shield' ? ShieldCheck : FileText;
   return (
     <li>
@@ -83,7 +88,7 @@ function DocRow({ url, label, note, icon = 'doc' }: { url: string; label: string
         <Icon className="size-4 shrink-0 text-secondary" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="block font-medium">{label}</span>
-          {note ? <span className="block text-[11px] text-secondary">{note}</span> : null}
+          {note ? <span className={`block text-[11px] ${noteTone === 'danger' ? 'font-semibold text-red-700' : 'text-secondary'}`}>{note}</span> : null}
         </span>
         <ExternalLink className="size-3.5 shrink-0 text-secondary" aria-hidden />
       </a>

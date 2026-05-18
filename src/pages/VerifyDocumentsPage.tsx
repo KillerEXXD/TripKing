@@ -17,6 +17,14 @@ import { FileUpload } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import type { AgentKycDocType, DriverKycDocType } from '@/types';
 
+/** Today's date as `YYYY-MM-DD` in the browser TZ — used as `min` on the DL expiry input
+ *  so a typo can't land the year at 1930 (the apply-to-trip eligibility check would then
+ *  block the driver forever with a confusing "expired" error). */
+function todayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function PageWrap({ children }: { children: React.ReactNode }) {
   return (
     <PageShell>
@@ -63,6 +71,13 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
   const ready = !!paths.aadhaar_front && !!paths.aadhaar_back && !!paths.driver_license && !!paths.selfie && last4ok && dlNumber.trim().length > 0 && consent && !submit.isPending;
 
   async function onSubmit() {
+    // Guard against direct keyboard entry that bypassed the picker's `min` attribute
+    // (some mobile browsers don't enforce it). The eligibility check on apply uses
+    // this date — a past value would otherwise quietly block every apply attempt.
+    if (dlExpiry && dlExpiry < todayIso()) {
+      toast.error("Driver licence expiry can't be in the past.");
+      return;
+    }
     try {
       await submit.mutateAsync({
         driverId: driver.id,
@@ -118,7 +133,9 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
             </div>
             <div className="space-y-1.5">
               <label htmlFor="dlx" className="text-sm font-medium">Expiry date</label>
-              <Input id="dlx" type="date" value={dlExpiry} onChange={(e) => setDlExpiry(e.target.value)} />
+              {/* `min=today` blocks the browser picker from accepting a past year
+               *  (a typo like '30' would otherwise land at 1930, blocking apply forever). */}
+              <Input id="dlx" type="date" min={todayIso()} value={dlExpiry} onChange={(e) => setDlExpiry(e.target.value)} />
             </div>
           </div>
         </Card>
