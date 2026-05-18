@@ -650,4 +650,18 @@ describe('TripDetailPage', () => {
     expect(screen.getByText('Cancelled')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /cancel this trip/i })).toBeNull();
   });
+
+  // Regression: the user-reported "1. 1. Call the customer…" — the saved instructions
+  // text already starts each line with "N." and the <ol> auto-numbers. Strip the leading
+  // counter so the visual order comes from the list element alone.
+  it('strips leading "N." numbering from driver_instructions lines so the <ol> doesn\'t double-number', () => {
+    setTrip({ data: makeTrip({ driverInstructions: '1. Call the customer before arrival\n2. Reach pickup 10 minutes early\n3) Follow Google Maps' }) });
+    renderDetail();
+    // Each rendered line should NOT include the leading "1. " / "2. " — only the body text.
+    expect(screen.getByText('Call the customer before arrival')).toBeInTheDocument();
+    expect(screen.getByText('Reach pickup 10 minutes early')).toBeInTheDocument();
+    expect(screen.getByText('Follow Google Maps')).toBeInTheDocument();
+    // Sanity: no rendered list item starts with "1." (the <ol>'s marker provides the digit).
+    expect(screen.queryByText(/^1\.\s+Call the customer/)).toBeNull();
+  });
 });

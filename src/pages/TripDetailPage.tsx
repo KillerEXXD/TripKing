@@ -746,7 +746,12 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
   // otherwise crash render with "Cannot read properties of undefined (reading 'variant')".
   const badge = STATUS_BADGE[trip.status] ?? { label: String(trip.status), variant: 'muted' as const };
   const commissionAmount = Math.round((trip.totalFare * trip.commissionPct) / 100);
-  const instructionLines = (trip.driverInstructions ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+  // Some seed/template instructions arrive already numbered ("1. Call the customer…"); the
+  // <ol> below adds its own counter, producing the user-reported "1. 1. …" doubling. Strip
+  // any leading "N." / "N)" / "N -" so the visual numbering comes from the list alone.
+  const instructionLines = (trip.driverInstructions ?? '').split('\n')
+    .map((s) => s.trim().replace(/^\d+\s*[.)\-:]\s*/, ''))
+    .filter(Boolean);
   const applyable = trip.status === 'open' || trip.status === 'has_applicants';
   const showApplyBar = viewer.isDriver && !viewer.isPoster && !viewer.iPosted && applyable;
   const showAcceptedBar = viewer.isAssignedDriver && (trip.status === 'accepted' || trip.status === 'in_progress');
