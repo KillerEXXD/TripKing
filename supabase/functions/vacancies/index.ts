@@ -219,15 +219,18 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         } else if (!driverId) {
           q = q.in('status', ['active', 'matched']);
           // Also hide rows whose window has already closed — the expire-stale cron
-          // (migration 048 + 057's NULL-until grace) runs every 5 min, this filter
-          // covers the gap. Two clauses:
+          // (migration 048 + 058's IST-calendar-day rule) runs every 5 min, this
+          // filter covers the gap. Two clauses:
           //   • available_until > now()   — explicit future window
-          //   • available_until IS NULL AND available_from > now() - 24h  — open-ended
-          //     vacancies are treated as 24h-from-available_from (migration 057's rule).
+          //   • available_until IS NULL AND available_from is at-or-after today's IST
+          //     midnight (UTC) — anything from a prior IST calendar day is stale
+          //     (migration 058's rule). India observes UTC+5:30 year-round (no DST).
           // Driver's own list (?driver_id=…) still sees stale rows so they can clean up.
-          const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+          const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+          const nowIst = new Date(Date.now() + IST_OFFSET_MS);
+          const istMidnightUtc = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET_MS);
           const nowIso = new Date().toISOString();
-          q = q.or(`available_until.gt.${nowIso},and(available_until.is.null,available_from.gt.${cutoff})`);
+          q = q.or(`available_until.gt.${nowIso},and(available_until.is.null,available_from.gte.${istMidnightUtc.toISOString()})`);
         }
         if (driverId) q = q.eq('driver_id', driverId);
         // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
