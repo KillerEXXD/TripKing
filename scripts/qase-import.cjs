@@ -67,6 +67,7 @@ const PHASES = [
   { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on start or window close.' },
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
   { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
+  { code: 'M',  title: 'M · Multi-way trips',             description: 'Migration 024 trip_type=multi_way — itineraries with ≥3 waypoints (pickup, ≥1 intermediate stop, final destination which may equal the pickup for a city-loop). Covers the POST /trips body-shape contract (server-side validation: ≥3 waypoints, strictly monotonic arrive_at, last-may-equal-first), the form-level Multi-way tab UI, and the full trip lifecycle (post → apply → assign → accept → start → complete) to prove multi-way trips behave identically to one-way trips for the trip-acceptance endpoints. Mirrored 1:1 by e2e/trip-types.spec.ts M1-M5 + the existing tab test.' },
 ];
 
 // Each scenario: { phase, id, title, preconditions?, steps[{action, expected}] }
@@ -556,6 +557,52 @@ const SCENARIOS = [
     { action: 'Navigate to /my-trips with no query params.', expected: 'Renders the tabbed "My trips" page (All / Driving / Invited / Applied / Posted etc.) — NOT the scoped Invites Received header. Same as today.' },
     { action: 'On the Invited tab, tap a trip → tap Back.', expected: 'Returns to /my-trips on the Invited tab. The tabbed view is the default fallback when no `?from=` is in the URL.' },
     { action: 'Plain /posted-trips (agent equivalent) behaves the same way.', expected: 'Tabbed view, no scoped header, Back returns to the tabbed view.' },
+  ]},
+
+  // ── M (Multi-way trips — migration 024) ──────────────────────────────
+  // 1:1 mirror of e2e/trip-types.spec.ts "PostTripPage — multi-way trips" suite.
+  // Each Mn case below has a corresponding Mn-named E2E test that's been verified to pass
+  // against the deployed Supabase. Use these manual cases for end-to-end QA passes through
+  // the UI; the E2E covers the body-shape + lifecycle contracts at the API tier.
+  { phase: 'M', id: 'M0', title: 'UI — Multi-way tab on /trips/new reveals the waypoint editor + Return to start checkbox',
+    preconditions: 'Signed-in approved agent on /trips/new.',
+    steps: [
+    { action: 'Tap the "Multi-way" tab in the trip-type segmented control.', expected: 'Section heading switches to "Multi-way itinerary". "Destinations (in order)" sub-section appears with an "Add destination" button. "Return to start" checkbox is visible (toggles whether the last waypoint loops back to the pickup city).' },
+    { action: 'Tap "Add destination" twice to build a 3-stop chain (pickup + 2 stops).', expected: 'Two destination rows appear, each with city picker, time of arrival picker, and optional wait-minutes input. Order is enforced (drag handle / arrow buttons present).' },
+    { action: 'Toggle "Return to start" on.', expected: 'A read-only "back to pickup city" row appears as the final waypoint. The to_city resolves to the pickup city on submit.' },
+  ]},
+  { phase: 'M', id: 'M1', title: 'Happy path — POST /trips with trip_type=multi_way and 3+ waypoints persists',
+    preconditions: 'Approved agent token. ≥3 distinct cities seeded.',
+    steps: [
+    { action: 'POST /trips with trip_type:"multi_way", waypoints: [pickup, via, drop] (3 entries). Pickup_at < via.arrive_at < drop.arrive_at.', expected: '200 OK with data.id returned. data.trip_type === "multi_way".' },
+    { action: 'GET /trips/{id}. Read shape.', expected: 'trip_type === "multi_way". waypoints.length >= 3. from_city_id mirrors waypoints[0].city_id; to_city_id mirrors the last destination waypoint\'s city_id.' },
+  ]},
+  { phase: 'M', id: 'M2', title: 'Return-to-start — multi_way last waypoint == first city is allowed',
+    preconditions: 'Approved agent token. ≥2 distinct cities seeded.',
+    steps: [
+    { action: 'POST /trips with trip_type:"multi_way", from_city_id === to_city_id, waypoints: [cityA, cityB (via), cityA (back)]. Strictly monotonic arrive_at.', expected: '200 OK. Unlike one_way (which 422s on last == first), multi_way explicitly permits the loop — this is the "drop the passenger somewhere, drive them back" use case.' },
+    { action: 'GET /trips/{id}. Verify trip_type.', expected: 'trip_type === "multi_way".' },
+  ]},
+  { phase: 'M', id: 'M3', title: 'Validation — multi_way with only 2 waypoints → 422',
+    preconditions: 'Approved agent token.',
+    steps: [
+    { action: 'POST /trips with trip_type:"multi_way" but only 2 waypoints (pickup + destination).', expected: '422 VALIDATION. Error message contains "multi_way" (server text: "multi_way requires ≥3 waypoints"). No trip row created.' },
+  ]},
+  { phase: 'M', id: 'M4', title: 'Validation — multi_way with non-monotonic arrive_at → 422',
+    preconditions: 'Approved agent token. ≥3 distinct cities seeded.',
+    steps: [
+    { action: 'POST /trips with trip_type:"multi_way", waypoints chain where waypoint[2].arrive_at < waypoint[1].arrive_at (out of time order).', expected: '422 VALIDATION. Server message includes "waypoints[i].arrive_at must be > previous". No trip row created.' },
+  ]},
+  { phase: 'M', id: 'M5', title: 'Lifecycle — multi_way trip survives post → apply → assign → accept → start → complete',
+    preconditions: 'Approved agent + approved driver (with vehicle) tokens. ≥3 distinct cities seeded.',
+    steps: [
+    { action: 'Agent posts a multi_way trip (M1 shape).', expected: '200, trip_id returned.' },
+    { action: 'Driver POST /trips/{id}/applicants.', expected: 'Trip status flips to has_applicants. Returns acceptance_id.' },
+    { action: 'Agent POST /trips/{id}/assign { acceptance_id }.', expected: 'Trip status → selected.' },
+    { action: 'Driver POST /trips/{id}/accept.', expected: 'Trip status → accepted. Returns passenger_otp (4-6 digit).' },
+    { action: 'Driver POST /trips/{id}/start with passenger_otp.', expected: 'Trip status → in_progress.' },
+    { action: 'Driver POST /trips/{id}/complete.', expected: '200. Trip status → completed.' },
+    { action: 'GET /trips/{id}. Verify trip_type preserved.', expected: 'trip_type === "multi_way" still. Lifecycle endpoints (apply/assign/accept/start/complete) do NOT have multi-way-specific branches that could regress — this test guards against a future refactor introducing one.' },
   ]},
 ];
 

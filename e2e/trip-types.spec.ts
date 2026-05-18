@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
-import { mintAdmin, mintAgent, loginAs, getCities, getCarTypes, API_BASE } from './helpers-api';
+import { mintAdmin, mintAgent, mintDriver, mintVehicle, loginAs, getCities, getCarTypes, API_BASE } from './helpers-api';
 
 /**
  * Migration-024 form: the PostTripPage carries a 3-tab segmented control
@@ -158,5 +158,204 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     expect(shape.waypoints?.[0]?.city_id).toBe(cities[0]!.id);
     expect(shape.waypoints?.[1]?.city_id).toBe(cities[1]!.id);
     expect(shape.waypoints?.[2]?.city_id).toBe(cities[0]!.id);
+  });
+});
+
+/**
+ * Multi-way trips (migration 024 — Qase suite "M · Multi-way trips"). A multi-way trip is
+ * an itinerary with ≥3 waypoints — pickup, one or more intermediate stops, then a final
+ * destination (which MAY equal the pickup, e.g. a city-loop). Validation rules per the
+ * edge function (supabase/functions/trips/index.ts):
+ *   - multi_way requires ≥3 waypoints (else 422 'multi_way requires ≥3 waypoints')
+ *   - arrive_at on each intermediate waypoint must be strictly > previous (else 422
+ *     'waypoints[i].arrive_at must be > previous')
+ *   - last waypoint MAY equal the first (the "return to start" flow)
+ *   - notes can't contain phone numbers (PII guard)
+ *
+ * These body-shape tests use the POST contract directly (form-driving the Multi-way
+ * waypoint editor + the Radix datetime pickers is fragile; the server is the witness).
+ */
+test.describe('PostTripPage — multi-way trips (migration 024)', () => {
+  test('M1 — POST /trips multi_way with 3+ waypoints → 200 + trip_type=multi_way persists', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    const viaAt   = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    const dropAt  = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[2]!.id,
+        pickup_at: pickupAt, expected_end_at: dropAt,
+        expected_distance_km: 250, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+        trip_type: 'multi_way',
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, arrive_at: viaAt, wait_minutes: 30 },
+          { city_id: cities[2]!.id, arrive_at: dropAt, is_destination: true },
+        ],
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const tripId = (await post.json())?.data?.id as string;
+    const shape = await readTripShape(request, agent.token, tripId);
+    expect(shape.trip_type).toBe('multi_way');
+    // The joined waypoints[] readback shape isn't reliable for city_id (same issue that
+    // skipped the round_trip test above) — assert on count + the persisted top-level
+    // from/to which the trigger mirrors from waypoints[0] / waypoints[last].
+    expect(shape.waypoints?.length).toBeGreaterThanOrEqual(3);
+    expect(shape.from_city_id).toBe(cities[0]!.id);
+    expect(shape.to_city_id).toBe(cities[2]!.id);
+  });
+
+  test('M2 — POST /trips multi_way with return-to-start (last waypoint == first city) → 200', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    const viaAt   = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    const backAt  = new Date(Date.now() + 14 * 3600 * 1000).toISOString();
+
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[0]!.id,
+        pickup_at: pickupAt, expected_end_at: backAt,
+        expected_distance_km: 280, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+        trip_type: 'multi_way',
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, arrive_at: viaAt, wait_minutes: 60, is_destination: true },
+          { city_id: cities[0]!.id, arrive_at: backAt, is_destination: true },
+        ],
+      }),
+    });
+    // Multi-way allows the loop (unlike one_way which 422s when last==first). This is the
+    // "drop the passenger somewhere, drive them back" use case.
+    expect(post.status()).toBe(200);
+    const tripId = (await post.json())?.data?.id as string;
+    const shape = await readTripShape(request, agent.token, tripId);
+    expect(shape.trip_type).toBe('multi_way');
+  });
+
+  test('M3 — POST /trips multi_way with only 2 waypoints → 422 VALIDATION', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[1]!.id,
+        pickup_at: new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
+        expected_distance_km: 140, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+        trip_type: 'multi_way',
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, is_destination: true },
+        ],
+      }),
+    });
+    expect(post.status()).toBe(422);
+    const body = await post.json();
+    // Server message includes "multi_way requires ≥3 waypoints" — match loosely on the count
+    // requirement so a future copy edit doesn't snap the test.
+    expect(JSON.stringify(body).toLowerCase()).toContain('multi_way');
+  });
+
+  test('M4 — POST /trips multi_way with non-monotonic arrive_at → 422 VALIDATION', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    const laterAt  = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    const earlier  = new Date(Date.now() + 6 * 3600 * 1000).toISOString(); // BEFORE laterAt → invalid
+
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[2]!.id,
+        pickup_at: pickupAt, expected_end_at: laterAt,
+        expected_distance_km: 250, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+        trip_type: 'multi_way',
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, arrive_at: laterAt },   // later first
+          { city_id: cities[2]!.id, arrive_at: earlier, is_destination: true }, // earlier — invalid
+        ],
+      }),
+    });
+    expect(post.status()).toBe(422);
+  });
+
+  // The full lifecycle has ~10 sequential API calls (mint admin/driver/vehicle/agent + post +
+  // apply + assign + accept + start + complete) — pushes past the default 30s timeout. Same
+  // pattern as journeys-critical.spec.ts which sets a 60s budget for the J* journeys.
+  test('M5 — multi_way lifecycle: post → apply → assign → accept → start → complete', async ({ request }) => {
+    test.setTimeout(60_000);
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
+    await mintVehicle(request, driver.token);
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    const viaAt   = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    const dropAt  = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+
+    // Post the multi-way trip
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        from_city_id: cities[0]!.id, to_city_id: cities[2]!.id,
+        pickup_at: pickupAt, expected_end_at: dropAt,
+        expected_distance_km: 250, car_type_id: carTypes[0]!.id, rate_per_km: 14,
+        commission_pct: 10, gst_amount: 98, driver_bata: 300,
+        passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+        hide_passenger_phone: false, auto_invite_matches: false,
+        trip_type: 'multi_way',
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, arrive_at: viaAt, wait_minutes: 30 },
+          { city_id: cities[2]!.id, arrive_at: dropAt, is_destination: true },
+        ],
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const tripId = (await post.json())?.data?.id as string;
+
+    // Walk through the full lifecycle via the same helpers J3-J7 use — proves multi-way
+    // trips behave identically to one-way trips for the trip-lifecycle endpoints (apply,
+    // assign, accept, start, complete don't have multi-way-specific branches that could regress).
+    const { applyToTrip, assignDriver, acceptTrip, startTrip, completeTrip, getTrip } = await import('./helpers-api');
+    const { acceptanceId } = await applyToTrip(request, driver.token, tripId);
+    await assignDriver(request, agent.token, tripId, acceptanceId);
+    const { passengerOtp } = await acceptTrip(request, driver.token, tripId);
+    expect(passengerOtp).toMatch(/^\d{4,6}$/);
+    await startTrip(request, driver.token, tripId, passengerOtp);
+    const completeResult = await completeTrip(request, driver.token, tripId);
+    expect(completeResult.status).toBe(200);
+
+    const final = await getTrip(request, agent.token, tripId);
+    expect(final?.status).toBe('completed');
+    expect(final?.trip_type).toBe('multi_way');
   });
 });
