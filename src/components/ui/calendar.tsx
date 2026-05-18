@@ -15,13 +15,15 @@ function Calendar({ className, classNames, ...props }: DayPickerProps) {
         button_previous: 'inline-flex size-7 items-center justify-center rounded-md hover:bg-muted',
         button_next: 'inline-flex size-7 items-center justify-center rounded-md hover:bg-muted',
         weekdays: 'grid grid-cols-7',
-        weekday: 'w-9 text-center text-xs text-muted-foreground font-normal',
+        weekday: 'w-8 text-center text-xs text-muted-foreground font-normal',
         week: 'grid grid-cols-7',
-        day: 'size-10 p-0 text-center text-sm',
+        day: 'size-8 p-0 text-center text-sm',
         day_button:
-          'inline-flex size-10 items-center justify-center rounded-full hover:bg-muted aria-selected:bg-primary aria-selected:text-primary-foreground aria-selected:hover:bg-primary/90 aria-selected:font-semibold aria-selected:shadow-md',
-        today:
-          'font-bold text-primary [&_button]:border-2 [&_button]:border-primary aria-selected:text-primary-foreground',
+          'inline-flex size-8 items-center justify-center rounded-full hover:bg-muted aria-selected:bg-primary aria-selected:text-primary-foreground aria-selected:hover:bg-primary/90 aria-selected:font-semibold',
+        // Today gets a soft emerald tint on the button + bold primary text. When also
+        // `aria-selected`, the day_button's `bg-primary` + `text-primary-foreground`
+        // override cleanly — both rules layer without hiding the day number.
+        today: 'font-bold text-primary [&_button]:bg-primary/10',
         outside: 'text-muted-foreground/40',
         disabled: 'text-muted-foreground/40 pointer-events-none',
         ...classNames,
