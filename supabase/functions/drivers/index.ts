@@ -496,6 +496,14 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (last4.length !== 4) return fail('VALIDATION', 'aadhaar_last4 must be the last 4 digits of the Aadhaar number', 422);
     const dlNumber = strOrNull(b.driver_license_number);
     if (!dlNumber) return fail('VALIDATION', 'driver_license_number is required', 422);
+    // Reject a past `driver_license_expiry` — clients can typo the year (e.g. picker
+    // landing at 1930), and the eligibility check on apply then blocks every trip
+    // silently. Today (UTC date string) is enough — exact TZ doesn't matter for an
+    // expiry that's supposed to be months/years out.
+    const dlExpRaw = strOrNull(b.driver_license_expiry);
+    if (dlExpRaw && dlExpRaw < new Date().toISOString().slice(0, 10)) {
+      return fail('VALIDATION', `driver_license_expiry (${dlExpRaw}) is in the past`, 422);
+    }
     // safety: paths must live under this driver's folder
     for (const p of [aadhaarFront, aadhaarBack, dlPath, selfiePath]) {
       if (!p.startsWith(`${id}/`)) return fail('VALIDATION', 'document paths must be under your own folder', 422);
