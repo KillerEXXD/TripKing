@@ -183,7 +183,8 @@ function DriverHome({ driver }: { driver: Driver }) {
   const invitedToDriveQuery = useTrips({ invited: 'me' });
 
   const myPosts = myPostsQuery.data ?? [];
-  const postedWithApplicants = myPosts.filter((t) => t.status === 'has_applicants').length;
+  const postsWithApplicants = myPosts.filter((t) => t.status === 'has_applicants');
+  const postedWithApplicants = postsWithApplicants.length;
   // Belt-and-braces: also exclude trips the driver has already applied to. The backend trigger
   // sync_trip_invitation_on_apply (migration 033) flips the invitation pending → applied when
   // the driver applies, but a re-invite from the agent rewrites the row back to pending — this
@@ -235,7 +236,10 @@ function DriverHome({ driver }: { driver: Driver }) {
 
         {postedWithApplicants > 0 ? (
           <PriorityCard
-            to="/posted-trips"
+            // One trip → tap straight into the trip detail page (applicant review
+            // section is embedded with all the trip context). Two+ → /posted-trips
+            // filtered to has_applicants so the driver picks which one to act on.
+            to={postedWithApplicants === 1 ? `/trips/${postsWithApplicants[0].id}?from=/` : '/posted-trips?status=has_applicants&from=/'}
             tone="amber"
             icon={<Sparkles className="size-3.5" aria-hidden />}
             label={`${postedWithApplicants > 1 ? 'Trips' : 'Trip'} you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`}

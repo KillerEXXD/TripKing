@@ -205,4 +205,24 @@ describe('DriverHomePage', () => {
     renderHome();
     expect(screen.getByText(/trip you posted has applicants/i)).toBeInTheDocument();
   });
+
+  // Regression: the card used to route to /posted-trips (agent My-posts page) which
+  // wasn't where a driver who posted a single trip wanted to land. Single-trip case →
+  // trip detail directly; 2+ → the filtered posted-trips list.
+  it('the applicants-prompt card routes to /trips/:id when only one posted trip has applicants', () => {
+    setTrips([{ data: [makeTrip({ id: 'p-one', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' })] }]);
+    renderHome();
+    const link = screen.getByRole('link', { name: /trip you posted has applicants/i });
+    expect(link.getAttribute('href')).toBe('/trips/p-one?from=/');
+  });
+
+  it('the applicants-prompt card routes to /posted-trips?status=has_applicants when 2+ posted trips have applicants', () => {
+    setTrips([{ data: [
+      makeTrip({ id: 'p-one', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver' }),
+      makeTrip({ id: 'p-two', status: 'has_applicants', postedByUserId: 'u1', postedByRole: 'driver', toCity: { id: 'c9', name: 'Salem', state: 'TN', lat: 12, lng: 79, sortOrder: 1, isActive: true } }),
+    ] }]);
+    renderHome();
+    const link = screen.getByRole('link', { name: /trips you posted have applicants/i });
+    expect(link.getAttribute('href')).toBe('/posted-trips?status=has_applicants&from=/');
+  });
 });
