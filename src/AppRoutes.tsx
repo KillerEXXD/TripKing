@@ -61,6 +61,11 @@ const AdminReferralFlagsPage = lazyWithRetry(() => import('@/pages/administratio
 const AdminDriversPage = lazyWithRetry(() => import('@/pages/administration/AdminDriversPage'));
 const BugsPage = lazyWithRetry(() => import('@/pages/administration/BugsPage'));
 const AdminDesignsPage = lazyWithRetry(() => import('@/pages/administration/AdminDesignsPage'));
+const FeedbackLandingPage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackLandingPage'));
+const FeedbackPagePage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackPagePage'));
+const FeedbackSusPage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackSusPage'));
+const FeedbackCrossPagePage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackCrossPagePage'));
+const FeedbackResultsPage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackResultsPage'));
 const AdminAgentsPage = lazyWithRetry(() => import('@/pages/administration/AdminAgentsPage'));
 const PassengersPage = lazyWithRetry(() => import('@/pages/administration/PassengersPage'));
 // Public marketing pages — no auth, no app layout.
@@ -214,8 +219,14 @@ export function AppRoutes() {
             <Route path="administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
             {/* /administration/designs uses a softer gate than the other admin routes — allowed
                 for admins AND users in the design-preview allowlist (feature_flags.designPreviews
-                from /auth/me, populated by the admin-managed list at /administration/config). */}
+                from /auth/me, populated by the admin-managed list at /administration/config).
+                The /feedback walk-throughs use the same gate so allowlisted reviewers can submit. */}
             <Route path="administration/designs" element={<DesignsRoute><AdminDesignsPage /></DesignsRoute>} />
+            <Route path="administration/designs/feedback" element={<DesignsRoute><FeedbackLandingPage /></DesignsRoute>} />
+            <Route path="administration/designs/feedback/page/:page" element={<DesignsRoute><FeedbackPagePage /></DesignsRoute>} />
+            <Route path="administration/designs/feedback/sus/:design" element={<DesignsRoute><FeedbackSusPage /></DesignsRoute>} />
+            <Route path="administration/designs/feedback/cross-page" element={<DesignsRoute><FeedbackCrossPagePage /></DesignsRoute>} />
+            <Route path="administration/designs/feedback/results" element={<DesignsRoute><FeedbackResultsPage /></DesignsRoute>} />
           </Route>
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>

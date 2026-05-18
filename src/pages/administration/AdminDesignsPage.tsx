@@ -133,6 +133,18 @@ export function AdminDesignsPage() {
         />
       </div>
 
+      {/* Feedback CTAs — sit under the Pages/Design tiles so reviewers can launch the
+          structured questionnaire or jump straight to the aggregated results. Routes are
+          under /app/* (the app prefix); both paths use the same <DesignsRoute> gate. */}
+      <div className="flex flex-wrap gap-2 text-xs">
+        <Link to="/app/administration/designs/feedback" className="rounded-pill bg-primary px-3 py-1.5 font-semibold text-primary-foreground">
+          Collect feedback
+        </Link>
+        <Link to="/app/administration/designs/feedback/results" className="rounded-pill border border-border bg-surface px-3 py-1.5 font-semibold text-foreground hover:border-primary/40">
+          See results
+        </Link>
+      </div>
+
       {tab === 'pages' ? <PagesTab /> : <DesignTab />}
     </main>
   );
