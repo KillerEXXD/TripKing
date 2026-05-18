@@ -286,9 +286,15 @@ const SCENARIOS = [
   ]},
 
   // ── P6 ────────────────────────────────────────────────────────────────
-  { phase: 'P6', id: 'P6.1', title: 'Start trip with valid OTP', steps: [
-    { action: 'Driver: Start trip with OTP. Enter 5-digit OTP + start-odo. Optional photo. Start.', expected: '"Trip started". Status: In progress. Bottom bar → Complete trip. POST /trips/{id}/start. Server verifies hash, sets trip_executions, vacancy → on_trip.' },
-  ]},
+  { phase: 'P6', id: 'P6.1', title: 'Start trip with odometer photo + reading + OTP',
+    preconditions: 'Updated for PR #293 (Phase 3 of trip-completion). The driver Start-trip form now requires ALL THREE: starting odometer **photo** (signed PUT URL into trip-executions-photos bucket), starting odometer **reading** (km), and **passenger OTP**. Backend POST /trips/{id}/start carries start_odo_url + start_odo_reading + passenger_otp.',
+    steps: [
+      { action: 'Driver opens the trip detail page on an accepted trip, taps "Start the trip" → form expands.', expected: 'Three fields: starting odometer photo (camera button), start odometer reading (km), passenger OTP. CTA disabled until all three are filled.' },
+      { action: 'Tap the photo field, take/select a clear shot of the dashboard.', expected: 'POST /trips/{id}/start-odo-upload-url returns a signed PUT URL. Upload succeeds; the storage path lands at trip-executions-photos/<trip_id>/start_odo. Preview shows in the form.' },
+      { action: 'Enter the start odometer reading (e.g. 50000). Enter the 5-digit OTP the agent shared with the passenger. Tap "Start the trip".', expected: '"Trip started — drive safe." Status: In progress. POST /trips/{id}/start succeeds with all three fields. Server stores start_odo_url + start_odo_reading + started_at. Vacancy → on_trip.' },
+      { action: 'Try the same form without the photo (e.g. clear field and re-tap Start).', expected: 'Inline toast "Upload a photo of the starting odometer." — no network call fires.' },
+    ],
+  },
   { phase: 'P6', id: 'P6.2', title: 'Wrong OTP × 5 → 60s lockout', preconditions: 'Enforced server-side by rateLimitOk(start-trip:{user}:{trip}, 5/60s) — PR #155, merged 2026-05-16.', steps: [
     { action: 'Enter 00000 six times.', expected: 'Attempts 1–5: 401 INVALID_OTP. Attempt 6: 429 RATE_LIMITED "Too many wrong OTP attempts — wait a minute and retry". After 60s, fresh attempt allowed.' },
   ]},
@@ -308,12 +314,50 @@ const SCENARIOS = [
   ]},
 
   // ── P7 ────────────────────────────────────────────────────────────────
-  { phase: 'P7', id: 'P7.1', title: 'Complete trip (happy)', steps: [
-    { action: 'Driver: Complete trip. End-odo + optional photo + notes. Confirm.', expected: '"Trip completed". Status: Completed. POST /trips/{id}/complete.' },
-    { action: 'Agent + Passenger.', expected: 'Agent 🔔 trip_completed. Passenger portal "Trip completed". Vacancy → expired.' },
-  ]},
+  { phase: 'P7', id: 'P7.1', title: 'Complete trip via the 2-step wizard (happy path, no overage, no toll)',
+    preconditions: 'Updated for PR #296 (Phase 4). "Complete the trip" CTA on the trip detail page (and "End trip" on the driver Home priority card — PR #297) now both navigate to /trips/{id}/complete — a routed 2-step wizard. Step 1 = end-odo photo + reading + toll + live payout preview. Step 2 = optional review (driver→manager) + optional private note.',
+    steps: [
+      { action: 'Driver: from /trips/{id} OR the Home "Driving now" card, tap "Complete the trip" / "End trip".', expected: 'Route changes to /trips/{id}/complete. Page header reads "Complete the trip". Step indicator: "Step 1 of 2 · Trip end & payout".' },
+      { action: 'Step 1: upload the ending odometer photo (signed URL into trip-executions-photos), enter end odometer reading (matching expected_distance_km — e.g. start 50000 + 100 km = 50100), leave toll blank.', expected: 'Payout preview shows Original payout = baseline driver_payout. No extra-KM line (actual = accepted). No toll line. Revised payout = original. "Next →" enabled.' },
+      { action: 'Tap "Next →". Step 2 shows star rating (optional) + Note-to-agent textarea. Skip the rating. Tap "Complete trip".', expected: '"Trip completed · ₹X paid out." POST /trips/{id}/complete with end_odo_url + end_odo_reading + toll_paid_by_driver=0. Migration 059 trigger writes trips.final_*. Status: Completed. Navigates to /my-trips?tab=completed.' },
+      { action: 'On /my-trips?tab=completed, confirm the just-completed trip is at the TOP (sorted by latest-completed).', expected: 'CompletedTripCard renders with "Completed Xs ago", final payout prominent, no extra-KM badge (no overage), no toll line.' },
+      { action: 'Agent: /notifications.', expected: '🔔 trip_completed "Your driver completed the trip — tap to leave a review."' },
+      { action: 'Passenger portal (/passenger/{otp}).', expected: '"Trip completed" status banner. Vacancy → expired. (No payout exposed.)' },
+    ],
+  },
+  { phase: 'P7', id: 'P7.1b', title: 'Complete trip with extra-KM overage + toll → payout recalculated',
+    preconditions: 'Migration 059: extra_distance_km = max(0, actual − expected). Extra KM billed at the trip\'s posted rate_per_km. Toll 100% reimbursed to driver and passed through to the passenger bill. Commission is NOT taken on toll.',
+    steps: [
+      { action: 'Start a trip (P6.1) with start_odo = 50000. Drive past the accepted distance — e.g. expected = 100 km, end_odo = 50125 → actual = 125 km → extra = 25 km. Tap "Complete the trip".', expected: 'Wizard step 1 opens.' },
+      { action: 'Upload end-odo photo, enter end reading 50125, enter toll 75 (₹).', expected: 'Live preview: "Actual distance 125 km driven · 100 km accepted" + amber "Extra 25 km @ ₹14/km = + ₹350" + sky "Toll reimbursement + ₹75" + emerald "Revised payout ₹1,800" (when baseline payout = 1410 from a 1400 fare, 10% commission, 50 GST, 200 bata).' },
+      { action: 'Tap "Next →" → Step 2 → "Complete trip".', expected: 'POST /trips/{id}/complete with toll_paid_by_driver=75. Server-side trigger writes trips.final_total_fare=1825, extra_distance_km=25, extra_km_fare=350, toll_amount=75, final_driver_payout=1800.' },
+      { action: 'Refresh /trips/{id} as the driver.', expected: 'FinalCostBreakdown card shows: Base ₹1,400 · Extra 25 km @ ₹14/km +₹350 · Toll +₹75 · Passenger bill ₹1,825 · commission/GST/bata lines · "Your payout ₹1,800".' },
+      { action: 'Refresh /trips/{id} as the agent.', expected: 'Same breakdown but the final-row label reads "Driver\'s payout". Numbers match.' },
+      { action: 'Open the passenger portal /passenger/{otp}.', expected: '"Your trip cost" card: Base ₹1,400 + Extra distance (25 km @ ₹14/km) ₹350 + Toll ₹75 → Total paid ₹1,825. No payout, no commission, no bata.' },
+    ],
+  },
+  { phase: 'P7', id: 'P7.1c', title: 'Complete-wizard validation: end_odo ≤ start_odo blocked; negative toll blocked',
+    steps: [
+      { action: 'On the wizard step 1, enter end_odo less than start_odo (e.g. start 50000, end 49000). Tap "Next →".', expected: 'Server rejects on submit with 422 "end_odo_reading must be greater than start_odo_reading". (Client also validates "end odometer reading > 0" inline.)' },
+      { action: 'Enter toll -5 and try to advance.', expected: '422 "toll_paid_by_driver must be a non-negative number". The corresponding inline guard on the client also blocks it: toast "Toll must be a non-negative number."' },
+    ],
+  },
+  { phase: 'P7', id: 'P7.1d', title: 'Complete-wizard: skipping the review still completes the trip',
+    steps: [
+      { action: 'Run the wizard end-to-end. On Step 2, leave the star rating at 0 (no stars selected). Optionally fill the private note. Tap "Complete trip".', expected: 'Trip completes (status → completed). NO review row inserted. POST /reviews is NOT fired. Driver lands on /my-trips?tab=completed. Driver can still leave a review later from /trips/{id}.' },
+    ],
+  },
+  { phase: 'P7', id: 'P7.1e', title: '"End trip" from the driver Home priority card opens the same wizard',
+    preconditions: 'PR #297 — single completion code path. The Home "Driving now" card\'s End trip button no longer fires the one-shot useCompleteTrip; it navigates to /trips/{id}/complete.',
+    steps: [
+      { action: 'Have an in_progress trip assigned to the driver. Open /. The "Driving now" priority card appears with "End trip" and "Continue" buttons.', expected: 'Both buttons visible.' },
+      { action: 'Tap "End trip".', expected: 'No native confirm dialog. Routes immediately to /trips/{id}/complete (the same wizard P7.1 uses).' },
+      { action: 'Run the wizard end-to-end (P7.1 happy path).', expected: 'Same outcome as completing from /trips/{id}. There is only one completion code path.' },
+    ],
+  },
   { phase: 'P7', id: 'P7.2', title: 'Complete without start (blocked)', steps: [
     { action: 'On an Accepted trip (not started), POST /complete via dev tools.', expected: '409 CONFLICT "Trip is \\"accepted\\", not \\"in_progress\\"". UI hides Complete until in_progress.' },
+    { action: 'On an Accepted trip (not started), POST /trips/{id}/end-odo-upload-url via dev tools.', expected: '409 CONFLICT "Trip is \\"accepted\\", not \\"in_progress\\"". The signed-URL endpoint is also status-gated.' },
   ]},
   { phase: 'P7', id: 'P7.3', title: 'Agent reviews driver', steps: [
     { action: 'Agent: /trips/{id} → Rate driver. Stars + tags + comment. Submit.', expected: '"Review posted". Card shows submitted rating. POST /reviews · passenger_to_driver.' },
