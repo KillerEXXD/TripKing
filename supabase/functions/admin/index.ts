@@ -156,6 +156,56 @@ const handler = withTiming('admin', async (req: Request): Promise<Response> => {
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/${segments[0]}`, 405);
   }
 
+  // ── /admin/design-feedback (in-app design-prototype questionnaire — admin-only) ──
+  if (segments[0] === 'design-feedback') {
+    const a = await requireAdmin(db, req);
+    if (a instanceof Response) return a;
+
+    if (segments.length === 1 && req.method === 'GET') {
+      const limit = Math.min(Number(url.searchParams.get('limit') ?? '100') || 100, 500);
+      const { data, error } = await db
+        .from('design_feedback')
+        .select('id, reviewer_user_id, reviewer_name, submitted_at, preferences, sus_scores, cross_page, notes')
+        .order('submitted_at', { ascending: false })
+        .limit(limit);
+      if (error) return fail('DB_ERROR', error.message, 500);
+      return ok(data ?? []);
+    }
+
+    if (segments.length === 1 && req.method === 'POST') {
+      const body = await readBody(req) as {
+        reviewer_name?: unknown;
+        preferences?: unknown;
+        sus_scores?: unknown;
+        cross_page?: unknown;
+        notes?: unknown;
+      };
+      const reviewer = typeof body.reviewer_name === 'string' ? body.reviewer_name.trim() : '';
+      if (!reviewer) return fail('VALIDATION', 'reviewer_name required', 400);
+      const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+      if (!isObj(body.preferences)) return fail('VALIDATION', 'preferences must be an object', 400);
+      if (!isObj(body.sus_scores))  return fail('VALIDATION', 'sus_scores must be an object',  400);
+      if (!isObj(body.cross_page))  return fail('VALIDATION', 'cross_page must be an object',  400);
+      const { data, error } = await db
+        .from('design_feedback')
+        .insert({
+          reviewer_user_id: a.id,
+          reviewer_name: reviewer,
+          preferences: body.preferences,
+          sus_scores: body.sus_scores,
+          cross_page: body.cross_page,
+          notes: typeof body.notes === 'string' ? body.notes : null,
+        })
+        .select('id, submitted_at')
+        .single();
+      if (error) return fail('DB_ERROR', error.message, 500);
+      await audit(db, a.id, 'create', 'design_feedback', data.id, null, { reviewer_name: reviewer });
+      return ok(data);
+    }
+
+    return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed on /admin/design-feedback`, 405);
+  }
+
   // ── /admin/referrals (Stage 9; admin-only — list, status, reverse, flags) ──
   if (segments[0] === 'referrals') {
     const a = await requireAdmin(db, req);

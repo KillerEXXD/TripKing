@@ -59,6 +59,11 @@ const AdminReferralFlagsPage = lazyWithRetry(() => import('@/pages/administratio
 const AdminDriversPage = lazyWithRetry(() => import('@/pages/administration/AdminDriversPage'));
 const BugsPage = lazyWithRetry(() => import('@/pages/administration/BugsPage'));
 const AdminDesignsPage = lazyWithRetry(() => import('@/pages/administration/AdminDesignsPage'));
+const FeedbackLandingPage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackLandingPage'));
+const FeedbackPagePage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackPagePage'));
+const FeedbackSusPage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackSusPage'));
+const FeedbackCrossPagePage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackCrossPagePage'));
+const FeedbackResultsPage = lazyWithRetry(() => import('@/pages/administration/designs/feedback/FeedbackResultsPage'));
 const AdminAgentsPage = lazyWithRetry(() => import('@/pages/administration/AdminAgentsPage'));
 const PassengersPage = lazyWithRetry(() => import('@/pages/administration/PassengersPage'));
 // Public marketing pages — no auth, no app layout.
@@ -206,6 +211,11 @@ export function AppRoutes() {
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
             <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
             <Route path="/administration/designs" element={<AdminRoute><AdminDesignsPage /></AdminRoute>} />
+            <Route path="/administration/designs/feedback" element={<AdminRoute><FeedbackLandingPage /></AdminRoute>} />
+            <Route path="/administration/designs/feedback/page/:page" element={<AdminRoute><FeedbackPagePage /></AdminRoute>} />
+            <Route path="/administration/designs/feedback/sus/:design" element={<AdminRoute><FeedbackSusPage /></AdminRoute>} />
+            <Route path="/administration/designs/feedback/cross-page" element={<AdminRoute><FeedbackCrossPagePage /></AdminRoute>} />
+            <Route path="/administration/designs/feedback/results" element={<AdminRoute><FeedbackResultsPage /></AdminRoute>} />
           </Route>
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>

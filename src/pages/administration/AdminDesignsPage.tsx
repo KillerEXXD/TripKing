@@ -105,15 +105,25 @@ export function AdminDesignsPage() {
         </p>
       </header>
 
-      <SegmentedTabs<Tab>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'pages',  label: 'Pages' },
-          { value: 'design', label: 'Design' },
-        ]}
-        ariaLabel="Grouping"
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SegmentedTabs<Tab>
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: 'pages',  label: 'Pages' },
+            { value: 'design', label: 'Design' },
+          ]}
+          ariaLabel="Grouping"
+        />
+        <div className="flex gap-2 text-xs">
+          <Link to="/administration/designs/feedback" className="rounded-pill bg-primary px-3 py-1.5 font-semibold text-primary-foreground">
+            Collect feedback
+          </Link>
+          <Link to="/administration/designs/feedback/results" className="rounded-pill border border-border bg-surface px-3 py-1.5 font-semibold text-foreground hover:border-primary/40">
+            See results
+          </Link>
+        </div>
+      </div>
 
       {tab === 'pages' ? <PagesTab /> : <DesignTab />}
     </main>
