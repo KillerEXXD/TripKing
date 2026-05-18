@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, MapPin, Sparkles } from 'lucide-react';
-import { useTrips } from '@/hooks/useTrips';
+import { useInfiniteTrips } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { carTypeHooks, cityHooks } from '@/hooks/useAdminConfig';
 import { NearMeFilter } from '@/components/location/NearMeFilter';
 import { routeChainText, TripTypeBadge } from '@/components/trip/RouteChain';
 import { Badge, Button, Card } from '@/components/ui';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
+import { EmptyState, ErrorState, InfiniteScrollSentinel, LoadingSkeleton } from '@/components/feedback';
 import { formatINR, formatPickupDateTime } from '@/lib/utils';
 import type { NearRadius, Trip, TripStatus } from '@/types';
 
@@ -84,11 +84,12 @@ export function TripFeedPage() {
     seeded.current = true;
   }, [myDriverQuery.data]);
 
-  const tripsQuery = useTrips({ status: FEED_STATUSES, fromCityId: fromCityId || undefined, ...(near ? { near } : {}) });
+  const tripsQuery = useInfiniteTrips({ status: FEED_STATUSES, fromCityId: fromCityId || undefined, ...(near ? { near } : {}) });
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
 
-  const trips = tripsQuery.data ?? [];
+  // Flatten all loaded pages into one list — see useInfiniteTrips for the page shape.
+  const trips = (tripsQuery.data?.pages ?? []).flatMap((p) => p.items);
   const filtered = trips.filter((t) => carTypeId === '' || t.carTypeId === carTypeId);
   const anyFilter = carTypeId !== '' || fromCityId !== '' || near != null;
 
@@ -107,7 +108,7 @@ export function TripFeedPage() {
         <div className="min-w-0 flex-1">
           <h1 className="text-base font-semibold">Open trips</h1>
           <p className="text-xs text-secondary">
-            {tripsQuery.isSuccess ? `${filtered.length} trip${filtered.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''} you can apply to` : 'Trips that still need a driver'}
+            {tripsQuery.isSuccess ? `${filtered.length}${tripsQuery.hasNextPage ? '+' : ''} trip${filtered.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''} you can apply to` : 'Trips that still need a driver'}
           </p>
         </div>
       </header>
@@ -163,7 +164,14 @@ export function TripFeedPage() {
             }
           />
         ) : (
-          filtered.map((t) => <TripCard key={t.id} trip={t} />)
+          <>
+            {filtered.map((t) => <TripCard key={t.id} trip={t} />)}
+            <InfiniteScrollSentinel
+              hasMore={!!tripsQuery.hasNextPage}
+              loading={tripsQuery.isFetchingNextPage}
+              onLoadMore={() => void tripsQuery.fetchNextPage()}
+            />
+          </>
         )}
       </div>
     </div>

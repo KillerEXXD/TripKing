@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Car, MapPin, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { useVacancies } from '@/hooks/useVacancies';
+import { useInfiniteVacancies } from '@/hooks/useVacancies';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
 import { useInviteDrivers } from '@/hooks/useTrips';
@@ -15,7 +15,7 @@ import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Badge, Button, Card, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
-import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
+import { EmptyState, ErrorState, InfiniteScrollSentinel, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatINR, formatShortDate, haversineKm } from '@/lib/utils';
 import type { NearRadius, Trip, Vacancy, VacancyInviteSummary } from '@/types';
 
@@ -264,9 +264,10 @@ export function VacanciesPage() {
   const [currentCityId, setCurrentCityId] = useState('');
   const [destinationCityId, setDestinationCityId] = useState('');
   const [near, setNear] = useState<NearRadius | null>(null);
-  const vacanciesQuery = useVacancies({ status: 'active', currentCityId: currentCityId || undefined, destinationCityId: destinationCityId || undefined, ...(near ? { near } : {}) });
+  const vacanciesQuery = useInfiniteVacancies({ status: 'active', currentCityId: currentCityId || undefined, destinationCityId: destinationCityId || undefined, ...(near ? { near } : {}) });
   const citiesQuery = cityHooks.useList();
-  const vacancies = vacanciesQuery.data ?? [];
+  // Flatten all loaded pages into one list. Each page is `{items, hasMore, nextOffset}`.
+  const vacancies = (vacanciesQuery.data?.pages ?? []).flatMap((p) => p.items);
   const anyFilter = !!currentCityId || !!destinationCityId || near != null;
 
   // Driver-only "I'm available" card. Admins viewing-as-agent (or anyone non-driver) see only the list.
@@ -278,8 +279,11 @@ export function VacanciesPage() {
   // Agents (and admins viewing-as-agent) can invite a driver to one of their open trips.
   const canInvite = effectiveRole === 'trip_manager' || effectiveRole === 'admin';
 
+  // Subtitle reflects what's loaded so far. Once the user scrolls past more pages, the count
+  // climbs. Adding a "+" when there might be more keeps the user from thinking "this is all".
+  const moreAvailable = vacanciesQuery.hasNextPage;
   const subtitle = vacanciesQuery.isSuccess
-    ? `${vacancies.length} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}`
+    ? `${vacancies.length}${moreAvailable ? '+' : ''} vacant driver${vacancies.length === 1 ? '' : 's'}${near ? ` within ${near.radiusKm} km` : ''}`
     : 'Drivers who have posted their availability';
 
   // Redesign: pills on the page-grey surface instead of a bordered band. The selects keep their
@@ -331,7 +335,14 @@ export function VacanciesPage() {
             message={anyFilter ? (near ? 'Try a bigger radius, or clear the location filter.' : 'Try widening the filters.') : 'When a driver posts their availability it shows up here.'}
           />
         ) : (
-          vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} canInvite={canInvite} />)
+          <>
+            {vacancies.map((v) => <VacancyCard key={v.id} vacancy={v} canInvite={canInvite} />)}
+            <InfiniteScrollSentinel
+              hasMore={!!vacanciesQuery.hasNextPage}
+              loading={vacanciesQuery.isFetchingNextPage}
+              onLoadMore={() => void vacanciesQuery.fetchNextPage()}
+            />
+          </>
         )}
       </div>
     </PageShell>

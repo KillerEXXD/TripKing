@@ -267,16 +267,22 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
           distById = new Map(list.map((r) => [r.id, toKm(Number(r.distance_m))]));
           q = q.in('id', [...distById.keys()]);
         }
-        const limit = Number(url.searchParams.get('limit') ?? '50');
-        q = near
-          ? q.limit(Math.min(Number.isFinite(limit) ? limit : 50, 200))
-          : q.order('created_at', { ascending: false }).limit(Math.min(Number.isFinite(limit) ? limit : 50, 200));
+        const rawLimit = Number(url.searchParams.get('limit') ?? '50');
+        const limit = Math.min(Number.isFinite(rawLimit) ? rawLimit : 50, 200);
+        const rawOffset = Number(url.searchParams.get('offset') ?? '0');
+        const offset = Math.max(0, Number.isFinite(rawOffset) ? Math.floor(rawOffset) : 0);
+        // Near path: order by distance is applied JS-side after the SQL — slice the
+        // page there too so the offset honours the distance order. Non-near path: rely
+        // on SQL .range() for offset/limit, which lets Postgres skip rows efficiently.
+        if (!near) q = q.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+        else q = q.limit(Math.min(limit + offset, 200)); // need enough rows to slice
         const { data, error } = await q;
         if (error) throw new Error(error.message);
         let out = (data ?? []) as Record<string, unknown>[];
         if (distById) {
           out = out.map((r) => ({ ...r, distance_km: distById!.get(r.id as string) ?? null }))
-                   .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity));
+                   .sort((a, b) => ((a.distance_km as number) ?? Infinity) - ((b.distance_km as number) ?? Infinity))
+                   .slice(offset, offset + limit);
         }
         return out.map((r) => shapeVacancy(r) as Record<string, unknown>);
       },

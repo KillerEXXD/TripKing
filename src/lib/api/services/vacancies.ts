@@ -23,9 +23,21 @@ export function getVacancies(params?: VacanciesQueryParams): Promise<Vacancy[]> 
   }
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
+  if (params?.offset != null && params.offset > 0) q.offset = params.offset;
   if (params?.sort) q.sort = params.sort;
   return apiClient.get<Api[]>('/vacancies', Object.keys(q).length ? q : undefined).then((r) => (r.data ?? []).map(transformVacancy));
 }
+/** Paginated variant for `useInfiniteVacancies`. Returns the page + a `hasMore` hint
+ *  inferred from `items.length === limit` (the backend doesn't echo a total — keeps the
+ *  list endpoint cheap). When `hasMore` is true, the next page starts at `offset + limit`. */
+export function getVacanciesPage(params: Omit<VacanciesQueryParams, 'offset' | 'limit'>, offset: number, limit: number): Promise<{ items: Vacancy[]; hasMore: boolean; nextOffset: number }> {
+  return getVacancies({ ...params, offset, limit }).then((items) => ({
+    items,
+    hasMore: items.length === limit,
+    nextOffset: offset + items.length,
+  }));
+}
+
 export function getVacancy(id: string): Promise<Vacancy> {
   return apiClient.get<Api>(`/vacancies/${id}`).then((r) => transformVacancy(unwrap(r.data)));
 }
