@@ -8,14 +8,13 @@ import { cityHooks } from '@/hooks/useAdminConfig';
 import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { PageHeader, PageShell } from '@/components/layout';
-import { Badge, Button, Card, Input, SectionLabel, StickyFooterCTA } from '@/components/ui';
+import { Badge, Button, Card, Input, SectionLabel, Select, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { KycGateNotice } from '@/components/driver';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatClockTime, formatShortDate } from '@/lib/utils';
 import type { Place, PostVacancyInput } from '@/types';
 
-const selectClass = 'h-11 w-full rounded-control border border-input bg-background px-3 text-base';
 const HOUR_MS = 3_600_000;
 const MIN_HOURS = 1;
 const MAX_HOURS = 24;
@@ -133,7 +132,7 @@ export function PostVacancyPage() {
     }
   }
 
-  const pageTitle = isEdit ? 'Edit your availability' : 'Post your availability';
+  const pageTitle = isEdit ? 'Edit your vacancy' : "I'm vacant";
 
   if (citiesQuery.isPending) {
     return (
@@ -146,7 +145,7 @@ export function PostVacancyPage() {
   if (isEdit && vacancyQuery.isPending) {
     return (
       <PageShell>
-        <PageHeader title="Edit your availability" backTo="/" />
+        <PageHeader title="Edit your vacancy" backTo="/" />
         <LoadingSkeleton rows={5} />
       </PageShell>
     );
@@ -154,7 +153,7 @@ export function PostVacancyPage() {
   if (isEdit && vacancyQuery.isError) {
     return (
       <PageShell>
-        <PageHeader title="Edit your availability" backTo="/" />
+        <PageHeader title="Edit your vacancy" backTo="/" />
         <ErrorState title="Couldn't load this vacancy" message="We couldn't fetch the details — try again." onRetry={() => void vacancyQuery.refetch()} />
       </PageShell>
     );
@@ -190,14 +189,14 @@ export function PostVacancyPage() {
         <div className="space-y-1.5">
           <label className="block space-y-1">
             <span className="text-sm font-medium">Where are you?</span>
-            <select className={selectClass} value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)}>
+            <Select tone="accent" value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)}>
               <option value="">Select your current city</option>
               {cities.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
           <PlacePinField value={currentPlace} onChange={setCurrentPlace} pinLabel="Pin your exact spot" pickerTitle="Pin your exact location" />
         </div>

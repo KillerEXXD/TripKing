@@ -179,7 +179,7 @@ export function DateTimeField({
                 ref={hourRef}
                 role="listbox"
                 aria-label="Hour"
-                className="h-56 w-12 overflow-y-auto scroll-smooth pr-1 [scrollbar-width:thin]"
+                className="h-64 w-12 overflow-y-auto scroll-smooth pr-1 [scrollbar-width:thin]"
               >
                 {HOURS_12.map((h) => {
                   const selected = draft.hour12 === h;
@@ -205,7 +205,7 @@ export function DateTimeField({
                 ref={minuteRef}
                 role="listbox"
                 aria-label="Minute"
-                className="h-56 w-12 overflow-y-auto scroll-smooth pr-1 [scrollbar-width:thin]"
+                className="h-64 w-12 overflow-y-auto scroll-smooth pr-1 [scrollbar-width:thin]"
               >
                 {MINUTES.map((m) => {
                   const selected = draft.minute === m;
@@ -249,8 +249,18 @@ export function DateTimeField({
               </div>
             </div>
           </div>
-          <div className="flex items-center justify-between border-t border-input bg-muted/30 px-3 py-2">
-            <div className="flex gap-1">
+          <div className="flex flex-col gap-2 border-t border-input bg-muted/30 px-3 py-2">
+            <Button
+              type="button"
+              variant="default"
+              onClick={commit}
+              disabled={!draft.date}
+              aria-label="Confirm date and time"
+              className="w-full"
+            >
+              OK
+            </Button>
+            <div className="flex justify-center gap-1">
               <Button type="button" variant="ghost" size="sm" onClick={clear}>
                 Clear
               </Button>
@@ -258,15 +268,6 @@ export function DateTimeField({
                 Today
               </Button>
             </div>
-            <Button
-              type="button"
-              size="sm"
-              onClick={commit}
-              disabled={!draft.date}
-              aria-label="Confirm date and time"
-            >
-              OK
-            </Button>
           </div>
         </div>
       </PopoverContent>

@@ -127,12 +127,12 @@ describe('PostedTripsPage', () => {
     expect(screen.getByText('share modal')).toBeInTheDocument();
   });
 
-  it('shows an "invited" badge + "View invites" link on cards with pending invitations', () => {
+  it('shows an "invited" badge on cards with pending invitations (no "View invites" link — invitees live on the trip detail page)', () => {
     setTrips({ data: [makeTrip({ status: 'open', pendingInvitationCount: 3 })] });
     renderPosted();
     fireEvent.click(screen.getByRole('button', { name: /^invited/i }));
     expect(screen.getByText(/3 invited/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /view invites/i }).getAttribute('href')).toMatch(/^\/trips\/t1\/invitations\?from=%2Fposted-trips%3Fstatus%3Dinvited/);
+    expect(screen.queryByRole('link', { name: /view invites/i })).toBeNull();
   });
 
   it('hides the invited badge when there are no pending invitations', () => {

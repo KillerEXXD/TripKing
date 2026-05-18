@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
 import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useDeclineTripInvite, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -86,9 +86,6 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
 
   const activeVehicles = (vehiclesQuery.data ?? []).filter((v) => v.isActive);
   const [vehicleId, setVehicleId] = useState('');
-  const [showQuote, setShowQuote] = useState(false);
-  const [quoteRate, setQuoteRate] = useState('');
-  const [quoteNote, setQuoteNote] = useState('');
   const chosenVehicleId = vehicleId || activeVehicles[0]?.id;
   const busy = applyMutation.isPending || withdrawMutation.isPending;
   // `withdrawn` means the driver pulled out (the store keeps the row instead of dropping it);
@@ -101,9 +98,8 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
       toast.error('Add a vehicle from your profile before applying.');
       return;
     }
-    const rate = Number(quoteRate);
     try {
-      const acc = await applyMutation.mutateAsync({ tripId: trip.id, input: { vehicleId: chosenVehicleId, quotedRatePerKm: Number.isFinite(rate) && rate > 0 ? Math.round(rate) : undefined, message: quoteNote.trim() || undefined } });
+      const acc = await applyMutation.mutateAsync({ tripId: trip.id, input: { vehicleId: chosenVehicleId } });
       recordApplication({ tripId: trip.id, acceptanceId: acc.id, appliedAt: acc.appliedAt, quotedRatePerKm: acc.applicantQuotedRatePerKm, message: acc.applicantMessage });
       toast.success('Applied — the trip manager has been notified.');
       // Briefly show the "Applied" pill so the driver sees their action
@@ -197,19 +193,6 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
               </select>
             </label>
           ) : null}
-          {showQuote ? (
-            <div className="space-y-2 rounded-lg border bg-white p-2.5">
-              <label className="flex items-center gap-2 text-sm">
-                <span className="shrink-0 text-secondary">My rate ₹</span>
-                <input type="number" inputMode="decimal" min={1} value={quoteRate} onChange={(e) => setQuoteRate(e.target.value)} placeholder={String(trip.ratePerKm)} className="h-9 w-full rounded-md border border-input px-2 text-sm" />
-                <span className="shrink-0 text-secondary">/km</span>
-              </label>
-              <input value={quoteNote} onChange={(e) => setQuoteNote(e.target.value)} placeholder="Short note to the manager (optional)" maxLength={140} className="h-9 w-full rounded-md border border-input px-2.5 text-sm" />
-            </div>
-          ) : null}
-          <button type="button" onClick={() => setShowQuote((v) => !v)} className="w-full text-xs text-secondary hover:text-foreground">
-            {showQuote ? 'Hide rate / note ▲' : 'Quote a different rate · add a note ▼'}
-          </button>
           <Button variant="full" size="lg" disabled={busy} onClick={() => void onApply()}>
             {applyMutation.isPending ? 'Applying…' : 'Apply for this trip'}
           </Button>
@@ -809,6 +792,11 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
         <div className="flex flex-wrap gap-1.5">
           {trip.carTypeLabel ? <Badge variant="outline">{trip.carTypeLabel}</Badge> : null}
           {trip.acRequired ? <Badge variant="outline">AC required</Badge> : null}
+          {trip.pendingInvitationCount > 0 ? (
+            <Badge variant="info">
+              <Send className="size-3" aria-hidden /> {trip.pendingInvitationCount} invited
+            </Badge>
+          ) : null}
         </div>
       </Card>
 

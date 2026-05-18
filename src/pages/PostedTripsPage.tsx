@@ -98,7 +98,6 @@ export function PostedTripCard({ trip, onShare, linkFromPath, footerSlot }: { tr
   // to the list — not to the detail page's default fallback.
   const fromSuffix = linkFromPath ? `?from=${encodeURIComponent(linkFromPath)}` : '';
   const dest = reviewable ? `/trips/${trip.id}/applicants${fromSuffix}` : `/trips/${trip.id}${fromSuffix}`;
-  const invitesDest = `/trips/${trip.id}/invitations${fromSuffix}`;
   // Trips posted within the last 5 minutes wear a sparkle NEW badge + "Posted Xm ago"
   // line. Pure client-side derived from `trip.createdAt` — no URL param needed; the
   // listing already sorts newest-first so the fresh card is at the top.
@@ -164,11 +163,6 @@ export function PostedTripCard({ trip, onShare, linkFromPath, footerSlot }: { tr
           <span />
         )}
         <div className="flex items-center gap-3">
-          {hasInvites ? (
-            <Link to={invitesDest} className="flex items-center text-blue-700">
-              View invites <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
-            </Link>
-          ) : null}
           <Link to={dest} className="flex items-center text-primary">
             {reviewable ? 'Review applicants' : 'View details'}
             <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
