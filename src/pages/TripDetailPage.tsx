@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
-import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useDeclineTripInvite, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useDeclineTripInvite, useStartOdoUploadUrl, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -23,6 +23,7 @@ import { InsufficientBalanceModal, type InsufficientBalanceSide } from '@/compon
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
+import { FileUpload } from '@/components/form';
 import { Badge, Button, Card, PriorityCard, StatusBanner } from '@/components/ui';
 import { LiveDot } from '@/components/ui/LiveDot';
 import { CountdownTimer } from '@/components/ui/CountdownTimer';
@@ -301,13 +302,15 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   );
 }
 
-/** Assigned-driver bottom CTA: start the trip with the passenger's OTP, then complete it. */
+/** Assigned-driver bottom CTA: start the trip with the passenger's OTP + odometer (photo + reading), then complete it. */
 function AcceptedDriverBar({ trip }: { trip: Trip }) {
   const startMutation = useStartTrip();
   const completeMutation = useCompleteTrip();
+  const startOdoUpload = useStartOdoUploadUrl();
   const [showStartForm, setShowStartForm] = useState(false);
   const [otp, setOtp] = useState('');
   const [startOdo, setStartOdo] = useState('');
+  const [startOdoPath, setStartOdoPath] = useState('');
   const [insufficient, setInsufficient] = useState<{ side: InsufficientBalanceSide; message?: string } | null>(null);
 
   async function onStart() {
@@ -321,12 +324,17 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
       toast.error('Enter your odometer reading before starting.');
       return;
     }
+    if (!startOdoPath) {
+      toast.error('Upload a photo of the starting odometer.');
+      return;
+    }
     try {
-      await startMutation.mutateAsync({ tripId: trip.id, input: { passengerOtp: code, startOdoReading: odoNum } });
+      await startMutation.mutateAsync({ tripId: trip.id, input: { passengerOtp: code, startOdoReading: odoNum, startOdoUrl: startOdoPath } });
       toast.success('Trip started — drive safe.');
       setShowStartForm(false);
       setOtp('');
       setStartOdo('');
+      setStartOdoPath('');
     } catch {
       toast.error("That OTP didn't match — double-check it with the passenger.");
     }
@@ -351,15 +359,14 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
         <>
           {showStartForm ? (
             <>
-              <input
-                type="text"
-                inputMode="numeric"
-                maxLength={8}
-                value={otp}
-                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                placeholder="Passenger OTP"
-                aria-label="Passenger OTP"
-                className="h-11 w-full rounded-md border border-input bg-white text-center font-mono text-lg tracking-[0.3em]"
+              <FileUpload
+                label="Starting odometer photo"
+                hint="Snap the dashboard so the reading is clearly visible."
+                value={startOdoPath || undefined}
+                required
+                capture="environment"
+                getUploadUrl={() => startOdoUpload.mutateAsync({ tripId: trip.id })}
+                onUploaded={(path) => setStartOdoPath(path)}
               />
               <input
                 type="number"
@@ -370,6 +377,16 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
                 placeholder="Start odometer reading (km)"
                 aria-label="Start odometer reading in kilometres"
                 className="h-11 w-full rounded-md border border-input bg-white px-3 text-base"
+              />
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={8}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                placeholder="Passenger OTP"
+                aria-label="Passenger OTP"
+                className="h-11 w-full rounded-md border border-input bg-white text-center font-mono text-lg tracking-[0.3em]"
               />
               <Button variant="full" size="lg" disabled={startMutation.isPending} onClick={() => void onStart()}>
                 {startMutation.isPending ? 'Starting…' : 'Start the trip'}

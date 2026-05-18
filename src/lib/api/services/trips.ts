@@ -4,8 +4,9 @@
  * (The matching `/trips/*` edge functions land in a later commit.)
  */
 import { apiClient, EmptyResponseError } from '@/lib/api/client';
+import { transformUploadUrl } from '@/lib/api/transforms/driver';
 import { toApiPostTrip, transformMyApplication, transformTrip, transformTripAcceptance } from '@/lib/api/transforms/trip';
-import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripMatchPreview, TripsQueryParams, UpdateTripDetailsInput, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, MyApplication, PostTripInput, Trip, TripAcceptance, TripInvitation, TripInvitationStatus, TripMatchPreview, TripsQueryParams, UpdateTripDetailsInput, UpdateTripPassengerInput, UploadUrlResponse } from '@/types';
 
 type Api = Record<string, unknown>;
 function unwrap<T>(d: T | null): T {
@@ -144,6 +145,19 @@ export function cancelAssignment(tripId: string, reason?: string): Promise<Trip>
   return apiClient.post<Api>(`/trips/${tripId}/cancel-assignment`, reason ? { reason } : {}).then((r) => transformTrip(unwrap(r.data)));
 }
 
+/** Signed PUT URL for the starting odometer photo into the private `trip-executions-photos` bucket. */
+export function getStartOdoUploadUrl(tripId: string): Promise<UploadUrlResponse> {
+  return apiClient
+    .post<Api>(`/trips/${tripId}/start-odo-upload-url`, {})
+    .then((r) => transformUploadUrl(unwrap(r.data)));
+}
+/** Signed PUT URL for the ending odometer photo. Trip must be in_progress. */
+export function getEndOdoUploadUrl(tripId: string): Promise<UploadUrlResponse> {
+  return apiClient
+    .post<Api>(`/trips/${tripId}/end-odo-upload-url`, {})
+    .then((r) => transformUploadUrl(unwrap(r.data)));
+}
+
 export function startTrip(tripId: string, input: { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number }): Promise<Trip> {
   return apiClient
     .post<Api>(`/trips/${tripId}/start`, {
@@ -154,12 +168,14 @@ export function startTrip(tripId: string, input: { passengerOtp: string; startOd
     .then((r) => transformTrip(unwrap(r.data)));
 }
 
-export function completeTrip(tripId: string, input?: { endOdoUrl?: string; endOdoReading?: number; driverNotes?: string }): Promise<Trip> {
+export function completeTrip(tripId: string, input?: { endOdoUrl?: string; endOdoReading?: number; tollPaidByDriver?: number; driverNotes?: string; driverReviewNote?: string }): Promise<Trip> {
   return apiClient
     .post<Api>(`/trips/${tripId}/complete`, {
       end_odo_url: input?.endOdoUrl ?? null,
       end_odo_reading: input?.endOdoReading ?? null,
+      toll_paid_by_driver: input?.tollPaidByDriver ?? 0,
       driver_notes: input?.driverNotes ?? null,
+      driver_review_note: input?.driverReviewNote ?? null,
     })
     .then((r) => transformTrip(unwrap(r.data)));
 }
