@@ -22,8 +22,22 @@ function futureLocal(daysFromNow: number, hour = 9): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Read the trip back via API + return the canonical fields the form serializes. */
-async function readTripShape(req: APIRequestContext, token: string, tripId: string): Promise<{ trip_type?: string; waypoints?: Array<{ city_id?: string }>; from_city_id?: string; to_city_id?: string; expected_end_at?: string | null }> {
+/** Read the trip back via API + return the canonical fields the form serializes.
+ *
+ * Waypoint shape note: the WAYPOINTS_JOIN on the server expands `city_id` into a nested
+ * `city: { id, name, ... }` object (see supabase/functions/trips/index.ts:88). The flat
+ * `city_id` column is NOT in the response — readback assertions must use `.city?.id`.
+ * (Previous version of this helper typed it as `{ city_id?: string }` which is what made
+ * round_trip + M1 think the readback was "unreliable" — it wasn't, the test was reading
+ * a field that doesn't exist on the response.)
+ */
+async function readTripShape(req: APIRequestContext, token: string, tripId: string): Promise<{
+  trip_type?: string;
+  waypoints?: Array<{ city?: { id?: string; name?: string }; arrive_at?: string | null; is_destination?: boolean; seq?: number }>;
+  from_city_id?: string;
+  to_city_id?: string;
+  expected_end_at?: string | null;
+}> {
   const r = await req.get(`${API_BASE}/trips/${tripId}`, { headers: { Authorization: `Bearer ${token}` } });
   const body = await r.json();
   return body?.data ?? {};
@@ -119,11 +133,11 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     expect(shape.trip_type).toBe('one_way');
   });
 
-  // Round-trip body shape: POST itself succeeds (waypoints are accepted with strictly
-  // monotonic arrive_at), but the readback's waypoints[].city_id is undefined — the joined
-  // shape isn't what we expected. Investigation deferred; the one_way test above proves the
-  // per-trip-type contract in principle.
-  test.skip('POST /trips round-trip → trip_type=round_trip + 3-waypoint chain + expected_end_at', async ({ request }) => {
+  // Round-trip body shape: previously skipped because the readback assertions checked
+  // `waypoints[i].city_id` which doesn't exist on the API response — the server's
+  // WAYPOINTS_JOIN expands city_id into a nested `city: { id, ... }` object. Fixed in this
+  // PR by re-typing readTripShape() and reading `.city.id` instead.
+  test('POST /trips round-trip → trip_type=round_trip + 3-waypoint chain + expected_end_at', async ({ request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     const cities = await getCities(request);
@@ -155,9 +169,10 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     expect(shape.trip_type).toBe('round_trip');
     expect(typeof shape.expected_end_at).toBe('string');
     expect(shape.waypoints?.length).toBe(3);
-    expect(shape.waypoints?.[0]?.city_id).toBe(cities[0]!.id);
-    expect(shape.waypoints?.[1]?.city_id).toBe(cities[1]!.id);
-    expect(shape.waypoints?.[2]?.city_id).toBe(cities[0]!.id);
+    // Sorted by seq on the server (sortWaypoints in supabase/functions/trips/index.ts:293).
+    expect(shape.waypoints?.[0]?.city?.id).toBe(cities[0]!.id);
+    expect(shape.waypoints?.[1]?.city?.id).toBe(cities[1]!.id);
+    expect(shape.waypoints?.[2]?.city?.id).toBe(cities[0]!.id);
   });
 });
 
@@ -206,10 +221,13 @@ test.describe('PostTripPage — multi-way trips (migration 024)', () => {
     const tripId = (await post.json())?.data?.id as string;
     const shape = await readTripShape(request, agent.token, tripId);
     expect(shape.trip_type).toBe('multi_way');
-    // The joined waypoints[] readback shape isn't reliable for city_id (same issue that
-    // skipped the round_trip test above) — assert on count + the persisted top-level
-    // from/to which the trigger mirrors from waypoints[0] / waypoints[last].
-    expect(shape.waypoints?.length).toBeGreaterThanOrEqual(3);
+    // Tighter assertions now that the readback shape is understood: 3 waypoints in the
+    // chain we posted, each nested-city id matches what we sent, and the top-level mirror
+    // columns agree.
+    expect(shape.waypoints?.length).toBe(3);
+    expect(shape.waypoints?.[0]?.city?.id).toBe(cities[0]!.id);
+    expect(shape.waypoints?.[1]?.city?.id).toBe(cities[1]!.id);
+    expect(shape.waypoints?.[2]?.city?.id).toBe(cities[2]!.id);
     expect(shape.from_city_id).toBe(cities[0]!.id);
     expect(shape.to_city_id).toBe(cities[2]!.id);
   });
