@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
+import { toast } from 'sonner';
 import { initSentry } from '@/lib/sentry';
 import { installGlobalErrorHandlers } from '@/lib/globalErrorHandlers';
 import { installSwErrorBridge } from '@/lib/swErrorBridge';
@@ -21,27 +22,32 @@ initPostHog();
 wireWebVitals();
 installConsoleHook();
 
-// Auto-updating service worker — new bundle activates immediately (no stale-bundle white screen).
-registerSW({
+// Service-worker update flow — when a new bundle is deployed, show a toast with a Refresh
+// action instead of auto-reloading the tab. Why: silent auto-reloads on a partly-typed form
+// or mid-flow can lose user state. The toast lets the user pick the moment.
+//
+// `onNeedRefresh` fires once the new SW has finished installing and is waiting to activate.
+// Tapping Refresh calls updateSW(true), which sends SKIP_WAITING to the SW and reloads the
+// page onto the new bundle. The SW's install handler no longer auto-skipWaiting itself —
+// that change lives in src/sw.ts.
+const updateSW = registerSW({
   immediate: true,
+  onNeedRefresh() {
+    toast.info('New version available', {
+      description: 'Refresh to load the latest update.',
+      duration: Infinity,
+      action: {
+        label: 'Refresh',
+        onClick: () => {
+          void updateSW(true);
+        },
+      },
+    });
+  },
   onRegisterError(error) {
     logger.debug('[PWA] service worker registration failed:', error);
   },
 });
-
-// When a new SW takes control of this client (after deploy + skipWaiting + clientsClaim),
-// reload so the open tab picks up the new JS bundle instead of running the old one until
-// the user manually refreshes. Without this, users see stale routing / stale code after a
-// deploy until they close the tab. The `refreshing` guard prevents reload loops on browsers
-// that fire `controllerchange` more than once during activation.
-if ('serviceWorker' in navigator) {
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return;
-    refreshing = true;
-    window.location.reload();
-  });
-}
 
 const rootEl = document.getElementById('root');
 if (!rootEl) {

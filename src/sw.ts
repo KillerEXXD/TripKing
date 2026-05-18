@@ -60,9 +60,13 @@ registerRoute(
   }),
 );
 
-// Auto-activate new SW versions (no stale-bundle white screen).
-self.addEventListener('install', () => {
-  void self.skipWaiting();
+// New SW installs but stays "waiting" until the page sends SKIP_WAITING (from the
+// "New version available — Refresh" toast wired in src/main.tsx). This gives the user
+// control over when the bundle swaps, instead of silently reloading mid-flow.
+self.addEventListener('message', (event) => {
+  if (event.data && (event.data as { type?: string }).type === 'SKIP_WAITING') {
+    void self.skipWaiting();
+  }
 });
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
