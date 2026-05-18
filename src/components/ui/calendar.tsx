@@ -21,7 +21,7 @@ function Calendar({ className, classNames, ...props }: DayPickerProps) {
         day_button:
           'inline-flex size-10 items-center justify-center rounded-full hover:bg-muted aria-selected:bg-primary aria-selected:text-primary-foreground aria-selected:hover:bg-primary/90 aria-selected:font-semibold aria-selected:shadow-md',
         today:
-          'font-bold text-primary [&>button]:ring-2 [&>button]:ring-primary [&>button]:ring-offset-1 aria-selected:text-primary-foreground aria-selected:[&>button]:ring-primary/40',
+          'font-bold text-primary [&_button]:border-2 [&_button]:border-primary aria-selected:text-primary-foreground',
         outside: 'text-muted-foreground/40',
         disabled: 'text-muted-foreground/40 pointer-events-none',
         ...classNames,

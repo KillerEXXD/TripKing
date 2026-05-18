@@ -162,10 +162,15 @@ export function DateTimeField({
           <CalendarIcon className="ml-2 size-4 shrink-0 text-muted-foreground" aria-hidden />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" onEscapeKeyDown={() => setOpen(false)}>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-[min(calc(100vw-1rem),22rem)] p-0 sm:w-auto sm:max-w-none"
+        onEscapeKeyDown={() => setOpen(false)}
+      >
         <div className="flex flex-col">
-          <div className="flex">
-            <div className="border-r border-input p-2">
+          <div className="flex flex-col sm:flex-row">
+            <div className="flex justify-center border-b border-input p-2 sm:border-b-0 sm:border-r">
               <Calendar
                 mode="single"
                 selected={draft.date}
@@ -174,7 +179,7 @@ export function DateTimeField({
                 defaultMonth={draft.date}
               />
             </div>
-            <div className="flex p-2">
+            <div className="flex justify-center p-2">
               <div
                 ref={hourRef}
                 role="listbox"
