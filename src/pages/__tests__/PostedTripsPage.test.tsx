@@ -157,6 +157,19 @@ describe('PostedTripsPage', () => {
     expect(screen.queryByText(/vellore → chennai/i)).toBeNull();
   });
 
+  it('within a status filter, sorts by createdAt descending (newest-posted first)', () => {
+    setTrips({ data: [
+      makeTrip({ id: 't-old', status: 'open', createdAt: '2099-05-30T00:00:00.000Z', fromCity: city('co', 'Old-from') }),
+      makeTrip({ id: 't-mid', status: 'open', createdAt: '2099-05-31T00:00:00.000Z', fromCity: city('cm', 'Mid-from') }),
+      makeTrip({ id: 't-new', status: 'open', createdAt: '2099-06-01T00:00:00.000Z', fromCity: city('cn', 'New-from') }),
+    ] });
+    renderPosted();
+    const cards = screen.getAllByText(/-from → chennai/i);
+    expect(cards[0]).toHaveTextContent(/^new-from/i);
+    expect(cards[1]).toHaveTextContent(/^mid-from/i);
+    expect(cards[2]).toHaveTextContent(/^old-from/i);
+  });
+
   it('All sorts trips by lifecycle priority (open → invited → has_applicants → … → cancelled)', () => {
     setTrips({ data: [
       makeTrip({ id: 't1', status: 'cancelled', fromCity: city('c1', 'Cancelled-from') }),
