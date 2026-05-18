@@ -292,7 +292,7 @@ export function VacanciesPage() {
 
       {isDriverView && myDriverId ? <IAmAvailableCard driverId={myDriverId} /> : null}
 
-      <div className="mb-3 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-3 flex flex-wrap gap-2 pb-1">
         <label className="sr-only" htmlFor="vac-current">Filter by where the driver is</label>
         <select id="vac-current" value={currentCityId} onChange={(e) => setCurrentCityId(e.target.value)} className={chipSelect}>
           <option value="">Driver in any city</option>

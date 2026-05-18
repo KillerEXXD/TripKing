@@ -146,7 +146,7 @@ export function IAmAvailableCard({ driverId }: Props) {
   const stop = (e: ReactMouseEvent) => e.stopPropagation();
 
   return (
-    <div className="mx-4 mt-3" data-testid="i-am-available-card">
+    <div className="mx-4 mb-3 mt-3" data-testid="i-am-available-card">
       {/*
         Visually matches the PriorityCard emerald tone (border-2, hover) but uses a bespoke layout.
         Even after PR 6 added rightAction + footerSlot, this card has a large left-side icon chip
