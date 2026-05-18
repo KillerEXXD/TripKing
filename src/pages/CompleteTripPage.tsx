@@ -131,14 +131,12 @@ export function CompleteTripPage() {
   }
 
   const endOdoNum = endOdoReading.trim() ? Number(endOdoReading) : null;
-  // The trip's start_odo_reading isn't exposed on the Trip type today — the server validates
-  // end > start on submit. The preview math here uses just end - <unknown> when needed; if the
-  // start reading were surfaced, we'd switch to a fully client-side preview. Phase 6 will
-  // surface it via the transform; for now the math degrades to "extra = 0" until submit.
+  const startOdoReading = trip.startOdoReading ?? null;
   const tollNum = toll.trim() ? Number(toll) : 0;
-  const preview = useMemoPreview(trip, endOdoNum, null, tollNum);
+  const preview = useMemoPreview(trip, endOdoNum, startOdoReading, tollNum);
 
-  const endValid = endOdoNum != null && Number.isFinite(endOdoNum) && endOdoNum > 0;
+  const endValid = endOdoNum != null && Number.isFinite(endOdoNum) && endOdoNum > 0
+    && (startOdoReading == null || endOdoNum > startOdoReading);
   const tollValid = !toll.trim() || (Number.isFinite(tollNum) && tollNum >= 0);
   const step1Valid = !!endOdoPath && endValid && tollValid;
 

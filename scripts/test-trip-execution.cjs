@@ -81,14 +81,21 @@ async function signIn(role, name) {
   const endSUEarly = await j('POST', `/trips/${tripId}/end-odo-upload-url`, { token: driver.token });
   check('POST /trips/:id/end-odo-upload-url before /start → 409 CONFLICT', endSUEarly.status === 409, `status=${endSUEarly.status}`);
 
+  // === Validation: missing odometer on /start ===
+  const startNoOdo = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp } });
+  check('POST /trips/:id/start without odo fields → 422 MISSING_ODOMETER', startNoOdo.status === 422 && startNoOdo.json?.error?.code === 'MISSING_ODOMETER', `status=${startNoOdo.status} code=${startNoOdo.json?.error?.code}`);
+
   // === Start with odometer ===
   const start = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 50000 } });
   check('POST /trips/:id/start with odo → 200, in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} err=${JSON.stringify(start.json?.error)}`);
+  check('GET /trips/:id (after start) carries flattened started_at + start_odo_reading on the row', !!start.json?.data?.execution?.started_at && start.json?.data?.execution?.start_odo_reading === 50000, `execution=${JSON.stringify(start.json?.data?.execution)}`);
 
   const endSU = await j('POST', `/trips/${tripId}/end-odo-upload-url`, { token: driver.token });
   check('POST /trips/:id/end-odo-upload-url (in_progress) → 200', endSU.status === 200 && !!endSU.json?.data?.signed_url, `status=${endSU.status}`);
 
   // === Validation ===
+  const completeNoOdo = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: {} });
+  check('complete without odo fields → 422 MISSING_ODOMETER', completeNoOdo.status === 422 && completeNoOdo.json?.error?.code === 'MISSING_ODOMETER', `status=${completeNoOdo.status} code=${completeNoOdo.json?.error?.code}`);
   const endLT = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 49000 } });
   check('complete with end_odo <= start → 422', endLT.status === 422, `status=${endLT.status}`);
   const negToll = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 50150, toll_paid_by_driver: -5 } });
@@ -111,6 +118,7 @@ async function signIn(role, name) {
   check('trip.toll_amount = 75', Number(tripView?.toll_amount) === 75, `got=${tripView?.toll_amount}`);
   check('trip.final_total_fare = 1825', Number(tripView?.final_total_fare) === 1825, `got=${tripView?.final_total_fare}`);
   check('trip.final_driver_payout = 1800', Number(tripView?.final_driver_payout) === 1800, `got=${tripView?.final_driver_payout}`);
+  check('GET /trips/:id (after complete) carries flattened completed_at + end_odo_reading + actual_distance_km on the embed', !!tripView?.execution?.completed_at && tripView?.execution?.end_odo_reading === 50125 && Number(tripView?.execution?.actual_distance_km) === 125, `execution=${JSON.stringify(tripView?.execution)}`);
 
   // === Passenger view (by OTP) ===
   const byOtp = (await j('GET', `/trips/by-otp/${otp}`)).json?.data;

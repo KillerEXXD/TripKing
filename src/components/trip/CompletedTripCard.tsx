@@ -18,10 +18,10 @@ export interface CompletedTripCardProps {
 }
 
 export function CompletedTripCard({ trip, linkFromPath }: CompletedTripCardProps) {
-  // Use `updatedAt` as a proxy for completion time until the transform surfaces
-  // `trip_executions.completed_at` (Phase 6). For a completed trip the status flip set
-  // `updated_at`, so this is monotonic and matches the desired "latest at top" sort.
-  const completedAt = trip.updatedAt ?? trip.createdAt;
+  // Prefer the precise `trip_executions.completed_at` surfaced by the transform; fall back
+  // to `updatedAt` on legacy completed rows that predate the embed (their trip_executions
+  // exists but completed_at may be null if the completion happened before the wizard wrote it).
+  const completedAt = trip.completedAt ?? trip.updatedAt ?? trip.createdAt;
   const finalPayout = trip.finalDriverPayout ?? trip.driverPayout;
   const totalFare = trip.finalTotalFare ?? trip.totalFare;
   const extraKm = trip.extraDistanceKm ?? null;

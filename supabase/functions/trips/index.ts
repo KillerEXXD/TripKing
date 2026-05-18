@@ -86,12 +86,19 @@ type Db = ReturnType<typeof serviceClient>;
 // includes the assigned driver (with live position) so a trip manager can track an in-progress trip on a map; from/to place joined alongside the curated cities;
 // waypoints (migration 024) joined as an ordered list so the client can render the route chain (one_way / round_trip / multi_way).
 const WAYPOINTS_JOIN = 'waypoints:trip_waypoints!trip_id(id, seq, city:cities!city_id(*), place:places!place_id(*), arrive_at, wait_minutes, is_destination, notes)';
+// trip_executions is 1:1 with trips (PK = trip_id) — embed it so list/detail responses carry
+// the start/end timestamps and odometer readings without a separate join on the client. The
+// frontend uses started_at/completed_at for sort + relative-time display, and start_odo_reading
+// to sharpen the completion-wizard's live payout preview.
+const EXECUTION_EMBED = 'execution:trip_executions!trip_id(started_at, completed_at, start_odo_reading, end_odo_reading, actual_distance_km, start_odo_url, end_odo_url, toll_paid_by_driver, driver_notes, driver_review_note)';
 const TRIP_SELECT =
-  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' +
+  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' + EXECUTION_EMBED + ', ' +
   'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, phone, profile_photo_url, kyc_status, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle))';
 // for the passenger portal (GET /trips/by-otp/:otp) — adds the driver's phone + the assigned vehicle.
+// Passenger sees completion timestamps for their bill card, but never the driver's notes / private review note.
+const BY_OTP_EXECUTION_EMBED = 'execution:trip_executions!trip_id(started_at, completed_at)';
 const BY_OTP_SELECT =
-  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' +
+  '*, posted_by_user:users!posted_by_user_id(display_handle), from_city:cities!from_city_id(*), to_city:cities!to_city_id(*), from_place:places!from_place_id(*), to_place:places!to_place_id(*), car_type:car_types(label), ' + WAYPOINTS_JOIN + ', ' + BY_OTP_EXECUTION_EMBED + ', ' +
   'assigned_driver:drivers!assigned_driver_id(id, user_id, full_name, phone, profile_photo_url, rating_avg, rating_count, total_trips_completed, current_lat, current_lng, current_location_at, user:users!user_id(display_handle)), ' +
   'assigned_vehicle:vehicles!assigned_vehicle_id(id, year, seats, ac, make:vehicle_makes(name), model:vehicle_models(name), car_type:car_types(label))';
 const ACCEPTANCE_SELECT =
@@ -1944,15 +1951,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const b = await readBody(req);
     const otpHash = await sha256hex(String(b.passenger_otp ?? ''));
     if (!trip.passenger_otp_hash || otpHash !== trip.passenger_otp_hash) return fail('INVALID_OTP', 'Incorrect passenger OTP', 401);
-    // Odometer capture: optional today (existing clients may omit it); the new wizard always sends
-    // both. Validate shape when supplied — non-negative integer reading + non-empty url. A later
-    // phase will flip these to required once all clients have rolled forward.
+    // Odometer capture is required on start (photo + reading) — the wizard always supplies
+    // both. Admin bypass keeps dev "force start" usable.
     const startOdoUrl = typeof b.start_odo_url === 'string' && b.start_odo_url ? b.start_odo_url : null;
     const startOdoReading = b.start_odo_reading == null || b.start_odo_reading === ''
       ? null
       : Number.isFinite(Number(b.start_odo_reading)) ? Math.trunc(Number(b.start_odo_reading)) : NaN;
     if (Number.isNaN(startOdoReading) || (startOdoReading != null && startOdoReading < 0)) {
       return fail('VALIDATION', 'start_odo_reading must be a non-negative integer', 422);
+    }
+    if (!isAdmin(u)) {
+      if (!startOdoUrl) return fail('MISSING_ODOMETER', 'start_odo_url is required (upload a photo of the starting odometer)', 422);
+      if (startOdoReading == null) return fail('MISSING_ODOMETER', 'start_odo_reading is required', 422);
     }
     const now = new Date().toISOString();
     await db.from('trips').update({ status: 'in_progress' }).eq('id', tripId);
@@ -1976,15 +1986,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (trip.status !== 'in_progress') return fail('CONFLICT', `Trip is "${trip.status}", not "in_progress"`, 409);
     const b = await readBody(req);
     const now = new Date().toISOString();
-    // End-odometer capture: optional today (existing clients may omit it); the new wizard sends
-    // both. Validate shape when supplied — non-negative integer + must exceed start_odo_reading
-    // (if a start reading exists). Toll defaults to 0; non-negative when supplied.
+    // End-odometer capture is required (photo + reading) and must exceed the start reading.
+    // The wizard always supplies both. Admin bypass keeps the dev path usable.
     const endOdoUrl = typeof b.end_odo_url === 'string' && b.end_odo_url ? b.end_odo_url : null;
     const endOdoReading = b.end_odo_reading == null || b.end_odo_reading === ''
       ? null
       : Number.isFinite(Number(b.end_odo_reading)) ? Math.trunc(Number(b.end_odo_reading)) : NaN;
     if (Number.isNaN(endOdoReading) || (endOdoReading != null && endOdoReading < 0)) {
       return fail('VALIDATION', 'end_odo_reading must be a non-negative integer', 422);
+    }
+    if (!isAdmin(u)) {
+      if (!endOdoUrl) return fail('MISSING_ODOMETER', 'end_odo_url is required (upload a photo of the ending odometer)', 422);
+      if (endOdoReading == null) return fail('MISSING_ODOMETER', 'end_odo_reading is required', 422);
     }
     const tollRaw = b.toll_paid_by_driver;
     const tollPaid = tollRaw == null || tollRaw === '' ? 0 : Number(tollRaw);

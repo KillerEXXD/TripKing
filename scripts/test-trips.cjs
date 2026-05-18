@@ -174,7 +174,8 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   // start: a non-assigned caller and a wrong OTP are rejected; the assigned driver with the right OTP starts it
   check('POST /trips/:id/start by a non-assigned caller → 403', (await j('POST', `/trips/${tid}/start`, { token, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } })).status === 403);
   check('POST /trips/:id/start (assigned driver, wrong OTP) → 401', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: '000001', start_odo_url: 'test://odo/start', start_odo_reading: 10000 } })).status === 401);
-  check('POST /trips/:id/start (negative odo reading) → 422', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp, start_odo_reading: -5 } })).status === 422);
+  check('POST /trips/:id/start (negative odo reading) → 422', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: -5 } })).status === 422);
+  check('POST /trips/:id/start (missing odometer) → 422 MISSING_ODOMETER', (await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp } })).status === 422);
   const start = await j('POST', `/trips/${tid}/start`, { token: dToken, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
   check('POST /trips/:id/start (assigned driver, valid OTP) → 200, in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
 
@@ -212,6 +213,7 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
     check('GET /trips?assigned_driver_id=<uuid> (authed, non-party) → contains the trip (browse-safe)', drivingById.status === 200 && (drivingById.json?.data || []).some((t) => t.id === tid), `len=${drivingById.json?.data?.length}`);
   }
 
+  check('POST /trips/:id/complete (missing odometer) → 422 MISSING_ODOMETER', (await j('POST', `/trips/${tid}/complete`, { token: dToken, body: {} })).status === 422);
   check('POST /trips/:id/complete (assigned driver, end <= start) → 422', (await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { end_odo_url: 'test://odo/end', end_odo_reading: 9000 } })).status === 422);
   check('POST /trips/:id/complete (assigned driver, negative toll) → 422', (await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10120, toll_paid_by_driver: -5 } })).status === 422);
   const complete = await j('POST', `/trips/${tid}/complete`, { token: dToken, body: { driver_notes: 'smoke', end_odo_url: 'test://odo/end', end_odo_reading: 10120, toll_paid_by_driver: 50, driver_review_note: 'Polite passenger' } });

@@ -82,6 +82,15 @@ export interface Trip {
   extraKmFare?: number;
   tollAmount?: number;
   finalDriverPayout?: number;
+  /** Flattened from the embedded trip_executions row (PR follow-up after the wizard shipped):
+   *  - startedAt / completedAt drive the "Completed X ago" timestamp + the Completed-tab sort
+   *  - startOdoReading sharpens the wizard's live extra-KM preview (math goes from
+   *    "extra = 0 until both readings typed" to "extra = endTyped − startStored"). */
+  startedAt?: string;
+  completedAt?: string;
+  startOdoReading?: number;
+  endOdoReading?: number;
+  actualDistanceKm?: number;
   /** Empty string means passenger details have not been entered yet. */
   passengerName: string;
   passengerPhone: string;
