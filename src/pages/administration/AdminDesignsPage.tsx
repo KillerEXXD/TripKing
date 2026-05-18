@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { SegmentedTabs } from '@/components/ui';
@@ -91,11 +91,17 @@ type Tab = 'pages' | 'design';
  */
 export function AdminDesignsPage() {
   const [tab, setTab] = useState<Tab>('design');
+  // The design tile on Home navigates here; users expect to land at the top of the page,
+  // not at whatever scroll position they had on Home. Mount-only scroll is fine — the page
+  // doesn't re-mount across tab changes (those are state-driven, not route-driven).
+  useEffect(() => { window.scrollTo(0, 0); }, []);
 
   return (
     <main className="mx-auto max-w-2xl space-y-5 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
-        <ArrowLeft className="size-4" aria-hidden /> Administration
+      {/* Back returns to Home (the Design Previews tile is on Home). For admins who reached
+          this from /administration, browser back still works. */}
+      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
       <header>
         <h1 className="text-2xl font-bold">Design previews</h1>

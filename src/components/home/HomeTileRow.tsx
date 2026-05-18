@@ -236,11 +236,9 @@ function ReferralTile({ code, link }: { code?: string; link?: string }) {
  */
 function DesignPreviewsTile() {
   return (
-    <a
-      href="https://trip-king-tour.vercel.app/"
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label="Open design previews — feedback site"
+    <Link
+      to="/administration/designs"
+      aria-label="Open design previews"
       className={cn(
         'flex min-w-0 items-center gap-3 rounded-card border border-l-4 border-black/5 p-3 shadow-card transition-shadow hover:shadow-md',
         'border-l-amber-500 bg-amber-50',
@@ -254,6 +252,6 @@ function DesignPreviewsTile() {
         <div className="truncate text-sm font-medium text-foreground">Review the new designs &amp; leave feedback</div>
       </div>
       <span className="shrink-0 text-xs font-medium text-amber-700">Open →</span>
-    </a>
+    </Link>
   );
 }

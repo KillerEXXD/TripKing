@@ -120,12 +120,14 @@ describe('HomeTileRow — Design previews tile (allowlist-gated)', () => {
     expect(screen.queryByRole('link', { name: /design previews/i })).toBeNull();
   });
 
-  it('shows the Design previews tile + links to the tour site when designPreviews is true', () => {
+  it('shows the Design previews tile + links to the IN-APP /administration/designs page when designPreviews is true', () => {
     vi.mocked(useAuth).mockReturnValue(mockUser({ designPreviews: true }));
     withRouter(<HomeTileRow role="driver" />);
     const tile = screen.getByRole('link', { name: /open design previews/i });
-    expect(tile).toHaveAttribute('href', 'https://trip-king-tour.vercel.app/');
-    expect(tile).toHaveAttribute('target', '_blank');
+    // Navigates IN-APP (React Router Link → relative href), NOT a new tab. Guard against a
+    // regression to the old external `target="_blank"` external-URL behaviour.
+    expect(tile).toHaveAttribute('href', '/administration/designs');
+    expect(tile).not.toHaveAttribute('target');
     expect(screen.getByText(/design previews/i)).toBeInTheDocument();
   });
 });

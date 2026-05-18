@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminDesignsPage } from '@/pages/administration/AdminDesignsPage';
@@ -57,5 +57,21 @@ describe('AdminDesignsPage', () => {
       const matches = screen.getAllByRole('link', { name }).filter((a) => a.getAttribute('href') === href);
       expect(matches.length, `expected ${href}`).toBeGreaterThan(0);
     }
+  });
+
+  it('back link points to Home (was "/administration" — now "/" so the page is reachable from the Home tile)', () => {
+    render(<Wrap><AdminDesignsPage /></Wrap>);
+    // The "Home" back link sits at the top of the page; design-row labels like
+    // "Home (dashboard)" and "Home cards + live tracking" also match /home/i, so use an
+    // exact-name regex (^Home$) to pick out just the back link.
+    const back = screen.getByRole('link', { name: /^Home$/ });
+    expect(back).toHaveAttribute('href', '/');
+  });
+
+  it('scrolls the window to top on mount (the page is reached from the Home tile; users expect to land at the top)', () => {
+    const scrollSpy = vi.fn();
+    Object.defineProperty(window, 'scrollTo', { value: scrollSpy, writable: true, configurable: true });
+    render(<Wrap><AdminDesignsPage /></Wrap>);
+    expect(scrollSpy).toHaveBeenCalledWith(0, 0);
   });
 });

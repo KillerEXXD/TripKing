@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import * as Sentry from '@sentry/react';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { AdminRoute } from '@/components/auth/AdminRoute';
+import { DesignsRoute } from '@/components/auth/DesignsRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { V2LayoutShell } from '@/components/v2/shared/V2LayoutShell';
 import { LoadingSkeleton, RouteErrorBoundary } from '@/components/feedback';
@@ -205,7 +206,10 @@ export function AppRoutes() {
             <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
             <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
             <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
-            <Route path="/administration/designs" element={<AdminRoute><AdminDesignsPage /></AdminRoute>} />
+            {/* /administration/designs uses a softer gate than the other admin routes — allowed
+                for admins AND users in the design-preview allowlist (feature_flags.designPreviews
+                from /auth/me, populated by the admin-managed list at /administration/config). */}
+            <Route path="/administration/designs" element={<DesignsRoute><AdminDesignsPage /></DesignsRoute>} />
           </Route>
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>
