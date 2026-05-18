@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronRight, ExternalLink } from 'lucide-react';
-import { SegmentedTabs } from '@/components/ui';
+import { ArrowLeft, Check, ChevronRight, ExternalLink, LayoutGrid, Layers } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { SKIN_PAGES } from '@/components/v2/shared/skinPages';
 
 interface DesignRoute {
@@ -111,15 +111,27 @@ export function AdminDesignsPage() {
         </p>
       </header>
 
-      <SegmentedTabs<Tab>
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'pages',  label: 'Pages' },
-          { value: 'design', label: 'Design' },
-        ]}
-        ariaLabel="Grouping"
-      />
+      {/* Dual-card toggle (not SegmentedTabs) — the pill segmented control was too subtle
+          here; reviewers were missing that this is a TWO-WAY view. Each toggle is a full
+          card with icon + label + helper line so both modes are visible at a glance, and
+          the active state has a strong emerald ring + check icon. */}
+      <div id="design-group-label" className="text-xs font-semibold uppercase tracking-wide text-secondary">Group by</div>
+      <div role="group" aria-labelledby="design-group-label" className="grid grid-cols-2 gap-3">
+        <ViewToggleCard
+          active={tab === 'pages'}
+          onClick={() => setTab('pages')}
+          icon={<Layers className="size-5" aria-hidden />}
+          label="Pages"
+          helper="Compare one screen across all 6 designs"
+        />
+        <ViewToggleCard
+          active={tab === 'design'}
+          onClick={() => setTab('design')}
+          icon={<LayoutGrid className="size-5" aria-hidden />}
+          label="Design"
+          helper="Walk all 9 screens within one direction"
+        />
+      </div>
 
       {tab === 'pages' ? <PagesTab /> : <DesignTab />}
     </main>
@@ -192,6 +204,53 @@ function DesignTab() {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Active state: emerald ring + tinted background + check badge — reads as "this is the
+ * selected view" at a glance. Inactive state: bordered card with hover, clearly clickable.
+ * Both halves of the toggle stay visible side-by-side so first-time users immediately see
+ * there are TWO ways to browse the designs (the original pill SegmentedTabs was too subtle).
+ */
+function ViewToggleCard({
+  active,
+  onClick,
+  icon,
+  label,
+  helper,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+  helper: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active ? 'true' : 'false'}
+      onClick={onClick}
+      className={cn(
+        'group flex flex-col items-start gap-1.5 rounded-card border-2 p-4 text-left transition-all',
+        active
+          ? 'border-emerald-500 bg-emerald-50 shadow-card'
+          : 'border-input bg-surface hover:border-emerald-300 hover:bg-emerald-50/40',
+      )}
+    >
+      <div className="flex w-full items-center justify-between">
+        <span className={cn('inline-flex size-9 items-center justify-center rounded-full', active ? 'bg-emerald-100 text-emerald-700' : 'bg-muted text-secondary')}>
+          {icon}
+        </span>
+        {active ? (
+          <span className="inline-flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+            <Check className="size-3" aria-hidden />
+          </span>
+        ) : null}
+      </div>
+      <div className={cn('text-base font-bold', active ? 'text-emerald-900' : 'text-foreground')}>{label}</div>
+      <div className={cn('text-xs leading-snug', active ? 'text-emerald-800' : 'text-secondary')}>{helper}</div>
+    </button>
   );
 }
 
