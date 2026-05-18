@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
 import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useDeclineTripInvite, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useDriverVehicles } from '@/hooks/useVehicles';
@@ -68,6 +69,84 @@ function Line({ label, value, muted, strong }: { label: string; value: string; m
       <span className={muted ? 'text-secondary' : undefined}>{label}</span>
       <span className={cn(strong ? 'text-lg text-emerald-700' : muted ? 'text-secondary' : 'font-medium')}>{value}</span>
     </div>
+  );
+}
+
+/** Driver-side banner: renders the diff carried by an unread `trip_updated` notification.
+ *  Each change is "before → after" so the driver sees exactly what changed since they
+ *  applied. CTAs: "Keep my application" marks the notification read (chip clears on the
+ *  Applied list). "Withdraw application" does the same plus fires the withdraw mutation.
+ *  Only shows when there's at least one unread trip_updated notification for this trip. */
+function TripUpdatedDiffBanner({ tripId, isApplied, acceptanceId }: { tripId: string; isApplied: boolean; acceptanceId?: string }) {
+  const { data: notifs } = useNotifications({ unreadOnly: true });
+  const markRead = useMarkNotificationRead();
+  const withdrawMutation = useWithdrawApplication();
+  const clearApplication = useMyApplicationsStore((s) => s.clearApplication);
+  const matching = (notifs ?? []).filter((n) => {
+    if (n.type !== 'trip_updated') return false;
+    const tid = (n.payloadJson as Record<string, unknown>)?.trip_id;
+    return tid === tripId;
+  });
+  if (matching.length === 0) return null;
+  // Show the newest notification's changes (the rest will all be marked read on dismiss).
+  const latest = matching[0];
+  const changes = (((latest.payloadJson as Record<string, unknown>)?.changes) ?? []) as Array<{ label: string; before: unknown; after: unknown; field: string }>;
+  const fmt = (field: string, v: unknown): string => {
+    if (v == null) return '—';
+    if (field === 'pickup_at' || field === 'expected_end_at') {
+      const d = new Date(String(v));
+      if (!Number.isNaN(d.getTime())) return formatPickupDateTime(d.toISOString());
+    }
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    return String(v);
+  };
+  const markAllRead = async () => {
+    await Promise.allSettled(matching.map((n) => markRead.mutateAsync(n.id)));
+  };
+  const onKeep = () => { void markAllRead(); };
+  const onWithdraw = async () => {
+    if (!acceptanceId) return;
+    if (!window.confirm('Withdraw your application from this trip?')) return;
+    try {
+      await withdrawMutation.mutateAsync({ tripId, acceptanceId });
+      clearApplication(tripId);
+      await markAllRead();
+      toast.success('Application withdrawn.');
+    } catch {
+      toast.error("Couldn't withdraw — please try again.");
+    }
+  };
+  return (
+    <Card className="gap-2 border-2 border-amber-300 bg-amber-50">
+      <div className="flex items-start gap-2">
+        <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-bold text-amber-900">The trip manager updated this trip</div>
+          <ul className="mt-2 space-y-1.5 rounded-lg border border-amber-200 bg-white/60 p-2.5 text-xs">
+            {changes.map((c) => (
+              <li key={c.field} className="flex flex-col gap-0.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-700">{c.label}</span>
+                <span>
+                  <span className="text-red-700 line-through">{fmt(c.field, c.before)}</span>
+                  <span className="mx-1 text-secondary">→</span>
+                  <span className="font-semibold text-emerald-700">{fmt(c.field, c.after)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={onKeep}>
+              {isApplied ? 'Keep my application' : 'Got it'}
+            </Button>
+            {isApplied && acceptanceId ? (
+              <Button type="button" size="sm" variant="outline" className="border-red-200 text-red-700 hover:bg-red-50" onClick={() => void onWithdraw()}>
+                Withdraw
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -696,6 +775,18 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
 
   return (
     <div className={cn('flex-1 space-y-3 p-4', (showApplyBar || showAcceptedBar) && 'pb-40')}>
+      {/* Driver-side "trip updated by poster" diff banner. Shows when there's an unread
+          `trip_updated` notification for this trip, with each change as a strikethrough
+          → bold diff line. CTAs: Keep (just dismiss/mark-read) and Withdraw (mark-read
+          + fire the existing withdraw mutation). Posters / admins don't see this — they
+          ARE the one who edited, so the banner would be self-referential. */}
+      {viewer.isDriver && !viewer.isPoster && !viewer.iPosted ? (
+        <TripUpdatedDiffBanner
+          tripId={trip.id}
+          isApplied={(!!myApplication && !myApplication.withdrawnAt) || (!myApplication && serverApplied)}
+          acceptanceId={myApplication?.acceptanceId ?? trip.myApplicationId ?? undefined}
+        />
+      ) : null}
       {viewer.isAssignedDriver && trip.status === 'selected' ? <SelectedDriverCard trip={trip} /> : null}
       {viewer.isPoster && trip.status === 'selected' ? <AwaitingAcceptanceBanner trip={trip} /> : null}
       {/* Agent-side "your driver declined" banner — fires when the trip's most recent driver
