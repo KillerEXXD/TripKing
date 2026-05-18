@@ -729,6 +729,9 @@ export function PostTripPage() {
                 <p className="mt-1 text-xs text-secondary">Commission, GST and the driver payout are calculated by TripKing — you&apos;ll see the final payout on the trip.</p>
               </div>
               <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" {...register('showFareToPassenger')} /> Show the fare to the passenger
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" {...register('extrasPaidByPassenger')} /> Packing / toll / permit extras paid by the passenger
               </label>
             </Card>
@@ -846,9 +849,6 @@ export function PostTripPage() {
               <Field label="Instructions for the driver (optional)">
                 <textarea rows={2} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base" {...register('driverInstructions')} />
               </Field>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input type="checkbox" {...register('showFareToPassenger')} /> Show the fare to the passenger
-              </label>
             </Card>
 
             {postTrip.isError ? <p className="text-sm text-red-700">Couldn&apos;t post the trip — please try again.</p> : null}
