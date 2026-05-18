@@ -26,7 +26,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { parseNearRadius, toKm, DRIVER_LOCATION_STALE_MINUTES } from '../_shared/geo.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
-import { cacheDelete } from '../_shared/cache.ts';
+import { cacheDelete, cacheDeletePattern, CacheTTL } from '../_shared/cache.ts';
 import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
 import { setCacheControl } from '../_shared/httpCache.ts';
 import { purgeCloudflareAsync, purgeUrlsFor } from '../_shared/cloudflarePurge.ts';
@@ -45,6 +45,12 @@ import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 const CACHE_EPOCH = 'v4';
 function invalidateDriverMe(userId: string): void {
   cacheDelete(`drivers:me:user-${userId}:${CACHE_EPOCH}`);
+}
+// Wipe the shared `drivers:detail:<id>` entry (heavy join cached on GET /drivers/:id).
+// Cheap — the entityKind/entityId index makes this O(log n).
+async function invalidateDriverDetail(driverId: string): Promise<void> {
+  cacheDeletePattern(`drivers:detail:${driverId}:*`);
+  await sharedCacheInvalidateEntity('driver', driverId);
 }
 
 /**
@@ -214,10 +220,26 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
   const id = segs[0];
   const sub = segs[1]; // 'location' | 'kyc' | 'kyc-docs' | 'kyc-doc-upload-url'
 
+  // Cache the heavy DRIVER_SELECT join (users + cities + vehicles+make+model+car_type).
+  // The row is the same for every viewer — per-viewer redaction (PII reveal, KYC strip) happens
+  // in respondDriver AFTER the cache lookup, so this entry is safe to share across callers.
   async function fetchDriver(driverId: string): Promise<Row | null> {
-    const { data, error } = await db.from('drivers').select(DRIVER_SELECT).eq('id', driverId).maybeSingle();
-    if (error) throw new Error(error.message);
-    return (data as Row) ?? null;
+    const { data } = await withCache<Row | null>(
+      {
+        key: `drivers:detail:${driverId}:${CACHE_EPOCH}`,
+        ttl: CacheTTL.SHORT,
+        tier: 'shared',
+        cacheType: 'profile',
+        entityKind: 'driver',
+        entityId: driverId,
+      },
+      async () => {
+        const { data, error } = await db.from('drivers').select(DRIVER_SELECT).eq('id', driverId).maybeSingle();
+        if (error) throw new Error(error.message);
+        return (data as Row) ?? null;
+      },
+    );
+    return data;
   }
   /**
    * owner/admin → full record + verification block;
@@ -437,6 +459,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
     invalidateDriverMe(ownerId);
+    await invalidateDriverDetail(id);
     return respondDriver(id, true);
   }
 
@@ -529,6 +552,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     if (error) return pgFail(error);
     await maybePromoteToReadyForApproval(db, 'driver', id);
     invalidateDriverMe(ownerId);
+    await invalidateDriverDetail(id);
     return respondDriver(id, true);
   }
 
@@ -556,6 +580,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
       payload_json: { kyc_status: next, kind: 'driver', ...(reason ? { note: reason } : {}) },
     });
     invalidateDriverMe(ownerId);
+    await invalidateDriverDetail(id);
     return respondDriver(id, true);
   }
 
@@ -593,6 +618,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
       payload_json: { is_active: b.is_active, kind: 'driver', ...(reason ? { reason } : {}) },
     });
     invalidateDriverMe(ownerId);
+    await invalidateDriverDetail(id);
     purgeVacanciesFor(id); // /vacancies cache must reflect the new is_active state (issue #21)
     // /vacancies list is now shared-tier (cache_type 'live', entity 'vacancy'/'list') — must
     // invalidate so the driver's vacancies reappear (or disappear) immediately for everyone.
@@ -611,6 +637,7 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
     const { error } = await db.from('drivers').update(patch).eq('id', id);
     if (error) return pgFail(error);
     invalidateDriverMe(ownerId);
+    await invalidateDriverDetail(id);
     return respondDriver(id, true);
   }
 

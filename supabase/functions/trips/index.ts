@@ -80,6 +80,17 @@ async function invalidateTripsList(): Promise<void> {
   cacheDeletePattern('trips:list:*');
   await sharedCacheInvalidateEntity('trip', 'list');
 }
+// Mutation on a specific trip — wipe its detail entry AND the list cache. The list cache is
+// shared by all viewers; the detail entry is keyed by tripId only (raw select; per-viewer
+// redaction happens after the cache lookup, so this entry is safe to share across callers).
+async function invalidateTrip(tripId: string): Promise<void> {
+  cacheDeletePattern('trips:list:*');
+  cacheDeletePattern(`trip:detail:${tripId}:*`);
+  await Promise.all([
+    sharedCacheInvalidateEntity('trip', 'list'),
+    sharedCacheInvalidateEntity('trip', tripId),
+  ]);
+}
 
 type Db = ReturnType<typeof serviceClient>;
 
@@ -1251,10 +1262,22 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
   if (!sub && req.method === 'GET') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to view a trip', 401);
-    const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', tripId).maybeSingle();
-    if (error) return fail('DB_ERROR', error.message, 500);
-    if (!data) return fail('NOT_FOUND', 'Trip not found', 404);
-    const raw = data as Record<string, unknown>;
+    // Cache the RAW select (heavy join: cities, places, waypoints, execution, assigned driver).
+    // Per-viewer enrichment (KYC, applicants, redaction, PII reveal + audit) runs AFTER the
+    // cache lookup so the audit log writes always happen. Audit is the side-effect we MUST NOT
+    // skip; the join is the expense we want to skip.
+    const detailKey = `trip:detail:${tripId}:${CACHE_EPOCH}`;
+    const { data: cachedRaw, hit: detailHit } = await withCache<Record<string, unknown> | null>(
+      { key: detailKey, ttl: CacheTTL.SHORT, tier: 'shared', cacheType: 'live', entityKind: 'trip', entityId: tripId },
+      async () => {
+        const { data, error } = await db.from('trips').select(TRIP_SELECT).eq('id', tripId).maybeSingle();
+        if (error) throw new Error(error.message);
+        return (data ?? null) as Record<string, unknown> | null;
+      },
+    );
+    if (!cachedRaw) return fail('NOT_FOUND', 'Trip not found', 404);
+    // Clone so per-viewer mutations (redaction, stamps) don't poison the cached object on this isolate.
+    const raw = { ...cachedRaw } as Record<string, unknown>;
     await enrichPostedByKyc([raw]);
     await enrichPendingInvitationCount([raw]);
     await enrichPlatformFeeBreakdown([raw]);
@@ -1327,7 +1350,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         }
       }
     }
-    return ok(redacted);
+    // Mark X-Cache so api_metrics.cache_status records the hit rate for this endpoint too.
+    // Response is per-viewer, so CDN scope stays private.
+    return setCacheControl(tagCacheHit(ok(redacted), detailHit), { ttl: CacheTTL.SHORT, scope: 'private' });
   }
 
   // ── /trips/:id/applicants ────────────────────────────────────────────────
@@ -1423,7 +1448,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
       await db.from('trips').update({ status: 'has_applicants' }).eq('id', tripId).eq('status', 'open');
       const { data: full } = await db.from('trip_acceptances').select(ACCEPTANCE_SELECT).eq('id', accId).single();
-      await invalidateTripsList();
+      await invalidateTrip(tripId);
       return ok(shapeAcceptance(full as Record<string, unknown>));
     }
     if (acceptanceId && !subsub && req.method === 'DELETE') {
@@ -1488,7 +1513,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
           });
         }
       }
-      await invalidateTripsList();
+      await invalidateTrip(tripId);
       return ok({ withdrawn: acceptanceId });
     }
     if (acceptanceId && subsub === 'reject' && req.method === 'POST') {
@@ -1503,7 +1528,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
       const { data, error } = await db.from('trip_acceptances').update({ status: 'rejected', decision_at: new Date().toISOString(), decision_note: (b.decision_note as string | null) ?? null }).eq('id', acceptanceId).eq('trip_id', tripId).select(ACCEPTANCE_SELECT).single();
       if (error) return pgFail(error);
-      await invalidateTripsList();
+      await invalidateTrip(tripId);
       return ok(shapeAcceptance(data as Record<string, unknown>));
     }
     return fail('METHOD_NOT_ALLOWED', `${req.method} not allowed`, 405);
@@ -1567,7 +1592,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       });
     }
     const t = await fullTrip(tripId, u!);
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     return ok(t);
   }
 
@@ -1715,7 +1740,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       payload_json: { trip_id: tripId },
     });
     const t = await fullTrip(tripId, u!);
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     // OTP echoed for dev parity; the agent UI uses this to copy/share with the passenger.
     return ok({ ...(t as Record<string, unknown>), passenger_otp: otp });
   }
@@ -1760,7 +1785,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       payload_json: { trip_id: tripId, reason },
     });
     const t = await fullTrip(tripId, u!);
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     return ok(t);
   }
 
@@ -1815,7 +1840,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       }
     }
     const t = await fullTrip(tripId, u!);
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     return ok(t);
   }
 
@@ -1972,7 +1997,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     );
     // Migration 039: trip is now consumed → the linked 'on_trip' vacancy expires.
     await syncVacanciesForTrip(db, 'start', tripId);
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -2054,7 +2079,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         payload_json: { trip_id: tripId },
       });
     }
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -2086,7 +2111,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         });
       }
     }
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
     return ok(await fullTrip(tripId, u!));
   }
 
@@ -2206,7 +2231,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (Object.keys(patch).length === 0) return ok(await fullTrip(tripId, u));
     const { error } = await db.from('trips').update(patch).eq('id', tripId);
     if (error) return pgFail(error);
-    await invalidateTripsList();
+    await invalidateTrip(tripId);
 
     // ── trip_updated fan-out ─────────────────────────────────────────────────
     // Notify every current applicant + every pending invitee that the trip changed,
