@@ -8,12 +8,16 @@ function Wrap({ children }: { children: React.ReactNode }) {
 }
 
 describe('AdminDesignsPage', () => {
-  it('renders the heading + Pages/Design tab strip with Design selected by default', () => {
+  it('renders the heading + Pages/Design toggle with Design pressed by default', () => {
     render(<Wrap><AdminDesignsPage /></Wrap>);
     expect(screen.getByRole('heading', { name: /design previews/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /pages/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /design/i })).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /design/i })).toHaveAttribute('aria-selected', 'true');
+    // The pill SegmentedTabs was replaced with a dual ViewToggleCard set (clearer two-way
+    // visual). Each card is a plain <button> with aria-pressed — NOT role="tab" (there's no
+    // associated tabpanel). Match by the visible label text.
+    expect(screen.getByRole('button', { name: /pages.*compare one screen/i })).toBeInTheDocument();
+    const designBtn = screen.getByRole('button', { name: /design.*walk all 9 screens/i });
+    expect(designBtn).toBeInTheDocument();
+    expect(designBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('Design tab: lists all 6 prototype skins with Open buttons that carry ?nav=design', () => {
@@ -43,7 +47,9 @@ describe('AdminDesignsPage', () => {
 
   it('Pages tab: lists 9 page rows, all defaulting to /v2 with ?nav=pages', () => {
     render(<Wrap><AdminDesignsPage /></Wrap>);
-    fireEvent.click(screen.getByRole('tab', { name: /pages/i }));
+    // Click the Pages toggle card (matched by its helper text to disambiguate from
+    // design-row labels that also contain "Pages" / "Page").
+    fireEvent.click(screen.getByRole('button', { name: /pages.*compare one screen/i }));
     // 9 SKIN_PAGES entries — assert the most distinct ones are present
     const expected = [
       ['/v2?nav=pages', /home \(dashboard\)/i],
