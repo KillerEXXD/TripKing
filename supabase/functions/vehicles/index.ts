@@ -38,6 +38,22 @@ const SLOT_TO_COL: Record<PhotoSlot, string> = {
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 
+/** Reject `insurance_expiry` / `permit_expiry` in the past. The client-side date picker
+ *  has a `min=today` guard (PR #282) but a direct API caller (curl, seed, mobile WebView
+ *  that ignores the attribute) can still slip a 1930 date through — and then the apply-to-trip
+ *  eligibility check blocks every trip silently. Same UTC-date check the drivers fn uses for
+ *  `driver_license_expiry`. Returns null when valid, a fail() response when not. */
+function validateExpiryFields(b: Row): Response | null {
+  const today = new Date().toISOString().slice(0, 10);
+  for (const field of ['insurance_expiry', 'permit_expiry'] as const) {
+    const raw = str(b[field]);
+    if (raw && raw < today) {
+      return fail('VALIDATION', `${field} (${raw}) is in the past`, 422);
+    }
+  }
+  return null;
+}
+
 async function eligibilityFor(db: Db, vehicles: Row[]): Promise<Row[]> {
   if (vehicles.length === 0) return vehicles;
   const { data: s } = await db.from('app_settings').select('min_vehicle_year').eq('id', 1).maybeSingle();
@@ -110,6 +126,8 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     const b = await readBody(req);
     if (!b.car_type_id || b.year === undefined || b.year === null) return fail('VALIDATION', 'car_type_id and year are required', 422);
     delete b.eligibility_status; // derived, never stored
+    const expErr = validateExpiryFields(b);
+    if (expErr) return expErr;
     const { data: created, error } = await db.from('vehicles').insert({ ...b, driver_id: did }).select('id').single();
     if (error) return pgFail(error);
     await maybePromoteToReadyForApproval(db, 'driver', did);
@@ -173,6 +191,8 @@ const handler = withTiming('vehicles', async (req: Request): Promise<Response> =
     delete b.id;
     delete b.eligibility_status; // derived, never stored
     if (Object.keys(b).length === 0) return fail('VALIDATION', 'Nothing to update', 422);
+    const expErr = validateExpiryFields(b);
+    if (expErr) return expErr;
     const { error } = await db.from('vehicles').update(b).eq('id', id);
     if (error) return pgFail(error);
     await maybePromoteToReadyForApproval(db, 'driver', owner.driverId);

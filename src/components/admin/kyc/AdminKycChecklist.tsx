@@ -30,6 +30,13 @@ export interface AdminKycSubject {
   verification?: VerificationSummary;
 }
 
+/** True when a `YYYY-MM-DD` date string is strictly before today (browser TZ). Used to flag
+ *  DL / insurance / permit expiries that snuck through with a typo'd year (e.g. 1930). */
+function isPastDate(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+  return iso < new Date().toISOString().slice(0, 10);
+}
+
 function StepIcon({ status }: { status: VerificationStepStatus }) {
   if (status === 'done') return <CheckCircle2 className="size-5 shrink-0 text-emerald-600" aria-hidden />;
   if (status === 'action_needed') return <TriangleAlert className="size-5 shrink-0 text-amber-600" aria-hidden />;
@@ -80,11 +87,11 @@ function DocTile({ label, url }: { label: string; url?: string }) {
   );
 }
 
-function Field({ label, value }: { label: string; value?: string | number | null }) {
+function Field({ label, value, tone }: { label: string; value?: string | number | null; tone?: 'danger' }) {
   return (
     <div>
       <div className="text-[11px] font-semibold text-secondary">{label}</div>
-      <div className="text-sm">{value === undefined || value === null || value === '' ? '—' : value}</div>
+      <div className={`text-sm${tone === 'danger' ? ' font-semibold text-red-700' : ''}`}>{value === undefined || value === null || value === '' ? '—' : value}</div>
     </div>
   );
 }
@@ -100,7 +107,19 @@ function DocumentsPanel({ kind, subjectId }: { kind: AdminKycKind; subjectId: st
     <div className="space-y-2">
       <div className="text-xs text-secondary">
         Aadhaar: {docs.aadhaarNumberMasked ?? '—'}
-        {kind === 'driver' ? ` · Licence: ${docs.driverLicenseNumber ?? '—'}${docs.driverLicenseExpiry ? ` (exp ${docs.driverLicenseExpiry})` : ''}` : ''}
+        {kind === 'driver' ? (
+          <>
+            {' · '}Licence: {docs.driverLicenseNumber ?? '—'}
+            {docs.driverLicenseExpiry ? (
+              // Red highlight on a past expiry so the admin reviewer can't miss a typo'd
+              // year (e.g. 1930) and accidentally approve a row that will then block
+              // every apply attempt with "Licence expired".
+              <span className={isPastDate(docs.driverLicenseExpiry) ? 'font-semibold text-red-700' : ''}>
+                {' '}(exp {docs.driverLicenseExpiry}{isPastDate(docs.driverLicenseExpiry) ? ' — EXPIRED' : ''})
+              </span>
+            ) : null}
+          </>
+        ) : null}
         {docs.kycDocsSubmittedAt ? ` · submitted ${new Date(docs.kycDocsSubmittedAt).toLocaleDateString('en-IN')}` : ''}
       </div>
       <div className={`grid gap-2 ${kind === 'driver' ? 'grid-cols-2' : 'grid-cols-3'}`}>
@@ -138,7 +157,18 @@ function VehiclePanel({ driverId, mode }: { driverId: string; mode: 'vehicle' | 
           <Field label="Type" value={v.carTypeLabel} />
           <Field label="Fuel" value={v.fuelTypeLabel} />
           <Field label="AC" value={v.ac ? 'Yes' : 'No'} />
-          <Field label="Insurance exp" value={v.insuranceExpiry} />
+          <Field
+            label="Insurance exp"
+            value={v.insuranceExpiry ? `${v.insuranceExpiry}${isPastDate(v.insuranceExpiry) ? ' — EXPIRED' : ''}` : null}
+            tone={isPastDate(v.insuranceExpiry) ? 'danger' : undefined}
+          />
+          {v.permitExpiry ? (
+            <Field
+              label="Permit exp"
+              value={`${v.permitExpiry}${isPastDate(v.permitExpiry) ? ' — EXPIRED' : ''}`}
+              tone={isPastDate(v.permitExpiry) ? 'danger' : undefined}
+            />
+          ) : null}
         </div>
       </div>
     );
