@@ -22,7 +22,7 @@ function ChargeRow({ e }: { e: CashWalletLedgerEntry }) {
           <div className="text-[11px] text-secondary">
             {date} · {sourceLabel}
             {e.referenceType === 'trip' && e.referenceId ? (
-              <> · <Link to={`/trips/${e.referenceId}`} className="font-medium text-primary underline">trip</Link></>
+              <> · <Link to={`/app/trips/${e.referenceId}`} className="font-medium text-primary underline">trip</Link></>
             ) : null}
           </div>
         </div>
@@ -33,7 +33,7 @@ function ChargeRow({ e }: { e: CashWalletLedgerEntry }) {
 }
 
 /**
- * `/wallet/charges` — Stage 3: receipts page showing every platform-fee debit
+ * `/app/wallet/charges` — Stage 3: receipts page showing every platform-fee debit
  * from this user's wallet (their own side only — the API is per-user). Pulls
  * the existing ledger and filters to `fee_debit` entries client-side.
  */
@@ -43,7 +43,7 @@ export function WalletChargesPage() {
 
   return (
     <main className="mx-auto max-w-3xl space-y-4 p-6">
-      <Link to="/wallet" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/wallet" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Wallet
       </Link>
       <h1 className="text-2xl font-bold">Platform-fee charges</h1>

@@ -15,7 +15,7 @@ describe('SkinSwitcher', () => {
   it('renders a Back to Designs link pointing at /administration/designs', () => {
     renderAt('/v2/trips');
     const back = screen.getByRole('link', { name: /back to design previews/i });
-    expect(back).toHaveAttribute('href', '/administration/designs');
+    expect(back).toHaveAttribute('href', '/app/administration/designs');
   });
 
   it('chip rail wraps to multiple lines so no chip is clipped on narrow viewports', () => {

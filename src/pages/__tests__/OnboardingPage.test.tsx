@@ -43,9 +43,9 @@ function setMutations(driverMut = mkMutation(), agentMut = mkMutation()) {
 
 function renderOnboarding() {
   return render(
-    <MemoryRouter initialEntries={['/onboarding']}>
+    <MemoryRouter initialEntries={['/app/onboarding']}>
       <Routes>
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/app/onboarding" element={<OnboardingPage />} />
         <Route path="/" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,

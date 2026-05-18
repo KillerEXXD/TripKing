@@ -10,33 +10,33 @@ export interface VerificationStepMeta {
 }
 
 export const DRIVER_VERIFICATION_STEPS: VerificationStepMeta[] = [
-  { key: 'details', title: 'Your details', why: 'Your name and home city — done when you signed up. Tap to edit.', route: () => '/profile#edit'},
+  { key: 'details', title: 'Your details', why: 'Your name and home city — done when you signed up. Tap to edit.', route: () => '/app/profile#edit'},
   {
     key: 'documents',
     title: 'Identity documents',
     why: 'Aadhaar (front & back), driving licence and a selfie — so we can confirm you are a real, licensed driver. Only admins see them.',
-    route: () => '/verify/documents',
+    route: () => '/app/verify/documents',
   },
-  { key: 'vehicle', title: 'Add your vehicle', why: 'The make, model, year and fuel type of the car you will drive.', route: () => '/vehicles/new' },
+  { key: 'vehicle', title: 'Add your vehicle', why: 'The make, model, year and fuel type of the car you will drive.', route: () => '/app/vehicles/new' },
   {
     key: 'vehicle_photos',
     title: 'Vehicle photos & papers',
     why: 'Photos of the car — front, back, both sides and the number plate — plus the RC book and insurance.',
-    route: (vid) => (vid ? `/vehicles/${vid}/photos` : '/vehicles/new'),
+    route: (vid) => (vid ? `/app/vehicles/${vid}/photos` : '/app/vehicles/new'),
   },
-  { key: 'video_call', title: 'Video verification', why: 'A quick video call so an admin can match your face to your documents and check the car is roadworthy.', route: () => '/verify/video-call' },
+  { key: 'video_call', title: 'Video verification', why: 'A quick video call so an admin can match your face to your documents and check the car is roadworthy.', route: () => '/app/verify/video-call' },
 ];
 
 /** The trip-manager (agent) verification checklist — Aadhaar + selfie + a video call, no vehicle/licence. */
 export const AGENT_VERIFICATION_STEPS: VerificationStepMeta[] = [
-  { key: 'details', title: 'Your details', why: 'Your name and business city — done when you signed up. Tap to edit.', route: () => '/profile#edit'},
+  { key: 'details', title: 'Your details', why: 'Your name and business city — done when you signed up. Tap to edit.', route: () => '/app/profile#edit'},
   {
     key: 'documents',
     title: 'Identity documents',
     why: 'Aadhaar (front & back) and a selfie — so we can confirm who you are. Only admins see them.',
-    route: () => '/verify/documents',
+    route: () => '/app/verify/documents',
   },
-  { key: 'video_call', title: 'Video verification', why: 'A quick video call so an admin can match your face to your documents.', route: () => '/verify/video-call' },
+  { key: 'video_call', title: 'Video verification', why: 'A quick video call so an admin can match your face to your documents.', route: () => '/app/verify/video-call' },
 ];
 
 /** The next step the user should act on (the first `todo` / `action_needed`), or null if they're just waiting. */

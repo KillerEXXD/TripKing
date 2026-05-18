@@ -54,7 +54,7 @@ export function InsufficientBalanceModal({ side, message, onClose }: Props) {
           <div className="mt-4 grid grid-cols-2 gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onClose}>Dismiss</Button>
             <Button type="button" variant="full" size="sm" asChild>
-              <Link to="/wallet" onClick={onClose}>{copy.ownAction}</Link>
+              <Link to="/app/wallet" onClick={onClose}>{copy.ownAction}</Link>
             </Button>
           </div>
         </Dialog.Content>

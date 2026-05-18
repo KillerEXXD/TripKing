@@ -10,14 +10,14 @@ function v(steps: VerificationSummary['steps']): VerificationSummary {
 describe('verificationSteps', () => {
   it('the driver checklist has the 5 steps in order, routing each to its screen', () => {
     expect(DRIVER_VERIFICATION_STEPS.map((s) => s.key)).toEqual(['details', 'documents', 'vehicle', 'vehicle_photos', 'video_call']);
-    expect(DRIVER_VERIFICATION_STEPS[1].route(undefined)).toBe('/verify/documents');
-    expect(DRIVER_VERIFICATION_STEPS[3].route('veh-1')).toBe('/vehicles/veh-1/photos');
-    expect(DRIVER_VERIFICATION_STEPS[3].route(undefined)).toBe('/vehicles/new');
+    expect(DRIVER_VERIFICATION_STEPS[1].route(undefined)).toBe('/app/verify/documents');
+    expect(DRIVER_VERIFICATION_STEPS[3].route('veh-1')).toBe('/app/vehicles/veh-1/photos');
+    expect(DRIVER_VERIFICATION_STEPS[3].route(undefined)).toBe('/app/vehicles/new');
   });
 
   it('the agent checklist is the 3-step variant — details, documents, video_call (no vehicle/licence)', () => {
     expect(AGENT_VERIFICATION_STEPS.map((s) => s.key)).toEqual(['details', 'documents', 'video_call']);
-    expect(AGENT_VERIFICATION_STEPS.map((s) => s.route(undefined))).toEqual(['/profile#edit', '/verify/documents', '/verify/video-call']);
+    expect(AGENT_VERIFICATION_STEPS.map((s) => s.route(undefined))).toEqual(['/app/profile#edit', '/app/verify/documents', '/app/verify/video-call']);
   });
 
   it('nextActionableStep defaults to the driver checklist', () => {

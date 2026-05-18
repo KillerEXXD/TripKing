@@ -49,7 +49,7 @@ function Body({ a }: { a: DriverAnalytics }) {
         message={a.hasDriverProfile ? "Once a trip manager picks you for a trip, your earnings and history show up here." : 'Set up your driver profile and start applying — your earnings and history will show up here.'}
         action={
           <Button asChild variant="full" size="sm">
-            <Link to="/trips">Browse trips</Link>
+            <Link to="/app/trips">Browse trips</Link>
           </Button>
         }
       />
@@ -76,7 +76,7 @@ function Body({ a }: { a: DriverAnalytics }) {
       </Card>
 
       <Card className="gap-1">
-        <Link to="/my-trips" className="text-sm font-medium text-primary underline">
+        <Link to="/app/my-trips" className="text-sm font-medium text-primary underline">
           See all your trips →
         </Link>
       </Card>
@@ -87,7 +87,7 @@ function Body({ a }: { a: DriverAnalytics }) {
 }
 
 /**
- * `/my-earnings` — the signed-in driver's earnings & history (the `/analytics/driver` blob for the
+ * `/app/my-earnings` — the signed-in driver's earnings & history (the `/app/analytics/driver` blob for the
  * caller): ₹ earned / pending, trips completed + by-status, distance driven, applications won/pending,
  * reviews received, and a 6-month earnings chart. Linked from the driver profile and home.
  */

@@ -5,7 +5,7 @@ import { useDriverKycDocs, useAgentKycDocs } from '@/hooks/useDrivers';
 import type { KycDocs } from '@/types';
 
 /**
- * "Your documents" — shows the signed-in user's submitted KYC docs on `/profile`.
+ * "Your documents" — shows the signed-in user's submitted KYC docs on `/app/profile`.
  * Aadhaar (front + back), Driver License (driver only), and the selfie used for
  * the video call gate. URLs are 5-minute signed download links from private
  * storage — they refresh on each query. Tap a row → opens the doc in a new tab.

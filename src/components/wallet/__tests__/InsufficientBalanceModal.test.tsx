@@ -12,7 +12,7 @@ describe('InsufficientBalanceModal', () => {
     render(<Wrap><InsufficientBalanceModal side="driver" onClose={() => undefined} /></Wrap>);
     expect(screen.getByText(/Driver wallet is short/i)).toBeInTheDocument();
     const link = screen.getByRole('link', { name: /top up my wallet/i });
-    expect(link).toHaveAttribute('href', '/wallet');
+    expect(link).toHaveAttribute('href', '/app/wallet');
   });
 
   it('renders agent-side copy', () => {

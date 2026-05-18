@@ -38,7 +38,7 @@ export function EditorialProfilePage() {
       </header>
 
       <nav aria-label="Reading list" className="mt-6 divide-y divide-border">
-        <ReadLink to="/profile">Full v1 profile</ReadLink>
+        <ReadLink to="/app/profile">Full v1 profile</ReadLink>
         <ReadLink to="/v5/trips">Browse trips</ReadLink>
         <button
           type="button"

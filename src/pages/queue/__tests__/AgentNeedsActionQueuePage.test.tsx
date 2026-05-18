@@ -21,9 +21,9 @@ function setTrips(s: QS = {}) {
 
 function renderQ() {
   return render(
-    <MemoryRouter initialEntries={['/queue/needs-action']}>
+    <MemoryRouter initialEntries={['/app/queue/needs-action']}>
       <Routes>
-        <Route path="/queue/needs-action" element={<AgentNeedsActionQueuePage />} />
+        <Route path="/app/queue/needs-action" element={<AgentNeedsActionQueuePage />} />
         <Route path="/" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,
@@ -48,7 +48,7 @@ describe('AgentNeedsActionQueuePage', () => {
     setTrips({ data: [makeTrip({ id: 'abc' })] });
     renderQ();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
-    expect(link).toHaveAttribute('href', '/trips/abc/applicants?from=/queue/needs-action');
+    expect(link).toHaveAttribute('href', '/app/trips/abc/applicants?from=/queue/needs-action');
   });
 
   it('back button goes to Home', () => {

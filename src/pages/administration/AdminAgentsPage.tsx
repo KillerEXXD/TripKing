@@ -35,7 +35,7 @@ function AgentCard({ a }: { a: Agent }) {
   return (
     <Card className="gap-2 transition-colors hover:border-primary/40">
       <div className="flex items-start gap-3">
-        <Link to={`/agents/${a.id}`} className="flex flex-1 items-start gap-3 min-w-0">
+        <Link to={`/app/agents/${a.id}`} className="flex flex-1 items-start gap-3 min-w-0">
           {a.profilePhotoUrl ? (
             <img src={a.profilePhotoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
           ) : (
@@ -59,7 +59,7 @@ function AgentCard({ a }: { a: Agent }) {
             </div>
           </div>
         </Link>
-        <Link to={`/administration/kyc?agentId=${a.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
+        <Link to={`/app/administration/kyc?agentId=${a.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
           KYC →
         </Link>
       </div>
@@ -75,7 +75,7 @@ function AgentCard({ a }: { a: Agent }) {
 const PAGE_SIZE = 50;
 
 /**
- * `/administration/agents` — read-only admin agents directory. Defaults to "All".
+ * `/app/administration/agents` — read-only admin agents directory. Defaults to "All".
  * Server-paginated via `useInfiniteAgents` (50/page); IntersectionObserver auto-fetches
  * the next page. Header shows the server total.
  */
@@ -107,7 +107,7 @@ export function AdminAgentsPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <div className="flex items-baseline justify-between gap-2">
@@ -116,7 +116,7 @@ export function AdminAgentsPage() {
       </div>
       <p className="text-sm text-secondary">
         Read-only directory. Move an agent through verification in the{' '}
-        <Link to="/administration/kyc" className="text-primary underline">
+        <Link to="/app/administration/kyc" className="text-primary underline">
           KYC review queue
         </Link>
         .

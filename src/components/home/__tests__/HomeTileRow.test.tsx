@@ -44,15 +44,15 @@ describe('HomeTileRow — driver', () => {
     withRouter(<HomeTileRow role="driver" />);
 
     // Earnings tile -> formatted ₹ total + the trip count subline.
-    expect(screen.getByRole('link', { name: /earnings/i })).toHaveAttribute('href', '/my-earnings');
+    expect(screen.getByRole('link', { name: /earnings/i })).toHaveAttribute('href', '/app/my-earnings');
     expect(screen.getByText(/14 trips/)).toBeInTheDocument();
 
     // Analytics tile -> count headline.
-    expect(screen.getByRole('link', { name: /analytics/i })).toHaveAttribute('href', '/analytics');
+    expect(screen.getByRole('link', { name: /analytics/i })).toHaveAttribute('href', '/app/analytics');
     expect(screen.getByText('14')).toBeInTheDocument();
 
     // Referral tile -> code visible inside its link.
-    expect(screen.getByRole('link', { name: /refer and earn/i })).toHaveAttribute('href', '/referrals');
+    expect(screen.getByRole('link', { name: /refer and earn/i })).toHaveAttribute('href', '/app/referrals');
     expect(screen.getByText('RAVI23')).toBeInTheDocument();
   });
 
@@ -79,7 +79,7 @@ describe('HomeTileRow — agent', () => {
 
     withRouter(<HomeTileRow role="agent" />);
 
-    expect(screen.getByRole('link', { name: /earnings/i })).toHaveAttribute('href', '/analytics');
+    expect(screen.getByRole('link', { name: /earnings/i })).toHaveAttribute('href', '/app/analytics');
     expect(screen.getByText(/22 posted/)).toBeInTheDocument();
     expect(screen.getByText('RAVI23')).toBeInTheDocument();
   });
@@ -126,7 +126,7 @@ describe('HomeTileRow — Design previews tile (allowlist-gated)', () => {
     const tile = screen.getByRole('link', { name: /open design previews/i });
     // Navigates IN-APP (React Router Link → relative href), NOT a new tab. Guard against a
     // regression to the old external `target="_blank"` external-URL behaviour.
-    expect(tile).toHaveAttribute('href', '/administration/designs');
+    expect(tile).toHaveAttribute('href', '/app/administration/designs');
     expect(tile).not.toHaveAttribute('target');
     expect(screen.getByText(/design previews/i)).toBeInTheDocument();
   });

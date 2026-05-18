@@ -79,16 +79,16 @@ function featureFor(endpoint: string): string {
   if (endpoint.startsWith('/admin/')) return 'admin';
   if (endpoint.startsWith('/auth')) return 'auth';
   if (endpoint.startsWith('/trip-acceptances') || endpoint.includes('/applicants')) return 'acceptances';
-  if (endpoint.startsWith('/trips')) return 'trips';
-  if (endpoint.startsWith('/vacancies')) return 'vacancies';
+  if (endpoint.startsWith('/app/trips')) return 'trips';
+  if (endpoint.startsWith('/app/vacancies')) return 'vacancies';
   if (endpoint.startsWith('/places')) return 'places';
-  if (endpoint.startsWith('/drivers')) return 'drivers';
-  if (endpoint.startsWith('/trip-managers') || endpoint.startsWith('/agents')) return 'agents';
-  if (endpoint.startsWith('/vehicles')) return 'vehicles';
-  if (endpoint.startsWith('/alerts')) return 'alerts';
+  if (endpoint.startsWith('/app/drivers')) return 'drivers';
+  if (endpoint.startsWith('/trip-managers') || endpoint.startsWith('/app/agents')) return 'agents';
+  if (endpoint.startsWith('/app/vehicles')) return 'vehicles';
+  if (endpoint.startsWith('/app/alerts')) return 'alerts';
   if (endpoint.startsWith('/reviews')) return 'reviews';
-  if (endpoint.startsWith('/notifications')) return 'notifications';
-  if (endpoint.startsWith('/me') || endpoint.startsWith('/profile')) return 'user';
+  if (endpoint.startsWith('/app/notifications')) return 'notifications';
+  if (endpoint.startsWith('/me') || endpoint.startsWith('/app/profile')) return 'user';
   return 'api';
 }
 

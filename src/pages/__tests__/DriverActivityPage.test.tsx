@@ -82,7 +82,7 @@ function setUp({ driving = tripsState(), posted = tripsState(), invited = tripsS
     return selector ? selector(state) : state;
   }) as never);
 }
-const renderPage = (url = '/my-trips') => render(<MemoryRouter initialEntries={[url]}><DriverActivityPage /></MemoryRouter>);
+const renderPage = (url = '/app/my-trips') => render(<MemoryRouter initialEntries={[url]}><DriverActivityPage /></MemoryRouter>);
 
 describe('DriverActivityPage', () => {
   beforeEach(() => {
@@ -161,7 +161,7 @@ describe('DriverActivityPage', () => {
     setUp({ applied: appsState({ data: [makeApp({ status: 'selected', trip: makeTrip({ id: 't-sel' }) })] }) });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
-    expect(screen.getByRole('link', { name: /view trip/i })).toHaveAttribute('href', '/trips/t-sel');
+    expect(screen.getByRole('link', { name: /view trip/i })).toHaveAttribute('href', '/app/trips/t-sel');
     expect(screen.queryByRole('button', { name: /view details/i })).toBeNull();
   });
 
@@ -202,16 +202,16 @@ describe('DriverActivityPage', () => {
 
   // Regression: user reported that tapping a trip from /my-trips?tab=posted → trip detail →
   // Back arrow was returning to the default Driving tab instead of staying on Posted. Fix is
-  // to pass linkFromPath="/my-trips?tab=posted" to each card, so trip-detail's Back honors it.
+  // to pass linkFromPath="/app/my-trips?tab=posted" to each card, so trip-detail's Back honors it.
   it('the Posted tab encodes ?tab=posted in each trip card link so back-nav preserves the tab', () => {
     setUp({ posted: tripsState({ data: [makeTrip({ id: 'p-back', toCity: city('cb', 'BackCity') })] }) });
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: /posted by me/i }));
-    const links = screen.getAllByRole('link').filter((a) => (a.getAttribute('href') ?? '').startsWith('/trips/p-back'));
+    const links = screen.getAllByRole('link').filter((a) => (a.getAttribute('href') ?? '').startsWith('/app/trips/p-back'));
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
-      // /my-trips?tab=posted encoded → %2Fmy-trips%3Ftab%3Dposted
-      expect(link.getAttribute('href')).toMatch(/[?&]from=%2Fmy-trips%3Ftab%3Dposted/);
+      // /my-trips?tab=posted encoded → %2Fapp%2Fmy-trips%3Ftab%3Dposted
+      expect(link.getAttribute('href')).toMatch(/[?&]from=%2Fapp%2Fmy-trips%3Ftab%3Dposted/);
     }
   });
 
@@ -221,7 +221,7 @@ describe('DriverActivityPage', () => {
     expect(screen.getByText(/no trips assigned to you yet/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^applied/i }));
     expect(screen.getByText(/haven't applied to any trips/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/trips');
+    expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/app/trips');
   });
 
   it('the Invited tab lists trips the driver was invited to', () => {
@@ -384,7 +384,7 @@ describe('DriverActivityPage', () => {
         makeTrip({ id: 'inv-b', toCity: city('cB', 'InvitedB-to'), invitationId: 'i-b', invitationStatus: 'pending' }),
       ] }),
     });
-    renderPage('/my-trips?scope=invites-received&from=/');
+    renderPage('/app/my-trips?scope=invites-received&from=/');
     // Scoped header
     expect(screen.getByText('Invites received')).toBeInTheDocument();
     expect(screen.getByText(/2 trips waiting for your decision/i)).toBeInTheDocument();
@@ -408,7 +408,7 @@ describe('DriverActivityPage', () => {
       // "waiting for your decision" view (same filter the home card applies).
       applied: appsState({ data: [makeApp({ acceptanceId: 'app-1', status: 'applied', trip: alreadyApplied })] }),
     });
-    renderPage('/my-trips?scope=invites-received&from=/');
+    renderPage('/app/my-trips?scope=invites-received&from=/');
     expect(screen.getByText(/2 trips waiting for your decision/i)).toBeInTheDocument();
     expect(screen.getByText(/vellore → pending1-to/i)).toBeInTheDocument();
     expect(screen.getByText(/vellore → pending2-to/i)).toBeInTheDocument();
@@ -422,17 +422,17 @@ describe('DriverActivityPage', () => {
         makeTrip({ id: 'inv-x', toCity: city('cX', 'InvitedX-to'), invitationId: 'i-x', invitationStatus: 'pending' }),
       ] }),
     });
-    renderPage('/my-trips?scope=invites-received&from=/');
+    renderPage('/app/my-trips?scope=invites-received&from=/');
     // The PostedTripCard renders TWO links to the same destination (the headline card area
     // + the "View details" link in the footer). Both must carry the breadcrumb.
-    const detailLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/trips/inv-x'));
+    const detailLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/app/trips/inv-x'));
     expect(detailLinks.length).toBeGreaterThan(0);
     for (const link of detailLinks) {
       const href = link.getAttribute('href') ?? '';
-      // Encoded by encodeURIComponent — `/my-trips?scope=invites-received&from=/` becomes
-      // `%2Fmy-trips%3Fscope%3Dinvites-received%26from%3D%2F`. Asserting on the decoded form
+      // Encoded by encodeURIComponent — `/app/my-trips?scope=invites-received&from=/` becomes
+      // `%2Fapp%2Fmy-trips%3Fscope%3Dinvites-received%26from%3D%2F`. Asserting on the decoded form
       // would miss an encoding regression, so check the raw href.
-      expect(href).toMatch(/[?&]from=%2Fmy-trips%3Fscope%3Dinvites-received/);
+      expect(href).toMatch(/[?&]from=%2Fapp%2Fmy-trips%3Fscope%3Dinvites-received/);
     }
   });
 
@@ -442,7 +442,7 @@ describe('DriverActivityPage', () => {
         makeTrip({ id: 'inv-d', toCity: city('cD', 'InvitedD-to'), invitationId: 'i-d', invitationStatus: 'pending' }),
       ] }),
     });
-    renderPage('/my-trips?scope=invites-received&from=/');
+    renderPage('/app/my-trips?scope=invites-received&from=/');
     // Decline button exists, and its nearest Card ancestor is the SAME Card that contains
     // the trip route — proves it's inside the card surface (footerSlot), not a sibling.
     const declineBtn = screen.getByRole('button', { name: /decline invitation/i });
@@ -474,7 +474,7 @@ describe('DriverActivityPage', () => {
     });
     vi.mocked(useDeclineTripInvite).mockReturnValue({ mutateAsync, isPending: false } as never);
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-    renderPage('/my-trips?scope=invites-received&from=/');
+    renderPage('/app/my-trips?scope=invites-received&from=/');
     // Snapshot the scoped header presence before decline.
     expect(screen.getByText('Invites received')).toBeInTheDocument();
     const declineBtns = screen.getAllByRole('button', { name: /decline invitation/i });
@@ -482,7 +482,7 @@ describe('DriverActivityPage', () => {
     await Promise.resolve();
     expect(mutateAsync).toHaveBeenCalled();
     // The scoped header is STILL present — proving the page didn't navigate away from the
-    // scoped view (the plain `/my-trips` tabbed view doesn't render this header).
+    // scoped view (the plain `/app/my-trips` tabbed view doesn't render this header).
     expect(screen.getByText('Invites received')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/');
     confirmSpy.mockRestore();

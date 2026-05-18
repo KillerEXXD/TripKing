@@ -50,7 +50,7 @@ function Row({ link }: { link: ReferralLink }) {
   const role = link.referredUserRole === 'trip_manager' ? 'agent' : 'driver';
   return (
     <li>
-      <Link to={`/referrals/${link.id}`} className="block px-3 py-2.5 transition hover:bg-slate-50">
+      <Link to={`/app/referrals/${link.id}`} className="block px-3 py-2.5 transition hover:bg-slate-50">
         <div className="flex items-start gap-2">
           <div className="flex size-8 flex-none items-center justify-center rounded-full bg-slate-100 text-base" aria-hidden>
             {role === 'driver' ? '🚗' : '📋'}

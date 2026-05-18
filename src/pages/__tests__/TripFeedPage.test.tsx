@@ -115,7 +115,7 @@ describe('TripFeedPage', () => {
     // Cards link to /trips/:id?from=/trips so Back from the detail page
     // returns the driver to Open Trips (not /my-trips).
     const card = screen.getByText(/vellore → chennai/i).closest('a');
-    expect(card).toHaveAttribute('href', '/trips/t1?from=/trips');
+    expect(card).toHaveAttribute('href', '/app/trips/t1?from=/trips');
   });
 
   it('"Clear filters" restores trips hidden by the car-type filter', () => {

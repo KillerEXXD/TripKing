@@ -61,7 +61,7 @@ function VehicleCard({ v }: { v: Vehicle }) {
           {permit ? <>Permit: {permit}</> : null}
         </div>
       ) : null}
-      <Link to={`/drivers/${v.driverId}`} className="text-xs font-medium text-primary underline">
+      <Link to={`/app/drivers/${v.driverId}`} className="text-xs font-medium text-primary underline">
         View driver profile →
       </Link>
     </Card>
@@ -71,7 +71,7 @@ function VehicleCard({ v }: { v: Vehicle }) {
 const PAGE_SIZE = 50;
 
 /**
- * `/administration/vehicles` — vehicle-eligibility dashboard (admin-only).
+ * `/app/administration/vehicles` — vehicle-eligibility dashboard (admin-only).
  * Defaults to "All". Server-paginated via `useInfiniteAdminVehicles` (50/page);
  * the eligibility filter is server-derived. Header shows the server total.
  */
@@ -106,7 +106,7 @@ export function VehicleEligibilityPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <div className="flex items-baseline justify-between gap-2">

@@ -93,7 +93,7 @@ function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
             </span>
           ) : (
             <Link
-              to={`/vacancies/${vacancy.id}/edit`}
+              to={`/app/vacancies/${vacancy.id}/edit`}
               aria-label={`Edit availability from ${where}`}
               className="rounded-md p-1.5 text-emerald-700 hover:bg-emerald-50"
             >
@@ -116,7 +116,7 @@ function MyVacancyCard({ vacancy }: { vacancy: Vacancy }) {
 }
 
 /**
- * "I'm available" hero for drivers on `/vacancies`. Shows `X / max active` where `max`
+ * "I'm available" hero for drivers on `/app/vacancies`. Shows `X / max active` where `max`
  * is admin-configurable via `app_settings.max_active_vacancies_per_driver` (migration
  * 022, default 2). Each active vacancy renders as its own card below the hero with
  * a Remove button so the driver can drop one without losing the others. The matching
@@ -201,7 +201,7 @@ export function IAmAvailableCard({ driverId }: Props) {
                 </Button>
               ) : (
                 <Button asChild size="sm" variant="default">
-                  <Link to="/vacancies/new" onClick={stop} aria-label="Post vacant">
+                  <Link to="/app/vacancies/new" onClick={stop} aria-label="Post vacant">
                     <Plus className="size-4" aria-hidden /> Post
                   </Link>
                 </Button>

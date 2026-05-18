@@ -100,7 +100,7 @@ describe('VehicleEligibilityPage', () => {
     expect(screen.getByText(/Toyota Innova 2014/)).toBeInTheDocument();
     expect(screen.getByText('TN01AB1234')).toBeInTheDocument();
     expect(screen.getAllByText('Expired').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getByRole('link', { name: /view driver profile/i })).toHaveAttribute('href', '/drivers/d1');
+    expect(screen.getByRole('link', { name: /view driver profile/i })).toHaveAttribute('href', '/app/drivers/d1');
   });
 
   it('shows an empty state when nothing matches', () => {

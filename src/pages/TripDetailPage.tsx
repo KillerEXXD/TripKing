@@ -253,7 +253,7 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
           </Button>
         </>
       ) : myDriverMissing ? (
-        <Button variant="full" size="lg" onClick={() => navigate('/profile')}>
+        <Button variant="full" size="lg" onClick={() => navigate('/app/profile')}>
           Set up your driver profile to apply
         </Button>
       ) : myDriverPending || vehiclesQuery.isPending ? (
@@ -263,14 +263,14 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
       ) : !kycApproved ? (
         <>
           <p className="text-center text-xs text-secondary">Finish your verification (KYC) before you can apply to trips.</p>
-          <Button variant="full" size="lg" onClick={() => navigate('/profile#get-verified')}>
+          <Button variant="full" size="lg" onClick={() => navigate('/app/profile#get-verified')}>
             Get verified to apply →
           </Button>
         </>
       ) : activeVehicles.length === 0 ? (
         <>
           <p className="text-center text-xs text-secondary">Add a vehicle from your profile to apply for trips.</p>
-          <Button variant="full" size="lg" onClick={() => navigate('/profile')}>
+          <Button variant="full" size="lg" onClick={() => navigate('/app/profile')}>
             Add a vehicle
           </Button>
         </>
@@ -339,7 +339,7 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
     }
   }
   function onComplete() {
-    navigate(`/trips/${trip.id}/complete`);
+    navigate(`/app/trips/${trip.id}/complete`);
   }
 
   return (
@@ -817,7 +817,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
               </div>
               {trip.applicantCount > 0 ? (
                 <Link
-                  to={`/trips/${trip.id}/applicants`}
+                  to={`/app/trips/${trip.id}/applicants`}
                   className="mt-2 inline-flex items-center gap-1.5 rounded-control bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-amber-700"
                 >
                   Review applicants
@@ -1036,7 +1036,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
           {trip.assignedDriver.verification ? (
             <CounterpartyChecklist verification={trip.assignedDriver.verification} steps={DRIVER_VERIFICATION_STEPS} />
           ) : null}
-          <Link to={`/drivers/${trip.assignedDriverId}`} className="flex items-center gap-1 text-sm font-medium text-primary">
+          <Link to={`/app/drivers/${trip.assignedDriverId}`} className="flex items-center gap-1 text-sm font-medium text-primary">
             View full profile <User className="size-4" aria-hidden />
           </Link>
         </Card>
@@ -1044,7 +1044,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
 
       {(viewer.isPoster || viewer.isAdmin) && trip.applicantCount > 0 ? (
         <Card>
-          <Link to={`/trips/${trip.id}/applicants`} className="text-sm font-medium text-primary">
+          <Link to={`/app/trips/${trip.id}/applicants`} className="text-sm font-medium text-primary">
             🤝 Review {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} →
           </Link>
         </Card>
@@ -1073,7 +1073,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
 }
 
 /**
- * `/trips/:id` — full trip detail, laid out like the prototype: route card,
+ * `/app/trips/:id` — full trip detail, laid out like the prototype: route card,
  * payout breakdown, driver instructions, "Posted by" with Call / Message CTAs,
  * applicant prompts, a fixed Apply / Withdraw bar (drivers, on open trips), a
  * Start / Complete bar (the assigned driver — Start verifies the passenger's
@@ -1104,7 +1104,7 @@ export function TripDetailPage() {
   // Always route to the user's own listing instead of history-back — otherwise the
   // Trip Detail ⇄ Applicants pair creates a circular trap with no exit. When the
   // user entered from a work queue (`?from=...`), return them there instead.
-  const goBack = () => navigate(from || (isDriver ? '/my-trips' : '/posted-trips'));
+  const goBack = () => navigate(from || (isDriver ? '/app/my-trips' : '/app/posted-trips'));
   const notFound = !id || (tripQuery.isError && tripQuery.error instanceof ApiError && tripQuery.error.status === 404);
 
   return (
@@ -1132,7 +1132,7 @@ export function TripDetailPage() {
         <TripDetail
           trip={tripQuery.data}
           fillPassenger={fillPassenger}
-          returnTo={from || '/trips'}
+          returnTo={from || '/app/trips'}
           viewer={{
             isDriver,
             // An admin viewing-as-driver isn't a poster for this purpose, even if they posted

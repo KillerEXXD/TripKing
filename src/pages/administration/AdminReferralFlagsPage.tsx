@@ -18,7 +18,7 @@ const SEV_TINT: Record<string, string> = {
   high: 'bg-rose-50 text-rose-900 ring-rose-200',
 };
 
-/** `/administration/referrals/flags` — Stage 9 fraud queue. Resolve with a note. */
+/** `/app/administration/referrals/flags` — Stage 9 fraud queue. Resolve with a note. */
 export function AdminReferralFlagsPage() {
   const [filter, setFilter] = useState<'open' | 'resolved' | 'all'>('open');
   const [noteFor, setNoteFor] = useState<Record<string, string>>({});
@@ -36,7 +36,7 @@ export function AdminReferralFlagsPage() {
 
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-6">
-      <Link to="/administration/referrals" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration/referrals" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Referrals
       </Link>
       <h1 className="flex items-center gap-2 text-2xl font-bold"><Flag className="size-5" aria-hidden /> Fraud queue</h1>
@@ -73,7 +73,7 @@ export function AdminReferralFlagsPage() {
                       <span className="text-sm font-semibold">{f.flagType.replace(/_/g, ' ')}</span>
                       {f.autoDetected ? <span className="text-[11px] text-secondary">(auto)</span> : null}
                     </div>
-                    <Link to={`/referrals/${f.referralLinkId}`} className="text-xs font-medium text-primary hover:underline">
+                    <Link to={`/app/referrals/${f.referralLinkId}`} className="text-xs font-medium text-primary hover:underline">
                       View referral →
                     </Link>
                     {f.note ? <p className="text-sm text-secondary">{f.note}</p> : null}

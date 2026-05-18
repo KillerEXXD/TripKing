@@ -32,7 +32,7 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
-        <Route path="/administration/kyc/:kind/:id" element={<KycDetailPage />} />
+        <Route path="/app/administration/kyc/:kind/:id" element={<KycDetailPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -69,7 +69,7 @@ describe('KycDetailPage', () => {
   });
 
   it('renders the 5 driver checklist steps with their statuses', () => {
-    renderAt('/administration/kyc/driver/d1');
+    renderAt('/app/administration/kyc/driver/d1');
     expect(screen.getByRole('heading', { name: /ravi/i })).toBeInTheDocument();
     expect(screen.getByText('Your details')).toBeInTheDocument();
     expect(screen.getByText('Identity documents')).toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('KycDetailPage', () => {
   });
 
   it('Approve is disabled while kyc_status is not ready_for_approval', () => {
-    renderAt('/administration/kyc/driver/d1');
+    renderAt('/app/administration/kyc/driver/d1');
     expect(screen.getByRole('button', { name: /^approve$/i })).toBeDisabled();
   });
 
@@ -91,7 +91,7 @@ describe('KycDetailPage', () => {
       kycStatus: 'ready_for_approval',
       verification: { ...baseDriver.verification, kycStatus: 'ready_for_approval', stepsDone: 5 },
     }) as never);
-    renderAt('/administration/kyc/driver/d1');
+    renderAt('/app/administration/kyc/driver/d1');
     const btn = screen.getByRole('button', { name: /^approve$/i });
     expect(btn).not.toBeDisabled();
     fireEvent.click(btn);
@@ -112,7 +112,7 @@ describe('KycDetailPage', () => {
         kycRejectionReason: null,
       },
     }) as never);
-    renderAt('/administration/kyc/agent/a1');
+    renderAt('/app/administration/kyc/agent/a1');
     expect(screen.getByText('Identity documents')).toBeInTheDocument();
     expect(screen.queryByText('Vehicle')).not.toBeInTheDocument();
     expect(screen.queryByText('Vehicle photos & papers')).not.toBeInTheDocument();

@@ -9,7 +9,7 @@ import type { Trip } from '@/types';
  * filters to `invitationStatus === 'pending'` before passing in.
  *
  * 1 invite  → links straight to the trip detail (Accept / Decline live there).
- * ≥2        → opens the driver's `/my-trips?scope=invites-received` scoped view
+ * ≥2        → opens the driver's `/app/my-trips?scope=invites-received` scoped view
  *             (filter strip hidden, back arrow → home).
  */
 export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
@@ -20,7 +20,7 @@ export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
     const trip = trips[0];
     return (
       <PriorityCard
-        to={`/trips/${trip.id}?from=/`}
+        to={`/app/trips/${trip.id}?from=/`}
         ariaLabel={`Invitation to drive ${trip.fromCity.name} to ${trip.toCity.name} — tap to accept or decline`}
         tone="indigo"
         icon={icon}
@@ -34,7 +34,7 @@ export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
 
   return (
     <PriorityCard
-      to="/my-trips?scope=invites-received&from=/"
+      to="/app/my-trips?scope=invites-received&from=/"
       ariaLabel={`${trips.length} invitations waiting for your decision`}
       tone="indigo"
       icon={icon}

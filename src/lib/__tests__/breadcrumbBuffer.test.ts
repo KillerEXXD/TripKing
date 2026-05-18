@@ -11,9 +11,9 @@ describe('breadcrumbBuffer', () => {
   });
 
   it('addDataBreadcrumb mirrors into the local buffer', () => {
-    addDataBreadcrumb('request', { feature: 'trips', endpoint: '/trips', method: 'GET' });
+    addDataBreadcrumb('request', { feature: 'trips', endpoint: '/app/trips', method: 'GET' });
     const last = getBreadcrumbs().pop();
     expect(last?.message).toBe('trips: request');
-    expect(last?.data.endpoint).toBe('/trips');
+    expect(last?.data.endpoint).toBe('/app/trips');
   });
 });

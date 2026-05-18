@@ -174,18 +174,18 @@ function setStore(byTrip: Record<string, unknown> = {}) {
   vi.mocked(useMyApplicationsStore).mockImplementation(((selector?: (s: typeof storeState) => unknown) => (selector ? selector(storeState) : storeState)) as never);
 }
 
-function renderDetail(entries: string[] = ['/trips/t1']) {
+function renderDetail(entries: string[] = ['/app/trips/t1']) {
   return render(
     <MemoryRouter initialEntries={entries}>
       <Routes>
-        <Route path="/trips/:id" element={<TripDetailPage />} />
-        <Route path="/trips" element={<div>trip feed</div>} />
-        <Route path="/my-trips" element={<div>my trips list</div>} />
-        <Route path="/posted-trips" element={<div>posted trips list</div>} />
-        <Route path="/profile" element={<div>profile page</div>} />
-        <Route path="/verify/documents" element={<div>verify documents page</div>} />
-        <Route path="/trips/:id/applicants" element={<div>applicant review</div>} />
-        <Route path="/trips/:id/complete" element={<div data-testid="complete-trip-route">complete trip wizard</div>} />
+        <Route path="/app/trips/:id" element={<TripDetailPage />} />
+        <Route path="/app/trips" element={<div>trip feed</div>} />
+        <Route path="/app/my-trips" element={<div>my trips list</div>} />
+        <Route path="/app/posted-trips" element={<div>posted trips list</div>} />
+        <Route path="/app/profile" element={<div>profile page</div>} />
+        <Route path="/app/verify/documents" element={<div>verify documents page</div>} />
+        <Route path="/app/trips/:id/applicants" element={<div>applicant review</div>} />
+        <Route path="/app/trips/:id/complete" element={<div data-testid="complete-trip-route">complete trip wizard</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -564,14 +564,14 @@ describe('TripDetailPage', () => {
     setTrip({ data: makeTrip({ invitationId: 'inv-1', invitationStatus: 'pending' }) });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     // Mirror the URL the home → scoped list → trip card chain produces.
-    const fromPath = '/my-trips?scope=invites-received&from=/';
-    const entry = `/trips/t1?from=${encodeURIComponent(fromPath)}`;
+    const fromPath = '/app/my-trips?scope=invites-received&from=/';
+    const entry = `/app/trips/t1?from=${encodeURIComponent(fromPath)}`;
     render(
       <MemoryRouter initialEntries={[entry]}>
         <Routes>
-          <Route path="/trips/:id" element={<TripDetailPage />} />
+          <Route path="/app/trips/:id" element={<TripDetailPage />} />
           <Route
-            path="/my-trips"
+            path="/app/my-trips"
             element={
               <LocationProbe />
             }

@@ -61,13 +61,13 @@ function setUpdates() {
 
 function renderProfile() {
   return render(
-    <MemoryRouter initialEntries={['/profile']}>
+    <MemoryRouter initialEntries={['/app/profile']}>
       <Routes>
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/signin" element={<div>signin page</div>} />
-        <Route path="/onboarding" element={<div>onboarding page</div>} />
-        <Route path="/drivers/:id" element={<div>public driver profile</div>} />
-        <Route path="/administration" element={<div>administration</div>} />
+        <Route path="/app/profile" element={<ProfilePage />} />
+        <Route path="/app/signin" element={<div>signin page</div>} />
+        <Route path="/app/onboarding" element={<div>onboarding page</div>} />
+        <Route path="/app/drivers/:id" element={<div>public driver profile</div>} />
+        <Route path="/app/administration" element={<div>administration</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -95,7 +95,7 @@ describe('ProfilePage', () => {
     renderProfile();
     expect(screen.getByRole('heading', { name: 'Ravi Kumar' })).toBeInTheDocument();
     expect(screen.getByText(/9 reviews/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /your public profile/i })).toHaveAttribute('href', '/drivers/d1');
+    expect(screen.getByRole('link', { name: /your public profile/i })).toHaveAttribute('href', '/app/drivers/d1');
     expect(screen.getByText(/Toyota Innova 2021/)).toBeInTheDocument();
   });
 
@@ -131,14 +131,14 @@ describe('ProfilePage', () => {
     setMyDriver({ isError: true, error: new ApiError('No profile for this user', 404) });
     renderProfile();
     expect(screen.getByText(/finish setting up your profile/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /set up my profile/i })).toHaveAttribute('href', '/onboarding');
+    expect(screen.getByRole('link', { name: /set up my profile/i })).toHaveAttribute('href', '/app/onboarding');
   });
 
   it('shows an Administration link for an admin account', () => {
     setUser(adminUser);
     renderProfile();
     expect(screen.getByText(/admin account/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /administration/i })).toHaveAttribute('href', '/administration');
+    expect(screen.getByRole('link', { name: /administration/i })).toHaveAttribute('href', '/app/administration');
   });
 
   it('signing out logs out and goes to /signin', async () => {

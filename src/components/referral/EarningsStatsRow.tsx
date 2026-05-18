@@ -22,7 +22,7 @@ function isoDay(daysAgo: number): string {
 }
 
 /**
- * The 7-figure earnings strip on `/referrals`:
+ * The 7-figure earnings strip on `/app/referrals`:
  *   Today · This week · This month  (top row)
  *   Lifetime · Pending · Withdrawable · Withdrawn  (bottom row)
  *

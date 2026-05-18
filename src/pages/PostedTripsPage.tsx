@@ -97,7 +97,7 @@ export function PostedTripCard({ trip, onShare, linkFromPath, footerSlot }: { tr
   // scoped view), it passes `linkFromPath` so the trip detail's back arrow returns
   // to the list — not to the detail page's default fallback.
   const fromSuffix = linkFromPath ? `?from=${encodeURIComponent(linkFromPath)}` : '';
-  const dest = reviewable ? `/trips/${trip.id}/applicants${fromSuffix}` : `/trips/${trip.id}${fromSuffix}`;
+  const dest = reviewable ? `/app/trips/${trip.id}/applicants${fromSuffix}` : `/app/trips/${trip.id}${fromSuffix}`;
   // Trips posted within the last 5 minutes wear a sparkle NEW badge + "Posted Xm ago"
   // line. Pure client-side derived from `trip.createdAt` — no URL param needed; the
   // listing already sorts newest-first so the fresh card is at the top.
@@ -175,7 +175,7 @@ export function PostedTripCard({ trip, onShare, linkFromPath, footerSlot }: { tr
 }
 
 /**
- * `/posted-trips` — the trips the signed-in user has posted, laid out like the
+ * `/app/posted-trips` — the trips the signed-in user has posted, laid out like the
  * prototype: a white header strip with a "Post a trip" button, a horizontal tab
  * strip (with per-status counts), then per-trip cards (route + fare line + pickup
  * + applicant badge) with a Share button and a "Review applicants / View details"
@@ -266,7 +266,7 @@ export function PostedTripsPage() {
           subtitle={subtitle}
           right={
             <Button asChild size="sm" className="gap-1.5">
-              <Link to="/trips/new">
+              <Link to="/app/trips/new">
                 <Plus className="size-4" aria-hidden /> Post
               </Link>
             </Button>
@@ -300,7 +300,7 @@ export function PostedTripsPage() {
             message="Post a trip and it'll show up here with its status and applicants."
             action={
               <Button asChild variant="outline" size="sm">
-                <Link to="/trips/new">Post a trip</Link>
+                <Link to="/app/trips/new">Post a trip</Link>
               </Button>
             }
           />
@@ -324,11 +324,11 @@ export function PostedTripsPage() {
                   onShare={() => setShareTrip(t)}
                   linkFromPath={
                     scope
-                      ? `/posted-trips?scope=${scope}${from && from !== '/' ? `&from=${from}` : '&from=/'}`
+                      ? `/app/posted-trips?scope=${scope}${from && from !== '/' ? `&from=${from}` : '&from=/'}`
                       // No scope → still encode the current filter chip so the trip detail
                       // Back arrow returns to the same filter (Open / Cancelled / Invited / …),
                       // not the default Open tab.
-                      : filter === 'open' ? '/posted-trips' : `/posted-trips?status=${filter}`
+                      : filter === 'open' ? '/app/posted-trips' : `/app/posted-trips?status=${filter}`
                   }
                 />
           ))

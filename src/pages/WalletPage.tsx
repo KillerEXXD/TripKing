@@ -96,7 +96,7 @@ function LedgerRow({ e }: { e: CashWalletLedgerEntry }) {
 }
 
 /**
- * `/wallet` — Stage 2 cash wallet. Shows the three sub-balances (Launch credit / Real money / From referrals),
+ * `/app/wallet` — Stage 2 cash wallet. Shows the three sub-balances (Launch credit / Real money / From referrals),
  * an "Add money" Razorpay flow (stubbed until credentials land), and the recent ledger.
  */
 export function WalletPage() {
@@ -121,7 +121,7 @@ export function WalletPage() {
           <Card className="gap-2">
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">Recent activity</div>
-              <Link to="/wallet/charges" className="text-xs font-medium text-primary hover:underline">Platform-fee charges →</Link>
+              <Link to="/app/wallet/charges" className="text-xs font-medium text-primary hover:underline">Platform-fee charges →</Link>
             </div>
             {q.data.recentLedger.length === 0 ? (
               <p className="text-sm text-secondary">No activity yet.</p>

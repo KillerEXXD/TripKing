@@ -49,7 +49,7 @@ function Body({ a }: { a: DriverAnalytics }) {
         message={a.hasDriverProfile ? "Once an agent picks you for a trip, your trip stats, application history, and monthly trend show up here." : 'Set up your driver profile and start applying — your analytics will show up here.'}
         action={
           <Button asChild variant="full" size="sm">
-            <Link to="/trips">Browse trips</Link>
+            <Link to="/app/trips">Browse trips</Link>
           </Button>
         }
       />
@@ -79,7 +79,7 @@ function Body({ a }: { a: DriverAnalytics }) {
       </Card>
 
       <Card className="gap-1">
-        <Link to="/my-earnings" className="text-sm font-medium text-primary underline">
+        <Link to="/app/my-earnings" className="text-sm font-medium text-primary underline">
           See your ₹ earnings + payout history →
         </Link>
       </Card>
@@ -90,8 +90,8 @@ function Body({ a }: { a: DriverAnalytics }) {
 }
 
 /**
- * `/driver-analytics` — the signed-in driver's trip-side analytics (the `/analytics/driver`
- * blob, framed for trip stats rather than ₹). Complements `/my-earnings` which is the
+ * `/app/driver-analytics` — the signed-in driver's trip-side analytics (the `/app/analytics/driver`
+ * blob, framed for trip stats rather than ₹). Complements `/app/my-earnings` which is the
  * ₹-focused view. Linked from the Driver Home Analytics tile.
  */
 export function DriverAnalyticsPage() {

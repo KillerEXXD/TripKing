@@ -40,7 +40,7 @@ describe('ReferredUserTable', () => {
     vi.mocked(svc.getMyReferred).mockResolvedValue([sampleLink] as never);
     render(<Wrap><ReferredUserTable /></Wrap>);
     await waitFor(() => expect(screen.getByText('Asha')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: /Asha/ })).toHaveAttribute('href', '/referrals/lk1');
+    expect(screen.getByRole('link', { name: /Asha/ })).toHaveAttribute('href', '/app/referrals/lk1');
     expect(screen.getByText(/3210/)).toBeInTheDocument();
     expect(screen.getByText('₹200')).toBeInTheDocument();
     expect(screen.getByText('/ ₹2,500')).toBeInTheDocument();

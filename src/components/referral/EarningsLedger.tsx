@@ -47,7 +47,7 @@ function formatDate(iso: string): string {
 }
 
 /**
- * Earnings ledger — one row per ledger entry on `/referrals/me`.
+ * Earnings ledger — one row per ledger entry on `/app/referrals/me`.
  * The backend joins trip route, fee.payment_source, fee.side, and the
  * referred user's name into each row, so this component is pure render.
  */

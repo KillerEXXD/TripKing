@@ -133,7 +133,7 @@ function AgentDetail({ agent }: { agent: Agent }) {
   );
 }
 
-/** `/agents/:id` — a trip manager's public profile (KYC, business, reviews from drivers). Read via `useAgent`. */
+/** `/app/agents/:id` — a trip manager's public profile (KYC, business, reviews from drivers). Read via `useAgent`. */
 export function AgentProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();

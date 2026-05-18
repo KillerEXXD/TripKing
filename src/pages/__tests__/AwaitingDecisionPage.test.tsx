@@ -23,9 +23,9 @@ function setApps(s: QS = {}) {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/my-trips/awaiting']}>
+    <MemoryRouter initialEntries={['/app/my-trips/awaiting']}>
       <Routes>
-        <Route path="/my-trips/awaiting" element={<AwaitingDecisionPage />} />
+        <Route path="/app/my-trips/awaiting" element={<AwaitingDecisionPage />} />
         <Route path="/" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,
@@ -42,7 +42,7 @@ describe('AwaitingDecisionPage', () => {
     setApps({ data: [makeApp({ acceptanceId: 'a1', trip: makeTrip({ id: 'trip-1' }) })] });
     renderPage();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
-    expect(link).toHaveAttribute('href', '/trips/trip-1?from=/my-trips/awaiting');
+    expect(link).toHaveAttribute('href', '/app/trips/trip-1?from=/my-trips/awaiting');
   });
 
   it('inline Decline button fires the decline mutation with the trip id (no need to drill into trip detail)', async () => {

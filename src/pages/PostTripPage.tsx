@@ -85,7 +85,7 @@ function Field({ label, error, hint, children }: { label: string; error?: string
 }
 
 /**
- * `/trips/new` — post a trip, as a 2-step wizard mirroring the prototype:
+ * `/app/trips/new` — post a trip, as a 2-step wizard mirroring the prototype:
  *   Step 1 · "where & when" — route (from / to cities, distance, pickup time)
  *            + vehicle requirements (car type, seats, AC).
  *   Step 2 · "price & details" — rate / bata (total fare = distance × rate;
@@ -96,7 +96,7 @@ function Field({ label, error, hint, children }: { label: string; error?: string
  */
 export function PostTripPage() {
   const navigate = useNavigate();
-  // `/trips/:id/edit` reuses this page in edit mode. When `:id` is set, we hydrate the
+  // `/app/trips/:id/edit` reuses this page in edit mode. When `:id` is set, we hydrate the
   // form from the existing trip and PATCH instead of POST on submit. The entry buttons
   // (Home priority card + trip-detail page) gate on `status ∈ {open, has_applicants}`
   // and `selectedDriverId == null`; the backend re-checks via the PATCH 409.
@@ -446,7 +446,7 @@ export function PostTripPage() {
             ? ` — ${newRecipientCount} applicant${newRecipientCount === 1 ? '' : 's'} notified`
             : '';
           toast.success(`Trip updated${notifNote}`);
-          navigate(`/trips/${editTripId}`);
+          navigate(`/app/trips/${editTripId}`);
         } catch {
           toast.error("Couldn't update the trip — try again.");
         }
@@ -667,7 +667,7 @@ export function PostTripPage() {
                       Review them first, or tap Update again to proceed — they&apos;ll be notified of the changes.
                     </p>
                     <div className="mt-2 flex gap-2">
-                      <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/trips/${editTripId}/applicants`)}>
+                      <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/app/trips/${editTripId}/applicants`)}>
                         Review applicants
                       </Button>
                     </div>
@@ -889,8 +889,8 @@ export function PostTripPage() {
       {postedTrip ? (
         <ShareTripModal
           trip={postedTrip}
-          onClose={() => navigate(isDriver ? '/my-trips?tab=posted' : '/posted-trips?status=open')}
-          onViewTrip={() => navigate(`/trips/${postedTrip.id}`)}
+          onClose={() => navigate(isDriver ? '/app/my-trips?tab=posted' : '/app/posted-trips?status=open')}
+          onViewTrip={() => navigate(`/app/trips/${postedTrip.id}`)}
         />
       ) : null}
 

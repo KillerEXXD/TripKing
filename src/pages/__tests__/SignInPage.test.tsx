@@ -26,14 +26,14 @@ function mockAuth(isAuthenticated = false) {
   });
 }
 
-function renderSignIn(initialEntry: string | { pathname: string; state: unknown } = '/signin') {
+function renderSignIn(initialEntry: string | { pathname: string; state: unknown } = '/app/signin') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
-        <Route path="/signin" element={<SignInPage />} />
+        <Route path="/app/signin" element={<SignInPage />} />
         <Route path="/" element={<div>home page</div>} />
-        <Route path="/onboarding" element={<div>onboarding screen</div>} />
-        <Route path="/trips/abc" element={<div>deep-linked trip</div>} />
+        <Route path="/app/onboarding" element={<div>onboarding screen</div>} />
+        <Route path="/app/trips/abc" element={<div>deep-linked trip</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -89,7 +89,7 @@ describe('SignInPage', () => {
   it('honours a pending "from" redirect after verify instead of /onboarding', async () => {
     mockAuth();
     verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
-    renderSignIn({ pathname: '/signin', state: { from: '/trips/abc' } });
+    renderSignIn({ pathname: '/app/signin', state: { from: '/app/trips/abc' } });
 
     fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '9876543210' } });
     fireEvent.click(screen.getByRole('button', { name: /send otp/i }));

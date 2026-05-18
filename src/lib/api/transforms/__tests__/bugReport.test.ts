@@ -25,7 +25,7 @@ function fullPayload() {
     reporter_phone: '+91',
     reporter_name: 'Ravi',
     page_url: 'https://x',
-    route: '/trips',
+    route: '/app/trips',
     browser_info: { ua: 'jsdom' },
     app_version: '0.1.0',
     console_logs: 'log',

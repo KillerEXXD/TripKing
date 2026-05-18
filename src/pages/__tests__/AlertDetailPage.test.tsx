@@ -42,10 +42,10 @@ function setMutations() {
 
 function renderDetail() {
   return render(
-    <MemoryRouter initialEntries={['/alerts/a1']}>
+    <MemoryRouter initialEntries={['/app/alerts/a1']}>
       <Routes>
-        <Route path="/alerts/:id" element={<AlertDetailPage />} />
-        <Route path="/alerts" element={<div>alerts list</div>} />
+        <Route path="/app/alerts/:id" element={<AlertDetailPage />} />
+        <Route path="/app/alerts" element={<div>alerts list</div>} />
       </Routes>
     </MemoryRouter>,
   );

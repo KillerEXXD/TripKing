@@ -18,7 +18,7 @@ interface AdminSectionTile {
 }
 
 const REFERENCE_TILE: AdminSectionTile = {
-  to: '/administration/config',
+  to: '/app/administration/config',
   title: 'Reference data',
   desc: 'Car types, fuel, makes & models, cities, languages, tags, app settings',
   Icon: SlidersHorizontal,
@@ -26,17 +26,17 @@ const REFERENCE_TILE: AdminSectionTile = {
 };
 
 const OPERATIONS_TILES: AdminSectionTile[] = [
-  { to: '/administration/dashboard',    title: 'Platform dashboard',         desc: 'Counts, fare totals, commission, monthly trip trend',           Icon: LayoutDashboard, tone: 'emerald' },
-  { to: '/administration/kyc',          title: 'KYC review queue',           desc: 'Verify drivers & agents — docs, video, approve / reject',      Icon: ShieldCheck,     tone: 'purple'  },
-  { to: '/administration/drivers',      title: 'Driver directory',           desc: 'Search by name, phone, city — filter by KYC status',           Icon: UserCheck,       tone: 'blue'    },
-  { to: '/administration/agents',       title: 'Agent directory',            desc: 'Search by name, phone, business — filter by KYC status',       Icon: Briefcase,       tone: 'sky'     },
-  { to: '/administration/passengers',   title: 'Passengers directory',       desc: 'Search by name, phone, alias — see referrer and trip count',   Icon: Users,           tone: 'teal'    },
-  { to: '/administration/video-calls',  title: 'Video call console',         desc: 'Scheduled & in-progress video verifications — finalize KYC',   Icon: Video,           tone: 'rose'    },
-  { to: '/administration/vehicles',     title: 'Vehicle eligibility',        desc: 'Search by registration or driver — filter by eligibility',     Icon: Car,             tone: 'orange'  },
-  { to: '/administration/reviews',      title: 'Reviews moderation',         desc: 'Flagged reviews — publish, hide, clear flags',                  Icon: AlertTriangle,   tone: 'red'     },
-  { to: '/administration/translations', title: 'Translation manager',        desc: 'Per-language string coverage and overrides',                   Icon: Languages,       tone: 'amber'   },
-  { to: '/administration/bugs',         title: 'Bug tracker',                 desc: 'Triage submitted bugs — status, comments, attachments',         Icon: Bug,             tone: 'red'     },
-  { to: '/administration/designs',      title: 'Design previews',             desc: 'Preview the 5 alternate UI directions — /v2 through /v6',      Icon: Palette,         tone: 'purple'  },
+  { to: '/app/administration/dashboard',    title: 'Platform dashboard',         desc: 'Counts, fare totals, commission, monthly trip trend',           Icon: LayoutDashboard, tone: 'emerald' },
+  { to: '/app/administration/kyc',          title: 'KYC review queue',           desc: 'Verify drivers & agents — docs, video, approve / reject',      Icon: ShieldCheck,     tone: 'purple'  },
+  { to: '/app/administration/drivers',      title: 'Driver directory',           desc: 'Search by name, phone, city — filter by KYC status',           Icon: UserCheck,       tone: 'blue'    },
+  { to: '/app/administration/agents',       title: 'Agent directory',            desc: 'Search by name, phone, business — filter by KYC status',       Icon: Briefcase,       tone: 'sky'     },
+  { to: '/app/administration/passengers',   title: 'Passengers directory',       desc: 'Search by name, phone, alias — see referrer and trip count',   Icon: Users,           tone: 'teal'    },
+  { to: '/app/administration/video-calls',  title: 'Video call console',         desc: 'Scheduled & in-progress video verifications — finalize KYC',   Icon: Video,           tone: 'rose'    },
+  { to: '/app/administration/vehicles',     title: 'Vehicle eligibility',        desc: 'Search by registration or driver — filter by eligibility',     Icon: Car,             tone: 'orange'  },
+  { to: '/app/administration/reviews',      title: 'Reviews moderation',         desc: 'Flagged reviews — publish, hide, clear flags',                  Icon: AlertTriangle,   tone: 'red'     },
+  { to: '/app/administration/translations', title: 'Translation manager',        desc: 'Per-language string coverage and overrides',                   Icon: Languages,       tone: 'amber'   },
+  { to: '/app/administration/bugs',         title: 'Bug tracker',                 desc: 'Triage submitted bugs — status, comments, attachments',         Icon: Bug,             tone: 'red'     },
+  { to: '/app/administration/designs',      title: 'Design previews',             desc: 'Preview the 5 alternate UI directions — /v2 through /v6',      Icon: Palette,         tone: 'purple'  },
 ];
 
 const TONE: Record<AdminSectionTile['tone'], string> = {

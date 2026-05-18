@@ -108,7 +108,7 @@ describe('VacanciesPage', () => {
     expect(screen.getAllByText('Chennai').length).toBeGreaterThan(0); // also a filter option
     expect(screen.getByText('Bangalore')).toBeInTheDocument(); // destination chip only
     expect(screen.getByText('Long trips welcome.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /ravi kumar/i })).toHaveAttribute('href', '/drivers/d1');
+    expect(screen.getByRole('link', { name: /ravi kumar/i })).toHaveAttribute('href', '/app/drivers/d1');
   });
 
   it('shows the availability time window on the card', () => {
@@ -154,7 +154,7 @@ describe('VacanciesPage', () => {
     renderVacancies();
     expect(screen.getByTestId('i-am-available-card')).toBeInTheDocument();
     expect(screen.getByText(/0 \/ 2 active/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /post vacant/i })).toHaveAttribute('href', '/vacancies/new');
+    expect(screen.getByRole('link', { name: /post vacant/i })).toHaveAttribute('href', '/app/vacancies/new');
   });
 
   it('shows a "N invites sent" badge for an agent who has already invited this driver', () => {
@@ -178,7 +178,7 @@ describe('VacanciesPage', () => {
     expect(screen.getByText(/Vellore → Bangalore/)).toBeInTheDocument();
     expect(screen.getByText('Pending')).toBeInTheDocument();
     expect(screen.getByText('Applied')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Vellore → Chennai/ })).toHaveAttribute('href', '/trips/trip1');
+    expect(screen.getByRole('link', { name: /Vellore → Chennai/ })).toHaveAttribute('href', '/app/trips/trip1');
   });
 
   it('hides the invites-sent badge when the viewer is a driver (myInvites absent)', () => {

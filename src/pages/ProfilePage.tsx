@@ -145,7 +145,7 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
             initial={{ fullName: driver.fullName, email: driver.email ?? '', cityId: driver.homeCity?.id ?? '', profilePhotoUrl: driver.profilePhotoUrl }}
           />
         ) : (
-          <Link to={`/drivers/${driver.id}`} className="text-sm font-medium text-primary underline">
+          <Link to={`/app/drivers/${driver.id}`} className="text-sm font-medium text-primary underline">
             View your public profile →
           </Link>
         )}
@@ -162,14 +162,14 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
       <Card className="gap-2">
         <div className="flex items-center justify-between">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Your vehicles</div>
-          <Link to="/vehicles/new" className="text-xs font-medium text-primary hover:underline">+ Add vehicle</Link>
+          <Link to="/app/vehicles/new" className="text-xs font-medium text-primary hover:underline">+ Add vehicle</Link>
         </div>
         {vehiclesQuery.isPending ? (
           <LoadingSkeleton rows={2} />
         ) : vehiclesQuery.isError ? (
           <p className="text-sm text-secondary">Couldn&apos;t load your vehicles.</p>
         ) : (vehiclesQuery.data ?? []).length === 0 ? (
-          <p className="text-sm text-secondary">No vehicles added yet. <Link to="/vehicles/new" className="font-medium text-primary underline">Add one</Link> to get verified.</p>
+          <p className="text-sm text-secondary">No vehicles added yet. <Link to="/app/vehicles/new" className="font-medium text-primary underline">Add one</Link> to get verified.</p>
         ) : (
           <div className="space-y-2">
             {(vehiclesQuery.data ?? []).map((v) => {
@@ -206,8 +206,8 @@ function DriverProfile({ driver, onSignOut, signingOut }: { driver: Driver; onSi
                   <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
                     <Badge variant={photosDone ? 'success' : 'warning'}>{photosDone ? 'Photos complete' : 'Photos needed'}</Badge>
                     {insExpired || permExpired ? <Badge variant="destructive">Papers expired</Badge> : null}
-                    <Link to={`/vehicles/${v.id}/photos`} className="font-medium text-primary hover:underline">{photosDone && !insExpired ? 'View photos' : 'Update papers'}</Link>
-                    <Link to={`/vehicles/${v.id}/edit`} className="font-medium text-primary hover:underline">Edit</Link>
+                    <Link to={`/app/vehicles/${v.id}/photos`} className="font-medium text-primary hover:underline">{photosDone && !insExpired ? 'View photos' : 'Update papers'}</Link>
+                    <Link to={`/app/vehicles/${v.id}/edit`} className="font-medium text-primary hover:underline">Edit</Link>
                   </div>
                 </div>
               );
@@ -270,7 +270,7 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
             initial={{ fullName: agent.fullName, email: agent.email ?? '', cityId: agent.businessCity?.id ?? '', profilePhotoUrl: agent.profilePhotoUrl }}
           />
         ) : (
-          <Link to={`/agents/${agent.id}`} className="text-sm font-medium text-primary underline">
+          <Link to={`/app/agents/${agent.id}`} className="text-sm font-medium text-primary underline">
             View your public profile →
           </Link>
         )}
@@ -292,7 +292,7 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
 }
 
 /**
- * `/profile` — the signed-in user's own account. Drivers see their public-profile
+ * `/app/profile` — the signed-in user's own account. Drivers see their public-profile
  * preview + vehicles + edit; agents see their business details + edit; admins get
  * an Administration link. Everyone gets sign-out. Built on `useMyDriver` /
  * `useMyAgent`; a 404 means the account has no driver/agent profile yet → onboard.
@@ -312,7 +312,7 @@ export function ProfilePage() {
     try {
       await logout();
     } finally {
-      navigate('/signin', { replace: true });
+      navigate('/app/signin', { replace: true });
     }
   }
 
@@ -344,7 +344,7 @@ export function ProfilePage() {
           <Card className="gap-2">
             <h2 className="text-xl font-bold">{user?.displayName || user?.phone}</h2>
             <p className="text-sm text-secondary">Admin account ({user?.role}).</p>
-            <Link to="/administration" className="text-sm font-medium text-primary underline">
+            <Link to="/app/administration" className="text-sm font-medium text-primary underline">
               Open Administration →
             </Link>
           </Card>
@@ -357,7 +357,7 @@ export function ProfilePage() {
           <h2 className="text-lg font-bold">Finish setting up your profile</h2>
           <p className="text-sm text-secondary">You don&apos;t have a {isAgent ? 'agent' : 'driver'} profile yet — complete onboarding to add one.</p>
           <Button asChild variant="full" size="sm" className="w-fit">
-            <Link to="/onboarding">Set up my profile</Link>
+            <Link to="/app/onboarding">Set up my profile</Link>
           </Button>
         </Card>
       ) : q?.isPending ? (

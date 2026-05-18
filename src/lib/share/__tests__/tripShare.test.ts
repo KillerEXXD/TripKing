@@ -44,7 +44,7 @@ afterEach(() => vi.restoreAllMocks());
 
 describe('buildShareUrl', () => {
   it('builds a /trips/:id link off the current origin', () => {
-    expect(buildShareUrl(makeTrip({ id: 'abc' }))).toMatch(/\/trips\/abc$/);
+    expect(buildShareUrl(makeTrip({ id: 'abc' }))).toMatch(/\/app\/trips\/abc$/);
   });
 });
 
@@ -62,11 +62,11 @@ describe('buildShareCaption', () => {
     expect(caption).toContain('Drop: Chennai, Tamil Nadu');
     expect(caption).toContain('🤝 Bata: ₹300');
     expect(caption).toContain('≈ Driver payout: ₹2,090');
-    expect(caption).toMatch(/🔗 View & apply: .*\/trips\/t1/);
+    expect(caption).toMatch(/🔗 View & apply: .*\/app\/trips\/t1/);
   });
   it('with withUrl:false omits the inline link', () => {
     const caption = buildShareCaption(makeTrip(), { withUrl: false });
-    expect(caption).not.toContain('/trips/t1');
+    expect(caption).not.toContain('/app/trips/t1');
     expect(caption).toContain('🔗 Link below');
   });
   it('does not include a "Posted by" line (poster identity stays in-app)', () => {

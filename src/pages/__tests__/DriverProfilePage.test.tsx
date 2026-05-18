@@ -41,9 +41,9 @@ function setDriver(state: DriverState) {
 
 function renderProfile() {
   return render(
-    <MemoryRouter initialEntries={['/drivers/d1']}>
+    <MemoryRouter initialEntries={['/app/drivers/d1']}>
       <Routes>
-        <Route path="/drivers/:id" element={<DriverProfilePage />} />
+        <Route path="/app/drivers/:id" element={<DriverProfilePage />} />
       </Routes>
     </MemoryRouter>,
   );

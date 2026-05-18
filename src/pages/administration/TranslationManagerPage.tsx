@@ -32,7 +32,7 @@ function LanguageEntryRow({ lang, onToggle, onRemove, busy }: { lang: LanguageRo
 }
 
 /**
- * `/administration/translations` — the translation manager (admin-only): the
+ * `/app/administration/translations` — the translation manager (admin-only): the
  * `languages` lookup that drives which locales the consumer app offers (the
  * admin app is English-only; UI strings are `t('key')` resolved per active
  * locale). Add / activate / deactivate / remove languages via `languageHooks`.
@@ -73,7 +73,7 @@ export function TranslationManagerPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Translation manager</h1>

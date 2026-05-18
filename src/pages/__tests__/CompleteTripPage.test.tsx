@@ -61,10 +61,10 @@ function setUp(trip = makeTrip()) {
 }
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/trips/t1/complete']}>
+    <MemoryRouter initialEntries={['/app/trips/t1/complete']}>
       <Routes>
-        <Route path="/trips/:id/complete" element={<CompleteTripPage />} />
-        <Route path="/my-trips" element={<div data-testid="my-trips">my trips</div>} />
+        <Route path="/app/trips/:id/complete" element={<CompleteTripPage />} />
+        <Route path="/app/my-trips" element={<div data-testid="my-trips">my trips</div>} />
       </Routes>
     </MemoryRouter>,
   );

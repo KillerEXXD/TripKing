@@ -21,7 +21,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
 const renderIt = (trip: Trip) =>
   render(
     <MemoryRouter>
-      <CompletedTripCard trip={trip} linkFromPath="/my-trips?tab=completed" />
+      <CompletedTripCard trip={trip} linkFromPath="/app/my-trips?tab=completed" />
     </MemoryRouter>,
   );
 
@@ -46,6 +46,6 @@ describe('CompletedTripCard', () => {
   it('links to /trips/:id with the from-path breadcrumb preserved', () => {
     renderIt(makeTrip());
     const links = screen.getAllByRole('link');
-    expect(links[0]).toHaveAttribute('href', '/trips/t1?from=%2Fmy-trips%3Ftab%3Dcompleted');
+    expect(links[0]).toHaveAttribute('href', '/app/trips/t1?from=%2Fapp%2Fmy-trips%3Ftab%3Dcompleted');
   });
 });

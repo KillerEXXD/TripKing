@@ -1,4 +1,4 @@
-/** Server-computed analytics blobs — the `/analytics/{admin,agent,driver,api-metrics}` payloads. */
+/** Server-computed analytics blobs — the `/app/analytics/{admin,agent,driver,api-metrics}` payloads. */
 
 /** A point on the rolling 6-month trip series (`trips_monthly` / agent `monthly`). */
 export interface MonthlyTripPoint {
@@ -8,7 +8,7 @@ export interface MonthlyTripPoint {
   completed: number;
 }
 
-/** A point on a driver's rolling 6-month earnings series (`monthly` on `/analytics/driver`). */
+/** A point on a driver's rolling 6-month earnings series (`monthly` on `/app/analytics/driver`). */
 export interface MonthlyEarningsPoint {
   /** `YYYY-MM`. */
   month: string;

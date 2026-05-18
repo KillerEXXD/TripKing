@@ -1,5 +1,5 @@
 /**
- * `/verify/documents` — the identity-documents step of the "Get verified" checklist.
+ * `/app/verify/documents` — the identity-documents step of the "Get verified" checklist.
  * Drivers upload Aadhaar (front & back), a driving licence and a selfie (+ the masked Aadhaar
  * last-4, licence number/expiry); trip managers upload Aadhaar (front & back) and a selfie only.
  * Submitting moves `kyc_status` → docs_submitted.
@@ -28,7 +28,7 @@ function todayIso(): string {
 function PageWrap({ children }: { children: React.ReactNode }) {
   return (
     <PageShell>
-      <PageHeader title="Identity documents" backTo="/profile" />
+      <PageHeader title="Identity documents" backTo="/app/profile" />
       {children}
     </PageShell>
   );
@@ -93,7 +93,7 @@ function DriverDocsForm({ tripId }: { tripId: string | null }) {
         },
       });
       toast.success("Documents submitted — we'll review them shortly.");
-      navigate('/profile');
+      navigate('/app/profile');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not submit your documents');
     }
@@ -185,7 +185,7 @@ function AgentDocsForm({ tripId }: { tripId: string | null }) {
         },
       });
       toast.success("Documents submitted — we'll review them shortly.");
-      navigate('/profile');
+      navigate('/app/profile');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not submit your documents');
     }

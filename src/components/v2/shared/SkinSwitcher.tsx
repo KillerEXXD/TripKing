@@ -62,7 +62,7 @@ export function SkinSwitcher() {
       className="sticky top-0 z-40 flex flex-wrap items-center gap-1.5 border-b border-border bg-page/95 px-3 py-2 backdrop-blur"
     >
       <Link
-        to="/administration/designs"
+        to="/app/administration/designs"
         aria-label="Back to Design previews"
         className="inline-flex shrink-0 items-center gap-1 rounded-pill border border-border bg-surface px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground"
       >

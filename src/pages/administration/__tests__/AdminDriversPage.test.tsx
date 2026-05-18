@@ -67,9 +67,9 @@ describe('AdminDriversPage', () => {
     expect(screen.getByText('Suresh P')).toBeInTheDocument();
     expect(screen.getByText('Pending', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
     // The whole card body is a link to /drivers/:id; KYC shortcut sits next to it.
-    const profileLinks = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.startsWith('/drivers/'));
+    const profileLinks = screen.getAllByRole('link').filter((el) => el.getAttribute('href')?.startsWith('/app/drivers/'));
     expect(profileLinks.length).toBeGreaterThanOrEqual(2);
-    expect(profileLinks[0]).toHaveAttribute('href', '/drivers/d1');
+    expect(profileLinks[0]).toHaveAttribute('href', '/app/drivers/d1');
   });
 
   it('shows the total count from the server in the header', () => {

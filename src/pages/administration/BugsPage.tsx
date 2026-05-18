@@ -40,7 +40,7 @@ const PRIORITY_TONE: Record<BugPriority, 'muted' | 'info' | 'warning' | 'destruc
 };
 
 /**
- * `/administration/bugs` — admin bug tracker. List + filter on the left,
+ * `/app/administration/bugs` — admin bug tracker. List + filter on the left,
  * detail side-sheet on the right. URL param `?bugId=` highlights/opens that
  * bug for deep-linking from notifications and the `/bug` slash command.
  */
@@ -75,7 +75,7 @@ export function BugsPage() {
 
   return (
     <main className="mx-auto max-w-6xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Bug tracker</h1>

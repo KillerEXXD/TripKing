@@ -1,5 +1,5 @@
 /**
- * Driver-side card for the `completed` tab on `/my-trips`. Mirrors the agent's PostedTripCard
+ * Driver-side card for the `completed` tab on `/app/my-trips`. Mirrors the agent's PostedTripCard
  * visual hierarchy — route + completed-at + distance summary + final payout — but with no
  * applicants/share affordances, since a completed trip is settled.
  *
@@ -27,7 +27,7 @@ export function CompletedTripCard({ trip, linkFromPath }: CompletedTripCardProps
   const extraKm = trip.extraDistanceKm ?? null;
   const tollAmount = trip.tollAmount ?? null;
   const from = linkFromPath ? `?from=${encodeURIComponent(linkFromPath)}` : '';
-  const dest = `/trips/${trip.id}${from}`;
+  const dest = `/app/trips/${trip.id}${from}`;
 
   return (
     <Card className="gap-0 p-0">

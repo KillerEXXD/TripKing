@@ -10,7 +10,7 @@ function rupees(paise: number): string {
 }
 
 /**
- * `/administration/app-wallet` (Stage 5) — admin-only read of the platform's
+ * `/app/administration/app-wallet` (Stage 5) — admin-only read of the platform's
  * accounts-receivable wallet. Read-only; refunds happen via the documented
  * support flows, not from this view.
  */
@@ -19,7 +19,7 @@ export function AdminAppWalletPage() {
 
   return (
     <main className="mx-auto max-w-4xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">App wallet</h1>
@@ -80,7 +80,7 @@ export function AdminAppWalletPage() {
                         <td className="px-2 py-1.5">{e.entryType}</td>
                         <td className="px-2 py-1.5 capitalize">{e.fee?.side ?? '—'}</td>
                         <td className="px-2 py-1.5">{e.fee?.paymentSource ? e.fee.paymentSource.replace(/_/g, ' ') : '—'}</td>
-                        <td className="px-2 py-1.5">{e.fee?.tripId ? <Link to={`/trips/${e.fee.tripId}`} className="text-primary underline">trip</Link> : '—'}</td>
+                        <td className="px-2 py-1.5">{e.fee?.tripId ? <Link to={`/app/trips/${e.fee.tripId}`} className="text-primary underline">trip</Link> : '—'}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums">
                           <span className={e.amountPaise >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
                             <ArrowDownRight className="mr-0.5 inline size-3.5" aria-hidden />

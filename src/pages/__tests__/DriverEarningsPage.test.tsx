@@ -47,14 +47,14 @@ describe('DriverEarningsPage', () => {
     expect(screen.getByText(/5 won · 2 pending/i)).toBeInTheDocument();
     expect(screen.getByText(/Your assigned trips by status/i)).toBeInTheDocument();
     expect(screen.getByTestId('earnings-chart')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /see all your trips/i })).toHaveAttribute('href', '/my-trips');
+    expect(screen.getByRole('link', { name: /see all your trips/i })).toHaveAttribute('href', '/app/my-trips');
   });
 
   it('shows the empty state (with a Browse CTA) when the driver has no assigned trips', () => {
     setQ({ data: { ...ANALYTICS, hasDriverProfile: true, tripsAssigned: 0, monthly: [] } });
     renderPage();
     expect(screen.getByText(/no earnings yet/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/trips');
+    expect(screen.getByRole('link', { name: /browse trips/i })).toHaveAttribute('href', '/app/trips');
     expect(screen.queryByTestId('earnings-chart')).toBeNull();
   });
 

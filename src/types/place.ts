@@ -50,7 +50,7 @@ export interface ResolvePlaceInput {
 
 /**
  * A centre + radius for the `?near_lat=&near_lng=&radius_km=` filters on the public
- * list endpoints (`/trips`, `/vacancies`, `/drivers`). When set, results are
+ * list endpoints (`/app/trips`, `/app/vacancies`, `/app/drivers`). When set, results are
  * restricted to in-radius rows, nearest first, each carrying a `distanceKm`.
  * The server caps the radius at 100 km.
  */

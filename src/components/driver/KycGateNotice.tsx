@@ -22,7 +22,7 @@ export function KycGateNotice({ heading, body, className }: KycGateNoticeProps) 
       </div>
       <p className="text-sm text-secondary">{body ?? 'You can browse straight away, but posting and applying need a verified account. The checklist on your profile walks you through it — documents, your vehicle, and a quick video call.'}</p>
       <Button variant="full" size="lg" asChild>
-        <Link to="/profile#get-verified">Go to verification</Link>
+        <Link to="/app/profile#get-verified">Go to verification</Link>
       </Button>
     </Card>
   );

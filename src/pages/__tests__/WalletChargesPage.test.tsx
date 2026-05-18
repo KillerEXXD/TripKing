@@ -36,6 +36,6 @@ describe('WalletChargesPage', () => {
     render(<Wrap><WalletChargesPage /></Wrap>);
     await waitFor(() => expect(screen.getByText('Driver-side platform fee')).toBeInTheDocument());
     expect(screen.getByText('−₹50')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'trip' })).toHaveAttribute('href', '/trips/trip-123');
+    expect(screen.getByRole('link', { name: 'trip' })).toHaveAttribute('href', '/app/trips/trip-123');
   });
 });

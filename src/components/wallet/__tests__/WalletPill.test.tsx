@@ -34,7 +34,7 @@ describe('WalletPill', () => {
     } as never);
     render(<Wrap><WalletPill /></Wrap>);
     await waitFor(() => expect(screen.getByText('₹1,250')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: /open wallet/i })).toHaveAttribute('href', '/wallet');
+    expect(screen.getByRole('link', { name: /open wallet/i })).toHaveAttribute('href', '/app/wallet');
   });
 
   it('flags low balance below threshold', async () => {

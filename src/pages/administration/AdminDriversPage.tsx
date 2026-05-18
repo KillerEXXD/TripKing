@@ -36,7 +36,7 @@ function DriverCard({ d }: { d: Driver }) {
   return (
     <Card className="gap-2 transition-colors hover:border-primary/40">
       <div className="flex items-start gap-3">
-        <Link to={`/drivers/${d.id}`} className="flex flex-1 items-start gap-3 min-w-0">
+        <Link to={`/app/drivers/${d.id}`} className="flex flex-1 items-start gap-3 min-w-0">
           {d.profilePhotoUrl ? (
             <img src={d.profilePhotoUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
           ) : (
@@ -72,7 +72,7 @@ function DriverCard({ d }: { d: Driver }) {
             </div>
           </div>
         </Link>
-        <Link to={`/administration/kyc?driverId=${d.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
+        <Link to={`/app/administration/kyc?driverId=${d.id}`} className="shrink-0 self-center text-xs font-medium text-primary underline">
           KYC →
         </Link>
       </div>
@@ -88,7 +88,7 @@ function DriverCard({ d }: { d: Driver }) {
 const PAGE_SIZE = 50;
 
 /**
- * `/administration/drivers` — read-only admin driver directory (admin-only). Defaults to "All"
+ * `/app/administration/drivers` — read-only admin driver directory (admin-only). Defaults to "All"
  * (no KYC filter). Loads pages of 50 via `useInfiniteDrivers`; the IntersectionObserver sentinel
  * at the bottom auto-fetches the next page. The header shows the live total from the server.
  */
@@ -121,7 +121,7 @@ export function AdminDriversPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <div className="flex items-baseline justify-between gap-2">
@@ -130,7 +130,7 @@ export function AdminDriversPage() {
       </div>
       <p className="text-sm text-secondary">
         Read-only directory. Move a driver through verification in the{' '}
-        <Link to="/administration/kyc" className="text-primary underline">
+        <Link to="/app/administration/kyc" className="text-primary underline">
           KYC review queue
         </Link>
         .

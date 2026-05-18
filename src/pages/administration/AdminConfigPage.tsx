@@ -71,12 +71,12 @@ function LabelListSection({ hooks, title, itemNoun }: { hooks: typeof carTypeHoo
   );
 }
 
-/** `/administration/config` — the master-data manager (§7.7). */
+/** `/app/administration/config` — the master-data manager (§7.7). */
 export function AdminConfigPage() {
   const [section, setSection] = useState<SectionId>('general');
   return (
     <main className="mx-auto max-w-3xl space-y-6 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Reference data</h1>

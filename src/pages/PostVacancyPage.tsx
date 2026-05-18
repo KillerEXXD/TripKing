@@ -37,7 +37,7 @@ function formatHours(h: number): string {
 }
 
 /**
- * `/vacancies/new` — a driver posts their availability ("I'm in city X, available
+ * `/app/vacancies/new` — a driver posts their availability ("I'm in city X, available
  * from <time> for <N> hours, willing to drive to [cities], min ₹/km"). Current city
  * and at least one destination are required; the start time defaults to now and the
  * window length steps in half hours. On success we go to the vacancy feed.
@@ -126,7 +126,7 @@ export function PostVacancyPage() {
         await postVacancy.mutateAsync(input);
         toast.success('Availability posted');
       }
-      navigate('/vacancies');
+      navigate('/app/vacancies');
     } catch {
       toast.error(isEdit ? "Couldn't save your changes — try again." : "Couldn't post your availability — try again.");
     }
@@ -323,7 +323,7 @@ export function PostVacancyPage() {
 
       <StickyFooterCTA>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" className="shrink-0" onClick={() => navigate('/vacancies')} disabled={pending}>
+          <Button type="button" variant="outline" className="shrink-0" onClick={() => navigate('/app/vacancies')} disabled={pending}>
             Cancel
           </Button>
           <Button type="button" variant="full" className="min-w-0 flex-1" onClick={() => void onSubmit()} disabled={!canSubmit}>

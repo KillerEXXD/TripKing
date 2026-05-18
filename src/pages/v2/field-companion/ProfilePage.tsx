@@ -28,7 +28,7 @@ export function FieldProfilePage() {
       </section>
 
       <nav aria-label="Account" className="mt-4 space-y-2 px-5">
-        <Link to="/profile" className="block rounded-card bg-surface p-4 text-[16px] shadow-card">
+        <Link to="/app/profile" className="block rounded-card bg-surface p-4 text-[16px] shadow-card">
           Open v1 profile
         </Link>
         <Link to="/v3/trips" className="block rounded-card bg-surface p-4 text-[16px] shadow-card">

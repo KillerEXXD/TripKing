@@ -1,5 +1,5 @@
 /**
- * `/vehicles/new` and `/vehicles/:id/edit` — step 3 of the driver "Get verified" checklist:
+ * `/app/vehicles/new` and `/app/vehicles/:id/edit` — step 3 of the driver "Get verified" checklist:
  * the vehicle's make / model / year / car type / seats / AC / fuel type / registration number.
  * Year is rejected inline if older than `app_settings.min_vehicle_year`. After adding a new
  * vehicle we go straight to its photos screen.
@@ -84,11 +84,11 @@ export function VehicleFormPage() {
       if (editing && id) {
         await updateVehicle.mutateAsync({ id, patch: input });
         toast.success('Vehicle updated');
-        navigate('/profile');
+        navigate('/app/profile');
       } else {
         const created = await addVehicle.mutateAsync(input);
         toast.success('Vehicle added — now add its photos.');
-        navigate(`/vehicles/${created.id}/photos`);
+        navigate(`/app/vehicles/${created.id}/photos`);
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not save the vehicle');

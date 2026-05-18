@@ -36,7 +36,7 @@ function FlaggedReviewCard({ review, onModerate, pending }: { review: Review; on
         </Badge>
         <span className="text-secondary">
           by {RATER_LABEL[review.raterRole] ?? 'a user'} · trip{' '}
-          <Link to={`/trips/${review.tripId}`} className="font-mono text-primary underline">
+          <Link to={`/app/trips/${review.tripId}`} className="font-mono text-primary underline">
             {review.tripId.slice(0, 8)}
           </Link>
           {review.isPublished ? '' : ' · hidden'}
@@ -55,7 +55,7 @@ function FlaggedReviewCard({ review, onModerate, pending }: { review: Review; on
 }
 
 /**
- * `/administration/reviews` — the reviews-moderation queue (admin-only). Lists
+ * `/app/administration/reviews` — the reviews-moderation queue (admin-only). Lists
  * flagged reviews (`GET /reviews?flagged=true`); "Clear flag" keeps the review
  * and takes it off the queue, "Hide review" unpublishes it (+ clears the flag).
  * Both go through `useModerateReview` (`POST /reviews/:id/moderate`).
@@ -75,7 +75,7 @@ export function ReviewModerationPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">Reviews moderation</h1>

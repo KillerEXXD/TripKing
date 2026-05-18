@@ -47,7 +47,7 @@ function VacancyCard({ vacancy, canInvite }: { vacancy: Vacancy; canInvite: bool
   return (
     <Card className="gap-3 transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
-        <Link to={`/drivers/${vacancy.driverId}`} className="min-w-0 flex-1">
+        <Link to={`/app/drivers/${vacancy.driverId}`} className="min-w-0 flex-1">
           <DriverIdentity driver={driver} sub={ratingSub} />
         </Link>
         {vacancy.minRatePerKm ? <Badge variant="muted">≥ {formatINR(vacancy.minRatePerKm)}/km</Badge> : null}
@@ -235,7 +235,7 @@ function MyInvitesBadge({ invites }: { invites: VacancyInviteSummary[] }) {
           return (
             <Link
               key={inv.id}
-              to={`/trips/${inv.tripId}`}
+              to={`/app/trips/${inv.tripId}`}
               className="flex items-center justify-between gap-3 rounded-lg border bg-white px-2.5 py-1.5 text-left text-xs transition-colors hover:border-primary/40"
             >
               <div className="min-w-0">
@@ -254,7 +254,7 @@ function MyInvitesBadge({ invites }: { invites: VacancyInviteSummary[] }) {
 }
 
 /**
- * `/vacancies` — the driver-availability feed: drivers who've posted "I'm in
+ * `/app/vacancies` — the driver-availability feed: drivers who've posted "I'm in
  * city X, available [dates], willing to drive to [cities]". Agents browse this
  * to line up a driver. Server-filtered by current city / destination city via
  * `useVacancies`; cards link to the driver's profile. (Posting a vacancy is a

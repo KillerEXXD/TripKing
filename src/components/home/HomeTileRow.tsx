@@ -111,7 +111,7 @@ function EarningsTile({ role }: { role: ReferralRole }) {
     return (
       <TileFrame
         accent="green"
-        to="/my-earnings"
+        to="/app/my-earnings"
         icon={<Wallet />}
         label="Earnings"
         primary={a ? formatINR(a.earningsTotal) : '—'}
@@ -123,7 +123,7 @@ function EarningsTile({ role }: { role: ReferralRole }) {
   return (
     <TileFrame
       accent="green"
-      to="/analytics"
+      to="/app/analytics"
       icon={<Wallet />}
       label="Earnings"
       primary={a ? formatINR(a.driverPayoutCompletedTotal) : '—'}
@@ -144,7 +144,7 @@ function AnalyticsTile({ role }: { role: ReferralRole }) {
     return (
       <TileFrame
         accent="blue"
-        to="/analytics"
+        to="/app/analytics"
         icon={<BarChart3 />}
         label="Analytics"
         primary={a ? String(a.tripsCompleted) : '—'}
@@ -156,7 +156,7 @@ function AnalyticsTile({ role }: { role: ReferralRole }) {
   return (
     <TileFrame
       accent="blue"
-      to="/analytics"
+      to="/app/analytics"
       icon={<BarChart3 />}
       label="Analytics"
       primary={a ? String(a.tripsPosted) : '—'}
@@ -215,7 +215,7 @@ function ReferralTile({ code, link }: { code?: string; link?: string }) {
   return (
     <TileFrame
       accent="purple"
-      to="/referrals"
+      to="/app/referrals"
       icon={<Gift />}
       label="Refer & earn"
       primary={primary}
@@ -237,7 +237,7 @@ function ReferralTile({ code, link }: { code?: string; link?: string }) {
 function DesignPreviewsTile() {
   return (
     <Link
-      to="/administration/designs"
+      to="/app/administration/designs"
       aria-label="Open design previews"
       className={cn(
         'flex min-w-0 items-center gap-3 rounded-card border border-l-4 border-black/5 p-3 shadow-card transition-shadow hover:shadow-md',

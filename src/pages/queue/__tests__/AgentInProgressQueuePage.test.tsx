@@ -21,11 +21,11 @@ function setTrips(s: QS = {}) {
 
 function renderQ() {
   return render(
-    <MemoryRouter initialEntries={['/queue/in-progress']}>
+    <MemoryRouter initialEntries={['/app/queue/in-progress']}>
       <Routes>
-        <Route path="/queue/in-progress" element={<AgentInProgressQueuePage />} />
+        <Route path="/app/queue/in-progress" element={<AgentInProgressQueuePage />} />
         <Route path="/" element={<div>home page</div>} />
-        <Route path="/trips/:id" element={<div>trip detail</div>} />
+        <Route path="/app/trips/:id" element={<div>trip detail</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -63,6 +63,6 @@ describe('AgentInProgressQueuePage', () => {
     setTrips({ data: [makeTrip({ id: 'abc' })] });
     renderQ();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
-    expect(link).toHaveAttribute('href', '/trips/abc?from=/queue/in-progress');
+    expect(link).toHaveAttribute('href', '/app/trips/abc?from=/queue/in-progress');
   });
 });

@@ -84,7 +84,7 @@ describe('KycReviewPage', () => {
     setDrivers({ rows: [{ id: 'd1', fullName: 'Ravi', kycStatus: 'docs_submitted' }] });
     renderKyc();
     const link = screen.getByRole('link', { name: /ravi/i });
-    expect(link).toHaveAttribute('href', '/administration/kyc/driver/d1');
+    expect(link).toHaveAttribute('href', '/app/administration/kyc/driver/d1');
   });
 
   it('switching to the Agents tab shows agent cards linking to the agent detail page', () => {
@@ -92,7 +92,7 @@ describe('KycReviewPage', () => {
     renderKyc();
     fireEvent.click(screen.getByRole('tab', { name: /^agents$/i }));
     const link = screen.getByRole('link', { name: /agent x/i });
-    expect(link).toHaveAttribute('href', '/administration/kyc/agent/a1');
+    expect(link).toHaveAttribute('href', '/app/administration/kyc/agent/a1');
   });
 
   it('clicking the "Approved" filter sends kycStatus="approved" to the server', () => {

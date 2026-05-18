@@ -89,11 +89,11 @@ function setWithdraw() {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/trips/t1/invitations']}>
+    <MemoryRouter initialEntries={['/app/trips/t1/invitations']}>
       <Routes>
-        <Route path="/trips/:id/invitations" element={<TripInvitationsPage />} />
-        <Route path="/drivers/:id" element={<div>driver profile</div>} />
-        <Route path="/posted-trips" element={<div>posted trips list</div>} />
+        <Route path="/app/trips/:id/invitations" element={<TripInvitationsPage />} />
+        <Route path="/app/drivers/:id" element={<div>driver profile</div>} />
+        <Route path="/app/posted-trips" element={<div>posted trips list</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -198,7 +198,7 @@ describe('TripInvitationsPage', () => {
     // "Review applicants" link (PostedTripCard renders this instead of "View details" when
     // status=has_applicants) → points to /trips/:id/applicants with the breadcrumb attached.
     const reviewLink = screen.getByRole('link', { name: /review applicants/i });
-    expect(reviewLink.getAttribute('href')).toMatch(/^\/trips\/t1\/applicants\?from=/);
+    expect(reviewLink.getAttribute('href')).toMatch(/^\/app\/trips\/t1\/applicants\?from=/);
   });
 
   it('passes a breadcrumb (?from=/trips/:id/invitations) so the trip detail back-arrow returns HERE', () => {
@@ -212,7 +212,7 @@ describe('TripInvitationsPage', () => {
     expect(links.length).toBeGreaterThan(0);
     for (const link of links) {
       const href = link.getAttribute('href') ?? '';
-      expect(href).toMatch(/\?from=%2Ftrips%2Ft1%2Finvitations/);
+      expect(href).toMatch(/\?from=%2Fapp%2Ftrips%2Ft1%2Finvitations/);
     }
   });
 

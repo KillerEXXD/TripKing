@@ -52,7 +52,7 @@ function setTrips(state: TripsState) {
   vi.mocked(useTrips).mockReturnValue({ isPending: false, isError: false, isSuccess: true, data: [], refetch: vi.fn(), ...state } as never);
 }
 
-function renderPosted(url = '/posted-trips') {
+function renderPosted(url = '/app/posted-trips') {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <PostedTripsPage />
@@ -122,7 +122,7 @@ describe('PostedTripsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^has applicants/i }));
     // PostedTripsPage now always passes linkFromPath so the trip-detail Back arrow returns
     // to the same filter chip — href carries a `?from=/posted-trips?status=…` breadcrumb.
-    expect(screen.getByRole('link', { name: /review applicants/i }).getAttribute('href')).toMatch(/^\/trips\/t1\/applicants\?from=%2Fposted-trips%3Fstatus%3Dhas_applicants/);
+    expect(screen.getByRole('link', { name: /review applicants/i }).getAttribute('href')).toMatch(/^\/app\/trips\/t1\/applicants\?from=%2Fapp%2Fposted-trips%3Fstatus%3Dhas_applicants/);
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
     expect(screen.getByText('share modal')).toBeInTheDocument();
   });
@@ -199,7 +199,7 @@ describe('PostedTripsPage', () => {
       makeTrip({ id: 'n1', status: 'open', pendingInvitationCount: 0, fromCity: city('c3', 'NoInvites') }),
       makeTrip({ id: 'd1', status: 'cancelled', pendingInvitationCount: 5, fromCity: city('c4', 'CancelledOutsideScope') }),
     ] });
-    renderPosted('/posted-trips?scope=invites-sent&from=/');
+    renderPosted('/app/posted-trips?scope=invites-sent&from=/');
     // Title swap + scope-specific subtitle (2 trips · 3 pending invites)
     expect(screen.getByText('Invites sent')).toBeInTheDocument();
     expect(screen.getByText(/2 trips · 3 pending invites/i)).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe('PostedTripsPage', () => {
 
   it('?scope=invites-sent with no qualifying trips — renders the scoped empty state with a "Back to home" action', () => {
     setTrips({ data: [makeTrip({ id: 'p1', status: 'open', pendingInvitationCount: 0 })] });
-    renderPosted('/posted-trips?scope=invites-sent&from=/');
+    renderPosted('/app/posted-trips?scope=invites-sent&from=/');
     expect(screen.getByText('No invitations pending')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
   });
@@ -227,13 +227,13 @@ describe('PostedTripsPage', () => {
     setTrips({ data: [
       makeTrip({ id: 'i1', status: 'open', pendingInvitationCount: 2, fromCity: city('c1', 'Vellore') }),
     ] });
-    renderPosted('/posted-trips?scope=invites-sent&from=/');
-    const tripLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/trips/i1'));
+    renderPosted('/app/posted-trips?scope=invites-sent&from=/');
+    const tripLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/app/trips/i1'));
     expect(tripLinks.length).toBeGreaterThan(0);
     for (const a of tripLinks) {
-      expect(a.getAttribute('href')).toMatch(/^\/trips\/i1(\/[a-z]+)?\?from=/);
+      expect(a.getAttribute('href')).toMatch(/^\/app\/trips\/i1(\/[a-z]+)?\?from=/);
       const fromParam = new URL(a.getAttribute('href')!, 'https://x').searchParams.get('from');
-      expect(fromParam).toContain('/posted-trips?scope=invites-sent');
+      expect(fromParam).toContain('/app/posted-trips?scope=invites-sent');
     }
   });
 });

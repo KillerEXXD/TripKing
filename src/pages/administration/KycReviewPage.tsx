@@ -34,7 +34,7 @@ interface KycEntry {
 }
 
 function EntryCard({ entry, kind }: { entry: KycEntry; kind: 'driver' | 'agent' }) {
-  const detailHref = `/administration/kyc/${kind}/${entry.id}`;
+  const detailHref = `/app/administration/kyc/${kind}/${entry.id}`;
   return (
     <Link to={detailHref} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-2xl">
       <Card className="flex items-center justify-between gap-3 transition-colors hover:bg-muted/40">
@@ -108,7 +108,7 @@ function AgentsQueue({ filter, search }: { filter: Filter; search: string }) {
 }
 
 /**
- * `/administration/kyc` — the KYC review queue (admin-only). Two-row header:
+ * `/app/administration/kyc` — the KYC review queue (admin-only). Two-row header:
  * row 1 chooses Drivers/Agents, row 2 filters by KYC status. Each card links to
  * the per-applicant detail page where the admin can drill into each checklist
  * step's evidence and finalize the decision.
@@ -126,7 +126,7 @@ export function KycReviewPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app/administration" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Administration
       </Link>
       <h1 className="text-2xl font-bold">KYC review</h1>

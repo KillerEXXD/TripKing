@@ -23,7 +23,7 @@ export interface VerificationSummary {
 }
 
 /**
- * The pre-reveal driver shape returned on public surfaces (`/drivers` list, `/drivers/:id` to a
+ * The pre-reveal driver shape returned on public surfaces (`/app/drivers` list, `/app/drivers/:id` to a
  * non-revealed viewer, the `driver` field on a vacancy, the `assigned_driver` on a browse-safe
  * trip). Identity (fullName / phone / email / profilePhotoUrl) is absent server-side until the
  * `can_reveal_driver` predicate fires — the client renders by `displayHandle` instead.
@@ -42,7 +42,7 @@ export interface DriverPublic {
   currentPlace?: Place;
   currentLat?: number;
   currentLng?: number;
-  /** Straight-line km from the `?near_*` centre — present only on a radius-filtered `/drivers` list. */
+  /** Straight-line km from the `?near_*` centre — present only on a radius-filtered `/app/drivers` list. */
   distanceKm?: number;
   kycStatus: KycStatus;
   ratingAvg: number;

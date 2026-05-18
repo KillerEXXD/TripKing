@@ -32,10 +32,10 @@ function setQuery(mock: ReturnType<typeof vi.fn>, data: unknown) {
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/verify/documents']}>
+    <MemoryRouter initialEntries={['/app/verify/documents']}>
       <Routes>
-        <Route path="/verify/documents" element={<VerifyDocumentsPage />} />
-        <Route path="/profile" element={<div>profile page</div>} />
+        <Route path="/app/verify/documents" element={<VerifyDocumentsPage />} />
+        <Route path="/app/profile" element={<div>profile page</div>} />
       </Routes>
     </MemoryRouter>,
   );
