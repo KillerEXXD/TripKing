@@ -136,6 +136,13 @@ export function transformTrip(api: Api): Trip {
     extraKmFare: numOpt(api.extra_km_fare),
     tollAmount: numOpt(api.toll_amount),
     finalDriverPayout: numOpt(api.final_driver_payout),
+    // The trip_executions embed is `execution: { started_at, completed_at, … }` — flatten it
+    // so consumers don't have to dig. Optional everywhere: null until the trip starts.
+    startedAt: str((api.execution as Record<string, unknown> | null | undefined)?.started_at),
+    completedAt: str((api.execution as Record<string, unknown> | null | undefined)?.completed_at),
+    startOdoReading: numOpt((api.execution as Record<string, unknown> | null | undefined)?.start_odo_reading),
+    endOdoReading: numOpt((api.execution as Record<string, unknown> | null | undefined)?.end_odo_reading),
+    actualDistanceKm: numOpt((api.execution as Record<string, unknown> | null | undefined)?.actual_distance_km),
     passengerName: str(api.passenger_name) ?? '',
     passengerPhone: str(api.passenger_phone) ?? '',
     passengerCount: num(api.passenger_count, 1),

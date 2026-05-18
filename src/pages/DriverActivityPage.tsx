@@ -362,13 +362,17 @@ export function DriverActivityPage() {
   const assigned = drivingQuery.data ?? [];
   const drivingTrips   = assigned.filter((t) => t.status === 'in_progress' || t.status === 'accepted');
   const selectedTrips  = assigned.filter((t) => t.status === 'selected');
-  // Latest-completed first. `updatedAt` was bumped when the status flipped to 'completed' so
-  // it's a stable proxy for the actual completion timestamp until the transform surfaces
-  // `trip_executions.completed_at`. Ties go to `id` so renders stay deterministic.
+  // Latest-completed first. Prefer the precise `trip_executions.completed_at` now that the
+  // transform surfaces it; fall back to `updatedAt` for legacy rows. Ties go to `id` so
+  // renders stay deterministic.
   const completedTrips = assigned
     .filter((t) => t.status === 'completed')
     .slice()
-    .sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? '') || a.id.localeCompare(b.id));
+    .sort((a, b) => {
+      const ka = a.completedAt ?? a.updatedAt ?? '';
+      const kb = b.completedAt ?? b.updatedAt ?? '';
+      return kb.localeCompare(ka) || a.id.localeCompare(b.id);
+    });
   const cancelledTrips = assigned.filter((t) => t.status === 'cancelled');
 
   // "All" — union of every trip the driver has a role on, deduped by trip.id, bucketed by the

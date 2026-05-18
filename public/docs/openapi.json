@@ -1476,7 +1476,7 @@
     "/trips/{id}/start": {
       "post": {
         "tags": ["trips"],
-        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress. start_odo_url + start_odo_reading are optional in this phase but supplied by the new wizard. Rate-limited: 5 attempts per driver+trip per 60s; 6th = 429.",
+        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress. Requires start_odo_url + start_odo_reading (422 MISSING_ODOMETER otherwise; admin bypasses). Rate-limited: 5 attempts per driver+trip per 60s; 6th = 429.",
         "parameters": [{ "$ref": "#/components/parameters/id" }],
         "requestBody": {
           "required": true,
@@ -1484,7 +1484,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["passenger_otp"],
+                "required": ["passenger_otp", "start_odo_url", "start_odo_reading"],
                 "properties": {
                   "passenger_otp": { "type": "string" },
                   "start_odo_url": { "type": "string" },
@@ -1506,13 +1506,15 @@
     "/trips/{id}/complete": {
       "post": {
         "tags": ["trips"],
-        "summary": "Complete the trip (assigned driver/admin; Bearer). end_odo_url + end_odo_reading are optional in this phase but supplied by the new wizard. When end_odo_reading is supplied alongside an existing start_odo_reading, it must be strictly greater (422 otherwise). toll_paid_by_driver is 100% reimbursed in final_driver_payout and added to final_total_fare; commission is NOT taken on toll. Extra distance over expected_distance_km is billed at the trip's posted rate_per_km. Fires the wallet-charge trigger (migration 044) — 402 INSUFFICIENT_WALLET_BALANCE_* if either wallet is short.",
+        "summary": "Complete the trip (assigned driver/admin; Bearer). Requires end_odo_url + end_odo_reading (422 MISSING_ODOMETER otherwise; admin bypasses). When end_odo_reading is supplied alongside an existing start_odo_reading, it must be strictly greater (422 VALIDATION otherwise). toll_paid_by_driver is 100% reimbursed in final_driver_payout and added to final_total_fare; commission is NOT taken on toll. Extra distance over expected_distance_km is billed at the trip's posted rate_per_km. Fires the wallet-charge trigger (migration 044) — 402 INSUFFICIENT_WALLET_BALANCE_* if either wallet is short.",
         "parameters": [{ "$ref": "#/components/parameters/id" }],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["end_odo_url", "end_odo_reading"],
                 "properties": {
                   "end_odo_url": { "type": "string" },
                   "end_odo_reading": { "type": "integer", "minimum": 0 },
