@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
-import { ArrowLeft, BellRing, Car, ChevronDown, ChevronRight, FileText, Info, Loader2, Route, Users, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BellRing, Car, ChevronDown, ChevronRight, FileText, Info, Loader2, Route, Users, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { usePostTrip, useTripMatchPreview } from '@/hooks/useTrips';
+import { usePostTrip, useTrip, useTripMatchPreview, useUpdateTripDetails } from '@/hooks/useTrips';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
@@ -16,8 +16,8 @@ import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEd
 import { Button, Card, Input, ProgressBar, SectionLabel, Select, StatusBanner, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
-import { cn, formatINR, formatKmAndDuration, formatShortDate, haversineKm } from '@/lib/utils';
-import type { Place, PostTripInput, Trip, TripType, WaypointInput } from '@/types';
+import { cn, formatINR, formatKmAndDuration, formatPickupDateTime, formatShortDate, haversineKm } from '@/lib/utils';
+import type { Place, PostTripInput, Trip, TripType, UpdateTripDetailsInput, WaypointInput } from '@/types';
 
 interface PostTripForm {
   fromCityId: string;
@@ -96,12 +96,20 @@ function Field({ label, error, hint, children }: { label: string; error?: string
  */
 export function PostTripPage() {
   const navigate = useNavigate();
+  // `/trips/:id/edit` reuses this page in edit mode. When `:id` is set, we hydrate the
+  // form from the existing trip and PATCH instead of POST on submit. The entry buttons
+  // (Home priority card + trip-detail page) gate on `status ∈ {open, has_applicants}`
+  // and `selectedDriverId == null`; the backend re-checks via the PATCH 409.
+  const { id: editTripId } = useParams<{ id?: string }>();
+  const isEdit = !!editTripId;
   const effectiveRole = useEffectiveRole();
   const isDriver = effectiveRole === 'driver';
   const myDriverQuery = useMyDriver(isDriver);
   const myAgentQuery = useMyAgent(!isDriver);
   const myKycStatus = (isDriver ? myDriverQuery.data?.kycStatus : myAgentQuery.data?.kycStatus) ?? undefined;
   const postTrip = usePostTrip();
+  const updateTrip = useUpdateTripDetails();
+  const editingTripQuery = useTrip(editTripId);
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
   const appSettings = useAppSettings();
@@ -109,6 +117,19 @@ export function PostTripPage() {
   const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
   const [fromPlace, setFromPlace] = useState<Place | null>(null);
   const [toPlace, setToPlace] = useState<Place | null>(null);
+  // Edit-mode hydration: pre-fill form ONCE when the existing trip arrives. The
+  // `hydrated` flag prevents react-query re-fetches from clobbering in-progress edits.
+  const [editHydrated, setEditHydrated] = useState(false);
+  // Pre-submit conflict banner: applicants/invitees that appeared while the agent
+  // was editing. Surfaced just before Update fires.
+  const [conflictCount, setConflictCount] = useState<number | null>(null);
+  // Diff confirm modal: shown when the agent's Update changes a notify-worthy field
+  // AND there are applicants/invitees who'll be alerted. Last chance to back out.
+  const [pendingDiff, setPendingDiff] = useState<null | {
+    changes: Array<{ label: string; before: string; after: string }>;
+    recipientCount: number;
+    submit: () => void;
+  }>(null);
   // ── trip-type state (migration 024) ────────────────────────────────────────
   const [tripType, setTripType] = useState<TripType>('one_way');
   const [expectedEndAt, setExpectedEndAt] = useState<string>('');     // datetime-local; required for round_trip + multi_way
@@ -130,16 +151,56 @@ export function PostTripPage() {
     if (!cur.driverInstructions && s.defaultDriverInstructions) setValue('driverInstructions', s.defaultDriverInstructions);
   }, [appSettings.data, getValues, setValue]);
 
-  // Pre-select "SUV" once the car_types list loads (falls back to first active row if missing /
-  // renamed). Saves the agent a tap on the most common choice. `shouldDirty: false` so the form
-  // doesn't think the user touched it.
+  // Pre-select "SUV" once the car_types list loads. Skipped in edit mode — the
+  // hydration effect below sets the real value from the loaded trip.
   useEffect(() => {
+    if (isEdit) return;
     if (getValues('carTypeId')) return;
     const active = (carTypesQuery.data ?? []).filter((c) => c.isActive);
     if (active.length === 0) return;
     const preferred = active.find((c) => c.label.trim().toLowerCase() === PREFERRED_DEFAULT_CAR_TYPE.toLowerCase()) ?? active[0];
     if (preferred) setValue('carTypeId', preferred.id, { shouldDirty: false, shouldValidate: false });
-  }, [carTypesQuery.data, getValues, setValue]);
+  }, [carTypesQuery.data, getValues, setValue, isEdit]);
+
+  // Edit-mode hydration: pre-fill the form ONCE from the loaded trip. Subsequent
+  // re-renders are blocked by `editHydrated` so they don't overwrite mid-edit changes.
+  // Mirror of PostVacancyPage's pattern.
+  useEffect(() => {
+    if (!isEdit || editHydrated || !editingTripQuery.data) return;
+    const t = editingTripQuery.data;
+    // Format an ISO timestamp into the `YYYY-MM-DDTHH:mm` shape `<input type="datetime-local">` /
+    // DateTimeField expect (local time so it reads to the user as the local clock time).
+    const toLocal = (iso: string | null | undefined): string => {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+    setValue('fromCityId', t.fromCity.id, { shouldDirty: false });
+    setValue('toCityId', t.toCity.id, { shouldDirty: false });
+    setValue('pickupAt', toLocal(t.pickupAt), { shouldDirty: false });
+    setValue('expectedDistanceKm', t.expectedDistanceKm, { shouldDirty: false });
+    setValue('carTypeId', t.carTypeId, { shouldDirty: false });
+    setValue('seatsRequired', t.seatsRequired, { shouldDirty: false });
+    setValue('acRequired', t.acRequired, { shouldDirty: false });
+    setValue('ratePerKm', t.ratePerKm, { shouldDirty: false });
+    setValue('driverBata', t.driverBata, { shouldDirty: false });
+    setValue('gstAmount', t.gstAmount, { shouldDirty: false });
+    setValue('acceptanceWindowMinutes', t.acceptanceWindowMinutes ?? 15, { shouldDirty: false });
+    setValue('extrasPaidByPassenger', t.extrasPaidByPassenger, { shouldDirty: false });
+    setValue('passengerName', t.passengerName ?? '', { shouldDirty: false });
+    setValue('passengerPhone', t.passengerPhone ?? '', { shouldDirty: false });
+    setValue('passengerCount', t.passengerCount ?? 1, { shouldDirty: false });
+    setValue('driverInstructions', t.driverInstructions ?? '', { shouldDirty: false });
+    setValue('showFareToPassenger', t.showFareToPassenger, { shouldDirty: false });
+    setValue('hidePassengerPhone', t.hidePassengerPhone, { shouldDirty: false });
+    if (t.fromPlace) setFromPlace(t.fromPlace);
+    if (t.toPlace) setToPlace(t.toPlace);
+    if (t.expectedEndAt) setExpectedEndAt(toLocal(t.expectedEndAt));
+    if (t.passengerName || t.passengerPhone) setPassengerSectionOpen(true);
+    setEditHydrated(true);
+  }, [isEdit, editHydrated, editingTripQuery.data, setValue]);
 
   const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch, autoInviteWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata', 'autoInviteMatches']);
   // Auto-invite preview — re-runs whenever the pickup city OR the planned interval
@@ -324,6 +385,80 @@ export function PostTripPage() {
       hidePassengerPhone: values.hidePassengerPhone,
       autoInviteMatches: values.autoInviteMatches,
     };
+    // ── EDIT MODE ─────────────────────────────────────────────────────────
+    // We don't POST a new trip — we PATCH the existing one. Two pre-flight checks:
+    //   (1) Refetch the trip and surface a conflict banner if applicants/invitees
+    //       appeared while editing. The agent has to click Update twice (once to
+    //       see the warning, once to confirm).
+    //   (2) If a notify-worthy field changed AND there's at least one recipient,
+    //       show a confirm modal listing each change. The backend fans out
+    //       trip_updated notifications on PATCH; this is the last chance to back out.
+    if (isEdit && editTripId) {
+      const refresh = await editingTripQuery.refetch();
+      const fresh = refresh.data;
+      if (!fresh) {
+        toast.error("Couldn't re-check the trip — please try again.");
+        return;
+      }
+      const newRecipientCount = (fresh.applicantCount ?? 0) + (fresh.pendingInvitationCount ?? 0);
+      const oldRecipientCount = (editingTripQuery.data?.applicantCount ?? 0) + (editingTripQuery.data?.pendingInvitationCount ?? 0);
+      if (newRecipientCount > oldRecipientCount && conflictCount === null) {
+        setConflictCount(newRecipientCount);
+        toast.warning(`${newRecipientCount - oldRecipientCount} new driver${newRecipientCount - oldRecipientCount === 1 ? '' : 's'} applied while you were editing — review above before continuing.`);
+        return;
+      }
+
+      // Build the PATCH payload (only commercial / scheduling / vehicle fields).
+      const patch: UpdateTripDetailsInput = {
+        ratePerKm: Number(values.ratePerKm),
+        driverBata: Math.max(0, Math.round(Number(values.driverBata) || 0)),
+        gstAmount: Math.max(0, Math.round(Number(values.gstAmount) || 0)),
+        pickupAt: pickupIso,
+        carTypeId: values.carTypeId,
+        acRequired: values.acRequired,
+        seatsRequired: Number(values.seatsRequired),
+        driverInstructions: values.driverInstructions.trim() || null,
+        extrasPaidByPassenger: values.extrasPaidByPassenger,
+        showFareToPassenger: values.showFareToPassenger,
+      };
+
+      // Build a human-readable diff vs the loaded trip. Only notify-worthy fields show up.
+      const original = editingTripQuery.data!;
+      const candidateChanges: Array<{ label: string; before: string; after: string }> = [];
+      if (patch.pickupAt && new Date(patch.pickupAt).toISOString() !== new Date(original.pickupAt).toISOString()) {
+        candidateChanges.push({ label: 'Pickup', before: formatPickupDateTime(original.pickupAt), after: formatPickupDateTime(patch.pickupAt) });
+      }
+      if (patch.ratePerKm !== original.ratePerKm) candidateChanges.push({ label: 'Rate / km', before: `₹${original.ratePerKm}`, after: `₹${patch.ratePerKm}` });
+      if (patch.driverBata !== original.driverBata) candidateChanges.push({ label: 'Driver bata', before: `₹${original.driverBata}`, after: `₹${patch.driverBata}` });
+      if (patch.gstAmount !== original.gstAmount) candidateChanges.push({ label: 'GST', before: `₹${original.gstAmount}`, after: `₹${patch.gstAmount}` });
+      if (patch.carTypeId !== original.carTypeId) {
+        const beforeLbl = (carTypesQuery.data ?? []).find((c) => c.id === original.carTypeId)?.label ?? original.carTypeId;
+        const afterLbl = (carTypesQuery.data ?? []).find((c) => c.id === patch.carTypeId)?.label ?? patch.carTypeId;
+        candidateChanges.push({ label: 'Car type', before: String(beforeLbl), after: String(afterLbl) });
+      }
+      if (patch.seatsRequired !== original.seatsRequired) candidateChanges.push({ label: 'Seats', before: String(original.seatsRequired), after: String(patch.seatsRequired) });
+      if (patch.acRequired !== original.acRequired) candidateChanges.push({ label: 'AC required', before: original.acRequired ? 'Yes' : 'No', after: patch.acRequired ? 'Yes' : 'No' });
+
+      const commitPatch = async () => {
+        try {
+          await updateTrip.mutateAsync({ tripId: editTripId, input: patch });
+          const notifNote = candidateChanges.length > 0 && newRecipientCount > 0
+            ? ` — ${newRecipientCount} applicant${newRecipientCount === 1 ? '' : 's'} notified`
+            : '';
+          toast.success(`Trip updated${notifNote}`);
+          navigate(`/trips/${editTripId}`);
+        } catch {
+          toast.error("Couldn't update the trip — try again.");
+        }
+      };
+      if (candidateChanges.length > 0 && newRecipientCount > 0) {
+        setPendingDiff({ changes: candidateChanges, recipientCount: newRecipientCount, submit: () => { setPendingDiff(null); void commitPatch(); } });
+        return;
+      }
+      await commitPatch();
+      return;
+    }
+
     try {
       const trip = await postTrip.mutateAsync(input);
       const invited = trip.autoInvitedCount ?? 0;
@@ -335,11 +470,18 @@ export function PostTripPage() {
   }
 
   const kycQueryPending = isDriver ? myDriverQuery.isPending : myAgentQuery.isPending;
-  if (citiesQuery.isPending || carTypesQuery.isPending || kycQueryPending) {
+  if (citiesQuery.isPending || carTypesQuery.isPending || kycQueryPending || (isEdit && !editHydrated && (editingTripQuery.isPending || editingTripQuery.isFetching))) {
     return (
       <div className="mx-auto max-w-md p-4">
-        <h1 className="mb-3 text-xl font-bold">Post a trip</h1>
+        <h1 className="mb-3 text-xl font-bold">{isEdit ? 'Edit trip' : 'Post a trip'}</h1>
         <LoadingSkeleton rows={6} />
+      </div>
+    );
+  }
+  if (isEdit && editingTripQuery.isError) {
+    return (
+      <div className="mx-auto max-w-md p-4">
+        <ErrorState title="Couldn't load this trip" message="We couldn't fetch the details — try again." onRetry={() => void editingTripQuery.refetch()} />
       </div>
     );
   }
@@ -382,7 +524,7 @@ export function PostTripPage() {
             <ArrowLeft className="size-5" aria-hidden />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold">Post a trip · {step === 1 ? 'where & when' : 'price & details'}</h1>
+            <h1 className="truncate text-base font-semibold">{isEdit ? 'Edit trip' : 'Post a trip'} · {step === 1 ? 'where & when' : 'price & details'}</h1>
             <div className="text-xs text-secondary">Step {step} of 2</div>
           </div>
         </div>
@@ -510,6 +652,29 @@ export function PostTripPage() {
           </>
         ) : (
           <>
+            {/* Conflict banner: applicants/invitees that appeared while editing. Surfaces
+                on the first Update tap (the gate releases on the second tap so the agent
+                can proceed if they still want to). */}
+            {isEdit && conflictCount !== null && conflictCount > 0 ? (
+              <Card className="gap-2 border-2 border-amber-300 bg-amber-50">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-700" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-bold text-amber-900">
+                      {conflictCount} {conflictCount === 1 ? 'driver' : 'drivers'} applied or were invited while you were editing
+                    </div>
+                    <p className="mt-0.5 text-xs text-amber-800">
+                      Review them first, or tap Update again to proceed — they&apos;ll be notified of the changes.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => navigate(`/trips/${editTripId}/applicants`)}>
+                        Review applicants
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ) : null}
             <Card className="gap-3">
               <SectionLabel icon={<Wallet />} accent="green">Pricing</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
@@ -699,6 +864,15 @@ export function PostTripPage() {
               Next: price &amp; details →
             </Button>
           </>
+        ) : isEdit ? (
+          <Button
+            type="button"
+            variant="full"
+            disabled={submitting || updateTrip.isPending}
+            onClick={() => void handleSubmit(onSubmit)()}
+          >
+            {submitting || updateTrip.isPending ? 'Updating…' : 'Update trip'}
+          </Button>
         ) : (
           <Button
             type="button"
@@ -718,6 +892,41 @@ export function PostTripPage() {
           onClose={() => navigate(isDriver ? '/my-trips?tab=posted' : '/posted-trips?status=open')}
           onViewTrip={() => navigate(`/trips/${postedTrip.id}`)}
         />
+      ) : null}
+
+      {/* Diff confirm modal — last step before PATCH fires + the trip_updated
+          notifications fan out. Lists each changed field so the agent sees exactly
+          what their applicants will see. Cancel keeps them on the form. */}
+      {pendingDiff ? (
+        <div role="dialog" aria-modal="true" aria-labelledby="diff-confirm-title" className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4">
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl">
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="diff-confirm-title" className="text-base font-bold">Send this update?</h2>
+              <button type="button" aria-label="Cancel update" onClick={() => setPendingDiff(null)} className="rounded p-1 text-secondary hover:bg-muted">
+                <X className="size-4" aria-hidden />
+              </button>
+            </div>
+            <p className="mt-2 text-sm text-secondary">
+              {pendingDiff.recipientCount} {pendingDiff.recipientCount === 1 ? 'driver who applied or was invited' : 'drivers who applied or were invited'} will be notified. They can withdraw if it doesn&apos;t work for them.
+            </p>
+            <ul className="mt-3 space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+              {pendingDiff.changes.map((c) => (
+                <li key={c.label} className="flex flex-col gap-0.5">
+                  <span className="text-xs font-medium uppercase tracking-wide text-secondary">{c.label}</span>
+                  <span><span className="text-red-700 line-through">{c.before}</span> <span className="mx-1 text-secondary">→</span> <span className="font-semibold text-emerald-700">{c.after}</span></span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 flex gap-2">
+              <Button type="button" variant="outline" className="flex-1" onClick={() => setPendingDiff(null)}>
+                Cancel
+              </Button>
+              <Button type="button" variant="full" className="flex-1" onClick={() => pendingDiff.submit()}>
+                Send update
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   );

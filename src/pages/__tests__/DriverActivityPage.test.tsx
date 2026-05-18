@@ -8,6 +8,10 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 import { useAuth } from '@/contexts/AuthContext';
 vi.mock('@/hooks/useTrips', () => ({ useTrips: vi.fn(), useMyApplications: vi.fn(), useWithdrawApplication: vi.fn(), useDeclineTripInvite: vi.fn() }));
 import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
+// "Trip details changed" chip on Applied cards reads from useNotifications. Default empty
+// so existing tests don't see the chip; the dedicated test below overrides per-call.
+vi.mock('@/hooks/useNotifications', () => ({ useNotifications: vi.fn(() => ({ data: [] })) }));
+import { useNotifications } from '@/hooks/useNotifications';
 vi.mock('@/stores/myApplicationsStore', async () => {
   const actual = await vi.importActual<typeof import('@/stores/myApplicationsStore')>('@/stores/myApplicationsStore');
   return { ...actual, useMyApplicationsStore: vi.fn() };

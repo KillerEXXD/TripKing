@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Mail, MapPin, Plus, Trash2, XCircle } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Mail, MapPin, Plus, Trash2, XCircle } from 'lucide-react';
 import { ScopedPageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
+import { useNotifications } from '@/hooks/useNotifications';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useCancelVacancy, useMyActiveVacancies, useMyExpiredVacancies } from '@/hooks/useVacancies';
 import { useMyApplicationsStore } from '@/stores/myApplicationsStore';
@@ -72,9 +73,31 @@ function applicantBanner(status: AcceptanceStatus, tripStatus: TripStatus): stri
   return null;
 }
 
+/** Set of trip IDs the driver has an unread `trip_updated` notification for.
+ *  Drives the amber "Date/time changed" chip on each Applied card and on the
+ *  trip-detail diff banner. Hook is render-cheap — `useNotifications` shares
+ *  the same react-query cache the notification bell already uses. */
+function useUnreadTripUpdateIds(): Set<string> {
+  const { data } = useNotifications({ unreadOnly: true });
+  return useMemo(() => {
+    const out = new Set<string>();
+    for (const n of (data ?? [])) {
+      if (n.type !== 'trip_updated') continue;
+      const tid = (n.payloadJson as Record<string, unknown>)?.trip_id;
+      if (typeof tid === 'string') out.add(tid);
+    }
+    return out;
+  }, [data]);
+}
+
 function ApplicationRow({ app }: { app: MyApplication }) {
   const t = app.trip;
   const badge = APPLICATION_BADGE[app.status] ?? APPLICATION_BADGE.applied;
+  // Did the trip poster edit the trip since this driver applied? If yes, surface
+  // a "Trip details changed" chip on the card. Clicking through to /trips/:id will
+  // show the full diff + Withdraw/Keep CTAs (TripDetailPage handles the read state).
+  const updatedTripIds = useUnreadTripUpdateIds();
+  const tripUpdated = updatedTripIds.has(t.id);
   // Defensive: STATUS_META is keyed by TripStatus, but the API has historically grown
   // its enum (selected/accepted/in_progress landed across separate releases). A trip
   // returned with an unrecognised status would crash with "Cannot read properties of
@@ -111,6 +134,11 @@ function ApplicationRow({ app }: { app: MyApplication }) {
           {badge.label}
         </Badge>
       </div>
+      {tripUpdated ? (
+        <div className="flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900">
+          <AlertTriangle className="size-3.5 shrink-0" aria-hidden /> Trip details changed — tap to review
+        </div>
+      ) : null}
       <div className="truncate text-xs text-secondary">
         Pickup: {formatPickupDateTime(t.pickupAt)}
         {app.applicantQuotedRatePerKm ? ` · you quoted ${formatINR(app.applicantQuotedRatePerKm)}/km` : ''}

@@ -2079,16 +2079,28 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
 
   // ── PATCH /trips/:id — update trip details ─────────────────────────────────
   // Passenger fields (name/phone/count, luggage, special_requests, hide_phone) editable until in_progress.
-  // Commercial + scheduling + vehicle fields (rate, bata, commission, gst, pickup_at, car_type, ac, seats,
-  // driver_instructions, extras_paid_by_passenger, show_fare_to_passenger) editable ONLY while status='open'
-  // — once anyone has applied/been invited/been selected, terms are locked. Route (cities, waypoints,
-  // distance) is never editable here — changing it is effectively a new trip.
+  // Commercial + scheduling + vehicle fields editable while status ∈ {'open', 'has_applicants'}.
+  // Once a driver is selected / accepted / the trip is in flight, terms are locked. When
+  // applicants/invitees exist at update-time, the post-patch fan-out below sends a
+  // `trip_updated` notification to each so they can re-evaluate and (if they want) withdraw.
+  // Route (cities, waypoints, distance) is never editable here — changing it is effectively
+  // a new trip.
   if (!sub && req.method === 'PATCH') {
     const u = await authUser(db, req);
     if (!u) return fail('UNAUTHORIZED', 'Sign in to update a trip', 401);
-    const { data: tripFull } = await db.from('trips').select('id, posted_by_user_id, status, pickup_at, expected_end_at, expected_distance_km, rate_per_km').eq('id', tripId).maybeSingle();
+    // Snapshot every notify-worthy field for the post-patch diff/fan-out below.
+    const { data: tripFull } = await db
+      .from('trips')
+      .select('id, posted_by_user_id, status, pickup_at, expected_end_at, expected_distance_km, rate_per_km, driver_bata, commission_pct, gst_amount, car_type_id, ac_required, seats_required')
+      .eq('id', tripId)
+      .maybeSingle();
     if (!tripFull) return fail('NOT_FOUND', 'Trip not found', 404);
-    const trip = tripFull as { id: string; posted_by_user_id: string; status: string; pickup_at: string | null; expected_end_at: string | null; expected_distance_km: number | null; rate_per_km: number | null };
+    const trip = tripFull as {
+      id: string; posted_by_user_id: string; status: string;
+      pickup_at: string | null; expected_end_at: string | null; expected_distance_km: number | null;
+      rate_per_km: number | null; driver_bata: number | null; commission_pct: number | null; gst_amount: number | null;
+      car_type_id: string | null; ac_required: boolean | null; seats_required: number | null;
+    };
     if (trip.posted_by_user_id !== u.id && !isAdmin(u)) return fail('FORBIDDEN', 'Only the trip poster can update this trip', 403);
     const blockingStatuses = ['in_progress', 'completed', 'cancelled'];
     if (blockingStatuses.includes(trip.status)) return fail('CONFLICT', 'Trip has started — it can no longer be edited', 422);
@@ -2115,11 +2127,15 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if ('special_requests' in b) patch.special_requests = (b.special_requests as string | null) ?? null;
     if ('hide_passenger_phone' in b && typeof b.hide_passenger_phone === 'boolean') patch.hide_passenger_phone = b.hide_passenger_phone;
 
-    // ── commercial / scheduling / vehicle fields (status='open' only) ──
+    // ── commercial / scheduling / vehicle fields ──
+    // Editable while status ∈ {'open', 'has_applicants'}. Once a driver is selected /
+    // accepted / the trip is in flight, terms are locked. When applicants/invitees exist
+    // at update-time, the post-patch fan-out below sends a `trip_updated` notification
+    // to each so they can re-evaluate.
     const COMMERCIAL_FIELDS = ['rate_per_km', 'driver_bata', 'commission_pct', 'gst_amount', 'pickup_at', 'car_type_id', 'ac_required', 'seats_required', 'driver_instructions', 'extras_paid_by_passenger', 'show_fare_to_passenger'] as const;
     const touchingCommercial = COMMERCIAL_FIELDS.some((f) => f in b);
-    if (touchingCommercial && trip.status !== 'open') {
-      return fail('CONFLICT', 'Trip details can only be edited while no driver has been invited or applied', 409);
+    if (touchingCommercial && !['open', 'has_applicants'].includes(trip.status)) {
+      return fail('CONFLICT', 'Trip details can only be edited until a driver is selected', 409);
     }
     if ('rate_per_km' in b) {
       const r = Number(b.rate_per_km);
@@ -2178,6 +2194,69 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const { error } = await db.from('trips').update(patch).eq('id', tripId);
     if (error) return pgFail(error);
     await invalidateTripsList();
+
+    // ── trip_updated fan-out ─────────────────────────────────────────────────
+    // Notify every current applicant + every pending invitee that the trip changed,
+    // with a `changes` array they can render diff-style. Restricted to NOTEWORTHY
+    // fields (commercial + scheduling + vehicle) — passenger fields and the route
+    // (which isn't editable here anyway) are filtered out so we don't spam drivers
+    // on a passenger-name typo fix. Best-effort: a notification failure does NOT
+    // fail the patch (the trip is already updated).
+    type ChangeEntry = { field: string; before: unknown; after: unknown; label: string };
+    const NOTIFY_FIELDS: Record<string, { before: unknown; label: string }> = {
+      pickup_at: { before: trip.pickup_at, label: 'Pickup date & time' },
+      expected_end_at: { before: trip.expected_end_at, label: 'Trip end time' },
+      rate_per_km: { before: trip.rate_per_km, label: 'Rate per km (₹)' },
+      driver_bata: { before: trip.driver_bata, label: 'Driver bata (₹)' },
+      commission_pct: { before: trip.commission_pct, label: 'Commission (%)' },
+      gst_amount: { before: trip.gst_amount, label: 'GST (₹)' },
+      car_type_id: { before: trip.car_type_id, label: 'Car type' },
+      seats_required: { before: trip.seats_required, label: 'Seats required' },
+      ac_required: { before: trip.ac_required, label: 'AC required' },
+    };
+    const changes: ChangeEntry[] = [];
+    for (const [field, meta] of Object.entries(NOTIFY_FIELDS)) {
+      if (!(field in patch)) continue;
+      const after = (patch as Record<string, unknown>)[field];
+      if (after === meta.before) continue; // skip no-ops
+      changes.push({ field, before: meta.before ?? null, after: after ?? null, label: meta.label });
+    }
+    if (changes.length > 0) {
+      try {
+        // Distinct recipient drivers: status='applied' acceptances + 'pending' invitations.
+        // Collapse on driver_id so a driver who both applied AND was invited only gets one notification.
+        const [{ data: apps }, { data: invs }] = await Promise.all([
+          db.from('trip_acceptances').select('driver_id').eq('trip_id', tripId).eq('status', 'applied'),
+          db.from('trip_invitations').select('driver_id').eq('trip_id', tripId).eq('status', 'pending'),
+        ]);
+        const driverIds = Array.from(new Set([
+          ...((apps ?? []) as { driver_id: string }[]).map((r) => r.driver_id),
+          ...((invs ?? []) as { driver_id: string }[]).map((r) => r.driver_id),
+        ]));
+        if (driverIds.length > 0) {
+          const { data: drvs } = await db.from('drivers').select('user_id').in('id', driverIds);
+          const userIds = ((drvs ?? []) as { user_id: string }[]).map((r) => r.user_id).filter(Boolean);
+          if (userIds.length > 0) {
+            const summary = changes.length === 1
+              ? `${changes[0].label} changed`
+              : `${changes.length} fields changed`;
+            const rows = userIds.map((uid) => ({
+              user_id: uid,
+              type: 'trip_updated',
+              title: 'A trip you applied to has been updated',
+              body: summary,
+              payload_json: { trip_id: tripId, changes },
+            }));
+            await db.from('notifications').insert(rows);
+          }
+        }
+      } catch (e) {
+        // Best-effort — the trip patch has already committed. Surface to Sentry via
+        // withTiming if it ever silently drops.
+        console.error('trip_updated fan-out failed', { tripId, error: (e as Error)?.message });
+      }
+    }
+
     return ok(await fullTrip(tripId, u));
   }
 

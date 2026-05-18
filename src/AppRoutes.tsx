@@ -158,6 +158,7 @@ export function AppRoutes() {
             <Route path="/" element={<HomeForRole />} />
             <Route path="/trips" element={<TripFeedPage />} />
             <Route path="/trips/new" element={<PostTripPage />} />
+            <Route path="/trips/:id/edit" element={<PostTripPage />} />
             <Route path="/trips/:id" element={<TripDetailPage />} />
             <Route path="/trips/:id/applicants" element={<ApplicantReviewPage />} />
             <Route path="/trips/:id/invitations" element={<TripInvitationsPage />} />

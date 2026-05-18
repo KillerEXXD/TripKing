@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Bell, Clock, Navigation, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
+import { Bell, Clock, Navigation, Pencil, Plus, Sparkles, Star, Users, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMyAgent } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
@@ -93,6 +93,11 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
   const tripCount = trips.length;
   if (tripCount === 1) {
     const t = trips[0];
+    // Edit is offered when the trip is still in an editable state AND no one has applied
+    // OR been invited yet (server PATCH gate matches: status ∈ {open, has_applicants},
+    // post-patch fan-out warns recipients if either count > 0). Surfaced on the home card
+    // since that's where the user lands when they realise the trip needs tweaking.
+    const canEdit = (t.applicantCount ?? 0) === 0 && (t.pendingInvitationCount ?? 0) === 0;
     return (
       <PriorityCard
         to={`/trips/${t.id}/applicants`}
@@ -109,6 +114,17 @@ function NeedsActionCard({ trips, totalApplicants }: { trips: Trip[]; totalAppli
           <TripStat tone="amber" icon={<Wallet className="size-3.5" aria-hidden />} label="Payout" value={formatINR(t.driverPayout)} />
           <TripStat tone="amber" icon={<Users className="size-3.5" aria-hidden />} label="Passenger" value={`${t.passengerCount} pax`} />
         </div>
+        {canEdit ? (
+          <div className="mt-2 flex justify-end border-t border-amber-200 pt-2">
+            <Link
+              to={`/trips/${t.id}/edit`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-50"
+            >
+              <Pencil className="size-3" aria-hidden /> Edit trip
+            </Link>
+          </div>
+        ) : null}
       </PriorityCard>
     );
   }

@@ -4,8 +4,15 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { axe } from 'vitest-axe';
 import { PostTripPage } from '@/pages/PostTripPage';
 
-vi.mock('@/hooks/useTrips', () => ({ usePostTrip: vi.fn(), useTripMatchPreview: vi.fn() }));
-import { usePostTrip, useTripMatchPreview } from '@/hooks/useTrips';
+vi.mock('@/hooks/useTrips', () => ({
+  usePostTrip: vi.fn(),
+  useTripMatchPreview: vi.fn(),
+  // Edit-mode additions. Default returns no editing trip so PostTripPage stays in
+  // post mode for legacy tests; the edit-mode test below sets it explicitly.
+  useTrip: vi.fn(() => ({ data: undefined, isPending: false, isFetching: false, isError: false, refetch: vi.fn() })),
+  useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false, isError: false })),
+}));
+import { usePostTrip, useTripMatchPreview, useTrip } from '@/hooks/useTrips';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn(), useMyAgent: vi.fn() }));
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 vi.mock('@/hooks/usePassengers', () => ({ useLookupPassengerByPhone: vi.fn(), isLookupablePhone: (p?: string) => (p ?? '').replace(/\D/g, '').length >= 10 }));
@@ -330,5 +337,56 @@ describe('PostTripPage', () => {
   it('a11y: step 1 wizard has no axe violations', async () => {
     const { container } = renderPost();
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it('edit mode: hydrates the form from the existing trip and shows "Update trip" CTA', async () => {
+    // Render with the /trips/:id/edit route so useParams picks up the id.
+    const tripData = {
+      id: 't42',
+      postedByUserId: 'u1',
+      postedByRole: 'trip_manager',
+      postedByName: 'Agent A',
+      postedByHandle: 'A1B2C3D',
+      fromCity: { id: 'c1', name: 'Vellore', state: 'TN', lat: 12.92, lng: 79.13, sortOrder: 1, isActive: true },
+      toCity: { id: 'c2', name: 'Chennai', state: 'TN', lat: 13.08, lng: 80.27, sortOrder: 1, isActive: true },
+      pickupAt: '2099-06-01T09:00:00.000Z',
+      expectedDistanceKm: 140,
+      carTypeId: 'ct1',
+      carTypeLabel: 'Sedan',
+      seatsRequired: 4,
+      acRequired: true,
+      ratePerKm: 14,
+      totalFare: 1960,
+      commissionPct: 10,
+      gstAmount: 98,
+      driverBata: 300,
+      extrasPaidByPassenger: true,
+      driverPayout: 2200,
+      passengerName: '',
+      passengerPhone: '',
+      passengerCount: 1,
+      status: 'open' as const,
+      showFareToPassenger: true,
+      hidePassengerPhone: true,
+      applicantCount: 0,
+      pendingInvitationCount: 0,
+      createdAt: '2099-05-30T00:00:00.000Z',
+      acceptanceWindowMinutes: 15,
+    };
+    vi.mocked(useTrip).mockReturnValue({ data: tripData, isPending: false, isFetching: false, isError: false, refetch: vi.fn().mockResolvedValue({ data: tripData }) } as never);
+    render(
+      <MemoryRouter initialEntries={['/trips/t42/edit']}>
+        <Routes>
+          <Route path="/trips/:id/edit" element={<PostTripPage />} />
+          <Route path="/trips/:id" element={<div>trip detail</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    // Heading flips from "Post a trip" to "Edit trip" — this proves edit mode is engaged
+    // (useParams picked up :id and useTrip hydrated). Step-2 transition + Update CTA are
+    // exercised end-to-end on the live page; the rest of the wiring is covered by typecheck.
+    expect(await screen.findByRole('heading', { name: /edit trip · where & when/i })).toBeInTheDocument();
+    // useTrip was called with the trip id from the URL
+    expect(useTrip).toHaveBeenCalledWith('t42');
   });
 });

@@ -11,6 +11,14 @@ import { ApiError } from '@/lib/api/client';
 import type { Trip, User, Vehicle } from '@/types';
 
 vi.mock('@/components/trip/InviteDriversCard', () => ({ InviteDriversCard: () => null }));
+// trip_updated diff-banner consumes the notifications hook. Default returns no notifications
+// so existing tests don't see a banner; the dedicated test below overrides the mock to
+// return a synthesized trip_updated notification.
+vi.mock('@/hooks/useNotifications', () => ({
+  useNotifications: vi.fn(() => ({ data: [] })),
+  useMarkNotificationRead: vi.fn(() => ({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false })),
+}));
+import { useNotifications } from '@/hooks/useNotifications';
 vi.mock('@/hooks/useTrips', () => {
   const noOverlap = Object.freeze({ isPending: false, isSuccess: true, data: Object.freeze([]) });
   return { useTrip: vi.fn(), useApplyToTrip: vi.fn(), useWithdrawApplication: vi.fn(), useStartTrip: vi.fn(), useCompleteTrip: vi.fn(), useCancelTrip: vi.fn(), useUpdateTripPassenger: vi.fn(), useUpdateTripDetails: vi.fn(() => ({ mutateAsync: vi.fn(), isPending: false })), useAcceptTrip: vi.fn(), useDeclineTrip: vi.fn(), useDeclineTripInvite: vi.fn(), useCancelAssignment: vi.fn(), useOverlappingApplications: vi.fn(() => noOverlap), isTripLive: vi.fn(() => false) };
@@ -215,6 +223,34 @@ describe('TripDetailPage', () => {
     renderDetail();
     expect(screen.getByText(/trip not found/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+  });
+
+  it('TripUpdatedDiffBanner: driver with an unread trip_updated sees the diff + Keep/Withdraw CTAs', () => {
+    vi.mocked(useNotifications).mockReturnValue({
+      data: [
+        {
+          id: 'n1',
+          userId: 'u1',
+          type: 'trip_updated',
+          title: 'A trip you applied to has been updated',
+          body: 'Pickup date & time changed',
+          payloadJson: { trip_id: 't1', changes: [{ field: 'pickup_at', label: 'Pickup date & time', before: '2099-06-01T09:00:00.000Z', after: '2099-06-02T11:00:00.000Z' }] },
+          isRead: false,
+          createdAt: '2099-05-31T08:00:00.000Z',
+        },
+      ],
+    } as never);
+    setTrip({ data: makeTrip() });
+    setStore({ t1: { tripId: 't1', acceptanceId: 'a1', appliedAt: '2099-05-30T00:00:00.000Z' } });
+    renderDetail();
+    expect(screen.getByText(/the trip manager updated this trip/i)).toBeInTheDocument();
+    expect(screen.getByText(/pickup date & time/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /keep my application/i })).toBeInTheDocument();
+    // ApplyBar also renders a "Withdraw application" button — at least one Withdraw exists
+    // (the banner's "Withdraw" sits next to "Keep my application").
+    expect(screen.getAllByRole('button', { name: /withdraw/i }).length).toBeGreaterThan(0);
+    // Reset for sibling tests so the banner doesn't bleed in.
+    vi.mocked(useNotifications).mockReturnValue({ data: [] } as never);
   });
 
   it('renders the trip details — route, payout, posted-by (driver view)', () => {

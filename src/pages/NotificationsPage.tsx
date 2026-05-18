@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlarmClock, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
+import { AlarmClock, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, FileEdit, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Button, Card } from '@/components/ui';
@@ -25,6 +25,8 @@ const ICON: Record<NotificationType, LucideIcon> = {
   trip_assignment_cancelled: RotateCcw,
   selection_expired: Hourglass,
   driver_declined: UserX,
+  // Migration 060: trip poster edited a trip with applicants/invitees.
+  trip_updated: FileEdit,
 };
 
 function relTime(iso: string): string {
