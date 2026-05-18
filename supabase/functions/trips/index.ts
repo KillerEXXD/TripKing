@@ -563,15 +563,23 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     return (data?.id as string | undefined) ?? null;
   }
   /**
-   * Find drivers eligible for an auto-invite to a trip from `fromCityId`:
+   * Find drivers eligible for an auto-invite to a trip from `fromCityId` at `pickupAt`:
    * active + KYC-approved drivers who have an open vacancy whose `current_city` is
-   * within `app_settings.invite_max_radius_km` of the pickup city. Sorted by distance
-   * ascending; caller decides whether to slice. Excludes `excludeDriverId` (used to
-   * skip the driver who is posting the trip themselves).
+   * within `app_settings.invite_max_radius_km` of the pickup city AND whose availability
+   * window covers the trip's `[pickupAt, expectedEndAt]` interval (mirrors the accept-time
+   * filter in `syncVacanciesForTrip`). Sorted by distance ascending; caller decides
+   * whether to slice. Excludes `excludeDriverId` (used to skip the driver who is posting
+   * the trip themselves).
+   *
+   * `pickupAt` / `expectedEndAt` are optional for backward compat: when omitted, the time
+   * filter is skipped (caller-side counts every active vacancy in radius regardless of
+   * when it's valid — only acceptable for diagnostic / fallback paths).
    */
   async function findMatchingDrivers(
     fromCityId: string,
     excludeDriverId: string | null,
+    pickupAt?: string | null,
+    expectedEndAt?: string | null,
   ): Promise<Array<{ driverId: string; userId: string; distanceKm: number }>> {
     if (!fromCityId) return [];
     const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
@@ -581,10 +589,19 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // Coerce explicitly; bail out only on NaN.
     const pLat = Number(pickupCity?.lat), pLng = Number(pickupCity?.lng);
     if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) return [];
-    const { data: vacRows } = await db
+    // Time-bounds filter: the vacancy window must cover the trip's planned interval.
+    // `available_until` is nullable (open-ended availability) — that's a hit if the
+    // start is on/before the pickup. Mirrors the accept-time gate in syncVacanciesForTrip
+    // (~line 130), so the preview never promises a match the assign step would reject.
+    let q = db
       .from('vacancies')
-      .select('driver_id, current_city:cities!current_city_id(lat, lng), driver:drivers!driver_id(id, user_id, is_active, kyc_status)')
+      .select('driver_id, available_from, available_until, current_city:cities!current_city_id(lat, lng), driver:drivers!driver_id(id, user_id, is_active, kyc_status)')
       .eq('status', 'active');
+    if (pickupAt) {
+      const endIso = expectedEndAt ?? pickupAt;
+      q = q.lte('available_from', pickupAt).or(`available_until.is.null,available_until.gte.${endIso}`);
+    }
+    const { data: vacRows } = await q;
     type VacRow = {
       driver_id: string;
       current_city: { lat: number | string | null; lng: number | string | null } | null;
@@ -1063,7 +1080,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (b.auto_invite_matches !== false) {
       try {
         const excludeDriverId = posterRole === 'driver' ? await driverIdFor(u.id) : null;
-        const matches = await findMatchingDrivers(plan.from_city_id ?? '', excludeDriverId);
+        // Pass the trip's planned interval so we only invite drivers whose advertised
+        // availability covers it — the old behaviour ignored time bounds and invited a
+        // driver to any future trip in their city, even one years out.
+        const matches = await findMatchingDrivers(plan.from_city_id ?? '', excludeDriverId, pickupAtIso, plan.expected_end_at);
         const top5 = matches.slice(0, 5).map((m) => m.driverId);
         if (top5.length > 0) {
           const { created: inv } = await inviteDrivers(
@@ -1127,9 +1147,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     }
     const fromCityId = url.searchParams.get('from_city_id') ?? '';
     if (!fromCityId) return fail('VALIDATION', 'from_city_id is required', 422);
+    // Time bounds are optional in the query but the form always sends them now (PR added
+    // when a 2060-pickup trip was previewing "1 matching driver" — vacancies cap out at
+    // ~24h, so no real driver could ever take it). Without these the count is meaningless.
+    const pickupAt = url.searchParams.get('pickup_at');
+    const expectedEndAt = url.searchParams.get('expected_end_at');
     const { data: usr } = await db.from('users').select('role').eq('id', u.id).maybeSingle();
     const excludeDriverId = (usr?.role === 'driver') ? await driverIdFor(u.id) : null;
-    const matches = await findMatchingDrivers(fromCityId, excludeDriverId);
+    const matches = await findMatchingDrivers(fromCityId, excludeDriverId, pickupAt, expectedEndAt);
     const total = matches.length;
     const cap = 5;
     return ok({ total_matches: total, will_invite: Math.min(total, cap), max_invites: cap });
