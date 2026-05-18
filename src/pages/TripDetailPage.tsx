@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
-import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useCompleteTrip, useDeclineTrip, useDeclineTripInvite, useStartOdoUploadUrl, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
+import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useDeclineTrip, useDeclineTripInvite, useStartOdoUploadUrl, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -19,7 +19,6 @@ import { InviteDriversCard } from '@/components/trip/InviteDriversCard';
 import { AcceptTripDialog } from '@/components/trip/AcceptTripDialog';
 import { DriverLocationReporter } from '@/components/trip/DriverLocationReporter';
 import { PassengerLinkModal } from '@/components/share/PassengerLinkModal';
-import { InsufficientBalanceModal, type InsufficientBalanceSide } from '@/components/wallet/InsufficientBalanceModal';
 import { AgentIdentity } from '@/components/agent/AgentIdentity';
 import { DriverIdentity } from '@/components/driver/DriverIdentity';
 import { CounterpartyChecklist, AGENT_VERIFICATION_STEPS, DRIVER_VERIFICATION_STEPS } from '@/components/driver';
@@ -302,16 +301,15 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   );
 }
 
-/** Assigned-driver bottom CTA: start the trip with the passenger's OTP + odometer (photo + reading), then complete it. */
+/** Assigned-driver bottom CTA: start the trip with the passenger's OTP + odometer (photo + reading), then send them into the completion wizard. */
 function AcceptedDriverBar({ trip }: { trip: Trip }) {
+  const navigate = useNavigate();
   const startMutation = useStartTrip();
-  const completeMutation = useCompleteTrip();
   const startOdoUpload = useStartOdoUploadUrl();
   const [showStartForm, setShowStartForm] = useState(false);
   const [otp, setOtp] = useState('');
   const [startOdo, setStartOdo] = useState('');
   const [startOdoPath, setStartOdoPath] = useState('');
-  const [insufficient, setInsufficient] = useState<{ side: InsufficientBalanceSide; message?: string } | null>(null);
 
   async function onStart() {
     const code = otp.trim();
@@ -339,17 +337,8 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
       toast.error("That OTP didn't match — double-check it with the passenger.");
     }
   }
-  async function onComplete() {
-    try {
-      await completeMutation.mutateAsync({ tripId: trip.id });
-      toast.success('Trip completed — your payout is queued.');
-    } catch (err) {
-      if (err instanceof ApiError && (err.code === 'INSUFFICIENT_WALLET_BALANCE_DRIVER' || err.code === 'INSUFFICIENT_WALLET_BALANCE_AGENT')) {
-        setInsufficient({ side: err.code === 'INSUFFICIENT_WALLET_BALANCE_DRIVER' ? 'driver' : 'agent', message: err.message });
-        return;
-      }
-      toast.error("Couldn't complete the trip — please try again.");
-    }
+  function onComplete() {
+    navigate(`/trips/${trip.id}/complete`);
   }
 
   return (
@@ -399,13 +388,10 @@ function AcceptedDriverBar({ trip }: { trip: Trip }) {
           )}
         </>
       ) : (
-        <Button variant="full" size="lg" disabled={completeMutation.isPending} onClick={() => void onComplete()}>
-          {completeMutation.isPending ? 'Completing…' : 'Complete the trip'}
+        <Button variant="full" size="lg" onClick={onComplete}>
+          Complete the trip
         </Button>
       )}
-      {insufficient ? (
-        <InsufficientBalanceModal side={insufficient.side} message={insufficient.message} onClose={() => setInsufficient(null)} />
-      ) : null}
     </div>
   );
 }

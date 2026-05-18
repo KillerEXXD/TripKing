@@ -185,6 +185,7 @@ function renderDetail(entries: string[] = ['/trips/t1']) {
         <Route path="/profile" element={<div>profile page</div>} />
         <Route path="/verify/documents" element={<div>verify documents page</div>} />
         <Route path="/trips/:id/applicants" element={<div>applicant review</div>} />
+        <Route path="/trips/:id/complete" element={<div data-testid="complete-trip-route">complete trip wizard</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -427,11 +428,11 @@ describe('TripDetailPage', () => {
     await waitFor(() => expect(startMutateAsync).toHaveBeenCalledWith({ tripId: 't1', input: { passengerOtp: '654321', startOdoReading: 42000, startOdoUrl: 't1/start_odo' } }));
   });
 
-  it('lets the assigned driver complete an in-progress trip', async () => {
+  it('the "Complete the trip" CTA sends the driver into the /trips/:id/complete wizard route', async () => {
     setTrip({ data: makeTrip({ status: 'in_progress', assignedDriverId: 'd1' }) });
     renderDetail();
     fireEvent.click(screen.getByRole('button', { name: /complete the trip/i }));
-    await waitFor(() => expect(completeMutateAsync).toHaveBeenCalledWith({ tripId: 't1' }));
+    await waitFor(() => expect(screen.getByTestId('complete-trip-route')).toBeInTheDocument());
   });
 
   it('lets the poster open the passenger share link once a driver is assigned', () => {
