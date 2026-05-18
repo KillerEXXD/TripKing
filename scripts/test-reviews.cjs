@@ -81,9 +81,9 @@ async function postTrip(agentToken, cityA, cityB, carTypeId) {
   const accept = await j('POST', `/trips/${tripId}/accept`, { token: driver.token });
   const otp = accept.json?.data?.passenger_otp;
   check('trip accepted + OTP returned', accept.status === 200 && accept.json?.data?.status === 'accepted' && !!otp, `status=${accept.status} ${JSON.stringify(accept.json?.error || '')}`);
-  const start = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp } });
+  const start = await j('POST', `/trips/${tripId}/start`, { token: driver.token, body: { passenger_otp: otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
   check('trip started', start.status === 200, `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
-  const complete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: {} });
+  const complete = await j('POST', `/trips/${tripId}/complete`, { token: driver.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
   check('trip completed', complete.status === 200 && complete.json?.data?.status === 'completed', `status=${complete.status} ${JSON.stringify(complete.json?.error || '')}`);
   if (!tripId) process.exit(1);
 

@@ -82,8 +82,8 @@ function execSql(sql) {
       const apply = await j('POST', `/trips/${tid}/applicants`, { token: B.token, body: {} });
       await j('POST', `/trips/${tid}/assign`, { token: A.token, body: { acceptance_id: apply.json?.data?.id } });
       const acc = await j('POST', `/trips/${tid}/accept`, { token: B.token });
-      await j('POST', `/trips/${tid}/start`, { token: B.token, body: { passenger_otp: acc.json?.data?.passenger_otp } });
-      await j('POST', `/trips/${tid}/complete`, { token: B.token, body: {} });
+      await j('POST', `/trips/${tid}/start`, { token: B.token, body: { passenger_otp: acc.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
+      await j('POST', `/trips/${tid}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
     }
     const refrPre = (await j('GET', '/referrals/me', { token: R.token })).json?.data;
     check('R earned ₹600 (12 trips × ₹50)', refrPre?.summary?.lifetime_earned_paise === 60000, `lifetime=${refrPre?.summary?.lifetime_earned_paise}`);

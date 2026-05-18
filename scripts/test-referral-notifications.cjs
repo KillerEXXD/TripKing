@@ -110,8 +110,8 @@ function notificationsFor(userId) {
     const apply = await j('POST', `/trips/${tid}/applicants`, { token: B.token, body: {} });
     await j('POST', `/trips/${tid}/assign`, { token: A.token, body: { acceptance_id: apply.json?.data?.id } });
     const acc = await j('POST', `/trips/${tid}/accept`, { token: B.token });
-    await j('POST', `/trips/${tid}/start`, { token: B.token, body: { passenger_otp: acc.json?.data?.passenger_otp } });
-    await j('POST', `/trips/${tid}/complete`, { token: B.token, body: {} });
+    await j('POST', `/trips/${tid}/start`, { token: B.token, body: { passenger_otp: acc.json?.data?.passenger_otp, start_odo_url: 'test://odo/start', start_odo_reading: 10000 } });
+    await j('POST', `/trips/${tid}/complete`, { token: B.token, body: { end_odo_url: 'test://odo/end', end_odo_reading: 10100 } });
 
     notifs = notificationsFor(R.userId);
     const earnNotif = notifs.find((n) => n.type === 'referral_earning');
