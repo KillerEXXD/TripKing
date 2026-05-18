@@ -49,5 +49,11 @@ export default defineConfig({
     restoreMocks: true,
     pool: 'forks',
     isolate: true,
+    // v8 coverage instrumentation slows React + jsdom renders roughly 10x on Windows. A test
+    // that completes in ~500 ms uninstrumented can take 4–6 s under coverage, which trips the
+    // default 5 s ceiling on the Husky pre-push gate. 15 s gives enough headroom for the slowest
+    // page-render tests (AdminDesignsPage renders ~60 <Link>s) without hiding genuinely runaway
+    // tests. `npm run test:run` (no coverage) is unaffected.
+    testTimeout: 15_000,
   },
 });
