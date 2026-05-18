@@ -165,12 +165,12 @@ export function DateTimeField({
       <PopoverContent
         align="start"
         sideOffset={4}
-        className="w-[min(calc(100vw-1rem),22rem)] p-0 sm:w-auto sm:max-w-none"
+        className="w-[min(calc(100vw-0.75rem),24rem)] p-0 sm:w-auto sm:max-w-none"
         onEscapeKeyDown={() => setOpen(false)}
       >
         <div className="flex flex-col">
-          <div className="flex flex-col sm:flex-row">
-            <div className="flex justify-center border-b border-input p-2 sm:border-b-0 sm:border-r">
+          <div className="flex">
+            <div className="flex shrink-0 border-r border-input p-1.5">
               <Calendar
                 mode="single"
                 selected={draft.date}
@@ -179,12 +179,12 @@ export function DateTimeField({
                 defaultMonth={draft.date}
               />
             </div>
-            <div className="flex justify-center p-2">
+            <div className="flex gap-0.5 p-1.5">
               <div
                 ref={hourRef}
                 role="listbox"
                 aria-label="Hour"
-                className="h-64 w-12 overflow-y-auto scroll-smooth pr-1 [scrollbar-width:thin]"
+                className="h-56 w-9 overflow-y-auto scroll-smooth [scrollbar-width:thin]"
               >
                 {HOURS_12.map((h) => {
                   const selected = draft.hour12 === h;
@@ -197,7 +197,7 @@ export function DateTimeField({
                       data-selected={selected}
                       onClick={() => setDraft((p) => ({ ...p, hour12: h }))}
                       className={cn(
-                        'block w-full rounded-md px-2 py-1.5 text-center text-sm hover:bg-muted',
+                        'block w-full rounded-md py-1 text-center text-sm hover:bg-muted',
                         selected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       )}
                     >
@@ -210,7 +210,7 @@ export function DateTimeField({
                 ref={minuteRef}
                 role="listbox"
                 aria-label="Minute"
-                className="h-64 w-12 overflow-y-auto scroll-smooth pr-1 [scrollbar-width:thin]"
+                className="h-56 w-9 overflow-y-auto scroll-smooth [scrollbar-width:thin]"
               >
                 {MINUTES.map((m) => {
                   const selected = draft.minute === m;
@@ -223,7 +223,7 @@ export function DateTimeField({
                       data-selected={selected}
                       onClick={() => setDraft((p) => ({ ...p, minute: m }))}
                       className={cn(
-                        'block w-full rounded-md px-2 py-1.5 text-center text-sm hover:bg-muted',
+                        'block w-full rounded-md py-1 text-center text-sm hover:bg-muted',
                         selected && 'bg-primary text-primary-foreground hover:bg-primary/90',
                       )}
                     >
@@ -232,7 +232,7 @@ export function DateTimeField({
                   );
                 })}
               </div>
-              <div role="radiogroup" aria-label="AM or PM" className="flex w-12 flex-col gap-1 pl-1">
+              <div role="radiogroup" aria-label="AM or PM" className="flex w-10 flex-col gap-1">
                 {(['AM', 'PM'] as const).map((mer) => {
                   const selected = draft.meridiem === mer;
                   return (
