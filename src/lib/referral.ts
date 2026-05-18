@@ -3,7 +3,7 @@
  * business logic. The `?ref=` query param is what `verify-otp` reads on the
  * new-user path to attach `users.referred_by_user_id`.
  */
-const PUBLIC_BASE_URL = 'https://trip-king.vercel.app';
+const PUBLIC_BASE_URL = 'https://tripkingapp.com';
 
 export function buildReferralLink(code: string): string {
   return `${PUBLIC_BASE_URL}/?ref=${encodeURIComponent(code)}`;

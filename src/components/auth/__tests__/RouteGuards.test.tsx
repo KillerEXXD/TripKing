@@ -26,7 +26,7 @@ function renderAt(path: string, element: ReactElement) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path={path} element={element} />
-        <Route path="/signin" element={<div>signin page</div>} />
+        <Route path="/app/signin" element={<div>signin page</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -41,7 +41,7 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('secret')).toBeInTheDocument();
   });
 
-  it('redirects to /signin when not authenticated', () => {
+  it('redirects to /app/signin when not authenticated', () => {
     setAuth({ user: null, isAuthenticated: false, isLoading: false });
     renderAt('/dash', <ProtectedRoute><div>secret</div></ProtectedRoute>);
     expect(screen.getByText('signin page')).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe('AdminRoute', () => {
     expect(screen.queryByText('admin area')).toBeNull();
   });
 
-  it('bounces an anonymous user to /signin', () => {
+  it('bounces an anonymous user to /app/signin', () => {
     setAuth({ user: null, isAuthenticated: false, isLoading: false });
     renderAt('/administration', <AdminRoute><div>admin area</div></AdminRoute>);
     expect(screen.getByText('signin page')).toBeInTheDocument();

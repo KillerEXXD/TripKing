@@ -3,7 +3,7 @@ import { buildReferralLink, buildReferralShareMessage, buildWhatsAppShareUrl } f
 
 describe('referral helpers', () => {
   it('buildReferralLink encodes the code as ?ref=', () => {
-    expect(buildReferralLink('ABC12345')).toBe('https://trip-king.vercel.app/?ref=ABC12345');
+    expect(buildReferralLink('ABC12345')).toBe('https://tripkingapp.com/?ref=ABC12345');
   });
 
   it('buildWhatsAppShareUrl percent-encodes the message', () => {
@@ -15,6 +15,6 @@ describe('referral helpers', () => {
   it('buildReferralShareMessage embeds code + link', () => {
     const msg = buildReferralShareMessage('XYZ99');
     expect(msg).toContain('XYZ99');
-    expect(msg).toContain('https://trip-king.vercel.app/?ref=XYZ99');
+    expect(msg).toContain('https://tripkingapp.com/?ref=XYZ99');
   });
 });
