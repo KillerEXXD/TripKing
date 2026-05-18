@@ -88,10 +88,17 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
   const [vehicleId, setVehicleId] = useState('');
   const chosenVehicleId = vehicleId || activeVehicles[0]?.id;
   const busy = applyMutation.isPending || withdrawMutation.isPending;
-  // `withdrawn` means the driver pulled out (the store keeps the row instead of dropping it);
-  // `isApplied` is the active "I have an outstanding application" state.
-  const withdrawn = !!myApplication?.withdrawnAt;
-  const isApplied = !!myApplication && !withdrawn;
+  // Two sources of truth for the driver's application on this trip:
+  //   1. The local zustand store (`myApplication`) — populated when THIS browser session
+  //      called POST /applicants. Includes `withdrawnAt` so we can show the red "withdrawn"
+  //      banner without losing the row.
+  //   2. The server-side `trip.myApplicationStatus` — present on every GET /trips/:id call
+  //      so a re-login / new device / cache-clear scenario still shows the right state.
+  // The server-side flag wins when the local store doesn't know about the trip yet.
+  const serverApplied = trip.myApplicationStatus === 'applied' || trip.myApplicationStatus === 'selected' || trip.myApplicationStatus === 'accepted';
+  const serverWithdrawn = trip.myApplicationStatus === 'withdrawn';
+  const withdrawn = !!myApplication?.withdrawnAt || (!myApplication && serverWithdrawn);
+  const isApplied = (!!myApplication && !myApplication.withdrawnAt) || (!myApplication && serverApplied);
 
   async function onApply() {
     if (!chosenVehicleId) {
@@ -105,8 +112,12 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
       // Briefly show the "Applied" pill so the driver sees their action
       // registered, then return them to where they came from (Open Trips).
       setTimeout(() => navigate(returnTo), 900);
-    } catch {
-      toast.error("Couldn't apply — please try again.");
+    } catch (err) {
+      // Surface the server's actual message (`ApiError.message`) instead of a generic toast —
+      // 409 "You already applied to this trip" is more useful than "try again". Same pattern
+      // for 403 KYC errors. Falls back to the generic copy for unexpected failures.
+      const msg = err instanceof ApiError ? err.message : "Couldn't apply — please try again.";
+      toast.error(msg);
     }
   }
   async function onDeclineInvite() {
@@ -121,15 +132,19 @@ function ApplyBar({ trip, myDriverId, myDriverPending, myDriverMissing, kycAppro
     }
   }
   async function onWithdraw() {
-    if (!myApplication) return;
+    // The acceptance id comes from either the local store (this-session apply) or the
+    // server-side `trip.myApplicationId` stamp (re-login / fresh device).
+    const acceptanceId = myApplication?.acceptanceId ?? trip.myApplicationId;
+    if (!acceptanceId) return;
     try {
-      await withdrawMutation.mutateAsync({ tripId: trip.id, acceptanceId: myApplication.acceptanceId });
+      await withdrawMutation.mutateAsync({ tripId: trip.id, acceptanceId });
       // Mark withdrawn (don't delete) so the trip card keeps showing the status
       // in light red — reminds the driver they pulled out and prevents a stale re-apply.
       markWithdrawn(trip.id);
       toast.success('Application withdrawn.');
-    } catch {
-      toast.error("Couldn't withdraw — please try again.");
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Couldn't withdraw — please try again.";
+      toast.error(msg);
     }
   }
 
@@ -660,6 +675,10 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
   const [editingPassenger, setEditingPassenger] = useState(fillPassenger && passengerEditable);
   const passengerCardRef = useRef<HTMLDivElement>(null);
   const myApplication: MyApplication | undefined = useMyApplicationsStore().byTrip[trip.id];
+  // Server-side fallback when the local store hasn't been hydrated (re-login, fresh
+  // device). Lets the "You've applied — waiting…" card render even when localStorage is
+  // empty. Same logic as the ApplyBar's `isApplied`.
+  const serverApplied = trip.myApplicationStatus === 'applied' || trip.myApplicationStatus === 'selected' || trip.myApplicationStatus === 'accepted';
   const [showShareLink, setShowShareLink] = useState(false);
   // Edit-trip dialog: only when no one has applied / been invited / been selected yet.
   // Server enforces this too (returns 409 if the gate slips).
@@ -709,6 +728,26 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
         </Card>
       ) : null}
       {viewer.isPoster && (trip.status === 'open' || trip.status === 'has_applicants') ? <InviteDriversCard trip={trip} /> : null}
+      {showApplyBar && !myApplication && serverApplied ? (
+        // Server says the driver has an applied row but the local store hasn't hydrated
+        // it yet (re-login / new device). Render the same "You've applied" card the
+        // local-store branch shows, minus the "submitted X ago" line (we don't have the
+        // applied_at timestamp without the local row).
+        <Card className="border-emerald-200 bg-emerald-50">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-700" aria-hidden />
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-emerald-900">
+                You&apos;ve applied — waiting for the trip manager
+                {trip.applicantCount > 0 ? (
+                  <> · {trip.applicantCount} applicant{trip.applicantCount === 1 ? '' : 's'} so far</>
+                ) : null}
+              </div>
+              <div className="text-xs text-emerald-700">We&apos;ll notify you with their decision.</div>
+            </div>
+          </div>
+        </Card>
+      ) : null}
       {showApplyBar && myApplication ? (
         myApplication.withdrawnAt ? (
           // Withdrawn — soft red wash so the driver remembers they pulled out.

@@ -114,6 +114,10 @@ export interface Trip {
   invitationId?: string;
   /** Only present on `GET /trips?invited=me` rows — the caller's invitation status (`pending` | `applied` — declined invites are filtered out of the list). */
   invitationStatus?: TripInvitationStatus;
+  /** Only present on `GET /trips/:id` for a driver — the caller's most recent trip_acceptances row id (if any). Drives the "Applied / Withdraw" affordance on the trip detail. */
+  myApplicationId?: string;
+  /** Only present on `GET /trips/:id` for a driver — the caller's most recent trip_acceptances status. */
+  myApplicationStatus?: AcceptanceStatus;
   createdAt: string;
   /** The passenger OTP — echoed only to the trip poster / admin (or returned by `POST /trips/:id/assign`). Used to build the passenger-portal link. */
   passengerOtp?: string;
