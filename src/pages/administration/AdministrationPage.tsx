@@ -72,7 +72,7 @@ function SectionTile({ tile }: { tile: AdminSectionTile }) {
 export function AdministrationPage() {
   return (
     <main className="mx-auto max-w-2xl space-y-4 p-6">
-      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
       <h1 className="text-2xl font-bold">Administration</h1>

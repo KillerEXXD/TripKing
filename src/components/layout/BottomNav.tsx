@@ -39,26 +39,26 @@ interface NavItem {
 // layout (Home · contextual · + · My); admins keep their 4-tab oversight
 // layout but adopt the same visuals.
 const DRIVER_NAV: NavItem[] = [
-  { id: 'home',   label: 'Home',        ariaLabel: 'Home',         Icon: Home,             to: '/',          iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p === '/' },
-  { id: 'browse', label: 'Find Trips',  ariaLabel: 'Find trips',   Icon: BrowseTripsIcon,  to: '/trips',     iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
-  { id: 'post',   label: 'Post Trip',   ariaLabel: 'Post a trip',  Icon: Plus,             to: '/trips/new', primary: true, iconSize: { width: 16, height: 16, strokeWidth: 2 }, match: (p) => p === '/trips/new' },
-  { id: 'mine',   label: 'My Trips',    ariaLabel: 'My trips',     Icon: ClipboardList,    to: '/my-trips',  iconSize: { width: 26, height: 26, strokeWidth: 1.8 }, match: (p) => p === '/my-trips' || p === '/posted-trips' },
+  { id: 'home',   label: 'Home',        ariaLabel: 'Home',         Icon: Home,             to: '/app',          iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p === '/app' },
+  { id: 'browse', label: 'Find Trips',  ariaLabel: 'Find trips',   Icon: BrowseTripsIcon,  to: '/app/trips',     iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p === '/app/trips' || (p.startsWith('/app/trips/') && p !== '/app/trips/new') },
+  { id: 'post',   label: 'Post Trip',   ariaLabel: 'Post a trip',  Icon: Plus,             to: '/app/trips/new', primary: true, iconSize: { width: 16, height: 16, strokeWidth: 2 }, match: (p) => p === '/app/trips/new' },
+  { id: 'mine',   label: 'My Trips',    ariaLabel: 'My trips',     Icon: ClipboardList,    to: '/app/my-trips',  iconSize: { width: 26, height: 26, strokeWidth: 1.8 }, match: (p) => p === '/app/my-trips' || p === '/app/posted-trips' },
 ];
 const AGENT_NAV: NavItem[] = [
-  { id: 'home', label: 'Home',        ariaLabel: 'Home',          Icon: Home,            to: '/',          iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p === '/' },
-  { id: 'find', label: 'Find Driver', ariaLabel: 'Find driver',   Icon: FindDriverIcon,  to: '/vacancies', iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p.startsWith('/vacancies') },
-  { id: 'post', label: 'Post Trip',   ariaLabel: 'Post a trip',   Icon: Plus,            to: '/trips/new', primary: true, iconSize: { width: 16, height: 16, strokeWidth: 2 }, match: (p) => p === '/trips/new' },
-  { id: 'mine', label: 'My Posts',    ariaLabel: 'My posts',      Icon: ClipboardList,   to: '/posted-trips', iconSize: { width: 26, height: 26, strokeWidth: 1.8 }, match: (p) => p === '/posted-trips' || p.endsWith('/applicants') },
+  { id: 'home', label: 'Home',        ariaLabel: 'Home',          Icon: Home,            to: '/app',          iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p === '/app' },
+  { id: 'find', label: 'Find Driver', ariaLabel: 'Find driver',   Icon: FindDriverIcon,  to: '/app/vacancies', iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p.startsWith('/app/vacancies') },
+  { id: 'post', label: 'Post Trip',   ariaLabel: 'Post a trip',   Icon: Plus,            to: '/app/trips/new', primary: true, iconSize: { width: 16, height: 16, strokeWidth: 2 }, match: (p) => p === '/app/trips/new' },
+  { id: 'mine', label: 'My Posts',    ariaLabel: 'My posts',      Icon: ClipboardList,   to: '/app/posted-trips', iconSize: { width: 26, height: 26, strokeWidth: 1.8 }, match: (p) => p === '/app/posted-trips' || p.endsWith('/applicants') },
 ];
 const ADMIN_NAV: NavItem[] = [
-  { id: 'home',   label: 'Home',        ariaLabel: 'Home',          Icon: Home,            to: '/',              iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p === '/' },
-  { id: 'browse', label: 'Find Trips',  ariaLabel: 'Find trips',    Icon: BrowseTripsIcon, to: '/trips',         iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p === '/trips' || (p.startsWith('/trips/') && p !== '/trips/new') },
-  { id: 'find',   label: 'Find Driver', ariaLabel: 'Find driver',   Icon: FindDriverIcon,  to: '/vacancies',     iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p.startsWith('/vacancies') },
-  { id: 'alerts', label: 'Alerts',      ariaLabel: 'Notifications', Icon: Bell,            to: '/notifications', iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p.startsWith('/notifications') },
+  { id: 'home',   label: 'Home',        ariaLabel: 'Home',          Icon: Home,            to: '/app',              iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p === '/app' },
+  { id: 'browse', label: 'Find Trips',  ariaLabel: 'Find trips',    Icon: BrowseTripsIcon, to: '/app/trips',         iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p === '/app/trips' || (p.startsWith('/app/trips/') && p !== '/app/trips/new') },
+  { id: 'find',   label: 'Find Driver', ariaLabel: 'Find driver',   Icon: FindDriverIcon,  to: '/app/vacancies',     iconSize: { width: 28, height: 28, strokeWidth: 1.6 }, match: (p) => p.startsWith('/app/vacancies') },
+  { id: 'alerts', label: 'Alerts',      ariaLabel: 'Notifications', Icon: Bell,            to: '/app/notifications', iconSize: { width: 24, height: 24, strokeWidth: 1.9 }, match: (p) => p.startsWith('/app/notifications') },
 ];
 
 /** Flow / detail screens are full-screen with their own back-bar + (sometimes) sticky CTA — no bottom nav. */
-const HIDE_NAV = /^\/(trips\/(new|[^/]+)|drivers\/[^/]+|alerts\/(new|[^/]+)|vacancies\/new)$|^\/trips\/[^/]+\/applicants$/;
+const HIDE_NAV = /^\/app\/(trips\/(new|[^/]+)|drivers\/[^/]+|alerts\/(new|[^/]+)|vacancies\/new)$|^\/app\/trips\/[^/]+\/applicants$/;
 
 /**
  * The app's bottom navigation — a NATURAL-FLOW sibling beneath the

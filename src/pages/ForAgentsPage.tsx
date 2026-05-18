@@ -179,7 +179,7 @@ export function ForAgentsPage() {
               ))}
             </div>
             <Link
-              to="/"
+              to="/app"
               className="inline-flex items-center gap-1.5 rounded-full bg-gray-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-gray-800"
             >
               {t.nav.openApp}
@@ -496,8 +496,8 @@ export function ForAgentsPage() {
           <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             <a href="#how" className="text-gray-500 hover:text-gray-900">{t.nav.howItWorks}</a>
             <a href="#features" className="text-gray-500 hover:text-gray-900">{lang === 'ta' ? 'அம்சங்கள்' : 'Features'}</a>
-            <Link to="/" className="text-gray-500 hover:text-gray-900">{t.nav.openApp}</Link>
-            <Link to="/website" className="text-gray-500 hover:text-gray-900">{lang === 'ta' ? 'முழு தளம்' : 'Full site'}</Link>
+            <Link to="/app" className="text-gray-500 hover:text-gray-900">{t.nav.openApp}</Link>
+            <Link to="/" className="text-gray-500 hover:text-gray-900">{lang === 'ta' ? 'முழு தளம்' : 'Full site'}</Link>
             <Link to="/passenger" className="text-emerald-700 hover:underline">
               {lang === 'ta' ? 'நீங்கள் பயணியா? →' : 'Are you a passenger? →'}
             </Link>

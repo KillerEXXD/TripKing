@@ -24,7 +24,7 @@ export function DesignsRoute({ children }: { children: ReactNode }) {
     );
   }
   if (!user) {
-    return <Navigate to="/signin" replace />;
+    return <Navigate to="/app/signin" replace />;
   }
   const isAdmin = user.role === 'admin';
   const hasDesignPreviews = user.featureFlags?.designPreviews === true;

@@ -57,159 +57,159 @@ function renderAt(path: string) {
 describe('AppRoutes', () => {
   beforeEach(() => vi.mocked(useAuth).mockReset());
 
-  it('/signin renders the sign-in page', async () => {
+  it('/app/signin renders the sign-in page', async () => {
     setAuth(null);
-    renderAt('/signin');
+    renderAt('/app/signin');
     expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 
-  it('/ redirects an anonymous user to /signin', async () => {
+  it('/app redirects an anonymous user to /app/signin', async () => {
     setAuth(null);
-    renderAt('/');
+    renderAt('/app');
     expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 
-  it('/ renders the role-aware home for a signed-in user', async () => {
+  it('/app renders the role-aware home for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/');
+    renderAt('/app');
     expect(await screen.findByText(/home for role/i)).toBeInTheDocument();
   });
 
-  it('/onboarding renders the onboarding screen for a signed-in user', async () => {
+  it('/app/onboarding renders the onboarding screen for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/onboarding');
+    renderAt('/app/onboarding');
     expect(await screen.findByText(/onboarding screen/i)).toBeInTheDocument();
   });
 
-  it('/onboarding redirects an anonymous user to /signin', async () => {
+  it('/app/onboarding redirects an anonymous user to /app/signin', async () => {
     setAuth(null);
-    renderAt('/onboarding');
+    renderAt('/app/onboarding');
     expect(await screen.findByRole('button', { name: /send otp/i })).toBeInTheDocument();
   });
 
-  it('/trips renders the trip feed for a signed-in user', async () => {
+  it('/app/trips renders the trip feed for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/trips');
+    renderAt('/app/trips');
     expect(await screen.findByText(/trip feed/i)).toBeInTheDocument();
   });
 
-  it('/trips/new renders the post-trip page for a signed-in user', async () => {
+  it('/app/trips/new renders the post-trip page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/trips/new');
+    renderAt('/app/trips/new');
     expect(await screen.findByText(/post trip/i)).toBeInTheDocument();
   });
 
-  it('/trips/:id renders the trip detail for a signed-in user', async () => {
+  it('/app/trips/:id renders the trip detail for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/trips/abc123');
+    renderAt('/app/trips/abc123');
     expect(await screen.findByText(/trip detail/i)).toBeInTheDocument();
   });
 
-  it('/trips/:id/applicants renders the applicant-review page for a signed-in user', async () => {
+  it('/app/trips/:id/applicants renders the applicant-review page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/trips/abc123/applicants');
+    renderAt('/app/trips/abc123/applicants');
     expect(await screen.findByText(/applicant review/i)).toBeInTheDocument();
   });
 
-  it('/my-trips/review renders the review-selections page for a signed-in user', async () => {
+  it('/app/my-trips/review renders the review-selections page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/my-trips/review');
+    renderAt('/app/my-trips/review');
     expect(await screen.findByText(/review selections page/i)).toBeInTheDocument();
   });
 
-  it('/posted-trips renders the posted-trips page for a signed-in user', async () => {
+  it('/app/posted-trips renders the posted-trips page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/posted-trips');
+    renderAt('/app/posted-trips');
     expect(await screen.findByText(/posted trips/i)).toBeInTheDocument();
   });
 
-  it('/drivers/:id renders the driver profile for a signed-in user', async () => {
+  it('/app/drivers/:id renders the driver profile for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/drivers/abc');
+    renderAt('/app/drivers/abc');
     expect(await screen.findByText(/driver profile/i)).toBeInTheDocument();
   });
 
-  it('/profile renders the account page for a signed-in user', async () => {
+  it('/app/profile renders the account page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/profile');
+    renderAt('/app/profile');
     expect(await screen.findByText(/my profile page/i)).toBeInTheDocument();
   });
 
-  it('/vacancies renders the available-drivers feed for a signed-in user', async () => {
+  it('/app/vacancies renders the available-drivers feed for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/vacancies');
+    renderAt('/app/vacancies');
     expect(await screen.findByText(/^vacancies page$/i)).toBeInTheDocument();
   });
 
-  it('/vacancies/new renders the post-vacancy page for a signed-in user', async () => {
+  it('/app/vacancies/new renders the post-vacancy page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/vacancies/new');
+    renderAt('/app/vacancies/new');
     expect(await screen.findByText(/post vacancy page/i)).toBeInTheDocument();
   });
 
-  it('/alerts renders the alerts list for a signed-in user', async () => {
+  it('/app/alerts renders the alerts list for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/alerts');
+    renderAt('/app/alerts');
     expect(await screen.findByText(/^alerts page$/i)).toBeInTheDocument();
   });
 
-  it('/alerts/new renders the create-alert page for a signed-in user', async () => {
+  it('/app/alerts/new renders the create-alert page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/alerts/new');
+    renderAt('/app/alerts/new');
     expect(await screen.findByText(/create alert page/i)).toBeInTheDocument();
   });
 
-  it('/alerts/:id renders the alert detail for a signed-in user', async () => {
+  it('/app/alerts/:id renders the alert detail for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/alerts/abc');
+    renderAt('/app/alerts/abc');
     expect(await screen.findByText(/alert detail page/i)).toBeInTheDocument();
   });
 
-  it('/notifications renders the notifications page for a signed-in user', async () => {
+  it('/app/notifications renders the notifications page for a signed-in user', async () => {
     setAuth(driver);
-    renderAt('/notifications');
+    renderAt('/app/notifications');
     expect(await screen.findByText(/notifications page/i)).toBeInTheDocument();
   });
 
-  it('/administration renders the admin hub for an admin', async () => {
+  it('/app/administration renders the admin hub for an admin', async () => {
     setAuth(admin);
-    renderAt('/administration');
+    renderAt('/app/administration');
     expect(await screen.findByRole('heading', { name: /administration/i })).toBeInTheDocument();
   });
 
-  it('/administration 403s a signed-in non-admin', async () => {
+  it('/app/administration 403s a signed-in non-admin', async () => {
     setAuth(driver);
-    renderAt('/administration');
+    renderAt('/app/administration');
     expect(await screen.findByText(/admins only/i)).toBeInTheDocument();
   });
 
-  it('/administration/kyc renders the KYC review queue for an admin', async () => {
+  it('/app/administration/kyc renders the KYC review queue for an admin', async () => {
     setAuth(admin);
-    renderAt('/administration/kyc');
+    renderAt('/app/administration/kyc');
     expect(await screen.findByText(/kyc review page/i)).toBeInTheDocument();
   });
 
-  it('/administration/kyc 403s a signed-in non-admin', async () => {
+  it('/app/administration/kyc 403s a signed-in non-admin', async () => {
     setAuth(driver);
-    renderAt('/administration/kyc');
+    renderAt('/app/administration/kyc');
     expect(await screen.findByText(/admins only/i)).toBeInTheDocument();
   });
 
-  it('/administration/vehicles renders the vehicle-eligibility dashboard for an admin', async () => {
+  it('/app/administration/vehicles renders the vehicle-eligibility dashboard for an admin', async () => {
     setAuth(admin);
-    renderAt('/administration/vehicles');
+    renderAt('/app/administration/vehicles');
     expect(await screen.findByText(/vehicle eligibility page/i)).toBeInTheDocument();
   });
 
-  it('/administration/reviews renders the reviews-moderation queue for an admin', async () => {
+  it('/app/administration/reviews renders the reviews-moderation queue for an admin', async () => {
     setAuth(admin);
-    renderAt('/administration/reviews');
+    renderAt('/app/administration/reviews');
     expect(await screen.findByText(/review moderation page/i)).toBeInTheDocument();
   });
 
-  it('/administration/translations renders the translation manager for an admin', async () => {
+  it('/app/administration/translations renders the translation manager for an admin', async () => {
     setAuth(admin);
-    renderAt('/administration/translations');
+    renderAt('/app/administration/translations');
     expect(await screen.findByText(/translation manager page/i)).toBeInTheDocument();
   });
 

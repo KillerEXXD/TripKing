@@ -146,73 +146,76 @@ export function AppRoutes() {
     <RouteErrorBoundary>
       <Suspense fallback={<PageFallback />}>
         <SentryRoutes>
-          <Route path="/signin" element={<SignInPage />} />
-          {/* Public marketing pages */}
-          <Route path="/website" element={<WebsitePage />} />
+          {/* PUBLIC ROOT — marketing + passenger portal. No auth, no app shell. The root
+              now serves the marketing site (was /website); the old /website path is
+              redirected by vercel.json (308 → /). Sign-in moves under /app/ — see below. */}
+          <Route path="/" element={<WebsitePage />} />
           <Route path="/for-agents" element={<ForAgentsPage />} />
           {/* Public passenger portal — OTP is the credential */}
           <Route path="/passenger" element={<PassengerPage />} />
           <Route path="/passenger/:otp" element={<PassengerPage />} />
+          {/* AUTH ENTRY — /app/signin (was /signin; old path 308'd by vercel.json). */}
+          <Route path="/app/signin" element={<SignInPage />} />
           {/* Post-sign-in onboarding/KYC — auth required, but full-screen (no app shell). */}
-          <Route path="/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
-          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-            <Route path="/" element={<HomeForRole />} />
-            <Route path="/trips" element={<TripFeedPage />} />
-            <Route path="/trips/new" element={<PostTripPage />} />
-            <Route path="/trips/:id/edit" element={<PostTripPage />} />
-            <Route path="/trips/:id/complete" element={<CompleteTripPage />} />
-            <Route path="/trips/:id" element={<TripDetailPage />} />
-            <Route path="/trips/:id/applicants" element={<ApplicantReviewPage />} />
-            <Route path="/trips/:id/invitations" element={<TripInvitationsPage />} />
-            <Route path="/posted-trips" element={<PostedTripsPage />} />
-            <Route path="/my-trips" element={<DriverActivityPage />} />
-            <Route path="/my-trips/awaiting" element={<AwaitingDecisionPage />} />
-            <Route path="/queue/in-progress" element={<AgentInProgressQueuePage />} />
-            <Route path="/queue/needs-action" element={<AgentNeedsActionQueuePage />} />
-            <Route path="/my-trips/review" element={<ReviewSelectionsPage />} />
-            <Route path="/drivers/:id" element={<DriverProfilePage />} />
-            <Route path="/agents/:id" element={<AgentProfilePage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/analytics" element={<AgentAnalyticsPage />} />
-            <Route path="/my-earnings" element={<DriverEarningsPage />} />
-            <Route path="/driver-analytics" element={<DriverAnalyticsPage />} />
-            <Route path="/verify/documents" element={<VerifyDocumentsPage />} />
-            <Route path="/verify/video-call" element={<BookVideoCallPage />} />
-            <Route path="/vehicles/new" element={<VehicleFormPage />} />
-            <Route path="/vehicles/:id/edit" element={<VehicleFormPage />} />
-            <Route path="/vehicles/:id/photos" element={<VehiclePhotosPage />} />
-            <Route path="/vacancies" element={<VacanciesPage />} />
-            <Route path="/vacancies/new" element={<PostVacancyPage />} />
-            <Route path="/vacancies/:id/edit" element={<PostVacancyPage />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/alerts/new" element={<CreateAlertPage />} />
-            <Route path="/alerts/:id" element={<AlertDetailPage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route path="/wallet" element={<WalletPage />} />
-            <Route path="/wallet/charges" element={<WalletChargesPage />} />
-            <Route path="/referrals" element={<ReferralsPage />} />
-            <Route path="/referrals/:linkId" element={<ReferralLinkDetailPage />} />
-            <Route path="/administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
-            <Route path="/administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
-            <Route path="/administration/app-wallet" element={<AdminRoute><AdminAppWalletPage /></AdminRoute>} />
-            <Route path="/administration/withdrawals" element={<AdminRoute><AdminWithdrawalsPage /></AdminRoute>} />
-            <Route path="/administration/referrals" element={<AdminRoute><AdminReferralsPage /></AdminRoute>} />
-            <Route path="/administration/referrals/flags" element={<AdminRoute><AdminReferralFlagsPage /></AdminRoute>} />
-            <Route path="/administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
-            <Route path="/administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
-            <Route path="/administration/kyc/:kind/:id" element={<AdminRoute><KycDetailPage /></AdminRoute>} />
-            <Route path="/administration/drivers" element={<AdminRoute><AdminDriversPage /></AdminRoute>} />
-            <Route path="/administration/agents" element={<AdminRoute><AdminAgentsPage /></AdminRoute>} />
-            <Route path="/administration/passengers" element={<AdminRoute><PassengersPage /></AdminRoute>} />
-            <Route path="/administration/video-calls" element={<AdminRoute><VideoCallConsolePage /></AdminRoute>} />
-            <Route path="/administration/vehicles" element={<AdminRoute><VehicleEligibilityPage /></AdminRoute>} />
-            <Route path="/administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
-            <Route path="/administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
-            <Route path="/administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
+          <Route path="/app/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
+          <Route path="/app" element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route index element={<HomeForRole />} />
+            <Route path="trips" element={<TripFeedPage />} />
+            <Route path="trips/new" element={<PostTripPage />} />
+            <Route path="trips/:id/edit" element={<PostTripPage />} />
+            <Route path="trips/:id/complete" element={<CompleteTripPage />} />
+            <Route path="trips/:id" element={<TripDetailPage />} />
+            <Route path="trips/:id/applicants" element={<ApplicantReviewPage />} />
+            <Route path="trips/:id/invitations" element={<TripInvitationsPage />} />
+            <Route path="posted-trips" element={<PostedTripsPage />} />
+            <Route path="my-trips" element={<DriverActivityPage />} />
+            <Route path="my-trips/awaiting" element={<AwaitingDecisionPage />} />
+            <Route path="queue/in-progress" element={<AgentInProgressQueuePage />} />
+            <Route path="queue/needs-action" element={<AgentNeedsActionQueuePage />} />
+            <Route path="my-trips/review" element={<ReviewSelectionsPage />} />
+            <Route path="drivers/:id" element={<DriverProfilePage />} />
+            <Route path="agents/:id" element={<AgentProfilePage />} />
+            <Route path="profile" element={<ProfilePage />} />
+            <Route path="analytics" element={<AgentAnalyticsPage />} />
+            <Route path="my-earnings" element={<DriverEarningsPage />} />
+            <Route path="driver-analytics" element={<DriverAnalyticsPage />} />
+            <Route path="verify/documents" element={<VerifyDocumentsPage />} />
+            <Route path="verify/video-call" element={<BookVideoCallPage />} />
+            <Route path="vehicles/new" element={<VehicleFormPage />} />
+            <Route path="vehicles/:id/edit" element={<VehicleFormPage />} />
+            <Route path="vehicles/:id/photos" element={<VehiclePhotosPage />} />
+            <Route path="vacancies" element={<VacanciesPage />} />
+            <Route path="vacancies/new" element={<PostVacancyPage />} />
+            <Route path="vacancies/:id/edit" element={<PostVacancyPage />} />
+            <Route path="alerts" element={<AlertsPage />} />
+            <Route path="alerts/new" element={<CreateAlertPage />} />
+            <Route path="alerts/:id" element={<AlertDetailPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="wallet" element={<WalletPage />} />
+            <Route path="wallet/charges" element={<WalletChargesPage />} />
+            <Route path="referrals" element={<ReferralsPage />} />
+            <Route path="referrals/:linkId" element={<ReferralLinkDetailPage />} />
+            <Route path="administration" element={<AdminRoute><AdministrationPage /></AdminRoute>} />
+            <Route path="administration/dashboard" element={<AdminRoute><AdminDashboardPage /></AdminRoute>} />
+            <Route path="administration/app-wallet" element={<AdminRoute><AdminAppWalletPage /></AdminRoute>} />
+            <Route path="administration/withdrawals" element={<AdminRoute><AdminWithdrawalsPage /></AdminRoute>} />
+            <Route path="administration/referrals" element={<AdminRoute><AdminReferralsPage /></AdminRoute>} />
+            <Route path="administration/referrals/flags" element={<AdminRoute><AdminReferralFlagsPage /></AdminRoute>} />
+            <Route path="administration/config" element={<AdminRoute><AdminConfigPage /></AdminRoute>} />
+            <Route path="administration/kyc" element={<AdminRoute><KycReviewPage /></AdminRoute>} />
+            <Route path="administration/kyc/:kind/:id" element={<AdminRoute><KycDetailPage /></AdminRoute>} />
+            <Route path="administration/drivers" element={<AdminRoute><AdminDriversPage /></AdminRoute>} />
+            <Route path="administration/agents" element={<AdminRoute><AdminAgentsPage /></AdminRoute>} />
+            <Route path="administration/passengers" element={<AdminRoute><PassengersPage /></AdminRoute>} />
+            <Route path="administration/video-calls" element={<AdminRoute><VideoCallConsolePage /></AdminRoute>} />
+            <Route path="administration/vehicles" element={<AdminRoute><VehicleEligibilityPage /></AdminRoute>} />
+            <Route path="administration/reviews" element={<AdminRoute><ReviewModerationPage /></AdminRoute>} />
+            <Route path="administration/translations" element={<AdminRoute><TranslationManagerPage /></AdminRoute>} />
+            <Route path="administration/bugs" element={<AdminRoute><BugsPage /></AdminRoute>} />
             {/* /administration/designs uses a softer gate than the other admin routes — allowed
                 for admins AND users in the design-preview allowlist (feature_flags.designPreviews
                 from /auth/me, populated by the admin-managed list at /administration/config). */}
-            <Route path="/administration/designs" element={<DesignsRoute><AdminDesignsPage /></DesignsRoute>} />
+            <Route path="administration/designs" element={<DesignsRoute><AdminDesignsPage /></DesignsRoute>} />
           </Route>
           {/* v2..v6 prototype skins — each top-level prefix is one design direction. */}
           <Route element={<ProtectedRoute><V2LayoutShell /></ProtectedRoute>}>

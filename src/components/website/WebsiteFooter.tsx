@@ -22,7 +22,7 @@ export function WebsiteFooter({ t }: { t: WebsiteCopy }) {
             <a href="#how" className="text-gray-600 hover:text-gray-900">{t.nav.howItWorks}</a>
             <a href="#features" className="text-gray-600 hover:text-gray-900">{t.nav.forDrivers}</a>
             <a href="#how" className="text-gray-600 hover:text-gray-900">{t.nav.forAgents}</a>
-            <Link to="/" className="text-gray-600 hover:text-gray-900">{t.nav.openApp}</Link>
+            <Link to="/app" className="text-gray-600 hover:text-gray-900">{t.nav.openApp}</Link>
             <Link to="/for-agents" className="text-gray-600 hover:text-gray-900">For agents</Link>
             <Link to="/passenger" className="text-emerald-700 hover:underline">
               {t.footer.passenger}

@@ -65,13 +65,13 @@ describe('AdminDesignsPage', () => {
     }
   });
 
-  it('back link points to Home (was "/administration" — now "/" so the page is reachable from the Home tile)', () => {
+  it('back link points to app Home (app now lives under /app/* after the marketing/app split)', () => {
     render(<Wrap><AdminDesignsPage /></Wrap>);
     // The "Home" back link sits at the top of the page; design-row labels like
     // "Home (dashboard)" and "Home cards + live tracking" also match /home/i, so use an
     // exact-name regex (^Home$) to pick out just the back link.
     const back = screen.getByRole('link', { name: /^Home$/ });
-    expect(back).toHaveAttribute('href', '/');
+    expect(back).toHaveAttribute('href', '/app');
   });
 
   it('scrolls the window to top on mount (the page is reached from the Home tile; users expect to land at the top)', () => {

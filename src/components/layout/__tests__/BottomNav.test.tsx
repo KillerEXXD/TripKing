@@ -48,7 +48,7 @@ describe('BottomNav', () => {
 
   it('marks the tab matching the current path as current', () => {
     setUser(driver);
-    renderNav('/trips');
+    renderNav('/app/trips');
     expect(screen.getByRole('button', { name: /find trips/i })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('button', { name: /^home$/i })).not.toHaveAttribute('aria-current');
   });
@@ -98,10 +98,10 @@ describe('BottomNav', () => {
   it('navigates when a tab is tapped', () => {
     setUser(driver);
     render(
-      <MemoryRouter initialEntries={['/']}>
+      <MemoryRouter initialEntries={['/app']}>
         <Routes>
-          <Route path="/" element={<><BottomNav /><div>home content</div></>} />
-          <Route path="/trips" element={<div>trips content</div>} />
+          <Route path="/app" element={<><BottomNav /><div>home content</div></>} />
+          <Route path="/app/trips" element={<div>trips content</div>} />
         </Routes>
       </MemoryRouter>,
     );

@@ -100,7 +100,7 @@ export function AdminDesignsPage() {
     <main className="mx-auto max-w-2xl space-y-5 p-6">
       {/* Back returns to Home (the Design Previews tile is on Home). For admins who reached
           this from /administration, browser back still works. */}
-      <Link to="/" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <Link to="/app" className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Home
       </Link>
       <header>
