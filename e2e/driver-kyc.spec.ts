@@ -15,16 +15,16 @@ test.describe('driver Get-verified flow', () => {
     const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'pending' });
     await loginAs(page, driver);
 
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.getByRole('link', { name: /get verified to start earning/i })).toBeVisible();
 
-    await page.goto('/profile');
+    await page.goto('/app/profile');
     await expect(page.getByRole('heading', { name: /get verified to start earning/i })).toBeVisible();
     for (const step of ['Your details', 'Identity documents', 'Add your vehicle', 'Vehicle photos & papers', 'Video verification']) {
       await expect(page.getByText(step, { exact: true })).toBeVisible();
     }
 
-    await page.goto('/verify/documents');
+    await page.goto('/app/verify/documents');
     await expect(page.getByRole('heading', { name: 'Identity documents' })).toBeVisible();
     await expect(page.getByText('Driving licence')).toBeVisible();
     await expect(page.getByText('Licence number')).toBeVisible();
@@ -40,10 +40,10 @@ test.describe('driver Get-verified flow', () => {
     await mintVehicle(request, driver.token);
     await loginAs(page, driver);
 
-    await page.goto('/');
+    await page.goto('/app');
     await expect(page.getByRole('link', { name: /get verified to start earning/i })).toHaveCount(0);
 
-    await page.goto('/profile');
+    await page.goto('/app/profile');
     await expect(page.getByText(/verified — you can apply to and post trips/i)).toBeVisible();
   });
 });

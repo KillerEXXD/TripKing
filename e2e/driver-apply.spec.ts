@@ -20,11 +20,11 @@ test.describe('driver apply flow', () => {
     await mintVehicle(request, driver.token);
     await loginAs(page, driver);
 
-    await page.goto('/trips');
+    await page.goto('/app/trips');
     await page.waitForLoadState('networkidle');
     await expect(page.getByRole('heading', { name: /open trips/i })).toBeVisible({ timeout: 10_000 });
 
-    await page.goto(`/trips/${tripId}`);
+    await page.goto(`/app/trips/${tripId}`);
     await page.waitForLoadState('networkidle');
     await expect(page).toHaveURL(new RegExp(`/trips/${tripId}$`));
 

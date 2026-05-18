@@ -210,16 +210,16 @@ export async function stubApi(page: Page, config: StubConfig = {}): Promise<void
 }
 
 async function signInWithRole(page: Page, localPhone: string): Promise<void> {
-  await page.goto('/signin');
+  await page.goto('/app/signin');
   await page.getByLabel('Mobile number').fill(localPhone);
   await page.getByRole('button', { name: /send otp/i }).click();
   await page.getByLabel('OTP code').fill('123456');
   await page.getByRole('button', { name: /verify & continue/i }).click();
-  // After verify, the app navigates away from /signin — it may land on /onboarding
-  // (explicit post-verify navigate) or /  (re-render after isAuthenticated flips).
+  // After verify, the app navigates away from /app/signin — it may land on /app/onboarding
+  // (explicit post-verify navigate) or /app (re-render after isAuthenticated flips).
   // Either is fine; the specs goto() the screen they actually care about next.
-  await page.waitForURL((url) => !url.pathname.startsWith('/signin'));
-  await page.goto('/');
+  await page.waitForURL((url) => !url.pathname.startsWith('/app/signin'));
+  await page.goto('/app');
 }
 
 export const signInAsDriver = (page: Page) => signInWithRole(page, '9876500000');

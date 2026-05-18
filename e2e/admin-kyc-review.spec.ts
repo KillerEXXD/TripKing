@@ -21,7 +21,7 @@ test.describe('admin KYC review flow', () => {
     await setKyc(request, admin.token, 'driver', driver.driverId, 'ready_for_approval');
     await loginAs(page, admin);
 
-    await page.goto(`/administration/kyc/driver/${driver.driverId}`);
+    await page.goto(`/app/administration/kyc/driver/${driver.driverId}`);
 
     const approveBtn = page.getByRole('button', { name: 'Approve', exact: true });
     await expect(approveBtn).toBeEnabled({ timeout: 10_000 });
