@@ -25,7 +25,7 @@ test.describe('Referral program — Qase mapping demo', () => {
     const admin = await mintAdmin(request);
     const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, driver);
-    await page.goto('/referrals');
+    await page.goto('/app/referrals');
 
     // The /referrals page was rebuilt to match the tour prototype — H1 is "Refer & earn" with
     // a short subtitle. When the spec §22 verbatim copy is restored, tighten the regex.
@@ -42,7 +42,7 @@ test.describe('Referral program — Qase mapping demo', () => {
     const admin = await mintAdmin(request);
     const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, driver);
-    await page.goto('/referrals');
+    await page.goto('/app/referrals');
 
     // Stats row + page chrome are visible for a brand-new account (referral code generated
     // on signup; the page renders the dashboard scaffold even with zero earnings).

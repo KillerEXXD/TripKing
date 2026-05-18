@@ -19,7 +19,7 @@ test.describe('PII gating — vacancies list (pre-reveal)', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
 
-    await page.goto('/vacancies');
+    await page.goto('/app/vacancies');
 
     // The just-posted vacancy shows the driver's auto-generated handle (something like AHANDLE0…).
     // It MUST NOT include the driver's stored display_name (which we prefixed `e2e-driver-…`).
@@ -39,7 +39,7 @@ test.describe('PII gating — vacancies list (pre-reveal)', () => {
     const { tripId } = await postTrip(request, agent.token);
     await loginAs(page, agent);
 
-    await page.goto('/vacancies');
+    await page.goto('/app/vacancies');
     await page.waitForLoadState('networkidle');
 
     // Open the first vacancy's invite dialog (parallel tests post many rows; the just-posted

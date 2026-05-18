@@ -15,7 +15,7 @@ test.describe('sign-in OTP flow', () => {
     const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
     const localPhone = driver.phone.replace(/^\+91/, ''); // form takes the 10-digit local part
 
-    await page.goto('/signin');
+    await page.goto('/app/signin');
 
     // Stage 1 — phone form
     const phone = page.getByLabel('Mobile number');
@@ -36,10 +36,10 @@ test.describe('sign-in OTP flow', () => {
     await expect(verifyBtn).toBeEnabled();
     await verifyBtn.click();
 
-    // Lands somewhere authenticated (either /onboarding or / — both are valid;
+    // Lands somewhere authenticated (either /app/onboarding or /app — both are valid;
     // the race between the explicit post-verify navigate and the inline auth
-    // redirect can go either way, but neither is /signin).
-    await page.waitForURL((url) => !url.pathname.startsWith('/signin'));
-    expect(new URL(page.url()).pathname).not.toBe('/signin');
+    // redirect can go either way, but neither is /app/signin).
+    await page.waitForURL((url) => !url.pathname.startsWith('/app/signin'));
+    expect(new URL(page.url()).pathname).not.toBe('/app/signin');
   });
 });

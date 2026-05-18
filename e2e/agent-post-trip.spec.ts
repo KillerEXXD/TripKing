@@ -18,7 +18,7 @@ test.describe('agent post-trip flow', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
 
-    await page.goto('/trips/new');
+    await page.goto('/app/trips/new');
     await expect(page).toHaveURL(/\/trips\/new$/);
     // Verified agent reaches the form (unverified ones would be intercepted by the KYC gate).
     await expect(page.locator('body').first()).toBeVisible();
@@ -45,7 +45,7 @@ test.describe('agent post-trip flow', () => {
     await postTrip(request, agent.token); // mints a fresh open trip (createdAt = now)
     await loginAs(page, agent);
 
-    await page.goto('/posted-trips');
+    await page.goto('/app/posted-trips');
     await page.waitForLoadState('networkidle');
 
     // The badge has aria-label="Newly posted trip" + visible text "NEW". Use the aria-label

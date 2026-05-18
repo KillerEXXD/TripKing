@@ -68,7 +68,7 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
-    await page.goto('/trips/new');
+    await page.goto('/app/trips/new');
 
     const oneWay = page.getByRole('tab', { name: /one-way/i });
     const roundTrip = page.getByRole('tab', { name: /round-trip/i });
@@ -83,7 +83,7 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
-    await page.goto('/trips/new');
+    await page.goto('/app/trips/new');
 
     await page.getByRole('tab', { name: /round-trip/i }).click();
     await expect(page.getByText(/Round-trip plan/i)).toBeVisible();
@@ -95,7 +95,7 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
-    await page.goto('/trips/new');
+    await page.goto('/app/trips/new');
 
     await page.getByRole('tab', { name: /multi-way/i }).click();
     await expect(page.getByText(/Multi-way itinerary/i)).toBeVisible();
