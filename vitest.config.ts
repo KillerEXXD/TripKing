@@ -51,9 +51,11 @@ export default defineConfig({
     isolate: true,
     // v8 coverage instrumentation slows React + jsdom renders roughly 10x on Windows. A test
     // that completes in ~500 ms uninstrumented can take 4–6 s under coverage, which trips the
-    // default 5 s ceiling on the Husky pre-push gate. 15 s gives enough headroom for the slowest
-    // page-render tests (AdminDesignsPage renders ~60 <Link>s) without hiding genuinely runaway
-    // tests. `npm run test:run` (no coverage) is unaffected.
-    testTimeout: 15_000,
+    // default 5 s ceiling on the Husky pre-push gate. We were at 15 s but AdminReferralsPage +
+    // a handful of other heavy-render tests still hit the ceiling intermittently under coverage
+    // parallel-forks contention on Windows. 30 s gives ~2x more headroom — still well short of
+    // anything that would hide a genuine infinite loop. `npm run test:run` (no coverage) is
+    // unaffected.
+    testTimeout: 30_000,
   },
 });
