@@ -7,6 +7,7 @@ import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { Button, Card, PriorityCard } from '@/components/ui';
 import { AGENT_VERIFICATION_STEPS, GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
+import { RecentReviewsCard } from '@/components/home/RecentReviewsCard';
 import { InstallAppCard } from '@/components/layout/InstallAppCard';
 import { HomeTileRow } from '@/components/home/HomeTileRow';
 import { WalletPill } from '@/components/wallet/WalletPill';
@@ -180,6 +181,8 @@ function AgentHome({ agent }: { agent: Agent }) {
         {inProgressTrips.length > 0 ? <TripsInProgressCard trips={inProgressTrips} /> : null}
         {needsActionTrips.length > 0 ? <NeedsActionCard trips={needsActionTrips} totalApplicants={needsActionApplicants} /> : null}
         <InvitesSentCard trips={myPosts} />
+
+        {user ? <RecentReviewsCard userId={user.id} /> : null}
 
         <PriorityCard
           to="/trips/new"

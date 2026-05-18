@@ -128,6 +128,10 @@ async function syncVacanciesForTrip(
   tripId: string,
   opts: { driverId?: string | null; pickupAt?: string | null; expectedEndAt?: string | null } = {},
 ): Promise<void> {
+  // Drivers whose vacancy row was touched — invalidated below so the agent's
+  // /vacancies?status=active list (90s shared cache) drops the stale 'active' entry
+  // immediately instead of leaking it for up to a minute. Fix for Qase D5 (V2).
+  const touchedDriverIds = new Set<string>();
   try {
     if (action === 'accept') {
       if (!opts.driverId || !opts.pickupAt) return;
@@ -135,41 +139,61 @@ async function syncVacanciesForTrip(
       // Falls back to pickup_at if expectedEndAt is missing (defensive — trips.expected_end_at
       // has been NOT NULL since migration 024).
       const endIso = opts.expectedEndAt ?? opts.pickupAt;
-      await db
+      const { data: updated } = await db
         .from('vacancies')
         .update({ status: 'on_trip', linked_trip_id: tripId, updated_at: new Date().toISOString() })
         .eq('driver_id', opts.driverId)
         .eq('status', 'active')
         .lte('available_from', opts.pickupAt)
-        .or(`available_until.is.null,available_until.gte.${endIso}`);
+        .or(`available_until.is.null,available_until.gte.${endIso}`)
+        .select('driver_id');
+      for (const r of (updated ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
       return;
     }
     if (action === 'start') {
-      await db
+      const { data: updated } = await db
         .from('vacancies')
         .update({ status: 'expired', updated_at: new Date().toISOString() })
         .eq('linked_trip_id', tripId)
-        .eq('status', 'on_trip');
+        .eq('status', 'on_trip')
+        .select('driver_id');
+      for (const r of (updated ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
       return;
     }
     // 'revert' — trip cancelled or driver unselected after accepting.
     const nowIso = new Date().toISOString();
     // window still in the future → back to 'active'
-    await db
+    const { data: revived } = await db
       .from('vacancies')
       .update({ status: 'active', linked_trip_id: null, updated_at: nowIso })
       .eq('linked_trip_id', tripId)
       .eq('status', 'on_trip')
-      .or(`available_until.is.null,available_until.gt.${nowIso}`);
+      .or(`available_until.is.null,available_until.gt.${nowIso}`)
+      .select('driver_id');
+    for (const r of (revived ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
     // anything left is past-window → expire it (still drop the link)
-    await db
+    const { data: expiredRows } = await db
       .from('vacancies')
       .update({ status: 'expired', linked_trip_id: null, updated_at: nowIso })
       .eq('linked_trip_id', tripId)
-      .eq('status', 'on_trip');
+      .eq('status', 'on_trip')
+      .select('driver_id');
+    for (const r of (expiredRows ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
   } catch (e) {
     // Side-effect: do not fail the parent request. withTiming will surface to Sentry if needed.
     console.error('syncVacanciesForTrip failed', { action, tripId, error: (e as Error)?.message });
+  } finally {
+    if (touchedDriverIds.size > 0) {
+      try {
+        cacheDeletePattern('vacancies:*');
+        await Promise.all([
+          sharedCacheInvalidateEntity('vacancy', 'list-public'),
+          ...[...touchedDriverIds].map((did) => sharedCacheInvalidateEntity('vacancy', `list-driver-${did}`)),
+        ]);
+      } catch (e) {
+        console.error('syncVacanciesForTrip cache invalidation failed', { action, tripId, error: (e as Error)?.message });
+      }
+    }
   }
 }
 

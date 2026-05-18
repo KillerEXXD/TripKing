@@ -18,6 +18,9 @@ vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn((
 // useReferral. Stub the whole component for these tests — its own coverage
 // lives in src/components/home/__tests__/HomeTileRow.test.tsx.
 vi.mock('@/components/home/HomeTileRow', () => ({ HomeTileRow: () => <div>home tile row</div> }));
+// RecentReviewsCard uses useDriverReviews (TanStack Query). Stub it — the card has its
+// own coverage in src/components/home/__tests__/RecentReviewsCard.test.tsx.
+vi.mock('@/components/home/RecentReviewsCard', () => ({ RecentReviewsCard: () => <div>recent reviews card</div> }));
 vi.mock('@/components/layout/InstallAppCard', () => ({ InstallAppCard: () => <div>install card</div> }));
 vi.mock('@/components/wallet/WalletPill', () => ({ WalletPill: () => <div>wallet pill</div> }));
 
