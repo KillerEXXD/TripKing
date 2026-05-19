@@ -230,8 +230,16 @@ type WaypointPlan = {
   to_place_id: string | null;
 };
 
+// When the agent doesn't set an `arrive_at` on the destination waypoint, expected_end_at
+// is derived from the trip's `expected_distance_km` at this average speed, plus a buffer
+// for pickup/drop. Picked to match Indian highway reality (with stops). Could move to
+// app_settings if the marketplace ever needs per-region tuning.
+const FALLBACK_AVG_SPEED_KMH = 40;
+const FALLBACK_BUFFER_HOURS = 1;
+const FALLBACK_MIN_TRIP_HOURS = 1;
+
 /** Parse + validate the waypoint shape from a POST body. Returns a Response on failure. */
-async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAtIso: string): Promise<WaypointPlan | Response> {
+async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAtIso: string, distanceKm: number): Promise<WaypointPlan | Response> {
   const tripType = (typeof body.trip_type === 'string' && ['one_way', 'round_trip', 'multi_way'].includes(body.trip_type) ? body.trip_type : 'one_way') as TripType;
 
   // Either accept `waypoints[]` directly, or synthesise from legacy from_*/to_* (one_way only).
@@ -286,7 +294,7 @@ async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAt
         arriveAt = a;
       }
       // arrive_at is optional for intermediate AND final waypoints — when the final's is null,
-      // expected_end_at falls back to pickup_at + 1 day (or the body-supplied expected_end_at).
+      // expected_end_at falls back to the distance-based estimate below (or the body-supplied value).
     }
     const notes = typeof w.notes === 'string' ? w.notes : null;
     try { assertNoPhones(notes, `waypoints[${i}].notes`); } catch (e) {
@@ -305,9 +313,19 @@ async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAt
     });
   }
 
-  // expected_end_at: body value > computed-from-last-waypoint > pickup_at + 1d
+  // expected_end_at: body value > computed-from-last-waypoint > distance-based estimate.
+  // The distance-based estimate replaces an older +24h fallback that made auto-invite
+  // useless: vacancies whose `available_until` ended even a few hours short of pickup+24h
+  // were excluded, so 4-hour Vellore→Chennai trips matched almost no real-world drivers
+  // (memory: vacancy-time-bounds-must-mirror). Distance + avg speed + 1h buffer gives a
+  // far more realistic window; vacancies that genuinely cover the drive now match.
   const lastWp = waypoints[waypoints.length - 1];
-  const computedEndMs = lastWp.arrive_at ? new Date(lastWp.arrive_at).getTime() + lastWp.wait_minutes * 60_000 : pickupMs + 86_400_000;
+  const fallbackDriveMs = distanceKm > 0
+    ? Math.max(FALLBACK_MIN_TRIP_HOURS, distanceKm / FALLBACK_AVG_SPEED_KMH + FALLBACK_BUFFER_HOURS) * 3600_000
+    : 86_400_000; // distance unknown — keep the old open-ended fallback as a safety net.
+  const computedEndMs = lastWp.arrive_at
+    ? new Date(lastWp.arrive_at).getTime() + lastWp.wait_minutes * 60_000
+    : pickupMs + fallbackDriveMs;
   const bodyEnd = typeof body.expected_end_at === 'string' ? body.expected_end_at : null;
   const endIso = bodyEnd ?? new Date(computedEndMs).toISOString();
   const endMs = new Date(endIso).getTime();
@@ -1042,7 +1060,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     }
     const pickupAtIso = String(b.pickup_at);
     // Resolve trip shape: a `waypoints[]` array (new style) OR legacy from_city_id/to_city_id (synthesised as a 2-waypoint one_way).
-    const plan = await buildWaypointPlan(db, b, pickupAtIso);
+    const plan = await buildWaypointPlan(db, b, pickupAtIso, distance);
     if (plan instanceof Response) return plan;
     if (typeof b.hide_passenger_phone !== 'boolean') {
       return fail('VALIDATION', 'hide_passenger_phone (a boolean) is required', 422);
