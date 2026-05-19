@@ -3,6 +3,7 @@ import { PageHeader, PageShell } from '@/components/layout';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { useAuth } from '@/contexts/AuthContext';
 import { useReferralDashboard } from '@/hooks/useReferral';
+import { useAppBack } from '@/hooks/useAppBack';
 import { ReferralCodeBlock } from '@/components/referral/ReferralCodeBlock';
 import { EarningsStatsRow } from '@/components/referral/EarningsStatsRow';
 import { TierProgressCard } from '@/components/referral/TierProgressCard';
@@ -39,6 +40,7 @@ function roleFor(userRole: string | undefined): ReferralRole {
  *   9. ReferralTermsAndFAQ
  */
 export function ReferralsPage() {
+  const back = useAppBack();
   const { user } = useAuth();
   const role = roleFor(user?.role);
   const q = useReferralDashboard();
@@ -48,7 +50,7 @@ export function ReferralsPage() {
       <PageHeader
         title="Refer & earn"
         subtitle="Invite drivers and agents — earn from every eligible paid trip they run."
-        backTo="/app"
+        onBack={back}
       />
 
       {/* Render the hero FIRST, regardless of the dashboard query state — it has its own

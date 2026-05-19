@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ChevronRight, Plus, Send, Share2, Sparkles, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrips } from '@/hooks/useTrips';
+import { useAppBack } from '@/hooks/useAppBack';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { AgentInProgressTripCard } from '@/components/trip/AgentInProgressTripCard';
 import { PageHeader, PageShell, ScopedPageHeader } from '@/components/layout';
@@ -210,6 +211,7 @@ export function PostedTripsPage() {
   const urlScope = searchParams.get('scope');
   const scope: Scope | null = isScope(urlScope) ? urlScope : null;
   const from = searchParams.get('from') ?? '/app';
+  const back = useAppBack();
   const setFilter = (next: Filter) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'open') params.delete('status');
@@ -256,7 +258,7 @@ export function PostedTripsPage() {
         <ScopedPageHeader
           title={SCOPE_META[scope].title}
           subtitle={subtitle}
-          backTo={from}
+          onBack={back}
           tone="blue"
           icon={<Send className="size-4" aria-hidden />}
         />

@@ -33,7 +33,7 @@ function renderQueue(props: Partial<Parameters<typeof QueueListPage>[0]> = {}) {
             </>
           }
         />
-        <Route path="/" element={<div>home page</div>} />
+        <Route path="/app" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -93,7 +93,7 @@ describe('QueueListPage', () => {
       <MemoryRouter initialEntries={['/app/queue/test']}>
         <Routes>
           <Route path="/app/queue/test" element={<Harness />} />
-          <Route path="/" element={<div>home page</div>} />
+          <Route path="/app" element={<div>home page</div>} />
         </Routes>
       </MemoryRouter>,
     );

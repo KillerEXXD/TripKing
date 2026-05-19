@@ -5,6 +5,7 @@ import { ScopedPageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDeclineTripInvite, useMyApplications, useTrips, useWithdrawApplication } from '@/hooks/useTrips';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useCancelVacancy, useMyActiveVacancies, useMyExpiredVacancies } from '@/hooks/useVacancies';
@@ -337,6 +338,7 @@ export function DriverActivityPage() {
   const urlScope = searchParams.get('scope');
   const scope: Scope | null = isScope(urlScope) ? urlScope : null;
   const fromParam = searchParams.get('from') ?? '/app';
+  const back = useAppBack();
   const urlTab = searchParams.get('tab');
   const tab: Tab = isTab(urlTab) ? urlTab : 'driving';
   const setTab = (next: Tab) => {
@@ -429,7 +431,7 @@ export function DriverActivityPage() {
         <ScopedPageHeader
           title="Invites received"
           subtitle={invitedQuery.data ? `${inviteCount} trip${inviteCount === 1 ? '' : 's'} waiting for your decision` : 'Loading invitations…'}
-          backTo={fromParam}
+          onBack={back}
           tone="indigo"
           icon={<Mail className="size-4" aria-hidden />}
         />

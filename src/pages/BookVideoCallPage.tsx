@@ -5,8 +5,9 @@
  * `kyc_status` → video_pending; an admin runs the call.
  */
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/layout';
+import { useAppBack } from '@/hooks/useAppBack';
 import { CalendarClock, ShieldCheck, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffectiveRole } from '@/stores/roleViewStore';
@@ -57,7 +58,7 @@ function SlotPicker({ onPick, disabled }: { onPick: (iso: string) => void; disab
 }
 
 export function BookVideoCallPage() {
-  const navigate = useNavigate();
+  const back = useAppBack('/app/profile');
   const effectiveRole = useEffectiveRole();
   const isAgent = effectiveRole === 'trip_manager';
   const driverQuery = useMyDriver(!isAgent);
@@ -92,7 +93,7 @@ export function BookVideoCallPage() {
 
   return (
     <div>
-      <Header onBack={() => navigate(-1)} />
+      <Header onBack={back} />
       <div className="space-y-4 px-4 py-4">
         {kyc === 'approved' && (
           <StatusBanner tone="success" icon={<ShieldCheck />} title="You’re verified — nothing more to do here." />

@@ -26,7 +26,7 @@ function renderPage() {
     <MemoryRouter initialEntries={['/app/my-trips/awaiting']}>
       <Routes>
         <Route path="/app/my-trips/awaiting" element={<AwaitingDecisionPage />} />
-        <Route path="/" element={<div>home page</div>} />
+        <Route path="/app" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,
   );

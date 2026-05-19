@@ -10,6 +10,7 @@ import { ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useSubmitAgentKycDocs, useSubmitDriverKycDocs } from '@/hooks/useDrivers';
+import { useAppBack } from '@/hooks/useAppBack';
 import { getAgentKycDocUploadUrl, getDriverKycDocUploadUrl } from '@/lib/api/services/drivers';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Button, Card, Input, StatusBanner } from '@/components/ui';
@@ -26,9 +27,10 @@ function todayIso(): string {
 }
 
 function PageWrap({ children }: { children: React.ReactNode }) {
+  const back = useAppBack('/app/profile');
   return (
     <PageShell>
-      <PageHeader title="Identity documents" backTo="/app/profile" />
+      <PageHeader title="Identity documents" onBack={back} />
       {children}
     </PageShell>
   );

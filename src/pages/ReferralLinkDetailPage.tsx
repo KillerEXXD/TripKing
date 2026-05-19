@@ -4,6 +4,7 @@ import { PageHeader, PageShell } from '@/components/layout';
 import { Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { useReferralLink } from '@/hooks/useReferral';
+import { useAppBack } from '@/hooks/useAppBack';
 import { formatINR } from '@/lib/utils';
 
 function rupees(paise: number): string {
@@ -15,13 +16,14 @@ function rupees(paise: number): string {
  * contribution to your earnings (date, route, fee source, your accrual).
  */
 export function ReferralLinkDetailPage() {
+  const back = useAppBack('/app/referrals');
   const { linkId } = useParams();
   const q = useReferralLink(linkId);
 
   const referredName = q.data?.link.referredUser?.displayName ?? 'Referred user';
   return (
     <PageShell>
-      <PageHeader title={referredName} backTo="/app/referrals" />
+      <PageHeader title={referredName} onBack={back} />
 
       {q.isPending ? (
         <LoadingSkeleton rows={5} />

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { useAppBack } from '@/hooks/useAppBack';
 import { ArrowLeft, MapPin, Sparkles } from 'lucide-react';
 import { useInfiniteTrips } from '@/hooks/useTrips';
 import { useMyDriver } from '@/hooks/useDrivers';
@@ -64,7 +65,7 @@ const chipClass = 'h-8 shrink-0 rounded-pill border border-border bg-surface px-
 const DEFAULT_RADIUS_KM = 25;
 
 export function TripFeedPage() {
-  const navigate = useNavigate();
+  const back = useAppBack();
   const [fromCityId, setFromCityId] = useState('');
   const [carTypeId, setCarTypeId] = useState('');
   const [near, setNear] = useState<NearRadius | null>(null);
@@ -102,7 +103,7 @@ export function TripFeedPage() {
   return (
     <div className="mx-auto max-w-md">
       <header className="flex items-center gap-3 bg-surface px-4 py-3 shadow-header">
-        <button type="button" aria-label="Back" onClick={() => navigate(-1)} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+        <button type="button" aria-label="Back" onClick={back} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>
         <div className="min-w-0 flex-1">

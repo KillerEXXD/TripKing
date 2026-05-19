@@ -216,8 +216,8 @@ describe('PostedTripsPage', () => {
     // Title swap + scope-specific subtitle (2 trips · 3 pending invites)
     expect(screen.getByText('Invites sent')).toBeInTheDocument();
     expect(screen.getByText(/2 trips · 3 pending invites/i)).toBeInTheDocument();
-    // Back arrow renders + points to /app
-    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/app');
+    // Back arrow renders (destination is controlled by useAppBack; covered in that hook's unit tests).
+    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
     // Filter chip strip is gone
     expect(screen.queryByRole('button', { name: /^all/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^invited/i })).toBeNull();

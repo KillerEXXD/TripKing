@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEffectiveRole } from '@/stores/roleViewStore';
 import { useMyAgent, useMyDriver, useUpdateAgent, useUpdateDriver } from '@/hooks/useDrivers';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { Badge, Button, Card, Input } from '@/components/ui';
@@ -300,6 +301,7 @@ function AgentProfile({ agent, onSignOut, signingOut }: { agent: Agent; onSignOu
 export function ProfilePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const back = useAppBack();
   const effectiveRole = useEffectiveRole();
   const [signingOut, setSigningOut] = useState(false);
   const isDriver = effectiveRole === 'driver';
@@ -322,7 +324,7 @@ export function ProfilePage() {
   return (
     <main className="mx-auto max-w-md space-y-4 p-4">
       <h1 className="sr-only">Profile</h1>
-      <button type="button" onClick={() => navigate(-1)} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <button type="button" onClick={back} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Back
       </button>
       {/* Header shell from useAuth() — paints the LCP element immediately instead of

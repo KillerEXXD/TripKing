@@ -4,6 +4,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { AlertTriangle, ArrowLeft, BellRing, Car, ChevronDown, ChevronRight, FileText, Info, Loader2, Route, Users, Wallet, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostTrip, useTrip, useTripMatchPreview, useUpdateTripDetails } from '@/hooks/useTrips';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useMyAgent, useMyDriver } from '@/hooks/useDrivers';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
@@ -96,6 +97,7 @@ function Field({ label, error, hint, children }: { label: string; error?: string
  */
 export function PostTripPage() {
   const navigate = useNavigate();
+  const back = useAppBack();
   // `/app/trips/:id/edit` reuses this page in edit mode. When `:id` is set, we hydrate the
   // form from the existing trip and PATCH instead of POST on submit. The entry buttons
   // (Home priority card + trip-detail page) gate on `status ∈ {open, has_applicants}`
@@ -497,7 +499,7 @@ export function PostTripPage() {
   if (myKycStatus && myKycStatus !== 'approved') {
     return (
       <div className="mx-auto max-w-md p-4">
-        <button type="button" onClick={() => navigate('/app')} className="-ml-1 mb-3 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <button type="button" onClick={back} className="-ml-1 mb-3 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden /> Back
         </button>
         <KycGateNotice heading="Get verified to post a trip" body="Once your account is verified you can post commercial trips and assign drivers. Your profile has a checklist that walks you through it." />
@@ -520,7 +522,7 @@ export function PostTripPage() {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="sticky top-0 z-10 bg-surface shadow-header">
         <div className="flex items-center gap-2 px-4 py-3">
-          <button type="button" aria-label="Back" onClick={() => (step === 1 ? navigate('/app') : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <button type="button" aria-label="Back" onClick={() => (step === 1 ? back() : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
             <ArrowLeft className="size-5" aria-hidden />
           </button>
           <div className="min-w-0">

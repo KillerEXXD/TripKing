@@ -50,7 +50,7 @@ function setData(data: MyApplication[]) {
   vi.mocked(useMyApplications).mockReturnValue({ isPending: false, isError: false, data, refetch: vi.fn() } as never);
 }
 
-function renderAt(state?: { from?: 'home' | 'my-trips' }) {
+function renderAt(state?: { from?: string }) {
   return render(
     <MemoryRouter initialEntries={[{ pathname: '/app/my-trips/review', state: state ?? null }]}>
       <Routes>
@@ -83,26 +83,26 @@ describe('ReviewSelectionsPage', () => {
     expect(screen.getByText(/no trips to review/i)).toBeInTheDocument();
   });
 
-  it('Back routes to / when state.from === "home"', () => {
+  it('Back routes to /app when state.from === "/app"', () => {
     setData([]);
-    renderAt({ from: 'home' });
+    renderAt({ from: '/app' });
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.getByText('home page')).toBeInTheDocument();
   });
 
-  it('Back routes to /my-trips when state.from === "my-trips"', () => {
+  it('Back routes to /app/my-trips when state.from === "/app/my-trips"', () => {
     setData([]);
-    renderAt({ from: 'my-trips' });
+    renderAt({ from: '/app/my-trips' });
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.getByText('my trips page')).toBeInTheDocument();
   });
 
-  it('Back on a deep-link (no origin state) falls back to history (navigate(-1))', () => {
+  it('Back on a deep-link (no origin state) falls back to the page-specific home (/app/my-trips)', () => {
     setData([]);
     renderAt();
-    // MemoryRouter starts at /my-trips/review with no prior entry; navigate(-1) is a no-op
-    // and we should stay on the review page.
+    // No ?from= and no state.from. MemoryRouter starts with history length 1, so useAppBack
+    // falls through to its `fallback` argument — `/app/my-trips` for this page.
     fireEvent.click(screen.getByRole('button', { name: /back/i }));
-    expect(screen.getByRole('heading', { name: /trips to review/i })).toBeInTheDocument();
+    expect(screen.getByText('my trips page')).toBeInTheDocument();
   });
 });

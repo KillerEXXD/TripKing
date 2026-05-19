@@ -151,7 +151,7 @@ function AwaitingMyDecisionCard({ apps }: { apps: MyApplication[] }) {
   return (
     <PriorityCard
       to={href}
-      linkState={{ from: 'home' }}
+      linkState={{ from: '/app' }}
       tone="indigo"
       icon={<Sparkles className="size-3.5" aria-hidden />}
       label={`${apps.length} trip${apps.length === 1 ? '' : 's'} waiting for your decision`}

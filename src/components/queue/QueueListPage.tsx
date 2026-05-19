@@ -44,7 +44,7 @@ export function QueueListPage<T>({
   emptyTitle,
   emptyMessage,
   emptyAction,
-  backTo = '/',
+  backTo = '/app',
   tone,
 }: QueueListPageProps<T>) {
   const navigate = useNavigate();

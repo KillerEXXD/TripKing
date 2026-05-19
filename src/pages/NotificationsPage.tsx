@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { AlarmClock, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, FileEdit, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
+import { useAppBack } from '@/hooks/useAppBack';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -86,6 +87,7 @@ function NotificationRow({ n, onRead }: { n: Notification; onRead: (id: string) 
  * `useMarkAllNotificationsRead` (the unread badge elsewhere reflects the change).
  */
 export function NotificationsPage() {
+  const back = useAppBack();
   const notifsQuery = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAll = useMarkAllNotificationsRead();
@@ -101,7 +103,7 @@ export function NotificationsPage() {
       <PageHeader
         title="Notifications"
         subtitle={subtitle}
-        backTo="/app"
+        onBack={back}
         right={
           <Button variant="outline" size="sm" disabled={unread === 0 || markAll.isPending} onClick={() => markAll.mutate()}>
             {markAll.isPending ? 'Marking…' : 'Mark all read'}

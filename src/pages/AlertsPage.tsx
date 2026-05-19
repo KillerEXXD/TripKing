@@ -1,6 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { ArrowLeft, Bell, MapPin, Plus } from 'lucide-react';
 import { useMyAlerts } from '@/hooks/useAlerts';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Badge, Button, Card } from '@/components/ui';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR } from '@/lib/utils';
@@ -61,7 +62,7 @@ function Section({ title, dotClass, alerts }: { title: string; dotClass: string;
  * to the alert detail (where pause / resume / delete live). New alerts at `/app/alerts/new`.
  */
 export function AlertsPage() {
-  const navigate = useNavigate();
+  const back = useAppBack();
   const alertsQuery = useMyAlerts();
   const alerts = alertsQuery.data ?? [];
   const active = alerts.filter((a) => a.isActive);
@@ -70,7 +71,7 @@ export function AlertsPage() {
   return (
     <div className="mx-auto max-w-md">
       <header className="sticky top-0 z-10 flex items-center gap-2 bg-surface px-4 py-3 shadow-header">
-        <button type="button" aria-label="Back" onClick={() => navigate('/app')} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+        <button type="button" aria-label="Back" onClick={back} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
           <ArrowLeft className="size-5" aria-hidden />
         </button>
         <div className="min-w-0 flex-1">
