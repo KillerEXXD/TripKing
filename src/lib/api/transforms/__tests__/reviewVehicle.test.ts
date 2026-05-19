@@ -57,10 +57,25 @@ describe('transformNotification', () => {
     expect(n.type).toBe('trip_assigned');
     expect(n.payloadJson).toEqual({ tripId: 't1' });
   });
-  it('throws on missing id/user_id/bad type', () => {
-    expect(() => transformNotification({ user_id: 'u1', display_handle: 'A1B2C3D', type: 'trip_assigned' })).toThrow();
+  it('accepts referral + withdrawal + trip_updated types', () => {
+    const types = [
+      'trip_updated',
+      'referral_signup', 'referral_verified', 'referral_qualified', 'referral_first_eligible_trip',
+      'referral_earning', 'referral_released', 'referral_cap_reached',
+      'withdrawal_requested', 'withdrawal_approved', 'withdrawal_rejected', 'withdrawal_paid',
+    ] as const;
+    for (const t of types) {
+      expect(transformNotification({ id: `n-${t}`, user_id: 'u1', type: t, title: 'x', body: 'y' }).type).toBe(t);
+    }
+  });
+  it('coerces an unknown type to "unknown" instead of throwing (forward-compat)', () => {
+    const n = transformNotification({ id: 'n', user_id: 'u1', type: 'brand_new_server_event', title: 'x', body: 'y' });
+    expect(n.type).toBe('unknown');
+    expect(n.title).toBe('x');
+  });
+  it('throws on missing id/user_id', () => {
+    expect(() => transformNotification({ user_id: 'u1', type: 'trip_assigned' })).toThrow(/no id/);
     expect(() => transformNotification({ id: 'n', type: 'trip_assigned' })).toThrow(/user_id/);
-    expect(() => transformNotification({ id: 'n', user_id: 'u1', display_handle: 'A1B2C3D', type: 'spam' })).toThrow(/bad type/);
   });
 });
 
