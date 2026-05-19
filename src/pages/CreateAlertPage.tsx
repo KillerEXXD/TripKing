@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useCreateAlert } from '@/hooks/useAlerts';
+import { useAppBack } from '@/hooks/useAppBack';
 import { carTypeHooks, cityHooks, useAppSettings } from '@/hooks/useAdminConfig';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { BellRing, Car } from 'lucide-react';
@@ -30,6 +31,7 @@ function FlowHeader({ title, onBack }: { title: string; onBack: () => void }) {
  */
 export function CreateAlertPage() {
   const navigate = useNavigate();
+  const back = useAppBack('/app/alerts');
   const createAlert = useCreateAlert();
   const citiesQuery = cityHooks.useList();
   const carTypesQuery = carTypeHooks.useList();
@@ -89,7 +91,7 @@ export function CreateAlertPage() {
   if (citiesQuery.isPending || carTypesQuery.isPending) {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader title="New alert" onBack={() => navigate('/app/alerts')} />
+        <FlowHeader title="New alert" onBack={back} />
         <div className="p-4">
           <LoadingSkeleton rows={5} />
         </div>
@@ -99,7 +101,7 @@ export function CreateAlertPage() {
   if (citiesQuery.isError || carTypesQuery.isError) {
     return (
       <div className="mx-auto max-w-md">
-        <FlowHeader title="New alert" onBack={() => navigate('/app/alerts')} />
+        <FlowHeader title="New alert" onBack={back} />
         <div className="p-4">
           <ErrorState title="Couldn't load the form" message="We need the city + car-type lists to create an alert." onRetry={() => { void citiesQuery.refetch(); void carTypesQuery.refetch(); }} />
         </div>
@@ -112,7 +114,7 @@ export function CreateAlertPage() {
 
   return (
     <div className="mx-auto max-w-md">
-      <FlowHeader title="New alert" onBack={() => navigate('/app/alerts')} />
+      <FlowHeader title="New alert" onBack={back} />
       <div className="space-y-3 p-4">
       <Card className="gap-3">
         <label className="block space-y-1">

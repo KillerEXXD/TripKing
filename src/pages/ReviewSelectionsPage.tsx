@@ -1,41 +1,30 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ChevronRight, Sparkles } from 'lucide-react';
 import { useMyApplications } from '@/hooks/useTrips';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Badge, Button, Card } from '@/components/ui';
 import { ScopedPageHeader } from '@/components/layout';
 import { EmptyState, ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { formatINR, formatKmAndDuration, formatPickupDateTime } from '@/lib/utils';
 import type { MyApplication } from '@/types';
 
-type Origin = 'home' | 'my-trips';
-function isOrigin(v: unknown): v is Origin {
-  return v === 'home' || v === 'my-trips';
-}
-
 /**
  * `/app/my-trips/review` — a driver's dedicated review list. Shows every application
  * with `status='selected'` (the agent has picked them; the driver needs to
  * Accept or Decline). The home-page "Review" card sends multi-trip drivers here.
  *
- * Back-button origin memory: the entry point passes `state.from` ('home' or
- * 'my-trips'); the header's Back routes there. Deep-links (no state) fall back
- * to `navigate(-1)`. Tapping into a trip forwards the same `from` so the trip
- * detail page's Back can chain through.
+ * Back-button origin memory is handled by useAppBack: the entry point passes
+ * `state.from` as a path (e.g. `/app` or `/app/my-trips`); the hook routes the
+ * back arrow there, or falls through to navigate(-1) / `/app/my-trips` on deep-link.
+ * Tapping into a trip forwards the same `from` so the trip detail's Back chains through.
  */
 export function ReviewSelectionsPage() {
-  const navigate = useNavigate();
+  const onBack = useAppBack('/app/my-trips');
   const location = useLocation();
-  const from = isOrigin((location.state as { from?: unknown } | null)?.from)
-    ? ((location.state as { from: Origin }).from)
-    : undefined;
+  // Forward the same `state.from` path on inner trip-detail Links so the chain continues.
+  const from = (location.state as { from?: string } | null)?.from;
   const query = useMyApplications();
   const awaiting = (query.data ?? []).filter((a) => a.status === 'selected');
-
-  function onBack() {
-    if (from === 'home') navigate('/app');
-    else if (from === 'my-trips') navigate('/app/my-trips');
-    else navigate(-1);
-  }
 
   return (
     <div className="mx-auto max-w-md">
@@ -68,14 +57,14 @@ export function ReviewSelectionsPage() {
             }
           />
         ) : (
-          awaiting.map((a) => <SelectedTripCard key={a.acceptanceId} app={a} from={from} />)
+          awaiting.map((a) => <SelectedTripCard key={a.acceptanceId} app={a} from={from ?? undefined} />)
         )}
       </div>
     </div>
   );
 }
 
-function SelectedTripCard({ app, from }: { app: MyApplication; from: Origin | undefined }) {
+function SelectedTripCard({ app, from }: { app: MyApplication; from: string | undefined }) {
   const t = app.trip;
   const state = from ? { from, via: 'review' as const } : { via: 'review' as const };
   return (

@@ -388,7 +388,7 @@ describe('DriverActivityPage', () => {
     // Scoped header
     expect(screen.getByText('Invites received')).toBeInTheDocument();
     expect(screen.getByText(/2 trips waiting for your decision/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/app');
+    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
     // No tab strip — the "All" / "Driving" / "Invited" tab buttons should NOT be present
     expect(screen.queryByRole('button', { name: /^all/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^driving/i })).toBeNull();
@@ -484,7 +484,7 @@ describe('DriverActivityPage', () => {
     // The scoped header is STILL present — proving the page didn't navigate away from the
     // scoped view (the plain `/app/my-trips` tabbed view doesn't render this header).
     expect(screen.getByText('Invites received')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/app');
+    expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
     confirmSpy.mockRestore();
   });
 

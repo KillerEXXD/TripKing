@@ -24,7 +24,7 @@ function renderQ() {
     <MemoryRouter initialEntries={['/app/queue/needs-action']}>
       <Routes>
         <Route path="/app/queue/needs-action" element={<AgentNeedsActionQueuePage />} />
-        <Route path="/" element={<div>home page</div>} />
+        <Route path="/app" element={<div>home page</div>} />
       </Routes>
     </MemoryRouter>,
   );

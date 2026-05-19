@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/layout';
 import { CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useUpdateVehicle, useVehicle } from '@/hooks/useVehicles';
+import { useAppBack } from '@/hooks/useAppBack';
 import { getVehiclePhotoUploadUrl } from '@/lib/api/services/vehicles';
 import { Button, Card, Input, StatusBanner } from '@/components/ui';
 import { FileUpload } from '@/components/form';
@@ -42,6 +43,7 @@ function Header({ onBack }: { onBack: () => void }) {
 export function VehiclePhotosPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const back = useAppBack('/app/profile');
   const vehicleQuery = useVehicle(id);
   const updateVehicle = useUpdateVehicle();
 
@@ -80,7 +82,7 @@ export function VehiclePhotosPage() {
 
   return (
     <div>
-      <Header onBack={() => navigate(-1)} />
+      <Header onBack={back} />
       <div className="space-y-4 px-4 py-4">
         <p className="text-sm text-secondary">Take clear daylight photos of the whole car. The number-plate shot should clearly show the registration number.</p>
 

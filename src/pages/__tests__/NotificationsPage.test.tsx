@@ -30,15 +30,15 @@ describe('back link', () => {
     render(<MemoryRouter><NotificationsPage /></MemoryRouter>);
   }
 
-  // The redesign moved the back affordance from a history-driven button onto
-  // <PageHeader backTo="/app">, which renders a <Link> with aria-label="Back" that
-  // always navigates to /app (the app home). We lose the "history.length" branching
-  // but gain a predictable destination + consistent visuals with every other page.
-  it('renders a Back link at the top of the page that points home', () => {
+  // The back affordance now uses useAppBack which renders a button (no href).
+  // Destination resolution is covered in src/hooks/__tests__/useAppBack.test.tsx;
+  // here we just verify the button is in the DOM and clicking it calls navigate.
+  it('renders a Back button at the top of the page', () => {
     mountWithMutations();
-    const back = screen.getByRole('link', { name: /back/i });
+    const back = screen.getByRole('button', { name: /back/i });
     expect(back).toBeInTheDocument();
-    expect(back).toHaveAttribute('href', '/app');
+    fireEvent.click(back);
+    expect(navigateSpy).toHaveBeenCalled();
   });
 });
 

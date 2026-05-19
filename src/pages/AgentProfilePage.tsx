@@ -1,7 +1,8 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout';
 import { Building2, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useAgent } from '@/hooks/useDrivers';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useDriverReviews } from '@/hooks/useReviews';
 import { useAuth } from '@/contexts/AuthContext';
 import { ReviewList } from '@/components/reviews/ReviewList';
@@ -136,13 +137,13 @@ function AgentDetail({ agent }: { agent: Agent }) {
 /** `/app/agents/:id` — a trip manager's public profile (KYC, business, reviews from drivers). Read via `useAgent`. */
 export function AgentProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const back = useAppBack();
   const agentQuery = useAgent(id);
   const notFound = !id || (agentQuery.isError && agentQuery.error instanceof ApiError && agentQuery.error.status === 404);
 
   return (
     <div className="mx-auto max-w-md">
-      <PageHeader title="Agent" onBack={() => navigate(-1)} />
+      <PageHeader title="Agent" onBack={back} />
 
       <div className="space-y-4 p-4">
         {notFound ? (

@@ -4,6 +4,7 @@ import { ChevronRight, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTrip, useTripInvites, useWithdrawTripInvite } from '@/hooks/useTrips';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Badge, Button, Card } from '@/components/ui';
 import { VerifiedBadge } from '@/components/ui/VerifiedBadge';
 import { ScopedPageHeader } from '@/components/layout';
@@ -105,9 +106,10 @@ function InvitationCard({
 export function TripInvitationsPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
-  // `?from=` overrides the default back target so the home-card → trip-invitations path
-  // walks back to home, not to /posted-trips. Matches the pattern TripDetailPage uses.
-  const backTarget = searchParams.get('from') ?? '/app/posted-trips';
+  // `?from=` overrides the default back target (home-card → trip-invitations walks back
+  // to home, not /posted-trips) — useAppBack handles the read; the fallback is the
+  // sensible default for someone who deep-linked into this page.
+  const back = useAppBack('/app/posted-trips');
   const [shareTrip, setShareTrip] = useState<Trip | null>(null);
   // Breadcrumb passed to the top trip-summary card so its "View details" link → trip detail
   // walks back HERE on the Back arrow. Preserve any existing `?from=` so the chain continues
@@ -141,7 +143,7 @@ export function TripInvitationsPage() {
       <ScopedPageHeader
         title="Invitations sent"
         subtitle={trip ? `${trip.fromCity.name} → ${trip.toCity.name} · ${trip.pendingInvitationCount} pending` : undefined}
-        backTo={backTarget}
+        onBack={back}
         tone="blue"
         icon={<Send className="size-4" aria-hidden />}
       />

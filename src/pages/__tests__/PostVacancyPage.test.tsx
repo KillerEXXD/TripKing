@@ -214,7 +214,7 @@ describe('PostVacancyPage', () => {
 
   it('the header Back arrow returns to home (not to the vacant-drivers list)', () => {
     renderPost();
-    fireEvent.click(screen.getByRole('link', { name: /back/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.getByText('home page')).toBeInTheDocument();
     expect(screen.queryByText('vacancy feed')).toBeNull();
   });
@@ -222,7 +222,7 @@ describe('PostVacancyPage', () => {
   it('the Back arrow on the KYC gate also returns to home', () => {
     setMyDriver('docs_submitted');
     renderPost();
-    fireEvent.click(screen.getByRole('link', { name: /back/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back/i }));
     expect(screen.getByText('home page')).toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Car, MapPin, Star, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useInfiniteVacancies } from '@/hooks/useVacancies';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { useTrips } from '@/hooks/useTrips';
 import { useInviteDrivers } from '@/hooks/useTrips';
@@ -261,6 +262,7 @@ function MyInvitesBadge({ invites }: { invites: VacancyInviteSummary[] }) {
  * driver action — its screen lands separately.)
  */
 export function VacanciesPage() {
+  const back = useAppBack();
   const [currentCityId, setCurrentCityId] = useState('');
   const [destinationCityId, setDestinationCityId] = useState('');
   const [near, setNear] = useState<NearRadius | null>(null);
@@ -292,7 +294,7 @@ export function VacanciesPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Vacant drivers" subtitle={subtitle} backTo="/app" />
+      <PageHeader title="Vacant drivers" subtitle={subtitle} onBack={back} />
 
       {isDriverView && myDriverId ? <IAmAvailableCard driverId={myDriverId} /> : null}
 

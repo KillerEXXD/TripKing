@@ -9,6 +9,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout';
 import { toast } from 'sonner';
 import { useAddVehicle, useUpdateVehicle, useVehicle } from '@/hooks/useVehicles';
+import { useAppBack } from '@/hooks/useAppBack';
 import { carTypeHooks, fuelTypeHooks, useAppSettings, useSeatOptions, useVehicleModelsForMake, vehicleMakeHooks } from '@/hooks/useAdminConfig';
 import { Button, Card, Input } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -24,6 +25,7 @@ export function VehicleFormPage() {
   const { id } = useParams<{ id: string }>();
   const editing = !!id;
   const navigate = useNavigate();
+  const back = useAppBack('/app/profile');
   const vehicleQuery = useVehicle(editing ? id : undefined);
   const addVehicle = useAddVehicle();
   const updateVehicle = useUpdateVehicle();
@@ -97,7 +99,7 @@ export function VehicleFormPage() {
 
   return (
     <div>
-      <Header onBack={() => navigate(-1)} title={editing ? 'Edit vehicle' : 'Add your vehicle'} />
+      <Header onBack={back} title={editing ? 'Edit vehicle' : 'Add your vehicle'} />
       <div className="space-y-4 px-4 py-4">
         <Card className="gap-4">
           <div className="grid grid-cols-2 gap-3">

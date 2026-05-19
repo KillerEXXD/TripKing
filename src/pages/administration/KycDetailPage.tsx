@@ -12,10 +12,11 @@
  *                                                                ↘ resubmit_required (→ docs re-upload → docs_submitted)
  */
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAgent, useDriver, useUpdateAgentKyc, useUpdateDriverKyc } from '@/hooks/useDrivers';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Badge, Button, Card, Input, StatusBanner } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { AdminKycChecklist, type AdminKycKind } from '@/components/admin/kyc/AdminKycChecklist';
@@ -124,7 +125,7 @@ function HeaderCard({ subject }: { subject: SubjectCommon }) {
 export function KycDetailPage() {
   const { kind: rawKind, id } = useParams<{ kind: string; id: string }>();
   const kind: Kind = rawKind === 'agent' ? 'agent' : 'driver';
-  const navigate = useNavigate();
+  const back = useAppBack('/app/administration/kyc');
 
   const driverQ = useDriver(kind === 'driver' ? id : undefined);
   const agentQ = useAgent(kind === 'agent' ? id : undefined);
@@ -154,7 +155,7 @@ export function KycDetailPage() {
 
   return (
     <main className="mx-auto max-w-2xl space-y-3 p-6">
-      <button type="button" onClick={() => navigate(-1)} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+      <button type="button" onClick={back} className="-ml-1 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
         <ArrowLeft className="size-4" aria-hidden /> Back to KYC queue
       </button>
 

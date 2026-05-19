@@ -4,6 +4,7 @@ import { PageHeader } from '@/components/layout';
 import { Pause, Play, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAlert, useDeleteAlert, useSetAlertActive } from '@/hooks/useAlerts';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Badge, Button, Card } from '@/components/ui';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { ApiError } from '@/lib/api/client';
@@ -79,13 +80,14 @@ function AlertDetail({ alert }: { alert: Alert }) {
 
 /** `/app/alerts/:id` — one saved-search alert: criteria, pause/resume, delete. */
 export function AlertDetailPage() {
+  const back = useAppBack('/app/alerts');
   const { id } = useParams<{ id: string }>();
   const alertQuery = useAlert(id);
   const notFound = !id || (alertQuery.isError && alertQuery.error instanceof ApiError && alertQuery.error.status === 404);
 
   return (
     <div className="mx-auto max-w-md">
-      <PageHeader title="Alert" backTo="/app/alerts" />
+      <PageHeader title="Alert" onBack={back} />
 
       <div className="space-y-4 p-4">
         {notFound ? (

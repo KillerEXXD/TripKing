@@ -1,5 +1,6 @@
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { PageHeader } from '@/components/layout';
+import { useAppBack } from '@/hooks/useAppBack';
 import { Car, MapPin, Phone, ShieldCheck } from 'lucide-react';
 import { useDriver } from '@/hooks/useDrivers';
 import { useDriverReviews } from '@/hooks/useReviews';
@@ -222,13 +223,13 @@ function DriverDetail({ driver }: { driver: Driver }) {
 /** `/app/drivers/:id` — a driver's public marketplace profile (rating, tags, vehicles). Read via `useDriver`. */
 export function DriverProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
+  const back = useAppBack();
   const driverQuery = useDriver(id);
   const notFound = !id || (driverQuery.isError && driverQuery.error instanceof ApiError && driverQuery.error.status === 404);
 
   return (
     <div className="mx-auto max-w-md">
-      <PageHeader title="Driver" onBack={() => navigate(-1)} />
+      <PageHeader title="Driver" onBack={back} />
 
       <div className="space-y-4 p-4">
         {notFound ? (

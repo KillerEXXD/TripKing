@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Compass, MapPin, Route, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
+import { useAppBack } from '@/hooks/useAppBack';
 import { useMyDriver } from '@/hooks/useDrivers';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
@@ -45,6 +46,7 @@ function formatHours(h: number): string {
  */
 export function PostVacancyPage() {
   const navigate = useNavigate();
+  const back = useAppBack();
   const { id: editId } = useParams<{ id: string }>();
   const isEdit = !!editId;
   const postVacancy = usePostVacancy();
@@ -137,7 +139,7 @@ export function PostVacancyPage() {
   if (citiesQuery.isPending) {
     return (
       <PageShell>
-        <PageHeader title={pageTitle} backTo="/app" />
+        <PageHeader title={pageTitle} onBack={back} />
         <LoadingSkeleton rows={5} />
       </PageShell>
     );
@@ -145,7 +147,7 @@ export function PostVacancyPage() {
   if (isEdit && vacancyQuery.isPending) {
     return (
       <PageShell>
-        <PageHeader title="Edit your vacancy" backTo="/app" />
+        <PageHeader title="Edit your vacancy" onBack={back} />
         <LoadingSkeleton rows={5} />
       </PageShell>
     );
@@ -153,7 +155,7 @@ export function PostVacancyPage() {
   if (isEdit && vacancyQuery.isError) {
     return (
       <PageShell>
-        <PageHeader title="Edit your vacancy" backTo="/app" />
+        <PageHeader title="Edit your vacancy" onBack={back} />
         <ErrorState title="Couldn't load this vacancy" message="We couldn't fetch the details — try again." onRetry={() => void vacancyQuery.refetch()} />
       </PageShell>
     );
@@ -161,7 +163,7 @@ export function PostVacancyPage() {
   if (citiesQuery.isError) {
     return (
       <PageShell>
-        <PageHeader title={pageTitle} backTo="/app" />
+        <PageHeader title={pageTitle} onBack={back} />
         <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
       </PageShell>
     );
@@ -170,7 +172,7 @@ export function PostVacancyPage() {
   if (myDriverQuery.data && myDriverQuery.data.kycStatus !== 'approved') {
     return (
       <PageShell>
-        <PageHeader title={pageTitle} backTo="/app" />
+        <PageHeader title={pageTitle} onBack={back} />
         <KycGateNotice heading="Get verified to post your availability" body="Once your account is verified — documents, your vehicle, and a quick video call — you can show as available so agents can find you." />
       </PageShell>
     );
@@ -182,7 +184,7 @@ export function PostVacancyPage() {
 
   return (
     <PageShell className="pb-32">
-      <PageHeader title={pageTitle} backTo="/app" />
+      <PageHeader title={pageTitle} onBack={back} />
       <div className="space-y-3">
       <Card className="gap-3">
         <SectionLabel icon={<Compass />} accent="green">Where & When</SectionLabel>
