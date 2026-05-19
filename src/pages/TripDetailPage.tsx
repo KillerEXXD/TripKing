@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { AlertTriangle, ArrowLeft, CheckCircle2, ClipboardList, Clock, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, ClipboardList, Clock, Copy, Info, Loader2, MapPin, MessageCircle, Pencil, Phone, Send, Share2, User, Users, UserX, Wallet, XCircle } from 'lucide-react';
 import { isTripLive, useAcceptTrip, useApplyToTrip, useCancelAssignment, useCancelTrip, useDeclineTrip, useDeclineTripInvite, useStartOdoUploadUrl, useStartTrip, useTrip, useUpdateTripPassenger, useWithdrawApplication } from '@/hooks/useTrips';
 import { useNotifications, useMarkNotificationRead } from '@/hooks/useNotifications';
 import { useLookupPassengerByPhone, isLookupablePhone } from '@/hooks/usePassengers';
@@ -768,6 +768,7 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
   // empty. Same logic as the ApplyBar's `isApplied`.
   const serverApplied = trip.myApplicationStatus === 'applied' || trip.myApplicationStatus === 'selected' || trip.myApplicationStatus === 'accepted';
   const [showShareLink, setShowShareLink] = useState(false);
+  const [otpCopied, setOtpCopied] = useState(false);
   // Edit-trip dialog: only when no one has applied / been invited / been selected yet.
   // Server enforces this too (returns 409 if the gate slips).
   const detailsEditable = viewer.isPoster && trip.status === 'open' && trip.applicantCount === 0;
@@ -945,15 +946,50 @@ function TripDetail({ trip, viewer, fillPassenger, returnTo }: { trip: Trip; vie
         // Bespoke layout — 3xl mono OTP is the centerpiece and doesn't fit PriorityCard's title slot.
         <Card className="gap-2 border-2 border-emerald-300 bg-emerald-50">
           <div className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">Passenger OTP</div>
-          <div className="text-center font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900">{trip.passengerOtp}</div>
+          <div className="flex items-center justify-center gap-3">
+            <div className="font-mono text-3xl font-bold tracking-[0.3em] text-emerald-900">{trip.passengerOtp}</div>
+            <button
+              type="button"
+              aria-label={otpCopied ? 'OTP copied' : 'Copy OTP'}
+              onClick={() => {
+                if (!trip.passengerOtp) return;
+                void navigator.clipboard?.writeText(trip.passengerOtp).then(
+                  () => {
+                    setOtpCopied(true);
+                    toast.success('OTP copied');
+                    setTimeout(() => setOtpCopied(false), 2000);
+                  },
+                  () => toast.error("Couldn't copy — select the code and copy it."),
+                );
+              }}
+              className="flex size-9 items-center justify-center rounded-full border border-emerald-300 bg-white text-emerald-700 hover:bg-emerald-100"
+            >
+              {otpCopied ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+            </button>
+          </div>
           <p className="text-xs text-emerald-800">
             Share this code with your passenger. The driver enters it when they meet to start the trip.
           </p>
-          {trip.passengerName ? (
-            <Button variant="full" size="sm" onClick={() => setShowShareLink(true)}>
-              Or send a passenger link (OTP built in)
+          <div className="grid grid-cols-2 gap-2">
+            <Button asChild variant="full" size="sm">
+              <a
+                href={(() => {
+                  const route = `${trip.fromCity.name} → ${trip.toCity.name}`;
+                  const msg = `Your TripKing trip — ${route}. Passenger OTP: ${trip.passengerOtp}. Share it with the driver when they arrive.`;
+                  const phoneDigits = (trip.passengerPhone ?? '').replace(/\D+/g, '');
+                  return `https://wa.me/${phoneDigits}?text=${encodeURIComponent(msg)}`;
+                })()}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Share OTP via WhatsApp"
+              >
+                <MessageCircle className="size-4" aria-hidden /> WhatsApp
+              </a>
             </Button>
-          ) : null}
+            <Button variant="outline" size="sm" onClick={() => setShowShareLink(true)}>
+              <Share2 className="size-4" aria-hidden /> Send link
+            </Button>
+          </div>
         </Card>
       ) : null}
 
