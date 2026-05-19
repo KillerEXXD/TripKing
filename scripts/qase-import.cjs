@@ -133,6 +133,24 @@ const SCENARIOS = [
     { action: 'Dev-tools: POST PATCH /trips/{id} on the has_applicants trip with any commercial field.', expected: '409 — trip is locked once it leaves status=open. Server is the source of truth, not the UI gate.' },
   ]},
 
+  { phase: 'P1', id: 'P1.7', title: 'Fare checkboxes are co-located in the fare card (PR #311)',
+    preconditions: 'After PR #311 the "Show the fare to the passenger" toggle was moved out of the More Details card and now lives directly above "Packing / toll / permit extras paid by the passenger" inside the fare card. Both flags must still post correctly.',
+    steps: [
+    { action: 'Open /app/post-trip → fill step 1 minimally → Next.', expected: 'Step 2 (fare + passenger + invitations + more-details) is shown.' },
+    { action: 'Scroll to the fare card (the one with rate/km, bata, the "Total fare …" summary).', expected: 'Two checkboxes sit immediately below the total-fare summary, in this order: (1) "Show the fare to the passenger", (2) "Packing / toll / permit extras paid by the passenger". No fare checkbox lives in the More Details card.' },
+    { action: 'Open the More Details card.', expected: 'It contains only the "Instructions for the driver (optional)" textarea — no "Show the fare to the passenger" toggle.' },
+    { action: 'Toggle "Show the fare to the passenger" ON, "Packing / toll …" OFF. Post the trip. Inspect POST /trips body in DevTools network tab.', expected: 'Request body has show_fare_to_passenger=true AND extras_paid_by_passenger=false. Trip is created successfully.' },
+  ]},
+  { phase: 'P1', id: 'P1.8', title: 'Newly-posted trip lands at the top of the agent/driver "My posts" list (PR #311)',
+    preconditions: 'After PR #311 the agent /app/posted-trips page sorts each status filter (Open, Cancelled, etc.) by createdAt DESC. The driver /app/my-trips?tab=posted tab already sorted createdAt DESC — verify it still does.',
+    steps: [
+    { action: 'AGENT side: sign in as a trip_manager who already has ≥2 open trips (one posted days ago, one posted hours ago). Post a third fresh trip via /app/post-trip.', expected: 'After "Trip posted", land on /app/posted-trips?status=open via the share-modal close button.' },
+    { action: 'On /app/posted-trips with the Open filter active, observe card order.', expected: 'The just-posted trip is the FIRST card (NEW badge + "Posted just now"). Older Open trips follow it in descending createdAt order.' },
+    { action: 'Switch to the Cancelled filter (after cancelling 2 trips at different times if the list is empty).', expected: 'Cards are also ordered by createdAt DESC — most-recently-cancelled-AT-POST-TIME trip is NOT what matters here; sort is by createdAt of the trip itself.' },
+    { action: 'DRIVER side: sign in as a driver who has posted ≥2 trips themselves. Post a third trip.', expected: 'Lands on /app/my-trips?tab=posted (the driver "Posted by me" tab).' },
+    { action: 'Observe card order on the Posted-by-me tab.', expected: 'Just-posted trip is the FIRST card. Older posted trips follow in descending createdAt order. (Sort was already in place pre-PR #311 — this step is a regression check.)' },
+  ]},
+
   // ── P2 ────────────────────────────────────────────────────────────────
   { phase: 'P2', id: 'P2.1', title: 'Browse public trip feed', steps: [
     { action: 'Driver → Trips bottom nav.', expected: 'Trips in/near home city, status open or has_applicants. Agent identity = business name only.' },
