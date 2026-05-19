@@ -141,11 +141,19 @@ export interface AgentRow {
   [k: string]: unknown;
 }
 
-const PII_KEYS = ['full_name', 'phone', 'email', 'profile_photo_url'] as const;
+// `full_name` and `profile_photo_url` are commercial branding in a driver-marketplace —
+// drivers WANT prospective trip-posters to recognise them by name + face. Only the actual
+// contact channels (`phone`, `email`) stay gated behind reveal, so spam/scrape attempts on
+// the public driver list can't pull contactable identifiers.
+// (2026-05-19: previously stripped name + photo too; that left the "Invited drivers" panel
+// and the invite-picker rendering "Driver A1B2C3D" with no way for the agent to tell who
+// they were inviting — the exact UX the marketplace doesn't want.)
+const PII_KEYS = ['phone', 'email'] as const;
 
 /**
- * Strip the four PII keys from a row when `reveal === false`. Does not mutate
- * the input. Always carries `display_handle` through.
+ * Strip private contact PII (phone + email) from a row when `reveal === false`. Does not
+ * mutate the input. Always carries `display_handle`, `full_name`, and `profile_photo_url`
+ * through — those are public commercial-branding fields.
  */
 export function redactDriver(row: DriverRow, reveal: boolean): DriverRow {
   if (reveal) return row;
