@@ -31,14 +31,14 @@ describe('back link', () => {
   }
 
   // The redesign moved the back affordance from a history-driven button onto
-  // <PageHeader backTo="/">, which renders a <Link> with aria-label="Back" that
-  // always navigates to /. We lose the "history.length" branching but gain a
-  // predictable destination + consistent visuals with every other page.
+  // <PageHeader backTo="/app">, which renders a <Link> with aria-label="Back" that
+  // always navigates to /app (the app home). We lose the "history.length" branching
+  // but gain a predictable destination + consistent visuals with every other page.
   it('renders a Back link at the top of the page that points home', () => {
     mountWithMutations();
     const back = screen.getByRole('link', { name: /back/i });
     expect(back).toBeInTheDocument();
-    expect(back).toHaveAttribute('href', '/');
+    expect(back).toHaveAttribute('href', '/app');
   });
 });
 

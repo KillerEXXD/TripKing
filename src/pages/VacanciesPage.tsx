@@ -292,7 +292,7 @@ export function VacanciesPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Vacant drivers" subtitle={subtitle} backTo="/" />
+      <PageHeader title="Vacant drivers" subtitle={subtitle} backTo="/app" />
 
       {isDriverView && myDriverId ? <IAmAvailableCard driverId={myDriverId} /> : null}
 

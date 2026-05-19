@@ -137,7 +137,7 @@ export function PostVacancyPage() {
   if (citiesQuery.isPending) {
     return (
       <PageShell>
-        <PageHeader title={pageTitle} backTo="/" />
+        <PageHeader title={pageTitle} backTo="/app" />
         <LoadingSkeleton rows={5} />
       </PageShell>
     );
@@ -145,7 +145,7 @@ export function PostVacancyPage() {
   if (isEdit && vacancyQuery.isPending) {
     return (
       <PageShell>
-        <PageHeader title="Edit your vacancy" backTo="/" />
+        <PageHeader title="Edit your vacancy" backTo="/app" />
         <LoadingSkeleton rows={5} />
       </PageShell>
     );
@@ -153,7 +153,7 @@ export function PostVacancyPage() {
   if (isEdit && vacancyQuery.isError) {
     return (
       <PageShell>
-        <PageHeader title="Edit your vacancy" backTo="/" />
+        <PageHeader title="Edit your vacancy" backTo="/app" />
         <ErrorState title="Couldn't load this vacancy" message="We couldn't fetch the details — try again." onRetry={() => void vacancyQuery.refetch()} />
       </PageShell>
     );
@@ -161,7 +161,7 @@ export function PostVacancyPage() {
   if (citiesQuery.isError) {
     return (
       <PageShell>
-        <PageHeader title={pageTitle} backTo="/" />
+        <PageHeader title={pageTitle} backTo="/app" />
         <ErrorState title="Couldn't load the form" message="We need the city list to post your availability." onRetry={() => void citiesQuery.refetch()} />
       </PageShell>
     );
@@ -170,7 +170,7 @@ export function PostVacancyPage() {
   if (myDriverQuery.data && myDriverQuery.data.kycStatus !== 'approved') {
     return (
       <PageShell>
-        <PageHeader title={pageTitle} backTo="/" />
+        <PageHeader title={pageTitle} backTo="/app" />
         <KycGateNotice heading="Get verified to post your availability" body="Once your account is verified — documents, your vehicle, and a quick video call — you can show as available so agents can find you." />
       </PageShell>
     );
@@ -182,7 +182,7 @@ export function PostVacancyPage() {
 
   return (
     <PageShell className="pb-32">
-      <PageHeader title={pageTitle} backTo="/" />
+      <PageHeader title={pageTitle} backTo="/app" />
       <div className="space-y-3">
       <Card className="gap-3">
         <SectionLabel icon={<Compass />} accent="green">Where & When</SectionLabel>

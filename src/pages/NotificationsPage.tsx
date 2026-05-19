@@ -101,7 +101,7 @@ export function NotificationsPage() {
       <PageHeader
         title="Notifications"
         subtitle={subtitle}
-        backTo="/"
+        backTo="/app"
         right={
           <Button variant="outline" size="sm" disabled={unread === 0 || markAll.isPending} onClick={() => markAll.mutate()}>
             {markAll.isPending ? 'Marking…' : 'Mark all read'}
