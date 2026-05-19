@@ -109,9 +109,23 @@ export function CompleteTripPage() {
   const [privateNote, setPrivateNote] = useState('');
   const [hoverScore, setHoverScore] = useState(0);
 
+  // Hooks must run unconditionally on every render — keep useMemoPreview() above
+  // any early return, otherwise a pending→ready transition adds a useMemo call
+  // and React throws "Rendered more hooks than during the previous render"
+  // (Sentry #7478926638). Inputs derive from form state + the (possibly undefined)
+  // trip; the hook returns null when trip isn't loaded yet.
+  const tripData = tripQuery.data;
+  const endOdoNum = endOdoReading.trim() ? Number(endOdoReading) : null;
+  const startOdoReading = tripData?.startOdoReading ?? null;
+  const tollNum = toll.trim() ? Number(toll) : 0;
+  const preview = useMemoPreview(tripData, endOdoNum, startOdoReading, tollNum);
+
   if (tripQuery.isPending) return <div className="p-6"><LoadingSkeleton rows={6} /></div>;
-  if (tripQuery.isError || !tripQuery.data) return <div className="p-6"><ErrorState title="Couldn't load the trip" onRetry={() => tripQuery.refetch()} /></div>;
-  const trip = tripQuery.data;
+  if (tripQuery.isError || !tripData || !preview) return <div className="p-6"><ErrorState title="Couldn't load the trip" onRetry={() => tripQuery.refetch()} /></div>;
+  // Re-alias to const so the non-null narrowing survives into closures (TS loses
+  // the `preview != null` proof when an inner `async function` captures it).
+  const trip = tripData;
+  const previewSafe = preview;
 
   const myDriverId = driverQuery.data?.id;
   const isAssignedDriver = !!myDriverId && trip.assignedDriverId === myDriverId;
@@ -129,11 +143,6 @@ export function CompleteTripPage() {
       </div>
     );
   }
-
-  const endOdoNum = endOdoReading.trim() ? Number(endOdoReading) : null;
-  const startOdoReading = trip.startOdoReading ?? null;
-  const tollNum = toll.trim() ? Number(toll) : 0;
-  const preview = useMemoPreview(trip, endOdoNum, startOdoReading, tollNum);
 
   const endValid = endOdoNum != null && Number.isFinite(endOdoNum) && endOdoNum > 0
     && (startOdoReading == null || endOdoNum > startOdoReading);
@@ -159,7 +168,7 @@ export function CompleteTripPage() {
         input: {
           endOdoUrl: endOdoPath,
           endOdoReading: endOdoNum ?? undefined,
-          tollPaidByDriver: preview.toll,
+          tollPaidByDriver: previewSafe.toll,
           driverReviewNote: privateNote.trim() || undefined,
         },
       });
@@ -179,7 +188,7 @@ export function CompleteTripPage() {
           }
         }
       }
-      toast.success(`Trip completed · ${formatINR(preview.revisedPayout)} paid out.`);
+      toast.success(`Trip completed · ${formatINR(previewSafe.revisedPayout)} paid out.`);
       navigate('/app/my-trips?tab=completed');
     } catch (err) {
       if (err instanceof ApiError && (err.code === 'INSUFFICIENT_WALLET_BALANCE_DRIVER' || err.code === 'INSUFFICIENT_WALLET_BALANCE_AGENT')) {
@@ -241,19 +250,19 @@ export function CompleteTripPage() {
 
           <div className="space-y-1.5 rounded-lg border bg-slate-50 p-3">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-secondary">Payout preview</div>
-            <Row label="Original payout" value={formatINR(preview.originalPayout)} muted />
+            <Row label="Original payout" value={formatINR(previewSafe.originalPayout)} muted />
             <Row
               label="Distance"
-              value={preview.actualKm != null ? `${formatKm(preview.actualKm)} driven · ${formatKm(preview.acceptedKm)} accepted` : `${formatKm(preview.acceptedKm)} accepted`}
+              value={previewSafe.actualKm != null ? `${formatKm(previewSafe.actualKm)} driven · ${formatKm(previewSafe.acceptedKm)} accepted` : `${formatKm(previewSafe.acceptedKm)} accepted`}
               muted
             />
-            {preview.extraKm > 0 ? (
-              <Row label={`Extra ${formatKm(preview.extraKm)} @ ${formatINR(trip.ratePerKm)}/km`} value={`+ ${formatINR(preview.extraFare)}`} accent="extra" />
+            {previewSafe.extraKm > 0 ? (
+              <Row label={`Extra ${formatKm(previewSafe.extraKm)} @ ${formatINR(trip.ratePerKm)}/km`} value={`+ ${formatINR(previewSafe.extraFare)}`} accent="extra" />
             ) : null}
-            {preview.toll > 0 ? (
-              <Row label="Toll reimbursement" value={`+ ${formatINR(preview.toll)}`} accent="toll" />
+            {previewSafe.toll > 0 ? (
+              <Row label="Toll reimbursement" value={`+ ${formatINR(previewSafe.toll)}`} accent="toll" />
             ) : null}
-            <Row label="Revised payout" value={formatINR(preview.revisedPayout)} strong />
+            <Row label="Revised payout" value={formatINR(previewSafe.revisedPayout)} strong />
           </div>
 
           <Button variant="full" size="lg" disabled={!step1Valid} onClick={() => void onNext()}>Next →</Button>
@@ -341,10 +350,13 @@ export function CompleteTripPage() {
   );
 }
 
-/** useMemo'd preview computation so the live numerals don't recompute on every keystroke render. */
-function useMemoPreview(trip: Trip, endOdoReading: number | null, startOdoReading: number | null, toll: number): PayoutPreview {
+/** useMemo'd preview computation so the live numerals don't recompute on every keystroke render.
+ *  Accepts `trip: Trip | undefined` so it can be called unconditionally at the top of the component,
+ *  before any early return — calling it after a conditional return triggers React's "Rendered more
+ *  hooks than during the previous render" error (Sentry #7478926638). */
+function useMemoPreview(trip: Trip | undefined, endOdoReading: number | null, startOdoReading: number | null, toll: number): PayoutPreview | null {
   return useMemo(
-    () => computePreview(trip, endOdoReading, startOdoReading, toll),
+    () => (trip ? computePreview(trip, endOdoReading, startOdoReading, toll) : null),
     [trip, endOdoReading, startOdoReading, toll],
   );
 }

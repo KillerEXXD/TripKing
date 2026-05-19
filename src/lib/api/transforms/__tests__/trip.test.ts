@@ -55,6 +55,15 @@ describe('transformTrip', () => {
     expect(() => transformTrip({ ...fullTrip, driver_payout: undefined })).toThrow(/MISSING_PAYOUT/);
     expect(() => transformTrip({ ...fullTrip, status: undefined })).toThrow(/MISSING_STATUS/);
   });
+  it('surfaces the actual field name on a MISSING_FIELD throw (Sentry #7488333585)', () => {
+    // Before the fix the message was literally "missing MISSING_FIELD" — useless for triage.
+    // It should name the field instead so Sentry tells you which one the backend dropped.
+    expect(() => transformTrip({ ...fullTrip, posted_by_user_id: undefined })).toThrow(/missing posted_by_user_id/);
+    expect(() => transformTrip({ ...fullTrip, posted_by_handle: undefined })).toThrow(/missing posted_by_handle/);
+    expect(() => transformTrip({ ...fullTrip, expected_distance_km: undefined })).toThrow(/missing expected_distance_km/);
+    expect(() => transformTrip({ ...fullTrip, rate_per_km: undefined })).toThrow(/missing rate_per_km/);
+    expect(() => transformTrip({ ...fullTrip, created_at: undefined })).toThrow(/missing created_at/);
+  });
   it('surfaces the assigned-driver join, distance-to-destination and the passenger OTP when present', () => {
     const t = transformTrip({
       ...fullTrip,

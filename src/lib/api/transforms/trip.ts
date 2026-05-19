@@ -46,9 +46,15 @@ type Api = Record<string, unknown>;
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v ? v : undefined;
 }
-function reqStr(v: unknown, code: TripTransformErrorCode, ctx: Api): string {
+function reqStr(v: unknown, code: TripTransformErrorCode, ctx: Api, field?: string): string {
   const s = str(v);
-  if (!s) throw new TripTransformError(`missing ${code}`, code, ctx);
+  if (!s) {
+    // Prefer the concrete `field` arg, else fall back to ctx.field, else the
+    // error code. Surfaces in Sentry as `missing posted_by_user_id` instead of
+    // the useless `missing MISSING_FIELD` (Sentry #7488333585).
+    const label = field ?? (typeof ctx?.field === 'string' ? ctx.field : code);
+    throw new TripTransformError(`missing ${label}`, code, { ...ctx, field: label });
+  }
   return s;
 }
 function num(v: unknown, fallback = 0): number {
@@ -57,9 +63,12 @@ function num(v: unknown, fallback = 0): number {
 function numOpt(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v)) ? Number(v) : undefined;
 }
-function reqNum(v: unknown, code: TripTransformErrorCode, ctx: Api): number {
+function reqNum(v: unknown, code: TripTransformErrorCode, ctx: Api, field?: string): number {
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
-  if (!Number.isFinite(n)) throw new TripTransformError(`missing ${code}`, code, ctx);
+  if (!Number.isFinite(n)) {
+    const label = field ?? (typeof ctx?.field === 'string' ? ctx.field : code);
+    throw new TripTransformError(`missing ${label}`, code, { ...ctx, field: label });
+  }
   return n;
 }
 function bool(v: unknown, fallback = false): boolean {
@@ -101,9 +110,9 @@ export function transformTrip(api: Api): Trip {
     tripType: tripTypeOf(api.trip_type),
     expectedEndAt: str(api.expected_end_at),
     waypoints: Array.isArray(api.waypoints) ? (api.waypoints as Api[]).map(transformWaypoint).sort((a, b) => a.seq - b.seq) : [],
-    postedByUserId: reqStr(api.posted_by_user_id, 'MISSING_FIELD', ctx),
+    postedByUserId: reqStr(api.posted_by_user_id, 'MISSING_FIELD', ctx, 'posted_by_user_id'),
     postedByRole: ((api.posted_by_role as string) ?? 'trip_manager') as PosterRole,
-    postedByHandle: reqStr(api.posted_by_handle, 'MISSING_FIELD', { ...ctx, field: 'posted_by_handle' }),
+    postedByHandle: reqStr(api.posted_by_handle, 'MISSING_FIELD', ctx, 'posted_by_handle'),
     postedByName: str(api.posted_by_name),
     postedByPhone: str(api.posted_by_phone),
     // Optional — server includes it when known so cards can render the inline Verified badge.
@@ -115,12 +124,12 @@ export function transformTrip(api: Api): Trip {
     fromPlace: maybePlace(api.from_place),
     toPlace: maybePlace(api.to_place),
     pickupAt: reqStr(api.pickup_at, 'MISSING_PICKUP', ctx),
-    expectedDistanceKm: reqNum(api.expected_distance_km, 'MISSING_FIELD', ctx),
+    expectedDistanceKm: reqNum(api.expected_distance_km, 'MISSING_FIELD', ctx, 'expected_distance_km'),
     carTypeId: reqStr(api.car_type_id, 'MISSING_CAR_TYPE', ctx),
     carTypeLabel: str(carType?.label),
     seatsRequired: num(api.seats_required, 4),
     acRequired: bool(api.ac_required, true),
-    ratePerKm: reqNum(api.rate_per_km, 'MISSING_FIELD', ctx),
+    ratePerKm: reqNum(api.rate_per_km, 'MISSING_FIELD', ctx, 'rate_per_km'),
     totalFare: reqNum(api.total_fare, 'MISSING_FARE', ctx),
     commissionPct: num(api.commission_pct, 0),
     gstAmount: num(api.gst_amount, 0),
@@ -172,7 +181,7 @@ export function transformTrip(api: Api): Trip {
     myApplicationStatus: typeof api.my_application_status === 'string'
       ? (api.my_application_status as Trip['myApplicationStatus'])
       : undefined,
-    createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx),
+    createdAt: reqStr(api.created_at, 'MISSING_FIELD', ctx, 'created_at'),
     updatedAt: str(api.updated_at),
     passengerOtp: str(api.passenger_otp),
     distanceKm: numOpt(api.distance_km),
@@ -242,7 +251,7 @@ function assignedDriverOf(v: unknown): AssignedDriver | undefined {
  */
 export function transformDriverSummary(api: Api, ctx: Api): DriverSummary {
   return {
-    id: reqStr(api.id, 'MISSING_FIELD', ctx),
+    id: reqStr(api.id, 'MISSING_FIELD', ctx, 'driver.id'),
     userId: str(api.user_id) ?? '',
     displayHandle: str(api.display_handle) ?? '',
     fullName: str(api.full_name),
@@ -274,15 +283,15 @@ export function transformTripAcceptance(api: Api): TripAcceptance {
   const vehicle = api.vehicle as Api | undefined;
   return {
     id,
-    tripId: reqStr(api.trip_id, 'MISSING_FIELD', ctx),
-    driverId: reqStr(api.driver_id, 'MISSING_FIELD', ctx),
+    tripId: reqStr(api.trip_id, 'MISSING_FIELD', ctx, 'trip_id'),
+    driverId: reqStr(api.driver_id, 'MISSING_FIELD', ctx, 'driver_id'),
     driver: transformDriverSummary(driver, ctx),
     vehicleId: str(api.vehicle_id),
     vehicle: vehicle && typeof vehicle === 'object' ? transformVehicleSummary(vehicle) : undefined,
     status: (str(api.status) ?? 'applied') as AcceptanceStatus,
     applicantMessage: str(api.applicant_message),
     applicantQuotedRatePerKm: typeof api.applicant_quoted_rate_per_km === 'number' ? (api.applicant_quoted_rate_per_km as number) : undefined,
-    appliedAt: reqStr(api.applied_at, 'MISSING_FIELD', ctx),
+    appliedAt: reqStr(api.applied_at, 'MISSING_FIELD', ctx, 'applied_at'),
     decisionAt: str(api.decision_at),
     decisionNote: str(api.decision_note),
   };
@@ -296,7 +305,7 @@ export function transformMyApplication(api: Api): MyApplication {
   return {
     acceptanceId: reqStr(api.id, 'MISSING_ID', { api }),
     status: (str(api.status) ?? 'applied') as AcceptanceStatus,
-    appliedAt: reqStr(api.applied_at, 'MISSING_FIELD', ctx),
+    appliedAt: reqStr(api.applied_at, 'MISSING_FIELD', ctx, 'applied_at'),
     applicantQuotedRatePerKm: typeof api.applicant_quoted_rate_per_km === 'number' ? (api.applicant_quoted_rate_per_km as number) : undefined,
     applicantMessage: str(api.applicant_message),
     trip: transformTrip(trip),

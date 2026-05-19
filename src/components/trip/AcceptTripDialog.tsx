@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { LoadingSkeleton } from '@/components/feedback';
@@ -33,16 +33,29 @@ export function AcceptTripDialog({
   const overlapping = overlap.data ?? [];
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
-  // Default-check every overlapping application when the list loads.
+  // Default-check every overlapping application when the list loads. Depend on
+  // the *serialised* id-list, not the array ref — `overlap.data ?? []` returns
+  // a fresh `[]` on every render when data is undefined, which would re-fire
+  // this effect every render and trigger the same loop as the auto-confirm
+  // below (Sentry #7487250955).
+  const overlappingIds = overlapping.map((a) => a.acceptanceId).join(',');
   useEffect(() => {
     if (overlap.isSuccess) {
-      setChecked(new Set(overlapping.map((a) => a.acceptanceId)));
+      setChecked(new Set(overlappingIds ? overlappingIds.split(',') : []));
     }
-  }, [overlap.isSuccess, overlapping]);
+  }, [overlap.isSuccess, overlappingIds]);
 
-  // Empty-list short-circuit — no dialog, just confirm.
+  // Empty-list short-circuit — no dialog, just confirm. Fire AT MOST ONCE per
+  // open=true cycle: parents often pass `onConfirm={(ids) => runAccept(ids)}`
+  // which is a fresh function reference on every render, so this effect would
+  // re-fire on every parent rerender and call onConfirm() in a tight loop —
+  // React's "Maximum update depth exceeded" (Sentry #7487250955). The ref
+  // resets to false when the dialog closes, so re-opening still works.
+  const didAutoConfirmRef = useRef(false);
   useEffect(() => {
-    if (open && overlap.isSuccess && overlapping.length === 0) {
+    if (!open) { didAutoConfirmRef.current = false; return; }
+    if (!didAutoConfirmRef.current && overlap.isSuccess && overlapping.length === 0) {
+      didAutoConfirmRef.current = true;
       onConfirm([]);
     }
   }, [open, overlap.isSuccess, overlapping.length, onConfirm]);
