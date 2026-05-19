@@ -1930,12 +1930,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
         .eq('trip_id', tripId)
         .order('created_at', { ascending: false });
       if (error) return pgFail(error);
-      // Privacy rule: the actor (agent) reveals themselves on invite, but the recipient
-      // (driver) stays anonymous to the agent until they reciprocate by applying. So we
-      // strip full_name / phone / profile_photo_url from each invitee unless their
-      // trip_invitations.status === 'applied' (i.e. they've moved from pending → applied
-      // by opening / applying via the invite). Trust signals (rating, KYC, trip count,
-      // handle) stay visible the whole time so the agent has something to act on.
+      // Privacy rule: name + photo are commercial branding and always visible (so the agent
+      // can recognise who they invited). Phone stays gated until the driver reciprocates by
+      // applying — `trip_invitations.status === 'applied'`. Trust signals (rating, KYC,
+      // trip count, handle) are always visible.
       const flat = (data ?? []).map((row) => {
         const r = row as Record<string, unknown>;
         const reciprocated = r.status === 'applied';
@@ -1946,7 +1944,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
           flatDrv.display_handle = uu && typeof uu.display_handle === 'string' ? uu.display_handle : null;
           delete flatDrv.user;
           if (!reciprocated) {
-            for (const k of ['full_name', 'phone', 'profile_photo_url']) delete flatDrv[k];
+            delete flatDrv.phone;
           }
           r.driver = flatDrv;
         }

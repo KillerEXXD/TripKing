@@ -65,7 +65,7 @@ Deno.test('assertNoPhones — passes when no mobile is present', () => {
   assertNoPhones(undefined, 'notes');
 });
 
-Deno.test('redactDriver — strips the four PII keys when reveal=false', () => {
+Deno.test('redactDriver — strips phone + email when reveal=false; keeps name + photo (commercial branding)', () => {
   const row = {
     id: 'd1',
     user_id: 'u1',
@@ -77,10 +77,10 @@ Deno.test('redactDriver — strips the four PII keys when reveal=false', () => {
     rating_avg: 4.7,
   };
   const out = redactDriver(row, false);
-  if ('full_name' in out) throw new Error('full_name leaked');
   if ('phone' in out) throw new Error('phone leaked');
   if ('email' in out) throw new Error('email leaked');
-  if ('profile_photo_url' in out) throw new Error('photo leaked');
+  if (out.full_name !== 'Raj') throw new Error('name should stay visible — commercial branding');
+  if (out.profile_photo_url !== 'https://example.com/r.jpg') throw new Error('photo should stay visible — commercial branding');
   if (out.display_handle !== 'A2X9F1') throw new Error('handle missing');
   if (out.rating_avg !== 4.7) throw new Error('rating dropped');
 });
@@ -98,7 +98,7 @@ Deno.test('redactDriver — does not mutate the input row', () => {
   if (row.full_name !== 'Raj') throw new Error('input mutated');
 });
 
-Deno.test('redactAgent — mirrors redactDriver', () => {
+Deno.test('redactAgent — mirrors redactDriver (strips phone + email, keeps name + photo)', () => {
   const row = {
     id: 'a1',
     user_id: 'u2',
@@ -109,9 +109,9 @@ Deno.test('redactAgent — mirrors redactDriver', () => {
     display_handle: 'A11111',
   };
   const out = redactAgent(row, false);
-  if ('full_name' in out || 'phone' in out || 'email' in out || 'profile_photo_url' in out) {
-    throw new Error('PII leaked');
-  }
+  if ('phone' in out || 'email' in out) throw new Error('contact PII leaked');
+  if (out.full_name !== 'Priya') throw new Error('name should stay visible');
+  if (out.profile_photo_url !== 'p.jpg') throw new Error('photo should stay visible');
   if (out.display_handle !== 'A11111') throw new Error('handle missing');
 });
 

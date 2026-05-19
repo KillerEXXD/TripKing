@@ -72,17 +72,16 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   // D posts a vacancy so GET /vacancies has at least one row joined to a driver
   await j('POST', '/vacancies', { token: D.token, body: { current_city_id: cityIds[0], destinations: [{ cityId: cityIds[1] }], notes: 'route flexible' } });
 
-  // ── 2. GET /vacancies — driver.full_name undefined, driver.display_handle present ──
+  // ── 2. GET /vacancies — driver name + photo VISIBLE (commercial branding); phone + email gated ──
   const vac = await j('GET', '/vacancies');
   const rows = vac.json?.data || [];
   const ours = rows.find((r) => r.driver && r.driver.id === driverId);
   check('2a. GET /vacancies returned ≥1 row joined to our driver', !!ours, `rows=${rows.length}`);
   if (ours) {
-    check('2b. driver.full_name is absent', !('full_name' in ours.driver));
-    check('2c. driver.phone is absent', !('phone' in ours.driver));
-    check('2d. driver.email is absent', !('email' in ours.driver));
-    check('2e. driver.profile_photo_url is absent', !('profile_photo_url' in ours.driver));
-    check('2f. driver.display_handle matches A[0-9A-F]{6}', typeof ours.driver.display_handle === 'string' && HANDLE_RE.test(ours.driver.display_handle), `got=${ours.driver.display_handle}`);
+    check('2b. driver.full_name is present (commercial branding)', typeof ours.driver.full_name === 'string' && ours.driver.full_name.length > 0, `got=${ours.driver.full_name}`);
+    check('2c. driver.phone is absent (private contact)', !('phone' in ours.driver));
+    check('2d. driver.email is absent (private contact)', !('email' in ours.driver));
+    check('2e. driver.display_handle matches A[0-9A-F]{6}', typeof ours.driver.display_handle === 'string' && HANDLE_RE.test(ours.driver.display_handle), `got=${ours.driver.display_handle}`);
   }
 
   // A posts a trip
