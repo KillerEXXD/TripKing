@@ -107,7 +107,7 @@ function renderPost() {
     <MemoryRouter initialEntries={['/app/trips/new']}>
       <Routes>
         <Route path="/app/trips/new" element={<PostTripPage />} />
-        <Route path="/" element={<div>home</div>} />
+        <Route path="/app" element={<div>home</div>} />
         <Route path="/app/trips/:id" element={<div>trip detail</div>} />
         <Route path="/app/posted-trips" element={<PostedTripsListingStub />} />
         <Route path="/app/my-trips" element={<MyTripsListingStub />} />

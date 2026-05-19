@@ -9,7 +9,7 @@ import type { Trip } from '@/types';
 
 function TripRow({ trip }: { trip: Trip }) {
   return (
-    <Link to={`/app/trips/${trip.id}/applicants?from=/queue/needs-action`} className="block">
+    <Link to={`/app/trips/${trip.id}/applicants?from=/app/queue/needs-action`} className="block">
       <Card className="gap-1.5 transition-colors hover:border-primary/40">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">

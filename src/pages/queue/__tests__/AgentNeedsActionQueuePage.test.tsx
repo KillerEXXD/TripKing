@@ -44,11 +44,11 @@ describe('AgentNeedsActionQueuePage', () => {
     expect(screen.getByText(/3 applicants/i)).toBeInTheDocument();
   });
 
-  it('row links go to /trips/:id/applicants with ?from=/queue/needs-action', () => {
+  it('row links go to /trips/:id/applicants with ?from=/app/queue/needs-action', () => {
     setTrips({ data: [makeTrip({ id: 'abc' })] });
     renderQ();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
-    expect(link).toHaveAttribute('href', '/app/trips/abc/applicants?from=/queue/needs-action');
+    expect(link).toHaveAttribute('href', '/app/trips/abc/applicants?from=/app/queue/needs-action');
   });
 
   it('back button goes to Home', () => {

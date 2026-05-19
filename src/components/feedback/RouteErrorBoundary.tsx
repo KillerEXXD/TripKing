@@ -17,7 +17,7 @@ export function RouteErrorBoundary({ children }: { children: ReactNode }) {
       <div className="w-full max-w-md space-y-3">
         <ErrorState title="This page hit a snag" message="Try again, or head back home." onRetry={() => window.location.reload()} />
         <div className="flex justify-center">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/app')}>
             Back to home
           </Button>
         </div>

@@ -564,7 +564,7 @@ describe('TripDetailPage', () => {
     setTrip({ data: makeTrip({ invitationId: 'inv-1', invitationStatus: 'pending' }) });
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
     // Mirror the URL the home → scoped list → trip card chain produces.
-    const fromPath = '/app/my-trips?scope=invites-received&from=/';
+    const fromPath = '/app/my-trips?scope=invites-received&from=/app';
     const entry = `/app/trips/t1?from=${encodeURIComponent(fromPath)}`;
     render(
       <MemoryRouter initialEntries={[entry]}>
@@ -582,7 +582,7 @@ describe('TripDetailPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /decline invitation/i }));
     await waitFor(() => expect(declineInviteMutateAsync).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.getByTestId('probe-search').textContent).toBe('?scope=invites-received&from=/'),
+      expect(screen.getByTestId('probe-search').textContent).toBe('?scope=invites-received&from=/app'),
     );
     confirmSpy.mockRestore();
   });

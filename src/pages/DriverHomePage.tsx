@@ -234,7 +234,7 @@ function DriverHome({ driver }: { driver: Driver }) {
             // a small inline "Review N applicants →" link, easy to miss). Two+ →
             // /posted-trips filtered to has_applicants so the driver picks which
             // trip to review.
-            to={postedWithApplicants === 1 ? `/app/trips/${postsWithApplicants[0].id}/applicants?from=/` : '/app/posted-trips?status=has_applicants&from=/'}
+            to={postedWithApplicants === 1 ? `/app/trips/${postsWithApplicants[0].id}/applicants?from=/app` : '/app/posted-trips?status=has_applicants&from=/app'}
             tone="amber"
             icon={<Sparkles className="size-3.5" aria-hidden />}
             label={`${postedWithApplicants > 1 ? 'Trips' : 'Trip'} you posted ${postedWithApplicants > 1 ? 'have' : 'has'} applicants`}

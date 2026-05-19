@@ -156,7 +156,7 @@ describe('DriverHomePage', () => {
     });
     renderHome();
     const card = screen.getByRole('link', { name: /invitation to drive vellore to bangalore/i });
-    expect(card).toHaveAttribute('href', '/app/trips/inv-9?from=/');
+    expect(card).toHaveAttribute('href', '/app/trips/inv-9?from=/app');
     expect(card).toHaveTextContent(/accept or decline/i);
   });
 
@@ -211,7 +211,7 @@ describe('DriverHomePage', () => {
     const link = screen.getByRole('link', { name: /trip you posted has applicants/i });
     // Trip detail only shows a tiny inline "Review N applicants →" link; user expected
     // the dedicated review page — matches the "Review applicants" CTA on the card.
-    expect(link.getAttribute('href')).toBe('/app/trips/p-one/applicants?from=/');
+    expect(link.getAttribute('href')).toBe('/app/trips/p-one/applicants?from=/app');
   });
 
   it('the applicants-prompt card routes to /posted-trips?status=has_applicants when 2+ posted trips have applicants', () => {
@@ -221,6 +221,6 @@ describe('DriverHomePage', () => {
     ] }]);
     renderHome();
     const link = screen.getByRole('link', { name: /trips you posted have applicants/i });
-    expect(link.getAttribute('href')).toBe('/app/posted-trips?status=has_applicants&from=/');
+    expect(link.getAttribute('href')).toBe('/app/posted-trips?status=has_applicants&from=/app');
   });
 });

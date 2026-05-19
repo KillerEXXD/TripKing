@@ -35,7 +35,7 @@ const COUNTRY_CODES = [
 ];
 
 function fromOf(state: unknown): string {
-  return (state as { from?: string } | null)?.from ?? '/';
+  return (state as { from?: string } | null)?.from ?? '/app';
 }
 const onlyDigits = (s: string) => s.replace(/\D/g, '');
 
@@ -99,7 +99,7 @@ export function SignInPage() {
       // Admins never need driver/agent onboarding — skip straight to the role-aware home
       // so the RoleSwitcher + bottom nav render. Drivers/agents still pass through
       // /onboarding, which itself bails to / when a profile already exists (3a3e6db).
-      const target = from !== '/' ? from : me.role === 'admin' ? '/' : '/app/onboarding';
+      const target = from !== '/app' ? from : me.role === 'admin' ? '/app' : '/app/onboarding';
       navigate(target, { replace: true });
     } catch {
       toast.error("That code didn't work — try again");

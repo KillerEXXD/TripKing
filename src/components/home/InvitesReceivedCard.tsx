@@ -20,7 +20,7 @@ export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
     const trip = trips[0];
     return (
       <PriorityCard
-        to={`/app/trips/${trip.id}?from=/`}
+        to={`/app/trips/${trip.id}?from=/app`}
         ariaLabel={`Invitation to drive ${trip.fromCity.name} to ${trip.toCity.name} — tap to accept or decline`}
         tone="indigo"
         icon={icon}
@@ -34,7 +34,7 @@ export function InvitesReceivedCard({ trips }: { trips: Trip[] }) {
 
   return (
     <PriorityCard
-      to="/app/my-trips?scope=invites-received&from=/"
+      to="/app/my-trips?scope=invites-received&from=/app"
       ariaLabel={`${trips.length} invitations waiting for your decision`}
       tone="indigo"
       icon={icon}

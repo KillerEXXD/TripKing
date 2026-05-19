@@ -8,7 +8,7 @@ import type { Trip } from '@/types';
  * Renders nothing when no trip has pending invites (consistent with the "hide empty
  * cards on home" pattern).
  *
- * 1 trip with invites → straight to that trip's `/invitations` view (with `?from=/`
+ * 1 trip with invites → straight to that trip's `/invitations` view (with `?from=/app`
  *   so its back arrow returns to home).
  * ≥2                  → a scoped view at `/app/posted-trips?scope=invites-sent`
  *   (filter strip hidden, back arrow → home). NOT the filtered /posted-trips
@@ -31,8 +31,8 @@ export function InvitesSentCard({ trips }: { trips: Trip[] }) {
   const total = tripsWithInvites.reduce((sum, t) => sum + (t.pendingInvitationCount ?? 0), 0);
   const tripCount = tripsWithInvites.length;
   const to = tripCount === 1
-    ? `/app/trips/${tripsWithInvites[0].id}/invitations?from=/`
-    : '/app/posted-trips?scope=invites-sent&from=/';
+    ? `/app/trips/${tripsWithInvites[0].id}/invitations?from=/app`
+    : '/app/posted-trips?scope=invites-sent&from=/app';
   const subtitle = tripCount === 1
     ? `for ${tripsWithInvites[0].fromCity.name} → ${tripsWithInvites[0].toCity.name}`
     : `across ${tripCount} trips`;

@@ -61,7 +61,7 @@ describe('InvitesSentCard', () => {
       makeTrip({ id: 'tb', pendingInvitationCount: 2 }),
     ]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/app/trips/tb/invitations?from=/');
+    expect(link).toHaveAttribute('href', '/app/trips/tb/invitations?from=/app');
     expect(link).toHaveTextContent(/2 invites awaiting driver/i);
   });
 
@@ -71,7 +71,7 @@ describe('InvitesSentCard', () => {
       makeTrip({ id: 't2', pendingInvitationCount: 3 }),
     ]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/app/posted-trips?scope=invites-sent&from=/');
+    expect(link).toHaveAttribute('href', '/app/posted-trips?scope=invites-sent&from=/app');
     expect(link).toHaveTextContent(/4 invites awaiting driver/i);
     expect(link).toHaveTextContent(/across 2 trips/i);
   });
@@ -93,7 +93,7 @@ describe('InvitesSentCard', () => {
     ]);
     const link = screen.getByRole('link');
     // Only the `open` trip counts → 2 invites across 1 trip → routes to its detail.
-    expect(link).toHaveAttribute('href', '/app/trips/t-open/invitations?from=/');
+    expect(link).toHaveAttribute('href', '/app/trips/t-open/invitations?from=/app');
     expect(link).toHaveTextContent(/2 invites awaiting driver/i);
   });
 });

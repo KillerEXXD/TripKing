@@ -497,7 +497,7 @@ export function PostTripPage() {
   if (myKycStatus && myKycStatus !== 'approved') {
     return (
       <div className="mx-auto max-w-md p-4">
-        <button type="button" onClick={() => navigate('/')} className="-ml-1 mb-3 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
+        <button type="button" onClick={() => navigate('/app')} className="-ml-1 mb-3 inline-flex items-center gap-1 text-sm text-secondary hover:text-foreground">
           <ArrowLeft className="size-4" aria-hidden /> Back
         </button>
         <KycGateNotice heading="Get verified to post a trip" body="Once your account is verified you can post commercial trips and assign drivers. Your profile has a checklist that walks you through it." />
@@ -520,7 +520,7 @@ export function PostTripPage() {
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
       <header className="sticky top-0 z-10 bg-surface shadow-header">
         <div className="flex items-center gap-2 px-4 py-3">
-          <button type="button" aria-label="Back" onClick={() => (step === 1 ? navigate('/') : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
+          <button type="button" aria-label="Back" onClick={() => (step === 1 ? navigate('/app') : setStep(1))} className="-ml-1 flex size-8 items-center justify-center rounded-full text-secondary hover:bg-muted">
             <ArrowLeft className="size-5" aria-hidden />
           </button>
           <div className="min-w-0">
