@@ -441,8 +441,19 @@ describe('TripDetailPage', () => {
     renderDetail();
     expect(screen.getByText(/passenger otp/i)).toBeInTheDocument();
     expect(screen.getByText('123456')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /send a passenger link/i }));
+    fireEvent.click(screen.getByRole('button', { name: /send link/i }));
     expect(screen.getByText(/\/passenger\/123456/)).toBeInTheDocument();
+  });
+
+  it('always exposes the WhatsApp + Send-link share buttons on the OTP card, even when no passenger details were filled in', () => {
+    vi.mocked(useAuth).mockReturnValue({ user: agent, isAuthenticated: true, isLoading: false, requestOtp: vi.fn(), verifyOtp: vi.fn(), logout: vi.fn() });
+    // No passengerName / passengerPhone — previously hid the share button entirely.
+    setTrip({ data: makeTrip({ status: 'accepted', passengerOtp: '654321', passengerName: '', passengerPhone: '' }) });
+    renderDetail();
+    const wa = screen.getByRole('link', { name: /share otp via whatsapp/i });
+    expect(wa.getAttribute('href')).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    expect(decodeURIComponent(wa.getAttribute('href') ?? '')).toContain('654321');
+    expect(screen.getByRole('button', { name: /send link/i })).toBeInTheDocument();
   });
 
   it('lets the poster cancel an open trip with a reason', async () => {
