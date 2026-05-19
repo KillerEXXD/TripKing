@@ -48,7 +48,7 @@ export function ReferralsPage() {
       <PageHeader
         title="Refer & earn"
         subtitle="Invite drivers and agents — earn from every eligible paid trip they run."
-        backTo="/"
+        backTo="/app"
       />
 
       {/* Render the hero FIRST, regardless of the dashboard query state — it has its own

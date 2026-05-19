@@ -57,7 +57,7 @@ function renderPost() {
   return render(
     <MemoryRouter initialEntries={['/app/vacancies/new']}>
       <Routes>
-        <Route path="/" element={<div>home page</div>} />
+        <Route path="/app" element={<div>home page</div>} />
         <Route path="/app/vacancies/new" element={<PostVacancyPage />} />
         <Route path="/app/vacancies" element={<div>vacancy feed</div>} />
       </Routes>
