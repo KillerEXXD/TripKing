@@ -93,6 +93,16 @@ const futureIso = (d = 1) => new Date(Date.now() + d * 86400000).toISOString();
   const tid = post.json?.data?.id;
   check('POST /trips (authed) → 200 + joined cities + driver_payout (= 14·140 − 10% − 98 + 300 = 1966)', post.status === 200 && !!tid && post.json?.data?.from_city?.name && post.json?.data?.driver_payout === 1966, `status=${post.status} ${JSON.stringify(post.json?.error || post.json?.data?.driver_payout)}`);
   if (!tid) process.exit(1);
+  // Regression: posting a trip with no `expected_end_at` (and no destination arrive_at)
+  // must derive a realistic end from `expected_distance_km`, NOT default to pickup+24h.
+  // 140 km / 40 km/h + 1h buffer ≈ 4.5h → end should be 1h..8h after pickup. The old
+  // pickup+24h default broke auto-invite (vacancy-time-bounds-must-mirror).
+  {
+    const pickupMs = new Date(post.json?.data?.pickup_at ?? 0).getTime();
+    const endMs = new Date(post.json?.data?.expected_end_at ?? 0).getTime();
+    const spanH = (endMs - pickupMs) / 3600_000;
+    check('POST /trips derives expected_end_at from distance (not pickup+24h)', spanH > 1 && spanH < 8, `span=${spanH.toFixed(2)}h (expected ~4.5h for 140km)`);
+  }
   const toLat = Number(post.json?.data?.to_city?.lat), toLng = Number(post.json?.data?.to_city?.lng);
 
   // poster reads their own trip → full
