@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button, Input } from '@/components/ui';
@@ -34,9 +34,6 @@ const COUNTRY_CODES = [
   { code: '+65', flag: 'SG' },
 ];
 
-function fromOf(state: unknown): string {
-  return (state as { from?: string } | null)?.from ?? '/app';
-}
 const onlyDigits = (s: string) => s.replace(/\D/g, '');
 
 /**
@@ -44,13 +41,15 @@ const onlyDigits = (s: string) => s.replace(/\D/g, '');
  * `/auth` edge function. There's no real SMS provider yet (placeholder): any phone number is
  * accepted, the "send OTP" step is best-effort (it just advances to OTP entry), and the dev
  * code is always `123456`. When a real SMS provider lands we'll enforce delivery + validation.
- * On a plain sign-in we send the user to `/app/onboarding` (name → role → city → create profile);
- * if they were bounced here from a protected page, we honour that `from` instead.
+ * On a successful OTP verify we always land on the Home tab (`/app`) — fresh drivers/agents
+ * pass through `/app/onboarding` which itself bails to `/app` if a profile already exists.
+ * We intentionally ignore any `location.state.from`: the user complained that re-authing after
+ * session expiry dropped them back on whichever protected page bounced them (e.g. `/app/profile`)
+ * rather than Home, which felt inconsistent.
  */
 export function SignInPage() {
   const { isAuthenticated, isLoading, requestOtp, verifyOtp } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [stage, setStage] = useState<'phone' | 'otp'>('phone');
   const [cc, setCc] = useState('+91');
   const [localPhone, setLocalPhone] = useState('');
@@ -68,7 +67,7 @@ export function SignInPage() {
     }
   }, [isLoading, isAuthenticated]);
 
-  if (isAuthenticated) return <Navigate to={fromOf(location.state)} replace />;
+  if (isAuthenticated) return <Navigate to="/app" replace />;
 
   const phoneE164 = `${cc}${onlyDigits(localPhone)}`;
   // No real SMS provider yet — accept any non-empty number; the dev code is always 123456.
@@ -95,11 +94,11 @@ export function SignInPage() {
     setBusy(true);
     try {
       const me = await verifyOtp(phoneE164, otp);
-      const from = fromOf(location.state);
-      // Admins never need driver/agent onboarding — skip straight to the role-aware home
-      // so the RoleSwitcher + bottom nav render. Drivers/agents still pass through
-      // /onboarding, which itself bails to / when a profile already exists (3a3e6db).
-      const target = from !== '/app' ? from : me.role === 'admin' ? '/app' : '/app/onboarding';
+      // Always land on Home after OTP verify. Admins go straight there; drivers/agents
+      // pass through /onboarding which bails to /app when a profile already exists
+      // (3a3e6db), so existing users still land on Home. We intentionally drop the
+      // `from` redirect — see the file-level comment.
+      const target = me.role === 'admin' ? '/app' : '/app/onboarding';
       navigate(target, { replace: true });
     } catch {
       toast.error("That code didn't work — try again");
