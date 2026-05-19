@@ -112,10 +112,10 @@ describe('TripFeedPage', () => {
     expect(screen.getByText(/bangalore → chennai/i)).toBeInTheDocument();
     expect(screen.getByText(/4\.2 km away/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /near me/i })).toBeInTheDocument();
-    // Cards link to /trips/:id?from=/trips so Back from the detail page
+    // Cards link to /trips/:id?from=/app/trips so Back from the detail page
     // returns the driver to Open Trips (not /my-trips).
     const card = screen.getByText(/vellore → chennai/i).closest('a');
-    expect(card).toHaveAttribute('href', '/app/trips/t1?from=/trips');
+    expect(card).toHaveAttribute('href', '/app/trips/t1?from=/app/trips');
   });
 
   it('"Clear filters" restores trips hidden by the car-type filter', () => {

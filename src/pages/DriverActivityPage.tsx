@@ -336,7 +336,7 @@ export function DriverActivityPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const urlScope = searchParams.get('scope');
   const scope: Scope | null = isScope(urlScope) ? urlScope : null;
-  const fromParam = searchParams.get('from') ?? '/';
+  const fromParam = searchParams.get('from') ?? '/app';
   const urlTab = searchParams.get('tab');
   const tab: Tab = isTab(urlTab) ? urlTab : 'driving';
   const setTab = (next: Tab) => {
@@ -442,7 +442,7 @@ export function DriverActivityPage() {
             query={invitedQuery}
             trips={scopedInvites}
             onShare={setShareTrip}
-            linkFromPath={`/app/my-trips?scope=invites-received${fromParam && fromParam !== '/' ? `&from=${encodeURIComponent(fromParam)}` : '&from=/'}`}
+            linkFromPath={`/app/my-trips?scope=invites-received${fromParam && fromParam !== '/app' ? `&from=${encodeURIComponent(fromParam)}` : '&from=/app'}`}
           />
         </div>
         {shareTrip ? <ShareTripModal trip={shareTrip} onClose={() => setShareTrip(null)} /> : null}

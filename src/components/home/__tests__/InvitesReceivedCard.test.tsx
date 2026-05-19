@@ -59,7 +59,7 @@ describe('InvitesReceivedCard', () => {
     renderCard([makeTrip({ id: 'inv-1', driverPayout: 3000 })]);
     const link = screen.getByRole('link');
     // ?from=/ tells TripDetailPage's back button to return to driver Home, not /my-trips.
-    expect(link).toHaveAttribute('href', '/app/trips/inv-1?from=/');
+    expect(link).toHaveAttribute('href', '/app/trips/inv-1?from=/app');
     expect(link).toHaveTextContent(/vellore → chennai/i);
     expect(link).toHaveTextContent(/accept or decline/i);
   });
@@ -67,7 +67,7 @@ describe('InvitesReceivedCard', () => {
   it('links to the scoped /my-trips?scope=invites-received view when 2+ invitations are pending', () => {
     renderCard([makeTrip({ id: 'a' }), makeTrip({ id: 'b' }), makeTrip({ id: 'c' })]);
     const link = screen.getByRole('link');
-    expect(link).toHaveAttribute('href', '/app/my-trips?scope=invites-received&from=/');
+    expect(link).toHaveAttribute('href', '/app/my-trips?scope=invites-received&from=/app');
     expect(link).toHaveTextContent(/3 trips invited you to drive/i);
   });
 });

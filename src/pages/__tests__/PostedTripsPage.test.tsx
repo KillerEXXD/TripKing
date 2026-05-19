@@ -121,7 +121,7 @@ describe('PostedTripsPage', () => {
     // Default filter is "Open"; the has_applicants trip lives under "Has applicants"
     fireEvent.click(screen.getByRole('button', { name: /^has applicants/i }));
     // PostedTripsPage now always passes linkFromPath so the trip-detail Back arrow returns
-    // to the same filter chip — href carries a `?from=/posted-trips?status=…` breadcrumb.
+    // to the same filter chip — href carries a `?from=/app/posted-trips?status=…` breadcrumb.
     expect(screen.getByRole('link', { name: /review applicants/i }).getAttribute('href')).toMatch(/^\/app\/trips\/t1\/applicants\?from=%2Fapp%2Fposted-trips%3Fstatus%3Dhas_applicants/);
     fireEvent.click(screen.getByRole('button', { name: /share/i }));
     expect(screen.getByText('share modal')).toBeInTheDocument();
@@ -199,12 +199,12 @@ describe('PostedTripsPage', () => {
       makeTrip({ id: 'n1', status: 'open', pendingInvitationCount: 0, fromCity: city('c3', 'NoInvites') }),
       makeTrip({ id: 'd1', status: 'cancelled', pendingInvitationCount: 5, fromCity: city('c4', 'CancelledOutsideScope') }),
     ] });
-    renderPosted('/app/posted-trips?scope=invites-sent&from=/');
+    renderPosted('/app/posted-trips?scope=invites-sent&from=/app');
     // Title swap + scope-specific subtitle (2 trips · 3 pending invites)
     expect(screen.getByText('Invites sent')).toBeInTheDocument();
     expect(screen.getByText(/2 trips · 3 pending invites/i)).toBeInTheDocument();
-    // Back arrow renders + points to /
-    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/');
+    // Back arrow renders + points to /app
+    expect(screen.getByRole('link', { name: /back/i })).toHaveAttribute('href', '/app');
     // Filter chip strip is gone
     expect(screen.queryByRole('button', { name: /^all/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /^invited/i })).toBeNull();
@@ -218,20 +218,20 @@ describe('PostedTripsPage', () => {
 
   it('?scope=invites-sent with no qualifying trips — renders the scoped empty state with a "Back to home" action', () => {
     setTrips({ data: [makeTrip({ id: 'p1', status: 'open', pendingInvitationCount: 0 })] });
-    renderPosted('/app/posted-trips?scope=invites-sent&from=/');
+    renderPosted('/app/posted-trips?scope=invites-sent&from=/app');
     expect(screen.getByText('No invitations pending')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /back to home/i })).toHaveAttribute('href', '/app');
   });
 
-  it('?scope=invites-sent — trip-card link includes ?from=/posted-trips?scope=invites-sent so the trip detail walks back to the scoped list', () => {
+  it('?scope=invites-sent — trip-card link includes ?from=/app/posted-trips?scope=invites-sent so the trip detail walks back to the scoped list', () => {
     setTrips({ data: [
       makeTrip({ id: 'i1', status: 'open', pendingInvitationCount: 2, fromCity: city('c1', 'Vellore') }),
     ] });
-    renderPosted('/app/posted-trips?scope=invites-sent&from=/');
+    renderPosted('/app/posted-trips?scope=invites-sent&from=/app');
     const tripLinks = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/app/trips/i1'));
     expect(tripLinks.length).toBeGreaterThan(0);
     for (const a of tripLinks) {
-      expect(a.getAttribute('href')).toMatch(/^\/app\/trips\/i1(\/[a-z]+)?\?from=/);
+      expect(a.getAttribute('href')).toMatch(/^\/app\/trips\/i1(\/[a-z]+)?\?from=%2Fapp/);
       const fromParam = new URL(a.getAttribute('href')!, 'https://x').searchParams.get('from');
       expect(fromParam).toContain('/app/posted-trips?scope=invites-sent');
     }

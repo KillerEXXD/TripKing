@@ -31,7 +31,7 @@ function renderSignIn(initialEntry: string | { pathname: string; state: unknown 
     <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route path="/app/signin" element={<SignInPage />} />
-        <Route path="/" element={<div>home page</div>} />
+        <Route path="/app" element={<div>home page</div>} />
         <Route path="/app/onboarding" element={<div>onboarding screen</div>} />
         <Route path="/app/trips/abc" element={<div>deep-linked trip</div>} />
       </Routes>

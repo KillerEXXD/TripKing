@@ -61,7 +61,7 @@ function SelectedRow({ app }: { app: MyApplication }) {
   }
   return (
     <Card className="gap-0 p-0">
-      <Link to={`/app/trips/${t.id}?from=/my-trips/awaiting`} className="block space-y-1.5 p-4 pb-3">
+      <Link to={`/app/trips/${t.id}?from=/app/my-trips/awaiting`} className="block space-y-1.5 p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">{t.fromCity.name} → {t.toCity.name}</div>
@@ -89,7 +89,7 @@ function SelectedRow({ app }: { app: MyApplication }) {
           <XCircle className="size-3.5" aria-hidden />
           {declineMutation.isPending ? 'Declining…' : 'Decline'}
         </button>
-        <Link to={`/app/trips/${t.id}?from=/my-trips/awaiting`} className="ml-auto flex items-center text-primary">
+        <Link to={`/app/trips/${t.id}?from=/app/my-trips/awaiting`} className="ml-auto flex items-center text-primary">
           Accept
           <ChevronRight className="ml-0.5 size-3.5" aria-hidden />
         </Link>

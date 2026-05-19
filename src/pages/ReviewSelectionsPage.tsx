@@ -32,7 +32,7 @@ export function ReviewSelectionsPage() {
   const awaiting = (query.data ?? []).filter((a) => a.status === 'selected');
 
   function onBack() {
-    if (from === 'home') navigate('/');
+    if (from === 'home') navigate('/app');
     else if (from === 'my-trips') navigate('/app/my-trips');
     else navigate(-1);
   }

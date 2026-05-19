@@ -209,7 +209,7 @@ export function PostedTripsPage() {
   const filter: Filter = isFilter(urlFilter) ? urlFilter : 'open';
   const urlScope = searchParams.get('scope');
   const scope: Scope | null = isScope(urlScope) ? urlScope : null;
-  const from = searchParams.get('from') ?? '/';
+  const from = searchParams.get('from') ?? '/app';
   const setFilter = (next: Filter) => {
     const params = new URLSearchParams(searchParams);
     if (next === 'open') params.delete('status');
@@ -324,7 +324,7 @@ export function PostedTripsPage() {
                   onShare={() => setShareTrip(t)}
                   linkFromPath={
                     scope
-                      ? `/app/posted-trips?scope=${scope}${from && from !== '/' ? `&from=${from}` : '&from=/'}`
+                      ? `/app/posted-trips?scope=${scope}${from && from !== '/app' ? `&from=${from}` : '&from=/app'}`
                       // No scope → still encode the current filter chip so the trip detail
                       // Back arrow returns to the same filter (Open / Cancelled / Invited / …),
                       // not the default Open tab.

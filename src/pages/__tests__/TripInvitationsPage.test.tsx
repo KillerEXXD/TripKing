@@ -198,10 +198,10 @@ describe('TripInvitationsPage', () => {
     // "Review applicants" link (PostedTripCard renders this instead of "View details" when
     // status=has_applicants) → points to /trips/:id/applicants with the breadcrumb attached.
     const reviewLink = screen.getByRole('link', { name: /review applicants/i });
-    expect(reviewLink.getAttribute('href')).toMatch(/^\/app\/trips\/t1\/applicants\?from=/);
+    expect(reviewLink.getAttribute('href')).toMatch(/^\/app\/trips\/t1\/applicants\?from=%2Fapp/);
   });
 
-  it('passes a breadcrumb (?from=/trips/:id/invitations) so the trip detail back-arrow returns HERE', () => {
+  it('passes a breadcrumb (?from=/app/trips/:id/invitations) so the trip detail back-arrow returns HERE', () => {
     setAuth(agent);
     setTrip({ data: makeTrip() });
     setInvites({ data: [makeInvite({ status: 'pending' })] });

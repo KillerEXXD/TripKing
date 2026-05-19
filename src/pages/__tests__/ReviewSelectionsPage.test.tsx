@@ -55,7 +55,7 @@ function renderAt(state?: { from?: 'home' | 'my-trips' }) {
     <MemoryRouter initialEntries={[{ pathname: '/app/my-trips/review', state: state ?? null }]}>
       <Routes>
         <Route path="/app/my-trips/review" element={<ReviewSelectionsPage />} />
-        <Route path="/" element={<div>home page</div>} />
+        <Route path="/app" element={<div>home page</div>} />
         <Route path="/app/my-trips" element={<div>my trips page</div>} />
         <Route path="/app/trips/:id" element={<div>trip detail</div>} />
       </Routes>

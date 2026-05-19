@@ -38,11 +38,11 @@ describe('AwaitingDecisionPage', () => {
     vi.mocked(useDeclineTrip).mockReset().mockReturnValue({ mutateAsync: vi.fn().mockResolvedValue(undefined), isPending: false } as never);
   });
 
-  it('lists selected applications and links each to the trip detail with ?from=/my-trips/awaiting', () => {
+  it('lists selected applications and links each to the trip detail with ?from=/app/my-trips/awaiting', () => {
     setApps({ data: [makeApp({ acceptanceId: 'a1', trip: makeTrip({ id: 'trip-1' }) })] });
     renderPage();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
-    expect(link).toHaveAttribute('href', '/app/trips/trip-1?from=/my-trips/awaiting');
+    expect(link).toHaveAttribute('href', '/app/trips/trip-1?from=/app/my-trips/awaiting');
   });
 
   it('inline Decline button fires the decline mutation with the trip id (no need to drill into trip detail)', async () => {

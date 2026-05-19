@@ -59,10 +59,10 @@ describe('AgentInProgressQueuePage', () => {
     expect(screen.getByText(/no trips in progress/i)).toBeInTheDocument();
   });
 
-  it('row links carry ?from=/queue/in-progress', () => {
+  it('row links carry ?from=/app/queue/in-progress', () => {
     setTrips({ data: [makeTrip({ id: 'abc' })] });
     renderQ();
     const link = screen.getByRole('link', { name: /Vellore → Chennai/i });
-    expect(link).toHaveAttribute('href', '/app/trips/abc?from=/queue/in-progress');
+    expect(link).toHaveAttribute('href', '/app/trips/abc?from=/app/queue/in-progress');
   });
 });
