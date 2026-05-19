@@ -86,7 +86,7 @@ describe('SignInPage', () => {
     expect(await screen.findByText('home page')).toBeInTheDocument();
   });
 
-  it('honours a pending "from" redirect after verify instead of /onboarding', async () => {
+  it('ignores any pending "from" redirect after verify — always lands on Home (via /onboarding which bails to /app for users with a profile)', async () => {
     mockAuth();
     verifyOtp.mockResolvedValue({ id: 'u1', role: 'driver', phone: '+919876543210', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
     renderSignIn({ pathname: '/app/signin', state: { from: '/app/trips/abc' } });
@@ -96,7 +96,21 @@ describe('SignInPage', () => {
     const otpInput = await screen.findByLabelText('OTP code');
     fireEvent.change(otpInput, { target: { value: '123456' } });
     fireEvent.click(screen.getByRole('button', { name: /verify & continue/i }));
-    expect(await screen.findByText('deep-linked trip')).toBeInTheDocument();
+    // Driver/agent: hits /onboarding (which itself bails to /app for established users).
+    expect(await screen.findByText('onboarding screen')).toBeInTheDocument();
+    expect(screen.queryByText('deep-linked trip')).toBeNull();
+  });
+
+  it('an admin signing in with a pending "from" still lands on /app, not the deep-link', async () => {
+    mockAuth();
+    verifyOtp.mockResolvedValue({ id: 'u1', role: 'admin', phone: '+919840780100', displayName: '', preferredLanguage: 'en', isActive: true, canReportBugs: false });
+    renderSignIn({ pathname: '/app/signin', state: { from: '/app/trips/abc' } });
+    fireEvent.change(screen.getByLabelText('Mobile number'), { target: { value: '98407 80100' } });
+    fireEvent.click(screen.getByRole('button', { name: /send otp/i }));
+    const otpInput = await screen.findByLabelText('OTP code');
+    fireEvent.change(otpInput, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /verify & continue/i }));
+    expect(await screen.findByText('home page')).toBeInTheDocument();
   });
 
   it('still advances to OTP entry even if request-otp fails (no real SMS provider yet)', async () => {
