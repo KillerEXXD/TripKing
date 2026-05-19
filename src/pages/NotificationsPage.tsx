@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { AlarmClock, BadgeCheck, Bell, BellRing, Bug, CheckCircle2, FileEdit, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Star, ThumbsDown, ThumbsUp, UserCheck, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
+import { AlarmClock, ArrowUpFromLine, BadgeCheck, Ban, Banknote, Bell, BellRing, Bug, CheckCircle2, Coins, FileEdit, Gift, Hourglass, Mail, MessageSquare, RotateCcw, ShieldOff, Sparkles, Star, ThumbsDown, ThumbsUp, Trophy, UserCheck, UserPlus, UserX, Wrench, XCircle, type LucideIcon } from 'lucide-react';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/hooks/useNotifications';
 import { PageHeader, PageShell } from '@/components/layout';
 import { Button, Card } from '@/components/ui';
@@ -27,6 +27,21 @@ const ICON: Record<NotificationType, LucideIcon> = {
   driver_declined: UserX,
   // Migration 060: trip poster edited a trip with applicants/invitees.
   trip_updated: FileEdit,
+  // Referral programme:
+  referral_signup: UserPlus,
+  referral_verified: BadgeCheck,
+  referral_qualified: Trophy,
+  referral_first_eligible_trip: Sparkles,
+  referral_earning: Coins,
+  referral_released: Gift,
+  referral_cap_reached: Ban,
+  // Withdrawal lifecycle:
+  withdrawal_requested: ArrowUpFromLine,
+  withdrawal_approved: CheckCircle2,
+  withdrawal_rejected: XCircle,
+  withdrawal_paid: Banknote,
+  // Forward-compat sentinel (transform coerces unknown server types here).
+  unknown: Bell,
 };
 
 function relTime(iso: string): string {

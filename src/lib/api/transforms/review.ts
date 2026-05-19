@@ -1,5 +1,6 @@
 /** Review + notification transforms — strict on the keys the app needs. */
 import { ApiTransformError } from '@/lib/api/transforms/base';
+import { addDataBreadcrumb } from '@/lib/sentry';
 import type { Notification, NotificationType, RaterRole, Review, ReviewDirection, ReviewInput, ReviewScore } from '@/types';
 
 export type ReviewTransformErrorCode = 'MISSING_ID' | 'MISSING_TRIP_ID' | 'BAD_DIRECTION' | 'BAD_SCORE';
@@ -57,18 +58,33 @@ const NOTIFICATION_TYPES: readonly NotificationType[] = [
   'bug_reported', 'bug_resolved', 'bug_commented',
   // Phase 3 of the two-step handshake (migration 032):
   'trip_selected', 'trip_assignment_cancelled', 'selection_expired', 'driver_declined',
+  // Migration 060 + referral / withdrawal lifecycle:
+  'trip_updated',
+  'referral_signup', 'referral_verified', 'referral_qualified', 'referral_first_eligible_trip',
+  'referral_earning', 'referral_released', 'referral_cap_reached',
+  'withdrawal_requested', 'withdrawal_approved', 'withdrawal_rejected', 'withdrawal_paid',
+  'unknown',
 ];
 export function transformNotification(api: Api): Notification {
   const id = str(api.id);
   if (!id) throw new Error('notification has no id');
   const userId = str(api.user_id);
   if (!userId) throw new Error(`notification ${id} has no user_id`);
-  const type = str(api.type);
-  if (!type || !NOTIFICATION_TYPES.includes(type as NotificationType)) throw new Error(`notification ${id}: bad type "${type}"`);
+  const rawType = str(api.type);
+  // Lenient on enum drift: a server-side notification type the client hasn't shipped
+  // yet must not take down the whole inbox. Breadcrumb so we can spot the drift in
+  // Sentry, then fall back to the 'unknown' sentinel — the UI uses title/body as-is.
+  let type: NotificationType;
+  if (rawType && NOTIFICATION_TYPES.includes(rawType as NotificationType)) {
+    type = rawType as NotificationType;
+  } else {
+    addDataBreadcrumb('unknown notification type', { feature: 'notifications', endpoint: '/notifications' }, 'warning');
+    type = 'unknown';
+  }
   return {
     id,
     userId,
-    type: type as NotificationType,
+    type,
     title: str(api.title) ?? '',
     body: str(api.body) ?? '',
     payloadJson: api.payload_json && typeof api.payload_json === 'object' ? (api.payload_json as Record<string, unknown>) : {},
