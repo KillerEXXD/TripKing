@@ -14,11 +14,12 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
+import { buildWaypointInputs } from '@/pages/postTripWaypoints';
 import { Button, Card, Input, ProgressBar, SectionLabel, Select, StatusBanner, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatKmAndDuration, formatPickupDateTime, formatShortDate, haversineKm } from '@/lib/utils';
-import type { Place, PostTripInput, Trip, TripType, UpdateTripDetailsInput, WaypointInput } from '@/types';
+import type { Place, PostTripInput, Trip, TripType, UpdateTripDetailsInput } from '@/types';
 
 interface PostTripForm {
   fromCityId: string;
@@ -338,25 +339,16 @@ export function PostTripPage() {
     // one-way keeps today's body (the server synthesises a 2-waypoint plan).
     const pickupIso = new Date(values.pickupAt).toISOString();
     const endIso = expectedEndAt ? new Date(expectedEndAt).toISOString() : undefined;
-    let waypointInputs: WaypointInput[] | undefined;
-    if (tripType === 'round_trip') {
-      waypointInputs = [
-        { cityId: values.fromCityId, placeId: fromPlace?.id },
-        { cityId: values.toCityId, placeId: toPlace?.id, arriveAt: pickupIso, waitMinutes: 0, isDestination: true },
-        { cityId: values.fromCityId, placeId: fromPlace?.id, arriveAt: endIso, waitMinutes: 0, isDestination: true },
-      ];
-    } else if (tripType === 'multi_way') {
-      const rows: WaypointInput[] = waypoints.map((w) => ({
-        cityId: w.cityId,
-        arriveAt: w.arriveAt ? new Date(w.arriveAt).toISOString() : undefined,
-        waitMinutes: w.waitMinutes,
-        isDestination: true,
-        notes: w.notes.trim() || undefined,
-      }));
-      const list: WaypointInput[] = [{ cityId: values.fromCityId, placeId: fromPlace?.id }, ...rows];
-      if (returnToStart) list.push({ cityId: values.fromCityId, placeId: fromPlace?.id, arriveAt: endIso, waitMinutes: 0, isDestination: true });
-      waypointInputs = list;
-    }
+    const waypointInputs = buildWaypointInputs({
+      tripType,
+      fromCityId: values.fromCityId,
+      toCityId: values.toCityId,
+      fromPlaceId: fromPlace?.id,
+      toPlaceId: toPlace?.id,
+      endIso,
+      multiWayRows: waypoints,
+      returnToStart,
+    });
     const input: PostTripInput = {
       tripType: tripType === 'one_way' ? undefined : tripType,
       waypoints: waypointInputs,

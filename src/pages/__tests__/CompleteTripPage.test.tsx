@@ -93,6 +93,29 @@ describe('CompleteTripPage', () => {
     expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled();
   });
 
+  it('shows an inline error when the ending odometer is not greater than the start (Qase D18)', () => {
+    setUp(makeTrip({ startOdoReading: 50000 }));
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /mock-upload:ending odometer photo/i }));
+    fireEvent.change(screen.getByLabelText(/end odometer reading/i), { target: { value: '49000' } });
+    expect(screen.getByText(/must be greater than the start reading \(50000 km\)/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+    // Fixing it clears the error and enables Next.
+    fireEvent.change(screen.getByLabelText(/end odometer reading/i), { target: { value: '50120' } });
+    expect(screen.queryByText(/must be greater than the start reading/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /next/i })).not.toBeDisabled();
+  });
+
+  it('shows an inline error for a negative toll value (Qase D19)', () => {
+    setUp();
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /mock-upload:ending odometer photo/i }));
+    fireEvent.change(screen.getByLabelText(/end odometer reading/i), { target: { value: '50125' } });
+    fireEvent.change(screen.getByLabelText(/toll paid by you/i), { target: { value: '-50' } });
+    expect(screen.getByText(/toll can.t be negative — enter 0/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /next/i })).toBeDisabled();
+  });
+
   it('the live preview shows extra-KM fare and toll line when applicable', () => {
     setUp();
     renderPage();

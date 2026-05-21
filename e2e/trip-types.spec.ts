@@ -143,9 +143,13 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
     const cities = await getCities(request);
     const carTypes = await getCarTypes(request);
     const pickupAt = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
-    const turnAt = new Date(Date.now() + 8 * 3600 * 1000).toISOString();  // strictly > pickup
-    const endAt = new Date(Date.now() + 28 * 3600 * 1000).toISOString(); // strictly > turn
+    const endAt = new Date(Date.now() + 28 * 3600 * 1000).toISOString();
 
+    // Mirror the EXACT body PostTripPage builds: the turnaround waypoint carries NO
+    // arrive_at (only the final return leg does). Qase D8/D9 — the old version of this
+    // test hand-built a valid `turnAt`-on-turnaround body and so never exercised the
+    // shape the form actually sends; the server's strict arrive_at>previous check
+    // rejected the form's turnaround (arrive_at == pickup) and broke every round-trip.
     const post = await request.post(`${API_BASE}/trips`, {
       headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
       data: JSON.stringify({
@@ -158,7 +162,7 @@ test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
         trip_type: 'round_trip',
         waypoints: [
           { city_id: cities[0]!.id },
-          { city_id: cities[1]!.id, arrive_at: turnAt, wait_minutes: 0, is_destination: true },
+          { city_id: cities[1]!.id, wait_minutes: 0, is_destination: true },
           { city_id: cities[0]!.id, arrive_at: endAt, wait_minutes: 0, is_destination: true },
         ],
       }),
