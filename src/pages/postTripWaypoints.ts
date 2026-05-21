@@ -1,57 +1,69 @@
-import type { WaypointInput, TripType } from '@/types';
+import type { WaypointInput, TripCategory } from '@/types';
 import type { WaypointDraft } from '@/components/trip/WaypointEditor';
+import type { TripDirection } from '@/components/trip/TripDirectionToggle';
 
 export interface BuildWaypointArgs {
-  tripType: TripType;
+  category: TripCategory;
+  /** Outstation only; Local is always one_way, Package has no direction. */
+  direction: TripDirection;
+  /** Outstation city endpoints. */
   fromCityId: string;
   toCityId: string;
+  /** Optional pinned exact points (Outstation) / required addresses (Local). */
   fromPlaceId?: string;
   toPlaceId?: string;
-  /** ISO end timestamp (round-trip return / multi-way return-to-start anchor). */
+  /** Outstation round-trip: a separate "return drop-off" pin (the return city is always From). */
+  returnPlaceId?: string;
+  /** ISO end timestamp — anchors the round-trip return leg. */
   endIso?: string;
-  /** Multi-way editor rows (ignored for one-way / round-trip). */
-  multiWayRows: WaypointDraft[];
-  returnToStart: boolean;
+  /** Intermediate stops (city-mode for Outstation, address-mode for Local). */
+  stops: WaypointDraft[];
 }
 
+const stopArrive = (s: WaypointDraft): string | undefined => (s.arriveAt ? new Date(s.arriveAt).toISOString() : undefined);
+
 /**
- * Build the `waypoints[]` POST payload from the trip-post form state.
+ * Build the `waypoints[]` POST payload from the trip-post form state (migration 071 model).
  *
- * Returns `undefined` for one-way trips — the server synthesises a 2-waypoint
- * plan from `from_*`/`to_*`, so no explicit waypoints are sent.
+ * Returns `undefined` when no explicit waypoints are needed — the server then synthesises a
+ * 2-waypoint plan from `from_*`/`to_*` (Outstation one-way with no stops, or Local with no
+ * stops where it derives the city from the place). Package also returns `undefined`: the
+ * server builds the pickup-only plan from `from_place_id` + `package_*`.
  *
- * IMPORTANT — round-trip turnaround carries NO `arriveAt`. The server enforces
- * strictly increasing `arrive_at` across waypoints, and the outbound leg's
- * natural arrival equals the trip pickup, so an `arriveAt:pickupIso` was rejected
- * with "arrive_at must be after the previous waypoint's time" — which broke EVERY
- * round-trip post (Qase D8/D9). Only the final return leg anchors the window via
- * `endIso`.
+ * IMPORTANT — the round-trip return leg carries NO `arriveAt` on the outbound legs (the server
+ * enforces strictly increasing `arrive_at`); only the final return leg anchors the window via
+ * `endIso` (Qase D8/D9 — an `arriveAt:pickupIso` on the outbound leg broke every round trip).
  */
 export function buildWaypointInputs(args: BuildWaypointArgs): WaypointInput[] | undefined {
-  const { tripType, fromCityId, toCityId, fromPlaceId, toPlaceId, endIso, multiWayRows, returnToStart } = args;
+  const { category, direction, fromCityId, toCityId, fromPlaceId, toPlaceId, returnPlaceId, endIso, stops } = args;
 
-  if (tripType === 'round_trip') {
+  if (category === 'package') return undefined;
+
+  if (category === 'local') {
+    if (stops.length === 0) return undefined; // server synthesises from from_place_id/to_place_id
     return [
-      { cityId: fromCityId, placeId: fromPlaceId },
-      { cityId: toCityId, placeId: toPlaceId, waitMinutes: 0, isDestination: true },
-      { cityId: fromCityId, placeId: fromPlaceId, arriveAt: endIso, waitMinutes: 0, isDestination: true },
+      { placeId: fromPlaceId },
+      ...stops.map((s) => ({ placeId: s.placeId, arriveAt: stopArrive(s), waitMinutes: s.waitMinutes, isDestination: true, notes: s.notes.trim() || undefined })),
+      { placeId: toPlaceId, isDestination: true },
     ];
   }
 
-  if (tripType === 'multi_way') {
-    const rows: WaypointInput[] = multiWayRows.map((w) => ({
-      cityId: w.cityId,
-      arriveAt: w.arriveAt ? new Date(w.arriveAt).toISOString() : undefined,
-      waitMinutes: w.waitMinutes,
-      isDestination: true,
-      notes: w.notes.trim() || undefined,
-    }));
-    const list: WaypointInput[] = [{ cityId: fromCityId, placeId: fromPlaceId }, ...rows];
-    if (returnToStart) list.push({ cityId: fromCityId, placeId: fromPlaceId, arriveAt: endIso, waitMinutes: 0, isDestination: true });
-    return list;
+  // Outstation
+  if (direction === 'round_trip') {
+    return [
+      { cityId: fromCityId, placeId: fromPlaceId },
+      ...stops.map((s) => ({ cityId: s.cityId, arriveAt: stopArrive(s), waitMinutes: s.waitMinutes, isDestination: true, notes: s.notes.trim() || undefined })),
+      { cityId: fromCityId, placeId: returnPlaceId ?? fromPlaceId, arriveAt: endIso, waitMinutes: 0, isDestination: true },
+    ];
   }
 
-  return undefined;
+  // Outstation one-way
+  if (stops.length === 0) return undefined; // legacy 2-waypoint synth from from/to city
+  return [
+    { cityId: fromCityId, placeId: fromPlaceId },
+    ...stops.map((s) => ({ cityId: s.cityId, arriveAt: stopArrive(s), waitMinutes: s.waitMinutes, isDestination: true, notes: s.notes.trim() || undefined })),
+    { cityId: toCityId, placeId: toPlaceId, isDestination: true },
+  ];
 }
 
 /**

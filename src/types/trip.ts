@@ -9,6 +9,8 @@ export type PosterRole = 'driver' | 'trip_manager';
 export type AcceptanceStatus = 'applied' | 'selected' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
 /** Migration 024: the *shape* of the route. */
 export type TripType = 'one_way' | 'round_trip' | 'multi_way';
+/** Migration 071: the booking *category*. Local = address-booked; Outstation = city-to-city; Package = hourly rental. */
+export type TripCategory = 'local' | 'outstation' | 'package';
 
 /** One stop in a trip's itinerary. seq=0 is the origin; the highest seq is the final destination. */
 export interface Waypoint {
@@ -39,6 +41,12 @@ export interface Trip {
   id: string;
   /** Route shape (migration 024). Optional for back-compat; transforms default to `one_way`. */
   tripType?: TripType;
+  /** Booking category (migration 071). Optional for back-compat; transforms default to `outstation`. */
+  tripCategory?: TripCategory;
+  /** Package only: hired hours (≥4). */
+  packageHours?: number;
+  /** Package only: included km cap. */
+  packageIncludedKm?: number;
   /** Trip end timestamp — the driver is committed until then. Multi-day trips have a real span. */
   expectedEndAt?: string;
   /** Ordered list of waypoints (origin → 0+ stops → final). Optional; transforms default to `[]`. */
@@ -246,6 +254,12 @@ export interface TripAcceptance {
 export interface PostTripInput {
   /** Route shape (migration 024). When omitted the server defaults to `one_way`. */
   tripType?: TripType;
+  /** Booking category (migration 071). When omitted the server defaults to `outstation`. */
+  tripCategory?: TripCategory;
+  /** Package only: hired hours (≥4). Required when `tripCategory` is `package`. */
+  packageHours?: number;
+  /** Package only: included km cap. Required when `tripCategory` is `package`. */
+  packageIncludedKm?: number;
   /** Ordered waypoints — preferred over `fromCityId`/`toCityId` for round_trip / multi_way / any
    *  trip with intermediate stops. Required when `tripType` is round_trip or multi_way. */
   waypoints?: WaypointInput[];

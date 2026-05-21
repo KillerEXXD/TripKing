@@ -63,45 +63,53 @@ async function capturePostedTripId(page: Page): Promise<() => string | null> {
 // `pickDate(page, label, isoDate)` that clicks the trigger → drives the popover → closes.
 // Tab-only assertions (one-way default, round-trip relabel, multi-way reveal) work without
 // dates and remain enabled.
-test.describe('PostTripPage — trip-type tabs (migration 024)', () => {
-  test('one-way is the default; section heading is "Route & schedule"', async ({ page, request }) => {
+test.describe('PostTripPage — trip-category tabs (migration 071)', () => {
+  test('Outstation is the default category with a one-way direction', async ({ page, request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
 
-    const oneWay = page.getByRole('tab', { name: /one-way/i });
-    const roundTrip = page.getByRole('tab', { name: /round-trip/i });
-    const multiWay = page.getByRole('tab', { name: /multi-way/i });
-    await expect(oneWay).toHaveAttribute('aria-selected', 'true');
-    await expect(roundTrip).toHaveAttribute('aria-selected', 'false');
-    await expect(multiWay).toHaveAttribute('aria-selected', 'false');
-    await expect(page.getByText(/Route & schedule/i)).toBeVisible();
+    await expect(page.getByRole('tab', { name: /local/i })).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByRole('tab', { name: /outstation/i })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: /package/i })).toHaveAttribute('aria-selected', 'false');
+    await expect(page.getByRole('tab', { name: /one-way/i })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText(/Outstation plan/i)).toBeVisible();
   });
 
-  test('switching to Round-trip relabels the destination + reveals "Trip ends"', async ({ page, request }) => {
+  test('Outstation round-trip locks To=From, shows "First stop", reveals "Trip ends"', async ({ page, request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
 
     await page.getByRole('tab', { name: /round-trip/i }).click();
-    await expect(page.getByText(/Round-trip plan/i)).toBeVisible();
-    await expect(page.getByText(/Turnaround city/i)).toBeVisible();
+    await expect(page.getByText(/First stop/i)).toBeVisible();
+    await expect(page.getByText(/round trip returns to the start city/i)).toBeVisible();
     await expect(page.getByText(/Trip ends/i)).toBeVisible();
   });
 
-  test('switching to Multi-way reveals the waypoint editor + the return-to-start checkbox', async ({ page, request }) => {
+  test('Local reveals the address-search inputs (no city dropdown)', async ({ page, request }) => {
     const admin = await mintAdmin(request);
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
 
-    await page.getByRole('tab', { name: /multi-way/i }).click();
-    await expect(page.getByText(/Multi-way itinerary/i)).toBeVisible();
-    await expect(page.getByText(/Destinations \(in order\)/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /add destination/i })).toBeVisible();
-    await expect(page.getByLabel(/return to start/i)).toBeVisible();
+    await page.getByRole('tab', { name: /local/i }).click();
+    await expect(page.getByText(/From \(pickup address\)/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /search the pickup address/i })).toBeVisible();
+    await expect(page.getByText(/To \(drop-off address\)/i)).toBeVisible();
+  });
+
+  test('Package reveals the pickup address + the hours/km package ladder', async ({ page, request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    await loginAs(page, agent);
+    await page.goto('/app/trips/new');
+
+    await page.getByRole('tab', { name: /package/i }).click();
+    await expect(page.getByText(/Rental package/i)).toBeVisible();
+    await expect(page.getByRole('radio', { name: /8 hr/i })).toBeVisible();
   });
 
   // Body-shape tests are pure API: the form's date pickers are Radix Popovers (not native
