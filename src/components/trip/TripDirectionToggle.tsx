@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** Outstation sub-toggle — the route's direction. (Local is always one-way; Package has no direction.) */
@@ -16,7 +17,7 @@ const TABS: { value: TripDirection; label: string; hint: string }[] = [
 
 export function TripDirectionToggle({ value, onChange, className }: TripDirectionToggleProps) {
   return (
-    <div role="tablist" aria-label="Trip direction" className={cn('flex gap-1.5 rounded-xl border bg-muted/40 p-1', className)}>
+    <div role="tablist" aria-label="Trip direction" className={cn('flex gap-2 rounded-xl', className)}>
       {TABS.map((t) => {
         const active = value === t.value;
         return (
@@ -27,12 +28,19 @@ export function TripDirectionToggle({ value, onChange, className }: TripDirectio
             aria-selected={active}
             onClick={() => onChange(t.value)}
             className={cn(
-              'flex-1 rounded-lg px-3 py-1.5 text-center transition-colors',
-              active ? 'bg-white text-foreground shadow-sm' : 'bg-transparent text-secondary hover:bg-white/50',
+              'relative flex-1 rounded-xl border-2 px-3 py-2 text-center transition-colors',
+              active
+                ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/30'
+                : 'border-input bg-white text-secondary hover:border-primary/40',
             )}
           >
-            <div className="text-xs font-semibold">{t.label}</div>
-            <div className="mt-0.5 text-[10px] text-secondary">{t.hint}</div>
+            {active ? (
+              <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <Check className="size-3" aria-hidden />
+              </span>
+            ) : null}
+            <div className={cn('text-sm font-bold', active ? 'text-primary' : 'text-foreground')}>{t.label}</div>
+            <div className={cn('mt-0.5 text-[10px]', active ? 'text-primary/70' : 'text-secondary')}>{t.hint}</div>
           </button>
         );
       })}

@@ -4,10 +4,17 @@ import { axe } from 'vitest-axe';
 import { TripDirectionToggle } from '@/components/trip/TripDirectionToggle';
 
 describe('TripDirectionToggle', () => {
-  it('marks the active direction selected', () => {
+  it('marks the active direction selected with a prominent primary outline + check badge', () => {
     render(<TripDirectionToggle value="round_trip" onChange={() => {}} />);
-    expect(screen.getByRole('tab', { name: /one-way/i })).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByRole('tab', { name: /round-trip/i })).toHaveAttribute('aria-selected', 'true');
+    const oneWay = screen.getByRole('tab', { name: /one-way/i });
+    const roundTrip = screen.getByRole('tab', { name: /round-trip/i });
+    expect(oneWay).toHaveAttribute('aria-selected', 'false');
+    expect(roundTrip).toHaveAttribute('aria-selected', 'true');
+    // The active option reads clearly as "selected": primary tint + a check badge.
+    expect(roundTrip.className).toMatch(/bg-primary\/10/);
+    expect(oneWay.className).toMatch(/border-input/);
+    expect(roundTrip.querySelector('svg')).not.toBeNull(); // check badge only on the active one
+    expect(oneWay.querySelector('svg')).toBeNull();
   });
 
   it('emits the picked direction', () => {
