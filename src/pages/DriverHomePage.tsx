@@ -9,6 +9,8 @@ import { useMyApplications, useTrips } from '@/hooks/useTrips';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { IAmAvailableCard } from '@/components/vacancy/IAmAvailableCard';
+import { OnlineToggle } from '@/components/presence/OnlineToggle';
+import { useDispatchAlgorithm } from '@/hooks/usePlatformConfig';
 import { Button, Card } from '@/components/ui';
 import { GetVerifiedBanner } from '@/components/driver';
 import { InvitesSentCard } from '@/components/home/InvitesSentCard';
@@ -174,6 +176,9 @@ function DriverHome({ driver }: { driver: Driver }) {
   const myDrivingQuery = useTrips({ assignedDriverId: 'me' });
   const myApplicationsQuery = useMyApplications();
   const invitedToDriveQuery = useTrips({ invited: 'me' });
+  // Platform algorithm decides the availability surface: Auto → "I'm Online"
+  // presence; Manual → today's "I'm vacant" card. Fails safe to manual.
+  const dispatchAlgorithm = useDispatchAlgorithm();
 
   const myPosts = myPostsQuery.data ?? [];
   const postsWithApplicants = myPosts.filter((t) => t.status === 'has_applicants');
@@ -223,7 +228,7 @@ function DriverHome({ driver }: { driver: Driver }) {
             BEFORE the reputation card — they're actionable; reputation is informational. */}
         {inProgressTrip ? <CurrentTripCard trip={inProgressTrip} /> : null}
         {awaitingDecision.length > 0 ? <AwaitingMyDecisionCard apps={awaitingDecision} /> : null}
-        <IAmAvailableCard driverId={driver.id} />
+        {dispatchAlgorithm === 'auto' ? <OnlineToggle driverId={driver.id} /> : <IAmAvailableCard driverId={driver.id} />}
         {pendingReceivedInvites.length > 0 ? <InvitesReceivedCard trips={pendingReceivedInvites} /> : null}
         {assignedTrip ? <AssignedTripCard trip={assignedTrip} /> : null}
 
