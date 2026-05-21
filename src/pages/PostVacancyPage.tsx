@@ -17,7 +17,8 @@ import { formatClockTime, formatShortDate } from '@/lib/utils';
 import type { Place, PostVacancyInput } from '@/types';
 
 const HOUR_MS = 3_600_000;
-const MIN_HOURS = 1;
+const MIN_HOURS = 0.25; // 15 min — the single sub-hour rung at the bottom (QA needs a short window to watch the expire cron); whole-hour steps above
+const SUB_HOUR_RUNG = 0.25;
 const MAX_HOURS = 24;
 const DEFAULT_HOURS = 4;
 const STEP_HOURS = 1; // PostHog logged 21 rage clicks on the "+" stepper in 7d — 0.5h steps were too many taps
@@ -27,14 +28,17 @@ function toDatetimeLocalValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-/** Clamp to [MIN_HOURS, MAX_HOURS], rounded to the nearest whole hour (STEP_HOURS). */
+/** Clamp to [MIN_HOURS, MAX_HOURS]. One sub-hour rung at the bottom (0.25h); whole hours above.
+ *  Anything below the 0.25↔1 midpoint snaps to the 15-min rung, so "−" from 1h lands on 0.25h
+ *  and "+" from 0.25h lands on 1h. */
 function clampHours(h: number): number {
-  return Math.min(MAX_HOURS, Math.max(MIN_HOURS, Math.round(h)));
+  if (h < (SUB_HOUR_RUNG + 1) / 2) return SUB_HOUR_RUNG; // < 0.625 → 15 min
+  return Math.min(MAX_HOURS, Math.max(1, Math.round(h)));
 }
-/** "4 hrs" / "1 hr" / "0.5 hrs" */
+/** "4 hrs" / "1 hr" / "15 min" */
 function formatHours(h: number): string {
-  const txt = Number.isInteger(h) ? String(h) : h.toFixed(1);
-  return `${txt} hr${h === 1 ? '' : 's'}`;
+  if (h < 1) return `${Math.round(h * 60)} min`;
+  return `${h} hr${h === 1 ? '' : 's'}`;
 }
 
 /**

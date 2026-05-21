@@ -43,6 +43,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
+import { openEndedLiveClause } from '../_shared/vacancyLiveness.ts';
 import { withCache, tagCacheHit } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
@@ -650,16 +651,18 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     const pLat = Number(pickupCity?.lat), pLng = Number(pickupCity?.lng);
     if (!Number.isFinite(pLat) || !Number.isFinite(pLng)) return [];
     // Time-bounds filter: the vacancy window must cover the trip's planned interval.
-    // `available_until` is nullable (open-ended availability) — that's a hit if the
-    // start is on/before the pickup. Mirrors the accept-time gate in syncVacanciesForTrip
-    // (~line 130), so the preview never promises a match the assign step would reject.
+    // `available_until` is nullable (open-ended availability). For the open-ended case we
+    // ALSO require the liveness rule (available_from on today's IST day) — otherwise a
+    // stale open-ended vacancy whose status the 5-min expire cron hasn't flipped yet would
+    // still get auto-invited (the cron-race; same rule the agent GET /vacancies list uses).
+    // Mirrors the accept-time gate in syncVacanciesForTrip (~line 130) + expire_stale_vacancies.
     let q = db
       .from('vacancies')
       .select('driver_id, available_from, available_until, current_city:cities!current_city_id(lat, lng), driver:drivers!driver_id(id, user_id, is_active, kyc_status)')
       .eq('status', 'active');
     if (pickupAt) {
       const endIso = expectedEndAt ?? pickupAt;
-      q = q.lte('available_from', pickupAt).or(`available_until.is.null,available_until.gte.${endIso}`);
+      q = q.lte('available_from', pickupAt).or(`available_until.gte.${endIso},${openEndedLiveClause()}`);
     }
     const { data: vacRows } = await q;
     type VacRow = {

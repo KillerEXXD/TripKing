@@ -14,7 +14,7 @@ import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
 import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
-import { buildWaypointInputs } from '@/pages/postTripWaypoints';
+import { buildWaypointInputs, editUpdateToastMessage } from '@/pages/postTripWaypoints';
 import { Button, Card, Input, ProgressBar, SectionLabel, Select, StatusBanner, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
@@ -436,10 +436,7 @@ export function PostTripPage() {
       const commitPatch = async () => {
         try {
           await updateTrip.mutateAsync({ tripId: editTripId, input: patch });
-          const notifNote = candidateChanges.length > 0 && newRecipientCount > 0
-            ? ` — ${newRecipientCount} applicant${newRecipientCount === 1 ? '' : 's'} notified`
-            : '';
-          toast.success(`Trip updated${notifNote}`);
+          toast.success(editUpdateToastMessage(newRecipientCount, candidateChanges.length));
           navigate(`/app/trips/${editTripId}`);
         } catch {
           toast.error("Couldn't update the trip — try again.");

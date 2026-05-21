@@ -125,6 +125,23 @@ describe('PostVacancyPage', () => {
     expect(screen.getAllByText((t) => t.includes('(6 hrs)')).length).toBeGreaterThan(0);
   });
 
+  it('the window stepper drops to a 15-min rung below 1h and climbs back to whole hours (Qase D7/D10)', () => {
+    renderPost();
+    const fewer = () => screen.getByRole('button', { name: /fewer hours/i });
+    // Default 4h → step down to 1h (3 clicks), then one more lands on the 15-min rung.
+    fireEvent.click(fewer()); // 4 → 3
+    fireEvent.click(fewer()); // 3 → 2
+    fireEvent.click(fewer()); // 2 → 1
+    expect(screen.getAllByText((t) => t.includes('(1 hr)')).length).toBeGreaterThan(0);
+    fireEvent.click(fewer()); // 1 → 15 min
+    expect(screen.getAllByText((t) => t.includes('(15 min)')).length).toBeGreaterThan(0);
+    // Floor reached — "Fewer hours" is now disabled.
+    expect(fewer()).toBeDisabled();
+    // "+" from the 15-min rung climbs back to 1h.
+    fireEvent.click(screen.getByRole('button', { name: /more hours/i }));
+    expect(screen.getAllByText((t) => t.includes('(1 hr)')).length).toBeGreaterThan(0);
+  });
+
   it('filters the destination chips by the search box and keeps a selected chip visible', () => {
     renderPost();
     expect(screen.getByRole('button', { name: 'Vellore' })).toBeInTheDocument();

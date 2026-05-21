@@ -21,6 +21,7 @@ import { withTiming } from '../_shared/timing.ts';
 import { serviceClient } from '../_shared/supabase.ts';
 import { rateLimitOk } from '../_shared/rateLimit.ts';
 import { parseNearRadius, toKm } from '../_shared/geo.ts';
+import { openEndedLiveClause } from '../_shared/vacancyLiveness.ts';
 import { withCache, tagCacheHit, okCached } from '../_shared/withCache.ts';
 import { CacheTTL, cacheDeletePattern } from '../_shared/cache.ts';
 import { sharedCacheInvalidateEntity } from '../_shared/sharedCache.ts';
@@ -222,15 +223,11 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
           // (migration 048 + 058's IST-calendar-day rule) runs every 5 min, this
           // filter covers the gap. Two clauses:
           //   • available_until > now()   — explicit future window
-          //   • available_until IS NULL AND available_from is at-or-after today's IST
-          //     midnight (UTC) — anything from a prior IST calendar day is stale
-          //     (migration 058's rule). India observes UTC+5:30 year-round (no DST).
+          //   • open-ended (NULL until) AND available_from on today's IST day — see
+          //     openEndedLiveClause (the same rule the auto-invite matcher uses).
           // Driver's own list (?driver_id=…) still sees stale rows so they can clean up.
-          const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
-          const nowIst = new Date(Date.now() + IST_OFFSET_MS);
-          const istMidnightUtc = new Date(Date.UTC(nowIst.getUTCFullYear(), nowIst.getUTCMonth(), nowIst.getUTCDate()) - IST_OFFSET_MS);
           const nowIso = new Date().toISOString();
-          q = q.or(`available_until.gt.${nowIso},and(available_until.is.null,available_from.gte.${istMidnightUtc.toISOString()})`);
+          q = q.or(`available_until.gt.${nowIso},${openEndedLiveClause()}`);
         }
         if (driverId) q = q.eq('driver_id', driverId);
         // hide vacancies of deactivated drivers — the is_active flag must be honoured everywhere
