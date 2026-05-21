@@ -8,7 +8,7 @@
  *
  * Skips cleanly (exit 0) if the API base isn't configured. Covers three flows:
  *   1. accept → vacancy on_trip; agent search excludes it; driver's own list includes it w/ linkedTrip.
- *   2. start → vacancy expired (slot consumed).
+ *   2. start → vacancy DELETED (slot consumed; no stale "expired" card left behind).
  *   3. cancel before start → vacancy reverts to 'active' (window still in the future).
  */
 const BASE = (process.env.VACANCY_ON_TRIP_API_BASE || process.env.TRIPS_API_BASE || (process.env.VITE_API_BASE_URL ? `${process.env.VITE_API_BASE_URL}/functions/v1` : '')).replace(/\/+$/, '');
@@ -160,7 +160,7 @@ async function applyAssignAccept(agentToken, driverToken, tripId) {
   check('trip #1 starts → in_progress', start.status === 200 && start.json?.data?.status === 'in_progress', `status=${start.status} ${JSON.stringify(start.json?.error || '')}`);
   const myListAfterStart = await j('GET', `/vacancies?driver_id=${driverId}&status=active,on_trip,expired,cancelled`);
   const vacAfterStart = (myListAfterStart.json?.data || []).find((v) => v.id === vac1.id);
-  check('after /start the linked vacancy is expired', vacAfterStart?.status === 'expired', `status=${vacAfterStart?.status}`);
+  check('after /start the linked vacancy is DELETED (gone, not left as an expired card)', !vacAfterStart, `found status=${vacAfterStart?.status}`);
 
   // ── Flow 2: cancel before start → vacancy reverts to active ────────────
   const vac2 = await postVacancy(driverToken, cityFrom, [cityTo]);
