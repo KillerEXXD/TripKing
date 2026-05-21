@@ -64,7 +64,7 @@ const PHASES = [
   { code: 'P6', title: 'P6 · Start & in-progress',        description: 'OTP handshake, brute-force lockout, live tracking, offline, mid-progress cancel.' },
   { code: 'P7', title: 'P7 · Completion & reviews',       description: 'Complete, complete-without-start blocked, reviews both directions, one-sided, review-on-cancelled blocked.' },
   { code: 'P8', title: 'P8 · Notifications & inbox',      description: 'Bell badge, deep-link per type, mark-read.' },
-  { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on start or window close.' },
+  { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on window close. PR #330 — accept uses interval OVERLAP (not containment) so every overlapping active vacancy flips, and the agent feed excludes any driver on an accepted/in_progress trip (defense-in-depth). PR #334 — starting a trip DELETES the consumed vacancy (no stale "expired — remove or repost" card).' },
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
   { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
   { code: 'M',  title: 'M · Multi-way trips',             description: 'Migration 024 trip_type=multi_way — itineraries with ≥3 waypoints (pickup, ≥1 intermediate stop, final destination which may equal the pickup for a city-loop). Covers the POST /trips body-shape contract (server-side validation: ≥3 waypoints, strictly monotonic arrive_at, last-may-equal-first), the form-level Multi-way tab UI, and the full trip lifecycle (post → apply → assign → accept → start → complete) to prove multi-way trips behave identically to one-way trips for the trip-acceptance endpoints. Mirrored 1:1 by e2e/trip-types.spec.ts M1-M5 + the existing tab test.' },
@@ -437,15 +437,22 @@ const SCENARIOS = [
     { action: 'Driver: post a vacancy whose window is fully in the future (e.g. tomorrow 9 AM – 9 PM).', expected: 'Status active.' },
     { action: 'Agent: post a trip inside that window. Driver applies + accepts. Agent then cancels the trip before it starts.', expected: 'Driver\'s vacancy reverts from on_trip → active (banner gone, agents see it again). linked_trip_id cleared.' },
   ]},
-  { phase: 'V', id: 'V6', title: 'Trip start consumes on_trip → expired',
-    preconditions: 'Symmetric to V5 but with a real start instead of a cancel.',
+  { phase: 'V', id: 'V6', title: 'Trip start consumes on_trip → vacancy is DELETED',
+    preconditions: 'PR #334 — starting a trip now DELETES the consumed vacancy entirely (was: marked expired), so it never lingers in the driver\'s "I\'m vacant" tab as a stale "remove or repost" card even when the posted window is still in the future.',
     steps: [
-    { action: 'As V5, but driver starts the trip (passenger OTP) instead of the agent cancelling.', expected: 'Vacancy moves on_trip → expired (slot consumed). Does NOT revert when the trip later completes.' },
+    { action: 'As V5, but driver starts the trip (passenger OTP) instead of the agent cancelling.', expected: 'The on_trip vacancy is DELETED — it disappears from the driver\'s "I\'m vacant" tab entirely (no "EXPIRED — please remove or repost" card), and stays gone after the trip completes. The driver posts a fresh vacancy when free again.' },
+    { action: 'Driver: open the "I\'m vacant" tab and the Expired section after the trip starts.', expected: 'The consumed vacancy is not listed under active OR expired. Only genuinely time-expired vacancies (window passed with no trip) appear in the "Expired — please remove or repost" section.' },
   ]},
   { phase: 'V', id: 'V7', title: 'Negative — vacancy outside trip window must NOT flip',
     preconditions: 'Sanity check that the overlap check isn\'t over-eager.',
     steps: [
-    { action: 'Driver: post a vacancy starting tomorrow. Agent: post a trip with pickup today and let this driver accept it.', expected: 'That vacancy stays active — its window doesn\'t cover the trip\'s pickup. (No flip.)' },
+    { action: 'Driver: post a vacancy starting tomorrow. Agent: post a trip with pickup today and let this driver accept it.', expected: 'That vacancy stays active — its window doesn\'t overlap the trip\'s [pickup_at, expected_end_at]. (No flip.)' },
+  ]},
+  { phase: 'V', id: 'V8', title: 'Driver on a live trip is excluded from agent search even with a stray active vacancy',
+    preconditions: 'PR #330 — defense-in-depth: the public/agent GET /vacancies path drops any driver with an accepted/in_progress trip that has not ended yet, so a vacancy posted AFTER the driver goes on-trip (or any path that skips the on_trip sync) cannot leak into "find a driver in city X". This was the live bug: a driver mid-trip still appeared in the agent\'s vacant-driver list.',
+    steps: [
+    { action: 'Driver: accept a trip and start it (status in_progress). While on the trip, post a NEW vacancy whose window overlaps the trip (current city, available now).', expected: 'POST succeeds; the driver sees it in their own /vacancies as status active (the on_trip sync only runs at accept time, so a post-start vacancy stays active).' },
+    { action: 'Agent: open Vacant drivers for that city.', expected: 'The on-trip driver is NOT listed — the feed excludes drivers with an accepted/in_progress trip not yet ended, even though their vacancy row is active. After the trip completes/cancels, a future-window vacancy reappears for agents.' },
   ]},
 
   // ── R (Referral program — PRs #166/#168/#169/#171/#172) ──────────────
