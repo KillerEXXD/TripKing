@@ -122,9 +122,17 @@ class ApiClient {
   private refreshPromise: Promise<boolean> | null = null;
   /** Set by AuthContext — invoked when refresh fails irrecoverably. */
   private authFailureHandler: (() => void) | null = null;
+  /** Set by AuthContext — invoked whenever the access token changes (login,
+   *  single-flight refresh, logout) so the Realtime socket can re-auth.
+   *  setTokens is the single choke-point both paths pass through. */
+  private tokenChangeHandler: ((token: string | null) => void) | null = null;
 
   onAuthFailure(handler: () => void): void {
     this.authFailureHandler = handler;
+  }
+
+  onTokenChange(handler: (token: string | null) => void): void {
+    this.tokenChangeHandler = handler;
   }
 
   // ── token storage ─────────────────────────────────────────────────────────
@@ -142,6 +150,7 @@ class ApiClient {
       if (refreshToken) window.localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
       else window.localStorage.removeItem(REFRESH_TOKEN_KEY);
     }
+    this.tokenChangeHandler?.(accessToken);
   }
   clearTokens(): void {
     this.setTokens(null, null);

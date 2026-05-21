@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/api/client';
 import { getCurrentUser, logout as logoutService, requestOtp as requestOtpService, verifyOtp as verifyOtpService } from '@/lib/api/services/auth';
 import { logger } from '@/lib/logger';
 import { queryClient } from '@/lib/queryClient';
+import { setRealtimeAuth, disconnectRealtime } from '@/lib/realtime';
 import { setSentryUser, clearSentryUser } from '@/lib/sentry';
 import { identifyUser, resetUser } from '@/lib/posthog';
 import type { User } from '@/types';
@@ -62,10 +63,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    // Keep the Realtime socket's JWT in lock-step with the REST token — fires on
+    // login, on every single-flight refresh, and on logout (null clears it).
+    apiClient.onTokenChange(setRealtimeAuth);
     // The API client tells us when a 401 + refresh failed (dead session).
     apiClient.onAuthFailure(() => {
       if (cancelled) return;
       clearLocalUserState();
+      disconnectRealtime();
       setUser(null);
       identifyObservability(null);
     });
@@ -78,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const me = await getCurrentUser();
         if (!cancelled) {
+          // Session restored from a stored token — setTokens didn't run, so push
+          // the existing JWT to Realtime explicitly.
+          setRealtimeAuth(apiClient.getAccessToken());
           lastUserIdRef.current = me.id;
           setUser(me);
           identifyObservability(me);
@@ -120,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout: async () => {
         try { await logoutService(); } catch { /* network errors must not strand us */ }
         clearLocalUserState();
+        disconnectRealtime();
         lastUserIdRef.current = null;
         setUser(null);
         identifyObservability(null);
