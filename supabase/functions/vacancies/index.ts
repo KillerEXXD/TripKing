@@ -180,6 +180,12 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const { data } = await db.from('drivers').select('id').eq('user_id', userId).maybeSingle();
     return (data?.id as string | undefined) ?? null;
   }
+  /** True if `vehicleId` is owned by `driverId`. Service-role bypasses RLS, so writes that
+   *  accept a vehicle_id must verify ownership here. */
+  async function vehicleBelongsToDriver(database: Db, vehicleId: string, driverId: string): Promise<boolean> {
+    const { data } = await database.from('vehicles').select('id').eq('id', vehicleId).eq('driver_id', driverId).maybeSingle();
+    return !!data;
+  }
   async function fullVacancy(vacancyId: string, cached: boolean): Promise<Response> {
     if (!cached) {
       const { data, error } = await db.from('vacancies').select(VACANCY_SELECT).eq('id', vacancyId).maybeSingle();
@@ -335,6 +341,12 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const currentCityId = strOrNull(b.current_city_id);
     if (!currentCityId) return fail('VALIDATION', 'current_city_id is required', 422);
     const currentPlaceId = strOrNull(b.current_place_id);
+    // The vacancy's vehicle drives car-type matching in auto-invite — it must be one of the
+    // posting driver's own vehicles (service-role bypasses RLS, so check ownership explicitly).
+    const vehicleId = strOrNull(b.vehicle_id);
+    if (vehicleId && !(await vehicleBelongsToDriver(db, vehicleId, did))) {
+      return fail('VALIDATION', 'vehicle_id must be one of your vehicles', 422);
+    }
     // Destinations — prefer the unified `destinations: [{ cityId?, placeId? }]` array (each entry may be a
     // curated city, a precise place, or both); fall back to the legacy parallel `destination_*_ids` arrays.
     let destPairs: { city_id: string | null; place_id: string | null }[];
@@ -352,7 +364,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
     const availableFrom = strOrNull(b.available_from) ?? new Date().toISOString();
     const insert = {
       driver_id: did,
-      vehicle_id: strOrNull(b.vehicle_id),
+      vehicle_id: vehicleId,
       current_city_id: currentCityId,
       current_place_id: currentPlaceId,
       available_from: availableFrom,
@@ -435,7 +447,13 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       update.current_city_id = v;
     }
     if ('current_place_id' in b) update.current_place_id = strOrNull(b.current_place_id);
-    if ('vehicle_id' in b) update.vehicle_id = strOrNull(b.vehicle_id);
+    if ('vehicle_id' in b) {
+      const nextVehicleId = strOrNull(b.vehicle_id);
+      if (nextVehicleId && !(await vehicleBelongsToDriver(db, nextVehicleId, vac.driver_id as string))) {
+        return fail('VALIDATION', 'vehicle_id must be one of your vehicles', 422);
+      }
+      update.vehicle_id = nextVehicleId;
+    }
     if ('available_from' in b) {
       const v = strOrNull(b.available_from);
       if (!v) return fail('VALIDATION', 'available_from cannot be empty', 422);

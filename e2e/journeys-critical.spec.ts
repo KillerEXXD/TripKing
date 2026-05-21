@@ -62,8 +62,10 @@ test.describe('Critical journey suite (P0 marketplace)', () => {
     const destCityId = cities[3]?.id ?? cities[1]!.id;
 
     const candidate = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
-    await mintVehicle(request, candidate.token);
-    await postVacancy(request, candidate.token, { currentCityId: pickupCityId, destinationCityIds: [destCityId] });
+    // Auto-invite matches the vacancy's vehicle car type to the trip — attach the minted vehicle
+    // (its car type + postTrip both default to carTypes[0], so they match).
+    const { vehicleId } = await mintVehicle(request, candidate.token);
+    await postVacancy(request, candidate.token, { currentCityId: pickupCityId, destinationCityIds: [destCityId], vehicleId });
 
     const { tripId } = await postTrip(request, agent.token, { autoInviteMatches: true, fromCityId: pickupCityId, toCityId: destCityId });
 

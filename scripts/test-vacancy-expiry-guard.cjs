@@ -67,10 +67,11 @@ function sql(statement) {
   const cities = (await j('GET', '/admin/cities')).json?.data || [];
   const cityB = cities[1]?.id || cities[0]?.id;
   const carType = (await j('GET', '/admin/car-types')).json?.data?.[0]?.id;
-  // Isolated pickup city at remote coords so NO other driver in the shared QA DB is within the
-  // auto-invite radius — the only candidate is our test driver. Without this, genuinely-active
-  // drivers in a busy seed city (e.g. Vellore) make total_matches non-deterministic.
-  const isoCity = await j('POST', '/admin/cities', { token: adminToken, body: { name: `expguard-${Date.now()}`, state: 'QA', lat: 2.0, lng: 2.0 } });
+  // Isolated pickup city at RANDOMIZED remote coords so NO other driver in the shared QA DB is
+  // within the auto-invite radius — the only candidate is our test driver. Coords must be random
+  // (≥1° ≈ 111km spread) so a prior run's still-live driver at a fixed point can't leak in; a
+  // fixed coord made total_matches non-deterministic across repeated runs.
+  const isoCity = await j('POST', '/admin/cities', { token: adminToken, body: { name: `expguard-${Date.now()}`, state: 'QA', lat: 60 + Math.random() * 20, lng: 60 + Math.random() * 20 } });
   const cityA = isoCity.json?.data?.id;
   check('seed: isolated pickup city created', isoCity.status === 200 && !!cityA, `status=${isoCity.status} ${JSON.stringify(isoCity.json?.error || '')}`);
   if (!cityA || !cityB || !carType) { console.error('need cities + car type'); process.exit(1); }

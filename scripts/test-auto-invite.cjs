@@ -64,10 +64,18 @@ function futureIso(hoursFromNow = 4) {
   const cities = (await j('GET', '/admin/cities')).json?.data || [];
   const cityA = cities[0]?.id;
   const cityB = cities[1]?.id || cityA;
-  if (!cityA || !cityB) { console.error('need at least one city'); process.exit(1); }
+  const carTypeId = (await j('GET', '/admin/car-types')).json?.data?.[0]?.id;
+  if (!cityA || !cityB || !carTypeId) { console.error('need a city + a car type'); process.exit(1); }
 
-  // Driver A posts a vacancy in cityA → becomes a match candidate for trips from cityA.
-  const vac = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: cityA, destination_city_ids: [cityB] } });
+  // Driver A owns a vehicle of the trip's car type and posts a vacancy naming it — auto-invite
+  // matches the vacancy's vehicle car type to the trip's required type (a vacancy with no
+  // vehicle, or the wrong type, isn't auto-invited).
+  const drvAVehicle = await j('POST', '/vehicles', { token: driverToken, body: { car_type_id: carTypeId, year: 2024, registration_number: `TN-AI-${Date.now().toString().slice(-6)}`, seats: 4 } });
+  const drvAVehicleId = drvAVehicle.json?.data?.id;
+  check('seed: Driver A vehicle created', drvAVehicle.status === 200 && !!drvAVehicleId, `${JSON.stringify(drvAVehicle.json?.error || drvAVehicle.status)}`);
+  // Window spans the trips below (pickup +4h/+5h; the matcher requires the vacancy to cover
+  // [pickup, end], so a default 4h window starting now would be too short).
+  const vac = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: cityA, destination_city_ids: [cityB], vehicle_id: drvAVehicleId, available_from: new Date().toISOString(), available_until: new Date(Date.now() + 12 * 3600e3).toISOString() } });
   check('seed: Driver A vacancy created in cityA', vac.status === 200 && !!vac.json?.data?.id, `${JSON.stringify(vac.json?.error || vac.status)}`);
 
   // ── GET /trips/match-preview ─────────────────────────────────────────────
@@ -87,7 +95,7 @@ function futureIso(hoursFromNow = 4) {
   // ── POST /trips with auto_invite_matches: true (the default) ─────────────
   const baseTrip = {
     from_city_id: cityA, to_city_id: cityB, pickup_at: futureIso(4),
-    expected_distance_km: 100, car_type_id: (await j('GET', '/admin/car-types')).json?.data?.[0]?.id,
+    expected_distance_km: 100, car_type_id: carTypeId,
     rate_per_km: 12, hide_passenger_phone: true, passenger_count: 1,
   };
   const onPost = await j('POST', '/trips', { token: agentToken, body: { ...baseTrip, auto_invite_matches: true } });

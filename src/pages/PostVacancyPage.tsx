@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
 import { useAppBack } from '@/hooks/useAppBack';
 import { useMyDriver } from '@/hooks/useDrivers';
+import { useDriverVehicles } from '@/hooks/useVehicles';
 import { cityHooks } from '@/hooks/useAdminConfig';
 import { LocationSearchPanel } from '@/components/location/LocationSearchPanel';
 import { PlacePinField } from '@/components/location/PlacePinField';
@@ -69,7 +70,19 @@ export function PostVacancyPage() {
   const [destQuery, setDestQuery] = useState('');
   const [minRatePerKm, setMinRatePerKm] = useState<number | ''>('');
   const [notes, setNotes] = useState('');
+  const [vehicleId, setVehicleId] = useState('');
   const [hydrated, setHydrated] = useState(false);
+
+  const vehiclesQuery = useDriverVehicles(myDriverQuery.data?.id);
+  const vehicles = vehiclesQuery.data ?? [];
+
+  // Default the vehicle to the driver's primary (or first) once the list loads — the agent's
+  // auto-invite matches this vehicle's car type to the trip's required type, so a vacancy must
+  // name a vehicle. Skipped in edit mode (the vacancy's own vehicle hydrates below).
+  useEffect(() => {
+    if (isEdit || vehicleId || vehicles.length === 0) return;
+    setVehicleId((vehicles.find((v) => v.isPrimary) ?? vehicles[0]).id);
+  }, [isEdit, vehicleId, vehicles]);
 
   useEffect(() => {
     if (!isEdit || hydrated || !vacancyQuery.data) return;
@@ -90,6 +103,7 @@ export function PostVacancyPage() {
     setDestPlaces(v.destinationPlaces);
     setMinRatePerKm(typeof v.minRatePerKm === 'number' ? v.minRatePerKm : '');
     setNotes(v.notes ?? '');
+    setVehicleId(v.vehicleId ?? '');
     setHydrated(true);
   }, [isEdit, hydrated, vacancyQuery.data]);
 
@@ -107,14 +121,15 @@ export function PostVacancyPage() {
   const sameDay = !!endDate && startDate.toDateString() === endDate.toDateString();
   const hasDest = destinationCityIds.length > 0 || destPlaces.length > 0;
   const pending = postVacancy.isPending || updateVacancy.isPending;
-  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && hasDest && !pending && (!isEdit || hydrated);
+  const canSubmit = currentCityId.length > 0 && startValid && hours >= MIN_HOURS && hasDest && !!vehicleId && !pending && (!isEdit || hydrated);
 
   async function onSubmit() {
-    if (!currentCityId || !startValid || hours < MIN_HOURS || !hasDest) {
-      toast.error('Pick your city, when you’re available, and at least one destination');
+    if (!currentCityId || !startValid || hours < MIN_HOURS || !hasDest || !vehicleId) {
+      toast.error('Pick your vehicle, city, when you’re available, and at least one destination');
       return;
     }
     const input: PostVacancyInput = {
+      vehicleId,
       currentCityId,
       currentPlaceId: currentPlace?.id,
       availableFrom: startDate.toISOString(),
@@ -206,6 +221,25 @@ export function PostVacancyPage() {
           </label>
           <PlacePinField value={currentPlace} onChange={setCurrentPlace} pinLabel="Pin your exact spot" pickerTitle="Pin your exact location" />
         </div>
+
+        <label className="block space-y-1">
+          <span className="text-sm font-medium">Which vehicle?</span>
+          {vehiclesQuery.isPending ? (
+            <LoadingSkeleton rows={1} />
+          ) : vehicles.length === 0 ? (
+            <p className="text-sm text-red-700">Add a vehicle in your profile before posting your availability.</p>
+          ) : (
+            <Select tone="accent" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)}>
+              <option value="">Select your vehicle</option>
+              {vehicles.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {[v.carTypeLabel, [v.makeLabel, v.modelName].filter(Boolean).join(' '), v.registrationNumber].filter(Boolean).join(' · ')}
+                </option>
+              ))}
+            </Select>
+          )}
+          <span className="text-xs text-secondary">Agents are matched to the car type they asked for.</span>
+        </label>
 
         <div className="space-y-2">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">

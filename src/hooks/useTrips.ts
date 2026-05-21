@@ -195,11 +195,12 @@ export function useTripMatchPreview(
   fromCityId: string | undefined,
   pickupAt: string | undefined,
   expectedEndAt: string | undefined,
+  carTypeId: string | undefined,
   enabled = true,
 ) {
   return useQuery({
-    queryKey: ['trips', 'match-preview', fromCityId ?? null, pickupAt ?? null, expectedEndAt ?? null],
-    queryFn: () => getTripMatchPreview(fromCityId as string, pickupAt, expectedEndAt),
+    queryKey: ['trips', 'match-preview', fromCityId ?? null, pickupAt ?? null, expectedEndAt ?? null, carTypeId ?? null],
+    queryFn: () => getTripMatchPreview(fromCityId as string, pickupAt, expectedEndAt, carTypeId),
     enabled: enabled && !!fromCityId && !!pickupAt,
     staleTime: 30_000,
     retry: 0,
