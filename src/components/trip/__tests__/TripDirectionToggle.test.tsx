@@ -10,9 +10,9 @@ describe('TripDirectionToggle', () => {
     const roundTrip = screen.getByRole('tab', { name: /round-trip/i });
     expect(oneWay).toHaveAttribute('aria-selected', 'false');
     expect(roundTrip).toHaveAttribute('aria-selected', 'true');
-    // The active option reads clearly as "selected": primary border + a check badge.
-    expect(roundTrip.className).toMatch(/border-primary/);
-    expect(oneWay.className).not.toMatch(/border-primary/);
+    // The active option reads clearly as "selected": primary tint + a check badge.
+    expect(roundTrip.className).toMatch(/bg-primary\/10/);
+    expect(oneWay.className).toMatch(/border-input/);
     expect(roundTrip.querySelector('svg')).not.toBeNull(); // check badge only on the active one
     expect(oneWay.querySelector('svg')).toBeNull();
   });
