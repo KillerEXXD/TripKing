@@ -12,14 +12,17 @@ import { useEffectiveRole } from '@/stores/roleViewStore';
 import { ShareTripModal } from '@/components/share/ShareTripModal';
 import { KycGateNotice } from '@/components/driver';
 import { PlacePinField } from '@/components/location/PlacePinField';
-import { TripTypeTabs } from '@/components/trip/TripTypeTabs';
+import { AddressField } from '@/components/location/AddressField';
+import { TripCategoryTabs } from '@/components/trip/TripCategoryTabs';
+import { TripDirectionToggle, type TripDirection } from '@/components/trip/TripDirectionToggle';
+import { PackageSelector, type PackageOption } from '@/components/trip/PackageSelector';
 import { WaypointEditor, type WaypointDraft } from '@/components/trip/WaypointEditor';
 import { buildWaypointInputs, editUpdateToastMessage } from '@/pages/postTripWaypoints';
 import { Button, Card, Input, ProgressBar, SectionLabel, Select, StatusBanner, StickyFooterCTA } from '@/components/ui';
 import { DateTimeField } from '@/components/form';
 import { ErrorState, LoadingSkeleton } from '@/components/feedback';
 import { cn, formatINR, formatKmAndDuration, formatPickupDateTime, formatShortDate, haversineKm } from '@/lib/utils';
-import type { Place, PostTripInput, Trip, TripType, UpdateTripDetailsInput } from '@/types';
+import type { Place, PostTripInput, Trip, TripCategory, UpdateTripDetailsInput } from '@/types';
 
 interface PostTripForm {
   fromCityId: string;
@@ -30,6 +33,8 @@ interface PostTripForm {
   seatsRequired: number;
   acRequired: boolean;
   ratePerKm: number;
+  /** Package only — the agent-entered total rental price. */
+  packagePrice: number;
   driverBata: number;
   gstAmount: number;
   /** Phase 1 of the two-step handshake — 5–30 min. */
@@ -55,6 +60,7 @@ const DEFAULTS: PostTripForm = {
   seatsRequired: 4,
   acRequired: true,
   ratePerKm: 0,
+  packagePrice: 0,
   driverBata: 0,
   gstAmount: 0,
   acceptanceWindowMinutes: 15,
@@ -120,6 +126,7 @@ export function PostTripPage() {
   const [postedTrip, setPostedTrip] = useState<Trip | null>(null);
   const [fromPlace, setFromPlace] = useState<Place | null>(null);
   const [toPlace, setToPlace] = useState<Place | null>(null);
+  const [returnPlace, setReturnPlace] = useState<Place | null>(null);
   // Edit-mode hydration: pre-fill form ONCE when the existing trip arrives. The
   // `hydrated` flag prevents react-query re-fetches from clobbering in-progress edits.
   const [editHydrated, setEditHydrated] = useState(false);
@@ -133,11 +140,12 @@ export function PostTripPage() {
     recipientCount: number;
     submit: () => void;
   }>(null);
-  // ── trip-type state (migration 024) ────────────────────────────────────────
-  const [tripType, setTripType] = useState<TripType>('one_way');
-  const [expectedEndAt, setExpectedEndAt] = useState<string>('');     // datetime-local; required for round_trip + multi_way
-  const [waypoints, setWaypoints] = useState<WaypointDraft[]>([]);    // multi_way destinations only
-  const [returnToStart, setReturnToStart] = useState<boolean>(false); // multi_way only — appends origin as final waypoint
+  // ── trip-category state (migration 071) ─────────────────────────────────────
+  const [category, setCategory] = useState<TripCategory>('outstation');
+  const [direction, setDirection] = useState<TripDirection>('one_way'); // Outstation only
+  const [packageOption, setPackageOption] = useState<PackageOption | null>(null);
+  const [expectedEndAt, setExpectedEndAt] = useState<string>('');     // datetime-local; required for round_trip
+  const [stops, setStops] = useState<WaypointDraft[]>([]);            // intermediate stops (city or address mode)
   const [distanceCalculating, setDistanceCalculating] = useState(false);
   const [passengerSectionOpen, setPassengerSectionOpen] = useState(false);
   const passengerSectionRef = useRef<HTMLDivElement>(null);
@@ -198,6 +206,12 @@ export function PostTripPage() {
     setValue('driverInstructions', t.driverInstructions ?? '', { shouldDirty: false });
     setValue('showFareToPassenger', t.showFareToPassenger, { shouldDirty: false });
     setValue('hidePassengerPhone', t.hidePassengerPhone, { shouldDirty: false });
+    setCategory(t.tripCategory ?? 'outstation');
+    setDirection(t.tripType === 'round_trip' ? 'round_trip' : 'one_way');
+    if (t.tripCategory === 'package' && t.packageHours && t.packageIncludedKm) {
+      setPackageOption({ hours: t.packageHours, includedKm: t.packageIncludedKm });
+      setValue('packagePrice', t.totalFare, { shouldDirty: false });
+    }
     if (t.fromPlace) setFromPlace(t.fromPlace);
     if (t.toPlace) setToPlace(t.toPlace);
     if (t.expectedEndAt) setExpectedEndAt(toLocal(t.expectedEndAt));
@@ -205,19 +219,23 @@ export function PostTripPage() {
     setEditHydrated(true);
   }, [isEdit, editHydrated, editingTripQuery.data, setValue]);
 
-  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch, autoInviteWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata', 'autoInviteMatches']);
+  const [fromCityId, toCityId, distanceWatch, carTypeId, acRequired, rateWatch, packagePriceWatch, passengerPhoneWatch, passengerNameWatch, hidePassengerPhoneWatch, pickupAtWatch, driverBataWatch, autoInviteWatch] = watch(['fromCityId', 'toCityId', 'expectedDistanceKm', 'carTypeId', 'acRequired', 'ratePerKm', 'packagePrice', 'passengerPhone', 'passengerName', 'hidePassengerPhone', 'pickupAt', 'driverBata', 'autoInviteMatches']);
   // Auto-invite preview — re-runs whenever the pickup city OR the planned interval
   // changes. The server filters vacancies by [available_from, available_until] against
   // the trip's [pickupAt, expectedEndAt]; without these the count would be meaningless
   // (year-2060 trip would have falsely shown "1 driver available"). The Post button is
   // gated on this query having settled (see submitting).
+  // Match-preview only runs for Outstation (it keys off the pickup city). Local + Package have
+  // no curated city on the form, so the preview is disabled — and the Post button must not wait
+  // on a query that will never run.
+  const previewEnabled = !!fromCityId && !!pickupAtWatch;
   const matchPreview = useTripMatchPreview(
     fromCityId || undefined,
     pickupAtWatch || undefined,
     expectedEndAt || undefined,
-    !!fromCityId && !!pickupAtWatch,
+    previewEnabled,
   );
-  const previewSettled = !matchPreview.isFetching && (matchPreview.isSuccess || matchPreview.isError);
+  const previewSettled = !previewEnabled || (!matchPreview.isFetching && (matchPreview.isSuccess || matchPreview.isError));
   const distance = Number(distanceWatch) || 0;
   const rate = Number(rateWatch) || 0;
   // Multi-day pricing preview — driver_bata is per-day; total = bata × ceil((end − start) / 1 day).
@@ -232,6 +250,8 @@ export function PostTripPage() {
   const bataPerDay = Math.max(0, Math.round(Number(driverBataWatch) || 0));
   const bataTotal = bataPerDay * tripDays;
   const totalFare = distance > 0 && rate > 0 ? Math.round(distance * rate) : 0;
+  // What the fare-summary row shows: agent-entered price for Package, else distance × rate.
+  const displayFare = category === 'package' ? Math.max(0, Math.round(Number(packagePriceWatch) || 0)) : totalFare;
   const cityName = (id: string) => citiesQuery.data?.find((c) => c.id === id)?.name;
   const carTypeName = (id: string) => carTypesQuery.data?.find((c) => c.id === id)?.label;
 
@@ -244,27 +264,33 @@ export function PostTripPage() {
   // hasn't changed semantics, so we leave that decision for a separate commit.
   const citiesData = citiesQuery.data;
   useEffect(() => {
+    // Package: the trip "distance" is just the included-km cap — no route to sum.
+    if (category === 'package') {
+      setDistanceCalculating(false);
+      setValue('expectedDistanceKm', packageOption ? packageOption.includedKm : 0, { shouldValidate: true });
+      return;
+    }
     const coordsOf = (id: string) => citiesData?.find((c) => c.id === id);
     type Pt = { lat: number; lng: number };
     const valid = (p: { lat?: number; lng?: number } | undefined | null): p is Pt =>
       !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng);
+    // A stop's coords — its searched place (address mode) or its city (city mode).
+    const stopPt = (s: WaypointDraft) => (s.place ? s.place : coordsOf(s.cityId));
 
-    // Build the ordered chain of coordinate pairs to sum.
-    let chain: Pt[] = [];
-    if (tripType === 'multi_way') {
-      const origin = fromPlace ?? coordsOf(fromCityId);
+    // Build the ordered chain of coordinate pairs to sum: origin → stops → final
+    // (round-trip ends back at the origin).
+    const chain: Pt[] = [];
+    const origin = fromPlace ?? coordsOf(fromCityId);
+    if (valid(origin)) chain.push({ lat: origin.lat, lng: origin.lng });
+    for (const s of stops) {
+      const p = stopPt(s);
+      if (valid(p)) chain.push({ lat: p.lat, lng: p.lng });
+    }
+    if (category === 'outstation' && direction === 'round_trip') {
       if (valid(origin)) chain.push({ lat: origin.lat, lng: origin.lng });
-      for (const w of waypoints) {
-        const c = coordsOf(w.cityId);
-        if (valid(c)) chain.push({ lat: c.lat, lng: c.lng });
-      }
-      if (returnToStart && valid(origin)) chain.push({ lat: origin.lat, lng: origin.lng });
     } else {
-      const a = fromPlace ?? coordsOf(fromCityId);
-      const b = toPlace ?? coordsOf(toCityId);
-      if (valid(a) && valid(b) && !(a.lat === b.lat && a.lng === b.lng)) {
-        chain = [{ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }];
-      }
+      const dest = toPlace ?? coordsOf(toCityId);
+      if (valid(dest)) chain.push({ lat: dest.lat, lng: dest.lng });
     }
 
     if (chain.length < 2) {
@@ -281,7 +307,7 @@ export function PostTripPage() {
       setDistanceCalculating(false);
     }, 450);
     return () => clearTimeout(t);
-  }, [tripType, fromCityId, toCityId, fromPlace, toPlace, waypoints, returnToStart, citiesData, setValue]);
+  }, [category, direction, fromCityId, toCityId, fromPlace, toPlace, stops, packageOption, citiesData, setValue]);
 
   // Look the passenger up by phone (debounced) once it's "complete" — prefill the name from the
   // directory when we have a hit and the name field is still empty (never clobber a typed name).
@@ -298,72 +324,89 @@ export function PostTripPage() {
     if (p && !getValues('passengerName').trim()) setValue('passengerName', p.name, { shouldValidate: true });
   }, [passengerLookup.data, getValues, setValue]);
 
+  // Category-aware route validation — returns an error string (toast + block) or null.
+  function routeError(): string | null {
+    if (category === 'package') {
+      if (!fromPlace) return 'Search the pickup address';
+      if (!packageOption) return 'Pick a rental package (hours)';
+      return null;
+    }
+    if (category === 'local') {
+      if (!fromPlace) return 'Search the pickup address';
+      if (!toPlace) return 'Search the drop-off address';
+      const bad = stops.findIndex((s) => !s.placeId);
+      if (bad >= 0) return `Stop ${bad + 1} needs an address`;
+      return null;
+    }
+    // Outstation
+    if (!getValues('fromCityId')) return 'Pick a starting city';
+    if (direction === 'round_trip') {
+      if (stops.length < 1) return 'Add at least the first stop (the round trip returns to the start)';
+      const bad = stops.findIndex((s) => !s.cityId);
+      if (bad >= 0) return `Stop ${bad + 1} needs a city`;
+      if (!expectedEndAt) return 'Set when the trip ends';
+      return null;
+    }
+    // Outstation one-way
+    if (!getValues('toCityId')) return 'Pick a destination city';
+    if (getValues('fromCityId') === getValues('toCityId')) return 'Pickup and drop-off cities must be different';
+    const bad = stops.findIndex((s) => !s.cityId);
+    if (bad >= 0) return `Stop ${bad + 1} needs a city`;
+    return null;
+  }
+
   async function onNext() {
-    // Multi-way uses the WaypointEditor instead of `toCityId`; skip that field's validation.
-    const fields = tripType === 'multi_way'
-      ? STEP1_FIELDS.filter((f) => f !== 'toCityId')
-      : [...STEP1_FIELDS];
+    // Always validate the schedule + vehicle fields; the city fields only matter for Outstation.
+    const skip: (keyof PostTripForm)[] = category === 'outstation'
+      ? (direction === 'round_trip' ? ['toCityId'] : [])
+      : ['fromCityId', 'toCityId'];
+    const fields = STEP1_FIELDS.filter((f) => !skip.includes(f));
     const ok = await trigger(fields as readonly (keyof PostTripForm)[]);
     if (!ok) return;
-    if (tripType !== 'multi_way' && getValues('fromCityId') === getValues('toCityId')) {
-      toast.error(tripType === 'round_trip' ? 'Starting city and turnaround must be different' : 'Pickup and drop-off cities must be different');
-      return;
-    }
-    if (tripType === 'multi_way') {
-      if (waypoints.length < 2 || waypoints.some((w) => !w.cityId)) {
-        toast.error('Add at least 2 destinations (each with a city)');
-        return;
-      }
-    }
-    if (tripType !== 'one_way' && !expectedEndAt) {
-      toast.error('Set when the trip ends');
-      return;
-    }
+    const err = routeError();
+    if (err) { toast.error(err); return; }
     setStep(2);
   }
 
   async function onSubmit(values: PostTripForm) {
-    // One-way + round-trip use from/to fields and they must differ.
-    if (tripType !== 'multi_way' && values.fromCityId === values.toCityId) {
-      toast.error(tripType === 'round_trip' ? 'Starting city and turnaround must be different' : 'Pickup and drop-off cities must be different');
-      setStep(1);
-      return;
-    }
-    // Multi-way needs ≥2 destinations, each with a city.
-    if (tripType === 'multi_way') {
-      const bad = waypoints.findIndex((w) => !w.cityId);
-      if (waypoints.length < 2) { toast.error('Multi-way trips need at least 2 destinations'); setStep(1); return; }
-      if (bad >= 0) { toast.error(`Destination ${bad + 1} needs a city`); setStep(1); return; }
-    }
-    // Build a waypoints array for the server only when the trip is round-trip or multi-way;
-    // one-way keeps today's body (the server synthesises a 2-waypoint plan).
+    const err = routeError();
+    if (err) { toast.error(err); setStep(1); return; }
     const pickupIso = new Date(values.pickupAt).toISOString();
+    // Round-trip needs an explicit end; otherwise the server computes one from the route/hours.
     const endIso = expectedEndAt ? new Date(expectedEndAt).toISOString() : undefined;
     const waypointInputs = buildWaypointInputs({
-      tripType,
+      category,
+      direction,
       fromCityId: values.fromCityId,
       toCityId: values.toCityId,
       fromPlaceId: fromPlace?.id,
       toPlaceId: toPlace?.id,
+      returnPlaceId: returnPlace?.id,
       endIso,
-      multiWayRows: waypoints,
-      returnToStart,
+      stops,
     });
+    const isPackage = category === 'package';
+    const submitRatePerKm = isPackage ? 0 : Number(values.ratePerKm);
+    const submitTotalFare = isPackage ? Math.max(0, Math.round(Number(values.packagePrice) || 0)) : totalFare;
     const input: PostTripInput = {
-      tripType: tripType === 'one_way' ? undefined : tripType,
+      tripType: category === 'outstation' && direction === 'round_trip' ? 'round_trip' : undefined,
+      tripCategory: category,
+      packageHours: isPackage ? packageOption?.hours : undefined,
+      packageIncludedKm: isPackage ? packageOption?.includedKm : undefined,
       waypoints: waypointInputs,
       expectedEndAt: endIso,
-      fromCityId: values.fromCityId,
-      toCityId: tripType === 'multi_way' ? (returnToStart ? values.fromCityId : (waypoints[waypoints.length - 1]?.cityId ?? '')) : values.toCityId,
+      // Outstation sends cities; Local/Package send a place and let the server derive the city.
+      fromCityId: category === 'outstation' ? values.fromCityId : '',
+      toCityId: category === 'outstation' ? (direction === 'round_trip' ? values.fromCityId : values.toCityId) : '',
       fromPlaceId: fromPlace?.id,
-      toPlaceId: toPlace?.id,
+      toPlaceId: isPackage ? undefined : toPlace?.id,
       pickupAt: pickupIso,
       expectedDistanceKm: Number(values.expectedDistanceKm),
       carTypeId: values.carTypeId,
       seatsRequired: Number(values.seatsRequired),
       acRequired: values.acRequired,
-      ratePerKm: Number(values.ratePerKm),
-      totalFare,
+      ratePerKm: submitRatePerKm,
+      totalFare: submitTotalFare,
       commissionPct: appSettings.data?.defaultCommissionPct ?? 0,
       gstAmount: Math.max(0, Math.round(Number(values.gstAmount) || 0)),
       driverBata: Math.max(0, Math.round(Number(values.driverBata) || 0)),
@@ -498,14 +541,18 @@ export function PostTripPage() {
 
   const cities = citiesQuery.data ?? [];
   const carTypes = (carTypesQuery.data ?? []).filter((c) => c.isActive);
+  const isPackageCategory = category === 'package';
   const submitting = isSubmitting || postTrip.isPending;
-  const multiWayReady = waypoints.length >= 2 && waypoints.every((w) => !!w.cityId);
-  const routeReady = tripType === 'multi_way'
-    ? !!fromCityId && multiWayReady
-    : !!fromCityId && !!toCityId && fromCityId !== toCityId;
-  const endTimeReady = tripType === 'one_way' || !!expectedEndAt;
-  const step1Ready = routeReady && !!getValues('pickupAt') && endTimeReady && distance >= 1 && !distanceCalculating && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
-  const summary = [cityName(fromCityId) && cityName(toCityId) ? `${cityName(fromCityId)} → ${cityName(toCityId)}` : null, distance > 0 ? `${distance} km` : null, carTypeName(carTypeId) ?? null, acRequired ? 'AC' : null].filter(Boolean).join(' · ');
+  const routeReady = routeError() === null;
+  const endTimeReady = !(category === 'outstation' && direction === 'round_trip') || !!expectedEndAt;
+  const distanceReady = category === 'package' ? !!packageOption : distance >= 1 && !distanceCalculating;
+  const step1Ready = routeReady && !!getValues('pickupAt') && endTimeReady && distanceReady && !!carTypeId && Number(getValues('seatsRequired')) >= 1;
+  const routeSummary = category === 'package'
+    ? (fromPlace ? `${fromPlace.name}${packageOption ? ` · ${packageOption.hours}hr/${packageOption.includedKm}km` : ''}` : null)
+    : category === 'local'
+      ? (fromPlace && toPlace ? `${fromPlace.name} → ${toPlace.name}` : null)
+      : (cityName(fromCityId) ? `${cityName(fromCityId)} → ${direction === 'round_trip' ? cityName(fromCityId) : cityName(toCityId)}` : null);
+  const summary = [routeSummary, category !== 'package' && distance > 0 ? `${distance} km` : null, carTypeName(carTypeId) ?? null, acRequired ? 'AC' : null].filter(Boolean).join(' · ');
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col">
@@ -525,57 +572,95 @@ export function PostTripPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex-1 space-y-3 p-4 pb-28">
         {step === 1 ? (
           <>
-            <TripTypeTabs value={tripType} onChange={setTripType} />
+            <TripCategoryTabs value={category} onChange={setCategory} />
             <Card className="gap-3">
               <SectionLabel icon={<Route />} accent="green">
-                {tripType === 'one_way' ? 'Route & Schedule' : tripType === 'round_trip' ? 'Round-trip plan' : 'Multi-way itinerary'}
+                {category === 'local' ? 'Local trip' : category === 'package' ? 'Rental package' : 'Outstation plan'}
               </SectionLabel>
-              <div className="space-y-1.5">
-                <Field label={tripType === 'one_way' ? 'From (pickup city)' : 'Trip starts from (city)'} error={errors.fromCityId?.message}>
-                  <Select tone="accent" {...register('fromCityId', { required: 'Pick a starting city' })}>
-                    <option value="">Select a city</option>
-                    {cities.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </Select>
-                </Field>
-                <PlacePinField value={fromPlace} onChange={setFromPlace} pinLabel="Pin the exact pickup point" pickerTitle="Pickup location" />
-              </div>
-              {tripType !== 'multi_way' ? (
-                <div className="space-y-1.5">
-                  <Field label={tripType === 'round_trip' ? 'Turnaround city' : 'To (drop-off city)'} error={errors.toCityId?.message}>
-                    <Select tone="accent" {...register('toCityId', { required: 'Pick a destination city' })}>
-                      <option value="">Select a city</option>
-                      {cities.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </Select>
-                  </Field>
-                  <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact drop-off point" pickerTitle="Drop-off location" />
-                </div>
+
+              {category === 'outstation' ? (
+                <TripDirectionToggle value={direction} onChange={setDirection} />
+              ) : null}
+
+              {category === 'package' ? (
+                <>
+                  <div className="space-y-1.5">
+                    <span className="text-sm font-medium">Pickup address</span>
+                    <AddressField value={fromPlace} onChange={setFromPlace} searchLabel="Search the pickup address" pickerTitle="Pickup address" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-sm font-medium">Rental package</span>
+                    <PackageSelector value={packageOption} onChange={setPackageOption} />
+                    <p className="text-xs text-secondary">The car is hired for these hours; extra km/hours beyond the package are settled separately.</p>
+                  </div>
+                </>
+              ) : category === 'local' ? (
+                <>
+                  <div className="space-y-1.5">
+                    <span className="text-sm font-medium">From (pickup address)</span>
+                    <AddressField value={fromPlace} onChange={setFromPlace} searchLabel="Search the pickup address" pickerTitle="Pickup address" />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-sm font-medium">Stops (optional)</span>
+                    <WaypointEditor value={stops} onChange={setStops} cities={cities} mode="address" near={fromPlace ? { lat: fromPlace.lat, lng: fromPlace.lng } : undefined} rowLabel="Stop" minRows={0} addLabel="Add stop" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <span className="text-sm font-medium">To (drop-off address)</span>
+                    <AddressField value={toPlace} onChange={setToPlace} searchLabel="Search the drop-off address" pickerTitle="Drop-off address" />
+                  </div>
+                </>
               ) : (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Destinations (in order)</div>
-                  <WaypointEditor
-                    value={waypoints}
-                    onChange={setWaypoints}
-                    cities={cities}
-                    rowLabel="Destination"
-                    minRows={0}
-                    addLabel="Add destination"
-                  />
-                  <label className="mt-1 flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={returnToStart}
-                      onChange={(e) => setReturnToStart(e.target.checked)}
-                      className="size-4 rounded border-input"
-                    />
-                    Return to start (the trip ends back at the origin)
-                  </label>
-                </div>
+                <>
+                  <div className="space-y-1.5">
+                    <Field label="Trip starts from (city)" error={errors.fromCityId?.message}>
+                      <Select tone="accent" {...register('fromCityId', { required: 'Pick a starting city' })}>
+                        <option value="">Select a city</option>
+                        {cities.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </Select>
+                    </Field>
+                    <PlacePinField value={fromPlace} onChange={setFromPlace} pinLabel="Pin the exact pickup point" pickerTitle="Pickup location" />
+                  </div>
+
+                  {direction === 'round_trip' ? (
+                    <>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium">Stops (in order)</span>
+                        <WaypointEditor value={stops} onChange={setStops} cities={cities} rowLabel="Stop" firstRowLabel="First stop" minRows={1} addLabel="Add stop" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Field label="To (drop-off city)">
+                          <Select tone="accent" value={fromCityId} disabled aria-readonly="true">
+                            <option value={fromCityId}>{cityName(fromCityId) ?? 'Same as start city'}</option>
+                          </Select>
+                        </Field>
+                        <p className="text-xs text-secondary">A round trip returns to the start city.</p>
+                        <PlacePinField value={returnPlace} onChange={setReturnPlace} pinLabel="Pin the exact return drop-off" pickerTitle="Return drop-off" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium">Stops (optional)</span>
+                        <WaypointEditor value={stops} onChange={setStops} cities={cities} rowLabel="Stop" minRows={0} addLabel="Add stop" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Field label="To (drop-off city)" error={errors.toCityId?.message}>
+                          <Select tone="accent" {...register('toCityId', { required: 'Pick a destination city' })}>
+                            <option value="">Select a city</option>
+                            {cities.map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </Select>
+                        </Field>
+                        <PlacePinField value={toPlace} onChange={setToPlace} pinLabel="Pin the exact drop-off point" pickerTitle="Drop-off location" />
+                      </div>
+                    </>
+                  )}
+                </>
               )}
-              <Field label={tripType === 'one_way' ? 'Pickup date & time' : 'Trip starts (date & time)'} error={errors.pickupAt?.message}>
+              <Field label={category === 'outstation' && direction === 'round_trip' ? 'Trip starts (date & time)' : 'Pickup date & time'} error={errors.pickupAt?.message}>
                 <Controller
                   control={control}
                   name="pickupAt"
@@ -590,15 +675,21 @@ export function PostTripPage() {
                   )}
                 />
               </Field>
-              {tripType !== 'one_way' ? (
-                <Field label="Trip ends (date & time)" hint={tripType === 'round_trip' ? 'When the driver is back at the start city.' : 'Auto-fills from the last destination — you can override.'}>
+              {category === 'outstation' && direction === 'round_trip' ? (
+                <Field label="Trip ends (date & time)" hint="When the driver is back at the start city.">
                   <DateTimeField value={expectedEndAt} onChange={setExpectedEndAt} />
                 </Field>
               ) : null}
               {/* keep the value in form state for validation + submit, but show it as an emerald summary row */}
               <input type="hidden" {...register('expectedDistanceKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Pick the pickup & drop-off points so we can work out the distance' })} />
               <div className="rounded-control border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm" role="status" aria-live="polite">
-                {distanceCalculating ? (
+                {category === 'package' ? (
+                  packageOption ? (
+                    <span className="text-emerald-900">Package: <strong className="font-bold text-emerald-700">{packageOption.hours} hr · {packageOption.includedKm} km included</strong></span>
+                  ) : (
+                    <span className="text-secondary">Pick a rental package to set the hours and included km.</span>
+                  )
+                ) : distanceCalculating ? (
                   <span className="flex items-center gap-1.5 text-secondary">
                     <Loader2 className="size-4 animate-spin" aria-hidden /> Calculating route…
                   </span>
@@ -607,7 +698,7 @@ export function PostTripPage() {
                     Estimated distance: <strong className="font-bold text-emerald-700">{formatKmAndDuration(distance)}</strong>
                   </span>
                 ) : (
-                  <span className="text-secondary">Pick the pickup & drop-off points to see the route distance and ETA.</span>
+                  <span className="text-secondary">Pick the pickup &amp; drop-off points to see the route distance and ETA.</span>
                 )}
               </div>
               {errors.expectedDistanceKm ? <span className="block text-xs text-red-700">{errors.expectedDistanceKm.message}</span> : null}
@@ -669,9 +760,15 @@ export function PostTripPage() {
             <Card className="gap-3">
               <SectionLabel icon={<Wallet />} accent="green">Pricing</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Rate per km (₹)" error={errors.ratePerKm?.message}>
-                  <Input type="number" min={1} step={1} inputMode="numeric" {...register('ratePerKm', { valueAsNumber: true, validate: (v) => (Number.isFinite(v) && v >= 1) || 'Enter a rate per km' })} />
-                </Field>
+                {category === 'package' ? (
+                  <Field label="Package price (₹)" error={errors.packagePrice?.message} hint={packageOption ? `For ${packageOption.hours} hr / ${packageOption.includedKm} km` : undefined}>
+                    <Input type="number" min={1} step={1} inputMode="numeric" {...register('packagePrice', { valueAsNumber: true, validate: (v) => !isPackageCategory || (Number.isFinite(v) && v >= 1) || 'Enter the rental price' })} />
+                  </Field>
+                ) : (
+                  <Field label="Rate per km (₹)" error={errors.ratePerKm?.message}>
+                    <Input type="number" min={1} step={1} inputMode="numeric" {...register('ratePerKm', { valueAsNumber: true, validate: (v) => isPackageCategory || (Number.isFinite(v) && v >= 1) || 'Enter a rate per km' })} />
+                  </Field>
+                )}
                 <Field
                   label="Driver bata (₹/day)"
                   error={errors.driverBata?.message}
@@ -714,8 +811,8 @@ export function PostTripPage() {
               </Field>
               <div className="rounded-lg bg-muted px-3 py-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="text-secondary">Total fare ({distance > 0 ? distance : '—'} km × {formatINR(rate)}/km)</span>
-                  <span className="font-bold">{totalFare > 0 ? formatINR(totalFare) : '—'}</span>
+                  <span className="text-secondary">{category === 'package' ? `Rental price (${packageOption ? `${packageOption.hours} hr / ${packageOption.includedKm} km` : 'package'})` : `Total fare (${distance > 0 ? distance : '—'} km × ${formatINR(rate)}/km)`}</span>
+                  <span className="font-bold">{displayFare > 0 ? formatINR(displayFare) : '—'}</span>
                 </div>
                 <p className="mt-1 text-xs text-secondary">Commission, GST and the driver payout are calculated by TripKing — you&apos;ll see the final payout on the trip.</p>
               </div>

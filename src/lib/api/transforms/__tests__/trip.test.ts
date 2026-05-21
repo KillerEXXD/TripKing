@@ -227,4 +227,33 @@ describe('toApiPostTrip', () => {
     expect(toApiPostTrip({ ...input, autoInviteMatches: true })).toMatchObject({ auto_invite_matches: true });
     expect(toApiPostTrip({ ...input, autoInviteMatches: false })).toMatchObject({ auto_invite_matches: false });
   });
+  it('omits trip_category / package_* unless set, and emits them when provided (migration 071)', () => {
+    const input: PostTripInput = {
+      fromCityId: 'c1', toCityId: 'c2', pickupAt: 'x', expectedDistanceKm: 1, carTypeId: 'ct',
+      seatsRequired: 4, acRequired: true, ratePerKm: 1, totalFare: 1, commissionPct: 0, gstAmount: 0,
+      driverBata: 0, extrasPaidByPassenger: true, passengerName: '', passengerPhone: '', passengerCount: 1,
+      showFareToPassenger: true, hidePassengerPhone: true,
+    };
+    const bare = toApiPostTrip(input);
+    expect(bare).not.toHaveProperty('trip_category');
+    expect(bare).not.toHaveProperty('package_hours');
+    expect(toApiPostTrip({ ...input, tripCategory: 'local' })).toMatchObject({ trip_category: 'local' });
+    expect(toApiPostTrip({ ...input, tripCategory: 'package', packageHours: 8, packageIncludedKm: 80 }))
+      .toMatchObject({ trip_category: 'package', package_hours: 8, package_included_km: 80 });
+  });
+});
+
+describe('transformTrip — category (migration 071)', () => {
+  it('defaults trip_category to outstation and leaves package fields undefined', () => {
+    const t = transformTrip(fullTrip);
+    expect(t.tripCategory).toBe('outstation');
+    expect(t.packageHours).toBeUndefined();
+    expect(t.packageIncludedKm).toBeUndefined();
+  });
+  it('surfaces a package trip with hours + included km', () => {
+    const t = transformTrip({ ...fullTrip, trip_category: 'package', package_hours: 8, package_included_km: 80 });
+    expect(t.tripCategory).toBe('package');
+    expect(t.packageHours).toBe(8);
+    expect(t.packageIncludedKm).toBe(80);
+  });
 });

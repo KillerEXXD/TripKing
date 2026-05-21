@@ -18,6 +18,7 @@ import type {
   PostTripInput,
   Trip,
   TripAcceptance,
+  TripCategory,
   TripStatus,
   TripType,
   VehicleSummary,
@@ -83,6 +84,10 @@ const TRIP_TYPES: TripType[] = ['one_way', 'round_trip', 'multi_way'];
 function tripTypeOf(v: unknown): TripType {
   return typeof v === 'string' && (TRIP_TYPES as string[]).includes(v) ? (v as TripType) : 'one_way';
 }
+const TRIP_CATEGORIES: TripCategory[] = ['local', 'outstation', 'package'];
+function tripCategoryOf(v: unknown): TripCategory {
+  return typeof v === 'string' && (TRIP_CATEGORIES as string[]).includes(v) ? (v as TripCategory) : 'outstation';
+}
 
 /** Migration-024 waypoint join → camelCase `Waypoint`. Tolerant of missing fields (server invariants
  *  guarantee id + seq; everything else is optional per business rules). */
@@ -108,6 +113,9 @@ export function transformTrip(api: Api): Trip {
   return {
     id,
     tripType: tripTypeOf(api.trip_type),
+    tripCategory: tripCategoryOf(api.trip_category),
+    packageHours: num(api.package_hours, 0) || undefined,
+    packageIncludedKm: num(api.package_included_km, 0) || undefined,
     expectedEndAt: str(api.expected_end_at),
     waypoints: Array.isArray(api.waypoints) ? (api.waypoints as Api[]).map(transformWaypoint).sort((a, b) => a.seq - b.seq) : [],
     postedByUserId: reqStr(api.posted_by_user_id, 'MISSING_FIELD', ctx, 'posted_by_user_id'),
@@ -341,6 +349,10 @@ export function toApiPostTrip(input: PostTripInput): Record<string, unknown> {
     hide_passenger_phone: input.hidePassengerPhone,
   };
   if (input.autoInviteMatches !== undefined) body.auto_invite_matches = input.autoInviteMatches;
+  // Migration-071 category fields — omit when unset so legacy callers POST the same shape.
+  if (input.tripCategory !== undefined) body.trip_category = input.tripCategory;
+  if (input.packageHours !== undefined) body.package_hours = input.packageHours;
+  if (input.packageIncludedKm !== undefined) body.package_included_km = input.packageIncludedKm;
   // Migration-024 fields — omit when unset so legacy callers continue to POST the same shape.
   if (input.tripType !== undefined) body.trip_type = input.tripType;
   if (input.expectedEndAt !== undefined) body.expected_end_at = input.expectedEndAt;
