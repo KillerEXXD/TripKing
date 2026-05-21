@@ -21,6 +21,9 @@ vi.mock('@/hooks/useVacancies', () => ({
 }));
 import { useVacancies } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useNotifications', () => ({ useUnreadNotificationCount: vi.fn(() => 0) }));
+// Platform algorithm defaults to 'manual' here so the home still renders the "I'm vacant"
+// card these tests assert on (the <OnlineToggle> auto path has its own test).
+vi.mock('@/hooks/usePlatformConfig', () => ({ useDispatchAlgorithm: () => 'manual', usePlatformConfig: vi.fn() }));
 vi.mock('@/hooks/useAdminConfig', () => ({
   cityHooks: { useList: vi.fn(() => ({ data: [] })) },
   useAppSettings: vi.fn(() => ({ isPending: false, data: { maxActiveVacanciesPerDriver: 2 } })),
