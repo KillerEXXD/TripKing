@@ -39,7 +39,8 @@ const authUser = (db: Db, req: Request) => authUserShared(db, req, { defaultRole
 // (Stage 4 of the referral program; migration 045).
 // v3 (2026-05-15): added `referral_code` to the user join + `referral` summary block on /me
 // (Stage 1 of the referral program; migration 042).
-const CACHE_EPOCH = 'v4';
+// v5 (2026-05-21): bumped after QA trips + e2e-profile wipe.
+const CACHE_EPOCH = 'v5';
 function invalidateAgentMe(userId: string): void {
   cacheDelete(`agents:me:user-${userId}:${CACHE_EPOCH}`);
 }

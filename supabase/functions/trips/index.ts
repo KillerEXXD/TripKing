@@ -64,7 +64,8 @@ import { readBody, pgFail } from '../_shared/http.ts';
 //   extra round-trip to `api_cache` on a miss but lets warm caches survive across isolates.
 //   Mutations invalidate by entityKind='trip' / entityId='list'. Bump on response-shape changes.
 // v7 (2026-05-16): bumped after QA-data reset wipe.
-const CACHE_EPOCH = 'v7';
+// v8 (2026-05-21): bumped after QA trips + e2e-profile wipe.
+const CACHE_EPOCH = 'v8';
 // Cache RAW (unredacted) rows from the trips list query. Redaction is per-viewer and cheap;
 // the SQL + joins are the expensive part. Key from the resolved filters (with `me` already
 // replaced by the actual driver_id) so two callers asking for "trips assigned to me" share the

@@ -11,6 +11,7 @@
 --     ├─ trip_invitations
 --     ├─ trip_waypoints
 --     ├─ trip_executions
+--     ├─ trip_offers
 --     ├─ reviews
 --     └─ platform_fee_charges
 --   notifications
@@ -38,8 +39,12 @@
 
 BEGIN;
 
+-- driver_presence.busy_trip_id is NO ACTION → clear it first so a surviving
+-- driver's presence row can't block the trips delete below.
+UPDATE public.driver_presence SET busy_trip_id = NULL WHERE busy_trip_id IS NOT NULL;
+
 -- One DELETE pulls trip_acceptances / trip_invitations / trip_waypoints /
--- trip_executions / reviews / platform_fee_charges with it via CASCADE.
+-- trip_executions / trip_offers / reviews / platform_fee_charges with it via CASCADE.
 DELETE FROM public.trips;
 
 -- Adjacent feature tables (no FK to trips, so each needs its own DELETE):
@@ -57,6 +62,7 @@ BEGIN
   SELECT count(*) INTO c FROM public.trip_invitations;      IF c <> 0 THEN RAISE EXCEPTION 'trip_invitations left: %', c; END IF;
   SELECT count(*) INTO c FROM public.trip_waypoints;        IF c <> 0 THEN RAISE EXCEPTION 'trip_waypoints left: %', c; END IF;
   SELECT count(*) INTO c FROM public.trip_executions;       IF c <> 0 THEN RAISE EXCEPTION 'trip_executions left: %', c; END IF;
+  SELECT count(*) INTO c FROM public.trip_offers;           IF c <> 0 THEN RAISE EXCEPTION 'trip_offers left: %', c; END IF;
   SELECT count(*) INTO c FROM public.reviews;               IF c <> 0 THEN RAISE EXCEPTION 'reviews left: %', c; END IF;
   SELECT count(*) INTO c FROM public.platform_fee_charges;  IF c <> 0 THEN RAISE EXCEPTION 'platform_fee_charges left: %', c; END IF;
   SELECT count(*) INTO c FROM public.notifications;         IF c <> 0 THEN RAISE EXCEPTION 'notifications left: %', c; END IF;
