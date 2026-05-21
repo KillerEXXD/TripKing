@@ -437,12 +437,20 @@ export async function getTrip(
 export async function postVacancy(
   req: APIRequestContext,
   driverToken: string,
-  opts: { currentCityId?: string; destinationCityIds?: string[]; notes?: string; vehicleId?: string } = {},
+  opts: { currentCityId?: string; destinationCityIds?: string[]; notes?: string; vehicleId?: string; windowHours?: number } = {},
 ): Promise<{ vacancyId: string }> {
   const cities = await getCities(req);
+  // Default window = now → +12h. Vacancies are never open-ended (PR #331: a missing
+  // available_until defaults to available_from + 4h), and postTrip's default pickup is +4h, so
+  // an implicit 4h window would END exactly at pickup and FAIL the auto-invite time-bounds gate
+  // (the vacancy must cover [pickup, expected_end]). An explicit 12h window covers the default trip.
+  const windowHours = opts.windowHours ?? 12;
+  const now = Date.now();
   const body: Record<string, unknown> = {
     current_city_id: opts.currentCityId ?? cities[0]!.id,
     destination_city_ids: opts.destinationCityIds ?? [cities[1]!.id],
+    available_from: new Date(now).toISOString(),
+    available_until: new Date(now + windowHours * 3600 * 1000).toISOString(),
     notes: opts.notes ?? 'e2e vacancy',
   };
   // Auto-invite matches the vacancy's vehicle car type to the trip — tests that rely on
