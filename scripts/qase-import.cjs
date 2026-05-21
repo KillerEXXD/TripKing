@@ -67,7 +67,7 @@ const PHASES = [
   { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on window close. PR #330 — accept uses interval OVERLAP (not containment) so every overlapping active vacancy flips, and the agent feed excludes any driver on an accepted/in_progress trip (defense-in-depth). PR #334 — starting a trip DELETES the consumed vacancy (no stale "expired — remove or repost" card). PR #331 — vacancies are never open-ended (missing end time → 4h default, NOT NULL), so far-future trips auto-invite nobody (V9). PR #338 — "I\'m vacant" requires a vehicle (V10); its car type drives auto-invite matching (P3.19).' },
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
   { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
-  { code: 'M',  title: 'M · Multi-way trips',             description: 'Migration 024 trip_type=multi_way — itineraries with ≥3 waypoints (pickup, ≥1 intermediate stop, final destination which may equal the pickup for a city-loop). Covers the POST /trips body-shape contract (server-side validation: ≥3 waypoints, strictly monotonic arrive_at, last-may-equal-first), the form-level Multi-way tab UI, and the full trip lifecycle (post → apply → assign → accept → start → complete) to prove multi-way trips behave identically to one-way trips for the trip-acceptance endpoints. Mirrored 1:1 by e2e/trip-types.spec.ts M1-M5 + the existing tab test.' },
+  { code: 'M',  title: 'M · Trip categories (Local · Outstation · Package)', description: 'Migration 071 — the post-trip form is organised by booking CATEGORY (Local / Outstation / Package) instead of the old One-way/Round-trip/Multi-way trip-type toggle (the Multi-way tab is retired; one-way-with-stops covers it). Local = address-booked (no city dropdown; the server derives the city from the place). Outstation = city-to-city with a one-way/round-trip sub-toggle (round-trip locks To=From, supports a "First stop" turnaround + more stops + a separate return pin). Package = hourly rental (pickup only; hours + included-km ladder; agent-entered flat price; no destination/distance). Covers tab/sub-toggle UI, the post body contract per category, city-derivation, package validation, distance/fare behaviour, edit-mode hydration, lifecycle parity, and back-compat. Backed by supabase/migrations/071, the trips edge fn, src/pages/PostTripPage.tsx, and scripts/test-trip-types.cjs (cases 10–13). The retired Multi-way (trip_type=multi_way) still validates server-side for legacy rows but has no UI tab.' },
   { code: 'RT', title: 'RT · Realtime live surfaces',     description: 'PR #324 — agent surfaces update WITHOUT a manual reload via a Supabase Realtime websocket used as a SIGNAL ("a row changed → refetch"), never as the data source: the payload is never rendered, data still flows through the REST API + transforms + per-viewer redaction, and RLS gates every subscription (the user\'s Supabase JWT, kept fresh by apiClient.onTokenChange). Four live tables: trip_acceptances (applicants), trips (status/count, filtered to posted_by_user_id), notifications, vacancies. React Query polling is the documented fallback when the socket drops (applicants ≤15s; trip detail 5–30s by status). Migration 063 adds these tables to the supabase_realtime publication with REPLICA IDENTITY FULL.' },
   { code: 'O',  title: 'O · Trip edit & applicant-conflict', description: 'PR #291 — agent can edit a posted trip after applicants exist; backend fans out a trip_updated notification to every applicant + pending invitee with a field-level diff. Frontend surfaces: Edit button on the home "Waiting for your decision" card (gated on 0 applicants), edit-mode on PostTripPage (heading flips, Update CTA), pre-submit conflict banner (applicants arrived mid-edit), diff confirm modal (lists each before → after), driver-side "Trip details changed" chip on the Applied tab, and the TripUpdatedDiffBanner on the trip-detail page with Keep / Withdraw CTAs. Backend gate: status ∈ {open, has_applicants}; selected/accepted/in_progress/completed/cancelled return 409.' },
 ];
@@ -675,50 +675,135 @@ const SCENARIOS = [
     { action: 'Plain /posted-trips (agent equivalent) behaves the same way.', expected: 'Tabbed view, no scoped header, Back returns to the tabbed view.' },
   ]},
 
-  // ── M (Multi-way trips — migration 024) ──────────────────────────────
-  // 1:1 mirror of e2e/trip-types.spec.ts "PostTripPage — multi-way trips" suite.
-  // Each Mn case below has a corresponding Mn-named E2E test that's been verified to pass
-  // against the deployed Supabase. Use these manual cases for end-to-end QA passes through
-  // the UI; the E2E covers the body-shape + lifecycle contracts at the API tier.
-  { phase: 'M', id: 'M0', title: 'UI — Multi-way tab on /trips/new reveals the waypoint editor + Return to start checkbox',
-    preconditions: 'Signed-in approved agent on /trips/new.',
+  // ── M · Trip categories (Local · Outstation · Package) — migration 071 ──
+  // Replaces the retired Multi-way (M0–M5) cases. Manual cases for full UI QA passes;
+  // the POST-body contract per category is also covered by scripts/test-trip-types.cjs
+  // (cases 10–13) and e2e/trip-types.spec.ts. The post-trip form is keyed by booking
+  // CATEGORY now — Local / Outstation / Package — not the old one-way/round-trip/multi-way tabs.
+
+  // -- General / tabs --------------------------------------------------------
+  { phase: 'M', id: 'M1', title: 'UI — three category tabs (Local · Outstation · Package); Outstation is the default',
+    preconditions: 'Signed-in approved agent (or approved driver) on /app/trips/new.',
     steps: [
-    { action: 'Tap the "Multi-way" tab in the trip-type segmented control.', expected: 'Section heading switches to "Multi-way itinerary". "Destinations (in order)" sub-section appears with an "Add destination" button. "Return to start" checkbox is visible (toggles whether the last waypoint loops back to the pickup city).' },
-    { action: 'Tap "Add destination" twice to build a 3-stop chain (pickup + 2 stops).', expected: 'Two destination rows appear, each with city picker, time of arrival picker, and optional wait-minutes input. Order is enforced (drag handle / arrow buttons present).' },
-    { action: 'Toggle "Return to start" on.', expected: 'A read-only "back to pickup city" row appears as the final waypoint. The to_city resolves to the pickup city on submit.' },
+    { action: 'Open /app/trips/new and look at the top segmented control.', expected: 'Exactly three tabs: "Local" (Around town, by address), "Outstation" (City to city), "Package" (Hourly rental). There is NO "Multi-way" tab. "Outstation" is selected by default (aria-selected=true) and the section heading reads "Outstation plan".' },
+    { action: 'Tap each tab in turn (Local, Package, back to Outstation).', expected: 'The route section below swaps to match the selected category each time, and the previously selected tab deselects (only one active at a time).' },
   ]},
-  { phase: 'M', id: 'M1', title: 'Happy path — POST /trips with trip_type=multi_way and 3+ waypoints persists',
-    preconditions: 'Approved agent token. ≥3 distinct cities seeded.',
+
+  // -- Outstation ------------------------------------------------------------
+  { phase: 'M', id: 'M2', title: 'UI — Outstation shows a One-way/Round-trip sub-toggle with a clearly highlighted active option',
+    preconditions: 'Agent on /app/trips/new, Outstation tab selected.',
     steps: [
-    { action: 'POST /trips with trip_type:"multi_way", waypoints: [pickup, via, drop] (3 entries). Pickup_at < via.arrive_at < drop.arrive_at.', expected: '200 OK with data.id returned. data.trip_type === "multi_way".' },
-    { action: 'GET /trips/{id}. Read shape.', expected: 'trip_type === "multi_way". waypoints.length >= 3. from_city_id mirrors waypoints[0].city_id; to_city_id mirrors the last destination waypoint\'s city_id.' },
+    { action: 'Observe the One-way / Round-trip sub-toggle under the "Outstation plan" heading.', expected: 'Two options: "One-way" (A → B, stops allowed) and "Round-trip" (A → … → back to A). One-way is active by default.' },
+    { action: 'Tap "Round-trip", then "One-way".', expected: 'The active option is visually unmistakable — a bold primary (green) outline + tint + a check badge in the corner — clearly distinct from the inactive option and from the solid-green category tab above. aria-selected flips correctly.' },
   ]},
-  { phase: 'M', id: 'M2', title: 'Return-to-start — multi_way last waypoint == first city is allowed',
-    preconditions: 'Approved agent token. ≥2 distinct cities seeded.',
+  { phase: 'M', id: 'M3', title: 'Outstation one-way — happy path posts trip_category=outstation, trip_type=one_way',
+    preconditions: 'Approved agent. ≥2 cities seeded (with lat/lng).',
     steps: [
-    { action: 'POST /trips with trip_type:"multi_way", from_city_id === to_city_id, waypoints: [cityA, cityB (via), cityA (back)]. Strictly monotonic arrive_at.', expected: '200 OK. Unlike one_way (which 422s on last == first), multi_way explicitly permits the loop — this is the "drop the passenger somewhere, drive them back" use case.' },
-    { action: 'GET /trips/{id}. Verify trip_type.', expected: 'trip_type === "multi_way".' },
+    { action: 'Outstation → One-way. Pick "Trip starts from" = Vellore, "To (drop-off city)" = Chennai. Set pickup tomorrow 09:00. Pick car type + seats.', expected: 'Estimated distance auto-fills (~140 km) in the emerald summary row. Next is enabled.' },
+    { action: 'Step 2: set rate/km + bata, then Post.', expected: '200. Toast "Trip posted". GET the trip: trip_category="outstation", trip_type="one_way", from_city=Vellore, to_city=Chennai, 2 waypoints.' },
   ]},
-  { phase: 'M', id: 'M3', title: 'Validation — multi_way with only 2 waypoints → 422',
-    preconditions: 'Approved agent token.',
+  { phase: 'M', id: 'M4', title: 'Outstation one-way — intermediate stops (Stop 1, Stop 2) persist in order',
+    preconditions: 'Approved agent. ≥4 cities seeded.',
     steps: [
-    { action: 'POST /trips with trip_type:"multi_way" but only 2 waypoints (pickup + destination).', expected: '422 VALIDATION. Error message contains "multi_way" (server text: "multi_way requires ≥3 waypoints"). No trip row created.' },
+    { action: 'Outstation → One-way. From = Vellore, To = Bangalore. In "Stops (optional)" tap "+ Add stop" twice; pick two intermediate cities; optionally set arrive-at + wait minutes + notes on each.', expected: 'Two stop rows appear ("Stop 1", "Stop 2") with city select + arrive-at + wait + notes. Distance recomputes to sum origin → stop1 → stop2 → destination.' },
+    { action: 'Post and GET the trip.', expected: '200. waypoints = [Vellore, Stop1, Stop2, Bangalore] in seq order; intermediate stops carry is_destination=true and their wait/notes; trip_type still one_way.' },
   ]},
-  { phase: 'M', id: 'M4', title: 'Validation — multi_way with non-monotonic arrive_at → 422',
-    preconditions: 'Approved agent token. ≥3 distinct cities seeded.',
+  { phase: 'M', id: 'M5', title: 'Outstation round-trip — To is locked to From, "First stop" + more stops, separate return pin',
+    preconditions: 'Approved agent. ≥3 cities seeded.',
     steps: [
-    { action: 'POST /trips with trip_type:"multi_way", waypoints chain where waypoint[2].arrive_at < waypoint[1].arrive_at (out of time order).', expected: '422 VALIDATION. Server message includes "waypoints[i].arrive_at must be > previous". No trip row created.' },
+    { action: 'Outstation → Round-trip. From = Vellore.', expected: 'A "Stops (in order)" editor appears with the first row labelled "First stop". The "To (drop-off city)" select is shown but DISABLED, pre-set to Vellore, with helper text "A round trip returns to the start city." A separate "Pin the exact return drop-off" link is present.' },
+    { action: 'Pick the First stop city (e.g. Tirupati), tap "+ Add stop" to add Stop 2, set "Trip ends (date & time)".', expected: 'Both stop rows accept a city; the end-time field is required and accepted.' },
+    { action: 'Post and GET the trip.', expected: '200. trip_type="round_trip", trip_category="outstation". waypoints = [Vellore, Tirupati, Stop2, Vellore(return)]; last waypoint city == first (Vellore); expected_end_at = the end time set; from_city == to_city == Vellore.' },
   ]},
-  { phase: 'M', id: 'M5', title: 'Lifecycle — multi_way trip survives post → apply → assign → accept → start → complete',
-    preconditions: 'Approved agent + approved driver (with vehicle) tokens. ≥3 distinct cities seeded.',
+  { phase: 'M', id: 'M6', title: 'Outstation round-trip — missing "Trip ends" blocks submit',
+    preconditions: 'Approved agent, Outstation → Round-trip with a valid From + First stop.',
     steps: [
-    { action: 'Agent posts a multi_way trip (M1 shape).', expected: '200, trip_id returned.' },
-    { action: 'Driver POST /trips/{id}/applicants.', expected: 'Trip status flips to has_applicants. Returns acceptance_id.' },
-    { action: 'Agent POST /trips/{id}/assign { acceptance_id }.', expected: 'Trip status → selected.' },
-    { action: 'Driver POST /trips/{id}/accept.', expected: 'Trip status → accepted. Returns passenger_otp (4-6 digit).' },
-    { action: 'Driver POST /trips/{id}/start with passenger_otp.', expected: 'Trip status → in_progress.' },
-    { action: 'Driver POST /trips/{id}/complete.', expected: '200. Trip status → completed.' },
-    { action: 'GET /trips/{id}. Verify trip_type preserved.', expected: 'trip_type === "multi_way" still. Lifecycle endpoints (apply/assign/accept/start/complete) do NOT have multi-way-specific branches that could regress — this test guards against a future refactor introducing one.' },
+    { action: 'Leave "Trip ends (date & time)" empty and tap Next.', expected: 'Blocked with a toast like "Set when the trip ends". Cannot advance to step 2.' },
+  ]},
+  { phase: 'M', id: 'M7', title: 'Outstation round-trip — at least the first stop is required',
+    preconditions: 'Approved agent, Outstation → Round-trip, From set, no stops added.',
+    steps: [
+    { action: 'With zero stops, set the end time and tap Next.', expected: 'Blocked with a toast like "Add at least the first stop (the round trip returns to the start)". The "First stop" row cannot be removed below the minimum of 1.' },
+  ]},
+  { phase: 'M', id: 'M8', title: 'Outstation one-way — same From and To city is rejected',
+    preconditions: 'Approved agent, Outstation → One-way.',
+    steps: [
+    { action: 'Set From = Chennai and To = Chennai. Tap Next (or Post).', expected: 'Blocked with "Pickup and drop-off cities must be different". No trip created.' },
+  ]},
+
+  // -- Local -----------------------------------------------------------------
+  { phase: 'M', id: 'M9', title: 'UI — Local replaces city dropdowns with address search + "add stop near From"',
+    preconditions: 'Approved agent, Local tab selected.',
+    steps: [
+    { action: 'Select the "Local" tab.', expected: 'No city dropdowns. "From (pickup address)" and "To (drop-off address)" each show a "Search …" button that opens the address search panel (geocoder). A "Stops (optional)" editor offers "+ Add stop" whose rows are address-searched (biased near the pickup). There is no One-way/Round-trip sub-toggle (Local is one-way).' },
+  ]},
+  { phase: 'M', id: 'M10', title: 'Local — happy path (no stops) derives the city from the address and posts',
+    preconditions: 'Approved agent. Geocoder/places reachable.',
+    steps: [
+    { action: 'Local. Search + pick a pickup address (e.g. "Katpadi, Vellore") and a drop-off address. Set pickup time, car type, seats.', expected: 'Both addresses render as chips with name + formatted address. Distance auto-computes from the two addresses. Next enabled.' },
+    { action: 'Post and GET the trip.', expected: '200. trip_category="local", trip_type="one_way". from_place/to_place set to the searched places; from_city/to_city are NON-null — the server DERIVED them (place.city_id, else nearest active city by haversine).' },
+  ]},
+  { phase: 'M', id: 'M11', title: 'Local — address stops persist as a place-only waypoint chain',
+    preconditions: 'Approved agent, Local. Geocoder reachable.',
+    steps: [
+    { action: 'Local. Pick From + To addresses. In "Stops (optional)" add one stop and search a nearby address for it (optionally set wait/notes).', expected: 'The stop row uses address search (not a city dropdown). Distance recomputes through the stop.' },
+    { action: 'Post and GET the trip.', expected: '200. waypoints = [fromPlace, stopPlace(is_destination), toPlace] — place-based; the server still fills from_city_id/to_city_id by derivation.' },
+  ]},
+  { phase: 'M', id: 'M12', title: 'Local — missing pickup or drop-off address blocks submit',
+    preconditions: 'Approved agent, Local.',
+    steps: [
+    { action: 'Pick only the From address (leave To empty) and tap Next.', expected: 'Blocked with "Search the drop-off address".' },
+    { action: 'Clear From, set only To, tap Next.', expected: 'Blocked with "Search the pickup address".' },
+  ]},
+
+  // -- Package ---------------------------------------------------------------
+  { phase: 'M', id: 'M13', title: 'UI — Package shows pickup address + hours/included-km ladder, hides destination & distance',
+    preconditions: 'Approved agent, Package tab selected.',
+    steps: [
+    { action: 'Select the "Package" tab.', expected: '"Pickup address" (address search) + a "Rental package" picker with the hr/km ladder (4hr/40km, 6hr/60km, 8hr/80km, 10hr/100km, 12hr/120km). NO destination / turnaround / route distance fields. The summary row reads the picked package (e.g. "8 hr · 80 km included") instead of a km distance.' },
+    { action: 'Go to step 2 (Pricing).', expected: 'The "Rate per km" field is replaced by a "Package price (₹)" field (with a "For 8 hr / 80 km" hint).' },
+  ]},
+  { phase: 'M', id: 'M14', title: 'Package — happy path posts hours + included km + agent price; to == from',
+    preconditions: 'Approved agent. Geocoder reachable.',
+    steps: [
+    { action: 'Package. Search a pickup address, pick the 8hr/80km package, set pickup time, car type, seats. Step 2: enter a package price (e.g. ₹2400).', expected: 'Next/Post enabled once a package is chosen and a price is entered.' },
+    { action: 'Post and GET the trip.', expected: '200. trip_category="package", trip_type="one_way", package_hours=8, package_included_km=80, total_fare=2400. to_city == from_city (pickup-only); expected_end_at = pickup + 8h. from_city derived from the pickup address.' },
+  ]},
+  { phase: 'M', id: 'M15', title: 'Package — must pick a package and enter a price before posting',
+    preconditions: 'Approved agent, Package, pickup address set.',
+    steps: [
+    { action: 'Without choosing a package, tap Next.', expected: 'Blocked with "Pick a rental package (hours)".' },
+    { action: 'Pick 8hr/80km, advance to step 2, leave Package price empty, tap Post.', expected: 'Blocked — "Enter the rental price" (field-level validation on Package price).' },
+  ]},
+  { phase: 'M', id: 'M16', title: 'Package — server rejects missing/too-small hours (contract)',
+    preconditions: 'Approved agent token (API-level).',
+    steps: [
+    { action: 'POST /trips { trip_category:"package", from_place_id, package_included_km:80, ... } omitting package_hours.', expected: '422 VALIDATION ("package_hours must be at least 4"). No trip row.' },
+    { action: 'POST /trips { trip_category:"package", from_place_id, package_hours:2, package_included_km:80 }.', expected: '422 VALIDATION (hours < 4). No trip row.' },
+  ]},
+
+  // -- Cross-cutting / regression -------------------------------------------
+  { phase: 'M', id: 'M17', title: 'Lifecycle parity — each category survives post → apply → assign → accept → start → complete',
+    preconditions: 'Approved agent + approved driver (with vehicle).',
+    steps: [
+    { action: 'Post one trip of each category (Local, Outstation round-trip, Package). For each: driver applies, agent assigns, driver accepts (gets OTP), starts with OTP, completes.', expected: 'Every category runs the full handshake identically. GET each on completion: status="completed" and trip_category preserved (local / outstation / package). No category-specific branch breaks the acceptance endpoints.' },
+  ]},
+  { phase: 'M', id: 'M18', title: 'Back-compat — pre-071 trips read back as trip_category=outstation',
+    preconditions: 'A trip that existed before migration 071 (or any trip posted without trip_category).',
+    steps: [
+    { action: 'GET an older trip (or POST /trips without trip_category) and read the shape.', expected: 'trip_category defaults to "outstation" (column default + transform fallback). Existing one-way and round-trip rows are unaffected; their trip_type is unchanged.' },
+  ]},
+  { phase: 'M', id: 'M19', title: 'Regression — Multi-way tab is gone from the UI but the API still accepts trip_type=multi_way',
+    preconditions: 'Approved agent.',
+    steps: [
+    { action: 'On /app/trips/new, confirm there is no "Multi-way" tab anywhere (category tabs are Local/Outstation/Package; Outstation sub-toggle is One-way/Round-trip only).', expected: 'No Multi-way affordance in the UI.' },
+    { action: 'POST /trips directly with trip_type:"multi_way" and ≥3 waypoints (legacy/API path).', expected: '200 — the server still validates and stores multi_way for legacy/API callers; only the UI tab was retired.' },
+  ]},
+  { phase: 'M', id: 'M20', title: 'Edit mode — editing a trip hydrates the right category; route stays read-only',
+    preconditions: 'An approved agent who posted a Package (and separately a Local and an Outstation round-trip) trip with 0 applicants.',
+    steps: [
+    { action: 'Open /app/trips/{id}/edit for the Package trip.', expected: 'The form opens with the Package category active and the package (hours/km) + price prefilled. For the round-trip, Outstation→Round-trip is active; for Local, the Local tab is active with its addresses.' },
+    { action: 'Confirm the route/category controls are not the editable surface.', expected: 'Edit only PATCHes commercial/scheduling fields (rate, bata, GST, pickup, car type, AC, seats, instructions). Changing the category/route is not part of the update — consistent with UpdateTripDetailsInput.' },
   ]},
 
   // ── O · Trip edit & applicant-conflict ─────────────────────────────────
@@ -880,6 +965,23 @@ async function main() {
     } else {
       const created = await qase('POST', `/case/${PROJECT}`, payload);
       console.log(`  + Case created: ${title} (id=${created.id})`);
+    }
+  }
+
+  // 3. Reconcile (delete-removed) — ONLY for suites listed in RECONCILE_SUITES.
+  // These suites are fully owned by this script, so any Qase case in them whose title
+  // is no longer in SCENARIOS is obsolete and gets deleted. (The M suite was retitled
+  // from "Multi-way trips" to "Trip categories" — this removes the stale M0–M5 cases.)
+  // Other suites are left untouched: cases there may be hand-authored in Qase.
+  const RECONCILE_SUITES = new Set(['M']);
+  const desiredTitles = new Set(SCENARIOS.map((s) => `${s.id} · ${s.title}`));
+  for (const code of RECONCILE_SUITES) {
+    const suiteId = suiteIdByCode.get(code);
+    if (!suiteId) continue;
+    const stale = existingCases.filter((c) => c.suite_id === suiteId && !desiredTitles.has(c.title));
+    for (const c of stale) {
+      await qase('DELETE', `/case/${PROJECT}/${c.id}`);
+      console.log(`  - Case deleted (obsolete in suite ${code}): ${c.title} (id=${c.id})`);
     }
   }
 

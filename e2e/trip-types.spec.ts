@@ -33,14 +33,39 @@ function futureLocal(daysFromNow: number, hour = 9): string {
  */
 async function readTripShape(req: APIRequestContext, token: string, tripId: string): Promise<{
   trip_type?: string;
-  waypoints?: Array<{ city?: { id?: string; name?: string }; arrive_at?: string | null; is_destination?: boolean; seq?: number }>;
+  trip_category?: string;
+  package_hours?: number | null;
+  package_included_km?: number | null;
+  waypoints?: Array<{ city?: { id?: string; name?: string }; place?: { id?: string } | null; arrive_at?: string | null; is_destination?: boolean; seq?: number }>;
   from_city_id?: string;
   to_city_id?: string;
+  from_place?: { id?: string } | null;
+  to_place?: { id?: string } | null;
   expected_end_at?: string | null;
 }> {
   const r = await req.get(`${API_BASE}/trips/${tripId}`, { headers: { Authorization: `Bearer ${token}` } });
   const body = await r.json();
   return body?.data ?? {};
+}
+
+/** Resolve a searched address into a stored place (find-or-create), returning its id + coords.
+ *  Used by the Local + Package contract tests (which book by address, not city). Returns null
+ *  when the geocoder/places endpoint is unavailable in the target env, so callers can skip. */
+async function resolvePlace(req: APIRequestContext, token: string, query: string): Promise<{ id: string; lat: number; lng: number } | null> {
+  const search = await req.get(`${API_BASE}/places/search?q=${encodeURIComponent(query)}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (search.status() !== 200) return null;
+  const hit = ((await search.json())?.data ?? [])[0];
+  if (!hit) return null;
+  const resolved = await req.post(`${API_BASE}/places`, {
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    data: JSON.stringify({
+      provider: hit.provider, provider_place_id: hit.providerPlaceId ?? hit.provider_place_id ?? null,
+      name: hit.name, formatted_address: hit.formattedAddress ?? hit.formatted_address ?? null,
+      state: hit.state ?? null, lat: hit.lat, lng: hit.lng,
+    }),
+  });
+  const place = (await resolved.json())?.data;
+  return place?.id ? { id: place.id, lat: hit.lat, lng: hit.lng } : null;
 }
 
 /** Capture the POST /trips response to get the new trip id. */
@@ -69,6 +94,9 @@ test.describe('PostTripPage — trip-category tabs (migration 071)', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
+    // The form renders a loading skeleton until the cities + car-type + KYC queries resolve;
+    // wait for the category tabs to appear before asserting (avoids a cold-dev-server race).
+    await expect(page.getByRole('tab', { name: /outstation/i })).toBeVisible({ timeout: 20000 });
 
     await expect(page.getByRole('tab', { name: /local/i })).toHaveAttribute('aria-selected', 'false');
     await expect(page.getByRole('tab', { name: /outstation/i })).toHaveAttribute('aria-selected', 'true');
@@ -82,11 +110,17 @@ test.describe('PostTripPage — trip-category tabs (migration 071)', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
+    // The form renders a loading skeleton until the cities + car-type + KYC queries resolve;
+    // wait for the category tabs to appear before asserting (avoids a cold-dev-server race).
+    await expect(page.getByRole('tab', { name: /outstation/i })).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('tab', { name: /round-trip/i }).click();
-    await expect(page.getByText(/First stop/i)).toBeVisible();
+    // To is locked to the start city + the round-trip helper + an end-time field appear immediately.
     await expect(page.getByText(/round trip returns to the start city/i)).toBeVisible();
     await expect(page.getByText(/Trip ends/i)).toBeVisible();
+    // Adding the first stop reveals the "First stop" row label (the turnaround).
+    await page.getByRole('button', { name: /add stop/i }).click();
+    await expect(page.getByText(/First stop/i)).toBeVisible();
   });
 
   test('Local reveals the address-search inputs (no city dropdown)', async ({ page, request }) => {
@@ -94,6 +128,9 @@ test.describe('PostTripPage — trip-category tabs (migration 071)', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
+    // The form renders a loading skeleton until the cities + car-type + KYC queries resolve;
+    // wait for the category tabs to appear before asserting (avoids a cold-dev-server race).
+    await expect(page.getByRole('tab', { name: /outstation/i })).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('tab', { name: /local/i }).click();
     await expect(page.getByText(/From \(pickup address\)/i)).toBeVisible();
@@ -106,10 +143,15 @@ test.describe('PostTripPage — trip-category tabs (migration 071)', () => {
     const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
     await loginAs(page, agent);
     await page.goto('/app/trips/new');
+    // The form renders a loading skeleton until the cities + car-type + KYC queries resolve;
+    // wait for the category tabs to appear before asserting (avoids a cold-dev-server race).
+    await expect(page.getByRole('tab', { name: /outstation/i })).toBeVisible({ timeout: 20000 });
 
     await page.getByRole('tab', { name: /package/i }).click();
-    await expect(page.getByText(/Rental package/i)).toBeVisible();
+    // The hr/km ladder (radiogroup) + the pickup-address field are the unambiguous Package signals.
     await expect(page.getByRole('radio', { name: /8 hr/i })).toBeVisible();
+    await expect(page.getByRole('radio', { name: /12 hr/i })).toBeVisible();
+    await expect(page.getByText(/Pickup address/i).first()).toBeVisible();
   });
 
   // Body-shape tests are pure API: the form's date pickers are Radix Popovers (not native
@@ -387,5 +429,191 @@ test.describe('PostTripPage — multi-way trips (migration 024)', () => {
     const final = await getTrip(request, agent.token, tripId);
     expect(final?.status).toBe('completed');
     expect(final?.trip_type).toBe('multi_way');
+  });
+});
+
+/**
+ * Trip categories (migration 071 — Qase suite "M · Trip categories"). The post-trip form is
+ * keyed by booking CATEGORY now: Local (address-booked, server derives the city), Outstation
+ * (city-to-city; one-way or round-trip), and Package (hourly rental, pickup-only). These are
+ * API-contract tests (the server is the witness); the UI tab/sub-toggle behaviour is covered
+ * by the "trip-category tabs" describe block above.
+ */
+const baseTripBody = (carTypeId: string) => ({
+  pickup_at: new Date(Date.now() + 4 * 3600 * 1000).toISOString(),
+  expected_distance_km: 120, car_type_id: carTypeId, rate_per_km: 14,
+  commission_pct: 10, gst_amount: 98, driver_bata: 300,
+  passenger_name: 'e2e Pax', passenger_phone: '+918888888888', passenger_count: 1,
+  hide_passenger_phone: false, auto_invite_matches: false,
+});
+
+test.describe('PostTripPage — trip categories (migration 071)', () => {
+  test('C1 — Outstation one-way defaults to trip_category=outstation, trip_type=one_way', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({ ...baseTripBody(carTypes[0]!.id), from_city_id: cities[0]!.id, to_city_id: cities[1]!.id }),
+    });
+    expect(post.status()).toBe(200);
+    const shape = await readTripShape(request, agent.token, (await post.json())?.data?.id);
+    expect(shape.trip_category).toBe('outstation');
+    expect(shape.trip_type).toBe('one_way');
+  });
+
+  test('C2 — Outstation one-way with intermediate stops persists origin → stops → destination', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const viaAt = new Date(Date.now() + 8 * 3600 * 1000).toISOString();
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        ...baseTripBody(carTypes[0]!.id), trip_category: 'outstation',
+        from_city_id: cities[0]!.id, to_city_id: cities[2]!.id,
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, arrive_at: viaAt, wait_minutes: 20, is_destination: true },
+          { city_id: cities[2]!.id, is_destination: true },
+        ],
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const shape = await readTripShape(request, agent.token, (await post.json())?.data?.id);
+    expect(shape.trip_category).toBe('outstation');
+    expect(shape.waypoints?.length).toBe(3);
+    expect(shape.waypoints?.[1]?.city?.id).toBe(cities[1]!.id);
+  });
+
+  test('C3 — Outstation round-trip: last waypoint city == first, expected_end_at honoured', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const endAt = new Date(Date.now() + 28 * 3600 * 1000).toISOString();
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        ...baseTripBody(carTypes[0]!.id), trip_category: 'outstation', trip_type: 'round_trip',
+        from_city_id: cities[0]!.id, to_city_id: cities[0]!.id, expected_end_at: endAt,
+        waypoints: [
+          { city_id: cities[0]!.id },
+          { city_id: cities[1]!.id, wait_minutes: 0, is_destination: true },
+          { city_id: cities[0]!.id, arrive_at: endAt, is_destination: true },
+        ],
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const shape = await readTripShape(request, agent.token, (await post.json())?.data?.id);
+    expect(shape.trip_category).toBe('outstation');
+    expect(shape.trip_type).toBe('round_trip');
+    expect(shape.waypoints?.[2]?.city?.id).toBe(cities[0]!.id);
+    expect(typeof shape.expected_end_at).toBe('string');
+  });
+
+  test('C4 — Local: address-only pickup derives a non-null from_city_id', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const cities = await getCities(request);
+    const carTypes = await getCarTypes(request);
+    const place = await resolvePlace(request, agent.token, 'Katpadi Vellore');
+    test.skip(!place, 'geocoder/places unavailable in this environment');
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({ ...baseTripBody(carTypes[0]!.id), trip_category: 'local', from_place_id: place!.id, to_city_id: cities[1]!.id }),
+    });
+    expect(post.status()).toBe(200);
+    const shape = await readTripShape(request, agent.token, (await post.json())?.data?.id);
+    expect(shape.trip_category).toBe('local');
+    expect(shape.trip_type).toBe('one_way');
+    expect(shape.from_city_id).toBeTruthy(); // server derived it from the place
+  });
+
+  test('C5 — Package: 8hr/80km pickup-only posts hours+km, to == from', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const carTypes = await getCarTypes(request);
+    const place = await resolvePlace(request, agent.token, 'Gandhi Road Vellore');
+    test.skip(!place, 'geocoder/places unavailable in this environment');
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        ...baseTripBody(carTypes[0]!.id), expected_distance_km: 80, rate_per_km: 0, total_fare: 2400,
+        trip_category: 'package', from_place_id: place!.id, package_hours: 8, package_included_km: 80,
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const shape = await readTripShape(request, agent.token, (await post.json())?.data?.id);
+    expect(shape.trip_category).toBe('package');
+    expect(shape.package_hours).toBe(8);
+    expect(shape.package_included_km).toBe(80);
+    expect(shape.from_city_id).toBe(shape.to_city_id);
+  });
+
+  test('C6 — Package without package_hours → 422 VALIDATION', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const carTypes = await getCarTypes(request);
+    const place = await resolvePlace(request, agent.token, 'Officers Line Vellore');
+    test.skip(!place, 'geocoder/places unavailable in this environment');
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        ...baseTripBody(carTypes[0]!.id), expected_distance_km: 80, rate_per_km: 0, total_fare: 2400,
+        trip_category: 'package', from_place_id: place!.id, package_included_km: 80,
+      }),
+    });
+    expect(post.status()).toBe(422);
+    expect((await post.json())?.error?.code).toBe('VALIDATION');
+  });
+
+  test('C7 — Package with hours below the 4-hour minimum → 422 VALIDATION', async ({ request }) => {
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const carTypes = await getCarTypes(request);
+    const place = await resolvePlace(request, agent.token, 'Bagayam Vellore');
+    test.skip(!place, 'geocoder/places unavailable in this environment');
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        ...baseTripBody(carTypes[0]!.id), expected_distance_km: 40, rate_per_km: 0, total_fare: 1200,
+        trip_category: 'package', from_place_id: place!.id, package_hours: 2, package_included_km: 40,
+      }),
+    });
+    expect(post.status()).toBe(422);
+    expect((await post.json())?.error?.code).toBe('VALIDATION');
+  });
+
+  test('C8 — Lifecycle: a Package trip survives post → apply → assign → accept → start → complete', async ({ request }) => {
+    test.slow(); // geocode + the full 6-step handshake against the live API needs the extra budget
+    const admin = await mintAdmin(request);
+    const agent = await mintAgent(request, { adminToken: admin.token, kyc: 'approved' });
+    const driver = await mintDriver(request, { adminToken: admin.token, kyc: 'approved' });
+    await mintVehicle(request, driver.token);
+    const carTypes = await getCarTypes(request);
+    const place = await resolvePlace(request, agent.token, 'Sathuvachari Vellore');
+    test.skip(!place, 'geocoder/places unavailable in this environment');
+    const post = await request.post(`${API_BASE}/trips`, {
+      headers: { Authorization: `Bearer ${agent.token}`, 'Content-Type': 'application/json' },
+      data: JSON.stringify({
+        ...baseTripBody(carTypes[0]!.id), expected_distance_km: 80, rate_per_km: 0, total_fare: 2400,
+        trip_category: 'package', from_place_id: place!.id, package_hours: 8, package_included_km: 80,
+      }),
+    });
+    expect(post.status()).toBe(200);
+    const tripId = (await post.json())?.data?.id as string;
+    const { applyToTrip, assignDriver, acceptTrip, startTrip, completeTrip, getTrip } = await import('./helpers-api');
+    const { acceptanceId } = await applyToTrip(request, driver.token, tripId);
+    await assignDriver(request, agent.token, tripId, acceptanceId);
+    const { passengerOtp } = await acceptTrip(request, driver.token, tripId);
+    await startTrip(request, driver.token, tripId, passengerOtp);
+    const done = await completeTrip(request, driver.token, tripId);
+    expect(done.status).toBe(200);
+    const final = await getTrip(request, agent.token, tripId);
+    expect(final?.status).toBe('completed');
+    expect(final?.trip_category).toBe('package');
   });
 });
