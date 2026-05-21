@@ -30,7 +30,7 @@ import {
   withdrawApplication,
   withdrawTripInvite,
 } from '@/lib/api/services/trips';
-import type { ApplyToTripInput, PostTripInput, TripInvitation, TripsQueryParams, TripStatus, UpdateTripDetailsInput, UpdateTripPassengerInput } from '@/types';
+import type { ApplyToTripInput, MyApplication, PostTripInput, TripInvitation, TripsQueryParams, TripStatus, UpdateTripDetailsInput, UpdateTripPassengerInput } from '@/types';
 
 type StartInput = { passengerOtp: string; startOdoUrl?: string; startOdoReading?: number };
 type CompleteInput = { endOdoUrl?: string; endOdoReading?: number; tollPaidByDriver?: number; driverNotes?: string; driverReviewNote?: string };
@@ -175,6 +175,26 @@ export function useMyApplications() {
     refetchOnWindowFocus: true,
     refetchOnMount: 'always',
   });
+}
+
+/**
+ * The driver's current LIVE auto-dispatch offer: a 'selected' application whose
+ * acceptance deadline is still in the future (soonest-deadline first). Polls fast
+ * (4s) so the ~60s offer window isn't eaten by latency. Only meaningful in Auto
+ * mode — the caller mounts it behind `useDispatchAlgorithm() === 'auto'`.
+ */
+export function useIncomingOffer(): MyApplication | null {
+  const q = useQuery({
+    queryKey: ['trips', 'applied'],
+    queryFn: getMyApplications,
+    refetchInterval: 4000,
+    refetchOnWindowFocus: true,
+    staleTime: 0,
+  });
+  const live = (q.data ?? [])
+    .filter((a) => a.status === 'selected' && a.trip?.acceptanceDeadlineAt && Date.parse(a.trip.acceptanceDeadlineAt) > Date.now())
+    .sort((a, b) => Date.parse(a.trip.acceptanceDeadlineAt!) - Date.parse(b.trip.acceptanceDeadlineAt!));
+  return live[0] ?? null;
 }
 
 const useInvalidateTrips = createInvalidator('trips', 'trip');

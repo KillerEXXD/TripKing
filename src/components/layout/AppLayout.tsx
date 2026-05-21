@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { RouteErrorBoundary } from '@/components/feedback';
 import { BugReportFAB } from '@/components/bug/BugReportFAB';
+import { IncomingOfferGate } from '@/components/dispatch/IncomingOfferModal';
 
 /**
  * Shell for authed routes — the prototype's app frame: a soft-grey page over
@@ -31,6 +32,7 @@ export function AppLayout() {
       </main>
       <BottomNav />
       <BugReportFAB />
+      <IncomingOfferGate />
     </div>
   );
 }
