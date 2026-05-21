@@ -1447,90 +1447,180 @@
     },
     "/trips/{id}/start-odo-upload-url": {
       "post": {
-        "tags": ["trips"],
-        "summary": "Mint a short-lived signed PUT URL for the start-odometer photo (assigned driver/admin; Bearer). Path: trip-executions-photos/<trip_id>/start_odo. Trip status must be 'accepted'.",
-        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "tags": [
+          "trips"
+        ],
+        "summary": "Mint a short-lived signed PUT URL for the start-odometer photo (assigned driver/admin; Bearer). Path: trip-executions-photos/<trip_id>/start_odo. Trip status must be \"accepted\". The browser PUTs bytes directly to the returned signed_url, then passes the resulting public-style URL as start_odo_url on POST /trips/{id}/start.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/Envelope" },
-          "401": { "$ref": "#/components/responses/Envelope" },
-          "403": { "$ref": "#/components/responses/Envelope" },
-          "404": { "$ref": "#/components/responses/Envelope" },
-          "409": { "$ref": "#/components/responses/Envelope" }
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          }
         }
       }
     },
     "/trips/{id}/end-odo-upload-url": {
       "post": {
-        "tags": ["trips"],
-        "summary": "Mint a short-lived signed PUT URL for the end-odometer photo (assigned driver/admin; Bearer). Path: trip-executions-photos/<trip_id>/end_odo. Trip status must be 'in_progress'.",
-        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "tags": [
+          "trips"
+        ],
+        "summary": "Mint a short-lived signed PUT URL for the end-odometer photo (assigned driver/admin; Bearer). Path: trip-executions-photos/<trip_id>/end_odo. Trip status must be \"in_progress\". The bytes go to the returned signed_url, then end_odo_url is sent on POST /trips/{id}/complete.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
         "responses": {
-          "200": { "$ref": "#/components/responses/Envelope" },
-          "401": { "$ref": "#/components/responses/Envelope" },
-          "403": { "$ref": "#/components/responses/Envelope" },
-          "404": { "$ref": "#/components/responses/Envelope" },
-          "409": { "$ref": "#/components/responses/Envelope" }
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          }
         }
       }
     },
     "/trips/{id}/start": {
       "post": {
-        "tags": ["trips"],
-        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress. Requires start_odo_url + start_odo_reading (422 MISSING_ODOMETER otherwise; admin bypasses). Rate-limited: 5 attempts per driver+trip per 60s; 6th = 429.",
-        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "tags": [
+          "trips"
+        ],
+        "summary": "Start the trip (assigned driver/admin; Bearer) — verifies the passenger OTP → in_progress. Requires start_odo_url + start_odo_reading (422 MISSING_ODOMETER if either is absent; admin bypasses). Rate-limited: 5 attempts per driver+trip per 60s; 6th = 429.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["passenger_otp", "start_odo_url", "start_odo_reading"],
+                "required": [
+                  "passenger_otp",
+                  "start_odo_url",
+                  "start_odo_reading"
+                ],
                 "properties": {
-                  "passenger_otp": { "type": "string" },
-                  "start_odo_url": { "type": "string" },
-                  "start_odo_reading": { "type": "integer", "minimum": 0 }
+                  "passenger_otp": {
+                    "type": "string"
+                  },
+                  "start_odo_url": {
+                    "type": "string"
+                  },
+                  "start_odo_reading": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "$ref": "#/components/responses/Envelope" },
-          "401": { "$ref": "#/components/responses/Envelope" },
-          "409": { "$ref": "#/components/responses/Envelope" },
-          "422": { "$ref": "#/components/responses/Envelope" },
-          "429": { "$ref": "#/components/responses/Envelope" }
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "429": {
+            "$ref": "#/components/responses/Envelope"
+          }
         }
       }
     },
     "/trips/{id}/complete": {
       "post": {
-        "tags": ["trips"],
-        "summary": "Complete the trip (assigned driver/admin; Bearer). Requires end_odo_url + end_odo_reading (422 MISSING_ODOMETER otherwise; admin bypasses). When end_odo_reading is supplied alongside an existing start_odo_reading, it must be strictly greater (422 VALIDATION otherwise). toll_paid_by_driver is 100% reimbursed in final_driver_payout and added to final_total_fare; commission is NOT taken on toll. Extra distance over expected_distance_km is billed at the trip's posted rate_per_km. Fires the wallet-charge trigger (migration 044) — 402 INSUFFICIENT_WALLET_BALANCE_* if either wallet is short.",
-        "parameters": [{ "$ref": "#/components/parameters/id" }],
+        "tags": [
+          "trips"
+        ],
+        "summary": "Complete the trip (assigned driver/admin; Bearer). Requires end_odo_url + end_odo_reading (422 MISSING_ODOMETER if either is absent; admin bypasses). When end_odo_reading is supplied alongside an existing start_odo_reading, it must be strictly greater (422 VALIDATION otherwise). toll_paid_by_driver is 100%% reimbursed in final_driver_payout and added to final_total_fare; commission is NOT taken on toll. Extra distance over expected_distance_km is billed at the trip's posted rate_per_km. Fires the wallet-charge trigger (migration 044) — 402 INSUFFICIENT_WALLET_BALANCE_* if either side's wallet is short.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/id"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["end_odo_url", "end_odo_reading"],
+                "required": [
+                  "end_odo_url",
+                  "end_odo_reading"
+                ],
                 "properties": {
-                  "end_odo_url": { "type": "string" },
-                  "end_odo_reading": { "type": "integer", "minimum": 0 },
-                  "toll_paid_by_driver": { "type": "number", "minimum": 0, "default": 0 },
-                  "driver_notes": { "type": "string" },
-                  "driver_review_note": { "type": "string", "description": "Private note to the trip-posting agent (separate from a public review)." }
+                  "end_odo_url": {
+                    "type": "string"
+                  },
+                  "end_odo_reading": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "toll_paid_by_driver": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0
+                  },
+                  "driver_notes": {
+                    "type": "string"
+                  },
+                  "driver_review_note": {
+                    "type": "string",
+                    "description": "Private note to the trip-posting agent (separate from a public review)."
+                  }
                 }
               }
             }
           }
         },
         "responses": {
-          "200": { "$ref": "#/components/responses/Envelope" },
-          "402": { "$ref": "#/components/responses/Envelope" },
-          "409": { "$ref": "#/components/responses/Envelope" },
-          "422": { "$ref": "#/components/responses/Envelope" }
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "402": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
         }
       }
     },
@@ -2681,6 +2771,141 @@
           "drivers"
         ],
         "summary": "Get the caller's own driver profile (Bearer; joined like /drivers/{id}). 404 if the caller has no driver profile yet. Carries a server-computed `verification` block (kyc_status, per-step status, steps_done/steps_total, the scheduled video_verification, kyc_rejection_reason) for the owner.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/online": {
+      "post": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Go \"I'm Online\" for Auto-dispatch (Bearer; the caller's own driver). Allocates a hidden global queue token (or keeps it on reconnect-within-grace) and starts the GPS heartbeat. 403 if deactivated, 403 KYC_REQUIRED if not approved. The response carries the derived presence (status: online|grace|offline) and NEVER the global token.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "lat",
+                  "lng"
+                ],
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lng": {
+                    "type": "number"
+                  },
+                  "vehicle_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "403": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/heartbeat": {
+      "post": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Refresh the caller's live GPS + liveness while online (Bearer). 409 if not online yet (call /drivers/online first). An in-grace driver who still holds a token is brought back online.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "lat",
+                  "lng"
+                ],
+                "properties": {
+                  "lat": {
+                    "type": "number"
+                  },
+                  "lng": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "409": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "422": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/offline": {
+      "post": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "Go offline (Bearer). Starts the configurable grace countdown; the global token is retained until the grace expires (status → grace), after which it is cleared (status → offline).",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "401": {
+            "$ref": "#/components/responses/Envelope"
+          },
+          "404": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
+    "/drivers/presence": {
+      "get": {
+        "tags": [
+          "drivers"
+        ],
+        "summary": "The caller's own presence (Bearer) — derived status (online|grace|offline), last_heartbeat_at, grace_expires_at, vehicle_id, busy_trip_id, current_lat/lng. The hidden global token is never exposed.",
         "responses": {
           "200": {
             "$ref": "#/components/responses/Envelope"
