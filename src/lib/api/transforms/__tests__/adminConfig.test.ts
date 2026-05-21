@@ -114,6 +114,15 @@ describe('transformAppSettings', () => {
     default_driver_instructions: '1. Call before arrival',
     max_active_vacancies_per_driver: 2,
     invite_max_radius_km: 15,
+    dispatch_algorithm: 'auto',
+    dispatch_offer_seconds: 60,
+    dispatch_offline_grace_seconds: 180,
+    dispatch_initial_radius_km: 3,
+    dispatch_radius_widen_km: 10,
+    dispatch_max_passes: 2,
+    dispatch_retry_cooldown_seconds: 120,
+    dispatch_max_retries: 3,
+    dispatch_heartbeat_stale_seconds: 90,
   };
   it('maps a full row', () => {
     expect(transformAppSettings(full)).toEqual({
@@ -127,7 +136,20 @@ describe('transformAppSettings', () => {
       defaultDriverInstructions: '1. Call before arrival',
       maxActiveVacanciesPerDriver: 2,
       inviteMaxRadiusKm: 15,
+      dispatchAlgorithm: 'auto',
+      dispatchOfferSeconds: 60,
+      dispatchOfflineGraceSeconds: 180,
+      dispatchInitialRadiusKm: 3,
+      dispatchRadiusWidenKm: 10,
+      dispatchMaxPasses: 2,
+      dispatchRetryCooldownSeconds: 120,
+      dispatchMaxRetries: 3,
+      dispatchHeartbeatStaleSeconds: 90,
     });
+  });
+  it('defaults dispatch_algorithm to manual when absent/invalid', () => {
+    expect(transformAppSettings({ ...full, dispatch_algorithm: undefined }).dispatchAlgorithm).toBe('manual');
+    expect(transformAppSettings({ ...full, dispatch_algorithm: 'bogus' }).dispatchAlgorithm).toBe('manual');
   });
   it('throws when a numeric setting is missing', () => {
     const { min_vehicle_year: _omit, ...rest } = full;
@@ -152,5 +174,7 @@ describe('toApi* writers — camelCase → snake_case, drop undefined', () => {
     expect(toApiAppSettings({ minVehicleYear: 2016, defaultCommissionPct: 12 })).toEqual({ min_vehicle_year: 2016, default_commission_pct: 12 });
     expect(toApiAppSettings({ maxActiveVacanciesPerDriver: 3 })).toEqual({ max_active_vacancies_per_driver: 3 });
     expect(toApiAppSettings({ inviteMaxRadiusKm: 20 })).toEqual({ invite_max_radius_km: 20 });
+    expect(toApiAppSettings({ dispatchAlgorithm: 'auto' })).toEqual({ dispatch_algorithm: 'auto' });
+    expect(toApiAppSettings({ dispatchOfferSeconds: 45, dispatchMaxRetries: 5 })).toEqual({ dispatch_offer_seconds: 45, dispatch_max_retries: 5 });
   });
 });

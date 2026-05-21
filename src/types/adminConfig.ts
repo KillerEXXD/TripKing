@@ -84,7 +84,29 @@ export interface AppSettings {
    *  pickup must be within this many km of the vacancy's announced city. Drivers without an
    *  active vacancy are not radius-checked. CHECK [1,200] in the DB. */
   inviteMaxRadiusKm: number;
+  // ── Dispatch (platform algorithm toggle + Auto-dispatch tuning) ───────────
+  /** Which dispatch algorithm the whole platform runs. `auto` = "I'm Online" presence +
+   *  token-queue offers; `manual` = "I'm vacant" + apply + agent-picks (today's flow). */
+  dispatchAlgorithm: DispatchAlgorithm;
+  /** Auto: seconds a driver has to accept an offer before it advances. CHECK [15,300]. */
+  dispatchOfferSeconds: number;
+  /** Auto: seconds a driver keeps their queue place after going offline. CHECK [30,1800]. */
+  dispatchOfflineGraceSeconds: number;
+  /** Auto: first search radius around a pickup, km. CHECK [1,100]. */
+  dispatchInitialRadiusKm: number;
+  /** Auto: how much the radius grows each round when nobody nearby accepts, km. CHECK [0,100]. */
+  dispatchRadiusWidenKm: number;
+  /** Auto: how many widening passes before a cooldown. CHECK [1,5]. */
+  dispatchMaxPasses: number;
+  /** Auto: seconds to wait before auto-retrying an exhausted trip. CHECK [30,3600]. */
+  dispatchRetryCooldownSeconds: number;
+  /** Auto: how many retry cycles before marking the trip Unfilled. CHECK [0,20]. */
+  dispatchMaxRetries: number;
+  /** Auto: no GPS heartbeat for this long ⇒ treated as offline. CHECK [30,600]. */
+  dispatchHeartbeatStaleSeconds: number;
 }
+
+export type DispatchAlgorithm = 'auto' | 'manual';
 
 // ── write-side input shapes ─────────────────────────────────────────────────
 export interface LookupInput {

@@ -206,6 +206,15 @@ export function transformAppSettings(api: Record<string, unknown>): AppSettings 
     defaultDriverInstructions: typeof api.default_driver_instructions === 'string' ? api.default_driver_instructions : '',
     maxActiveVacanciesPerDriver: reqNum(api.max_active_vacancies_per_driver, 'max_active_vacancies_per_driver', { api }),
     inviteMaxRadiusKm: reqNum(api.invite_max_radius_km, 'invite_max_radius_km', { api }),
+    dispatchAlgorithm: api.dispatch_algorithm === 'auto' ? 'auto' : 'manual',
+    dispatchOfferSeconds: reqNum(api.dispatch_offer_seconds, 'dispatch_offer_seconds', { api }),
+    dispatchOfflineGraceSeconds: reqNum(api.dispatch_offline_grace_seconds, 'dispatch_offline_grace_seconds', { api }),
+    dispatchInitialRadiusKm: reqNum(api.dispatch_initial_radius_km, 'dispatch_initial_radius_km', { api }),
+    dispatchRadiusWidenKm: reqNum(api.dispatch_radius_widen_km, 'dispatch_radius_widen_km', { api }),
+    dispatchMaxPasses: reqNum(api.dispatch_max_passes, 'dispatch_max_passes', { api }),
+    dispatchRetryCooldownSeconds: reqNum(api.dispatch_retry_cooldown_seconds, 'dispatch_retry_cooldown_seconds', { api }),
+    dispatchMaxRetries: reqNum(api.dispatch_max_retries, 'dispatch_max_retries', { api }),
+    dispatchHeartbeatStaleSeconds: reqNum(api.dispatch_heartbeat_stale_seconds, 'dispatch_heartbeat_stale_seconds', { api }),
   };
 }
 export function toApiAppSettings(input: AppSettingsInput): Record<string, unknown> {
@@ -220,5 +229,14 @@ export function toApiAppSettings(input: AppSettingsInput): Record<string, unknow
   if (input.defaultDriverInstructions !== undefined) out.default_driver_instructions = input.defaultDriverInstructions;
   if (input.maxActiveVacanciesPerDriver !== undefined) out.max_active_vacancies_per_driver = input.maxActiveVacanciesPerDriver;
   if (input.inviteMaxRadiusKm !== undefined) out.invite_max_radius_km = input.inviteMaxRadiusKm;
+  if (input.dispatchAlgorithm !== undefined) out.dispatch_algorithm = input.dispatchAlgorithm;
+  if (input.dispatchOfferSeconds !== undefined) out.dispatch_offer_seconds = input.dispatchOfferSeconds;
+  if (input.dispatchOfflineGraceSeconds !== undefined) out.dispatch_offline_grace_seconds = input.dispatchOfflineGraceSeconds;
+  if (input.dispatchInitialRadiusKm !== undefined) out.dispatch_initial_radius_km = input.dispatchInitialRadiusKm;
+  if (input.dispatchRadiusWidenKm !== undefined) out.dispatch_radius_widen_km = input.dispatchRadiusWidenKm;
+  if (input.dispatchMaxPasses !== undefined) out.dispatch_max_passes = input.dispatchMaxPasses;
+  if (input.dispatchRetryCooldownSeconds !== undefined) out.dispatch_retry_cooldown_seconds = input.dispatchRetryCooldownSeconds;
+  if (input.dispatchMaxRetries !== undefined) out.dispatch_max_retries = input.dispatchMaxRetries;
+  if (input.dispatchHeartbeatStaleSeconds !== undefined) out.dispatch_heartbeat_stale_seconds = input.dispatchHeartbeatStaleSeconds;
   return out;
 }

@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui';
 import { LookupListEditor } from '@/components/admin/LookupListEditor';
 import { AppSettingsForm } from '@/components/admin/AppSettingsForm';
+import { DispatchSettingsForm } from '@/components/admin/DispatchSettingsForm';
 import { CancelReasonsEditor, CitiesEditor, LanguagesEditor, MakesModelsEditor, ReviewTagsEditor, SeatOptionsEditor } from '@/components/admin/extraEditors';
 import { SingletonSettingsForm } from '@/components/admin/SingletonSettingsForm';
 import { AdminListEditor } from '@/components/admin/AdminListEditor';
@@ -12,6 +13,7 @@ import { carTypeHooks, fuelTypeHooks } from '@/hooks/useAdminConfig';
 
 type SectionId =
   | 'general'
+  | 'dispatch'
   | 'car-types'
   | 'fuel-types'
   | 'makes-models'
@@ -30,6 +32,7 @@ type SectionId =
 
 const SECTIONS: { id: SectionId; label: string }[] = [
   { id: 'general', label: 'General settings' },
+  { id: 'dispatch', label: 'Dispatch' },
   { id: 'car-types', label: 'Car types' },
   { id: 'fuel-types', label: 'Fuel types' },
   { id: 'makes-models', label: 'Vehicle makes & models' },
@@ -95,6 +98,7 @@ export function AdminConfigPage() {
       </nav>
       <Card>
         {section === 'general' && <AppSettingsForm />}
+        {section === 'dispatch' && <DispatchSettingsForm />}
         {section === 'car-types' && <LabelListSection hooks={carTypeHooks} title="Car types" itemNoun="car type" />}
         {section === 'fuel-types' && <LabelListSection hooks={fuelTypeHooks} title="Fuel types" itemNoun="fuel type" />}
         {section === 'makes-models' && <MakesModelsEditor />}
