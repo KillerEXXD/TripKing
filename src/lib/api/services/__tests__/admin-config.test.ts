@@ -67,14 +67,24 @@ describe('admin-config service', () => {
       default_driver_instructions: 'x',
       max_active_vacancies_per_driver: 2,
       invite_max_radius_km: 15,
+      dispatch_algorithm: 'manual',
+      dispatch_offer_seconds: 60,
+      dispatch_offline_grace_seconds: 180,
+      dispatch_initial_radius_km: 3,
+      dispatch_radius_widen_km: 10,
+      dispatch_max_passes: 2,
+      dispatch_retry_cooldown_seconds: 120,
+      dispatch_max_retries: 3,
+      dispatch_heartbeat_stale_seconds: 90,
     };
     vi.spyOn(apiClient, 'get').mockReturnValue(ok(settings) as never);
     const s = await getAppSettings();
     expect(s.minVehicleYear).toBe(2015);
+    expect(s.dispatchAlgorithm).toBe('manual');
 
-    const put = vi.spyOn(apiClient, 'put').mockReturnValue(ok({ ...settings, default_commission_pct: 12 }) as never);
-    const updated = await updateAppSettings({ defaultCommissionPct: 12 });
-    expect(put).toHaveBeenCalledWith('/admin/app-settings', { default_commission_pct: 12 });
-    expect(updated.defaultCommissionPct).toBe(12);
+    const put = vi.spyOn(apiClient, 'put').mockReturnValue(ok({ ...settings, dispatch_algorithm: 'auto' }) as never);
+    const updated = await updateAppSettings({ dispatchAlgorithm: 'auto' });
+    expect(put).toHaveBeenCalledWith('/admin/app-settings', { dispatch_algorithm: 'auto' });
+    expect(updated.dispatchAlgorithm).toBe('auto');
   });
 });

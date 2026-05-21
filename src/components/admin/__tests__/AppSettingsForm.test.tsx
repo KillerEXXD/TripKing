@@ -23,6 +23,15 @@ function fixture(over: Partial<AppSettings> = {}): AppSettings {
     defaultDriverInstructions: '1. Call before arrival',
     maxActiveVacanciesPerDriver: 2,
     inviteMaxRadiusKm: 15,
+    dispatchAlgorithm: 'manual',
+    dispatchOfferSeconds: 60,
+    dispatchOfflineGraceSeconds: 180,
+    dispatchInitialRadiusKm: 3,
+    dispatchRadiusWidenKm: 10,
+    dispatchMaxPasses: 2,
+    dispatchRetryCooldownSeconds: 120,
+    dispatchMaxRetries: 3,
+    dispatchHeartbeatStaleSeconds: 90,
     ...over,
   };
 }
