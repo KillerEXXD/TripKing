@@ -147,17 +147,21 @@ async function syncVacanciesForTrip(
   try {
     if (action === 'accept') {
       if (!opts.driverId || !opts.pickupAt) return;
-      // Full-interval overlap: vacancy must cover the trip's [pickup_at, expected_end_at].
-      // Falls back to pickup_at if expectedEndAt is missing (defensive — trips.expected_end_at
-      // has been NOT NULL since migration 024).
+      // Interval OVERLAP (not containment): suppress every active vacancy of this driver whose
+      // window [available_from, available_until] overlaps the trip's [pickup_at, expected_end_at].
+      // A driver committed to a trip can't be available during any overlapping window even when
+      // they posted a shorter availability than the trip runs — the old containment gate
+      // (available_until >= expected_end_at) silently left those rows 'active', leaking the driver
+      // into the agent feed. Catches multiple overlapping vacancies too. Falls back to pickup_at if
+      // expectedEndAt is missing (defensive — trips.expected_end_at NOT NULL since migration 024).
       const endIso = opts.expectedEndAt ?? opts.pickupAt;
       const { data: updated } = await db
         .from('vacancies')
         .update({ status: 'on_trip', linked_trip_id: tripId, updated_at: new Date().toISOString() })
         .eq('driver_id', opts.driverId)
         .eq('status', 'active')
-        .lte('available_from', opts.pickupAt)
-        .or(`available_until.is.null,available_until.gte.${endIso}`)
+        .lte('available_from', endIso)
+        .or(`available_until.is.null,available_until.gte.${opts.pickupAt}`)
         .select('driver_id');
       for (const r of (updated ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
       return;

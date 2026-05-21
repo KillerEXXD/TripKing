@@ -234,6 +234,21 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         const { data: inactive } = await db.from('drivers').select('id').eq('is_active', false);
         const inactiveIds = (inactive ?? []).map((r) => r.id as string);
         if (inactiveIds.length) q = q.not('driver_id', 'in', `(${inactiveIds.join(',')})`);
+        // Defense-in-depth (public path only): never surface a driver committed to a live trip.
+        // syncVacanciesForTrip flips overlapping vacancies to 'on_trip' on accept, but a row posted
+        // AFTER the driver went on-trip — or any path that skips the sync — would still leak. A
+        // driver with an accepted/in_progress trip that hasn't ended yet (expected_end_at > now)
+        // can't be freshly available within the feed's default live window, so drop them outright.
+        if (!driverId) {
+          const { data: busy } = await db
+            .from('trips')
+            .select('assigned_driver_id')
+            .in('status', ['accepted', 'in_progress'])
+            .not('assigned_driver_id', 'is', null)
+            .gt('expected_end_at', new Date().toISOString());
+          const busyIds = [...new Set((busy ?? []).map((r) => r.assigned_driver_id as string))];
+          if (busyIds.length) q = q.not('driver_id', 'in', `(${busyIds.join(',')})`);
+        }
         // Invite-picker passes the trip poster's user_id to hide their own vacancy from
         // the candidate list (a driver-user wearing both hats — they can't invite themselves).
         const excludeUserId = url.searchParams.get('exclude_user_id');
