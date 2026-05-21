@@ -104,6 +104,36 @@ function pick(src: Row, keys: string[]): Row {
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const strOrNull = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 const csv = (v: string | null): string[] => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
+const numOrNull = (v: unknown): number | null => {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v))) return Number(v);
+  return null;
+};
+/**
+ * Public shape of a driver's OWN presence. Derives the 3-state status and
+ * deliberately NEVER exposes the global `token` (or `geog`) — the driver only
+ * ever sees their status; the location-relative "X of N nearby" is computed
+ * separately. `null` → a default offline shape.
+ */
+function presenceShape(p: Row | null): Row {
+  if (!p) {
+    return { is_online: false, status: 'offline', online_since: null, last_heartbeat_at: null, current_lat: null, current_lng: null, vehicle_id: null, busy_trip_id: null, went_offline_at: null, grace_expires_at: null };
+  }
+  const graceTs = typeof p.grace_expires_at === 'string' ? Date.parse(p.grace_expires_at) : 0;
+  const status = p.is_online === true ? 'online' : graceTs && graceTs > Date.now() ? 'grace' : 'offline';
+  return {
+    is_online: p.is_online === true,
+    status,
+    online_since: p.online_since ?? null,
+    last_heartbeat_at: p.last_heartbeat_at ?? null,
+    current_lat: p.current_lat ?? null,
+    current_lng: p.current_lng ?? null,
+    vehicle_id: p.vehicle_id ?? null,
+    busy_trip_id: p.busy_trip_id ?? null,
+    went_offline_at: p.went_offline_at ?? null,
+    grace_expires_at: p.grace_expires_at ?? null,
+  };
+}
 const stripPrivateKyc = (drv: Row): Row => {
   const out = { ...drv };
   for (const f of PRIVATE_KYC_FIELDS) delete out[f];
@@ -274,6 +304,53 @@ const handler = withTiming('drivers', async (req: Request): Promise<Response> =>
   async function syncRole(userId: string, role: 'driver' | 'trip_manager'): Promise<void> {
     const { data: u } = await db.from('users').select('role').eq('id', userId).maybeSingle();
     if (u && u.role !== 'admin' && u.role !== role) await db.from('users').update({ role }).eq('id', userId);
+  }
+
+  // ── Presence / "I'm Online" (Auto-dispatch) ─────────────────────────────────
+  //   POST /drivers/online    (Bearer) { lat, lng, vehicle_id? } — join the queue (token allocated server-side)
+  //   POST /drivers/heartbeat (Bearer) { lat, lng }              — refresh GPS + liveness
+  //   POST /drivers/offline   (Bearer)                           — start the grace countdown (keeps token)
+  //   GET  /drivers/presence  (Bearer)                           — the caller's own derived presence
+  // The global token is NEVER returned to the client — only the derived status +
+  // a location-relative position would ever be exposed. Writes go through the
+  // SECURITY DEFINER RPCs (migration 069); the row is shaped by `presenceShape`.
+  if (['online', 'offline', 'heartbeat', 'presence'].includes(id) && !sub) {
+    const u = await authUser(db, req);
+    if (!u) return fail('UNAUTHORIZED', '', 401);
+    const { data: drv } = await db.from('drivers').select('id, is_active, kyc_status').eq('user_id', u.id).maybeSingle();
+    if (!drv) return fail('NOT_FOUND', 'No driver profile for this account', 404);
+    const driverId = drv.id as string;
+
+    if (id === 'presence' && req.method === 'GET') {
+      const { data: p } = await db.from('driver_presence').select('*').eq('driver_id', driverId).maybeSingle();
+      return ok(presenceShape(p as Row | null));
+    }
+    if (id === 'online' && req.method === 'POST') {
+      if (drv.is_active === false) return fail('FORBIDDEN', 'Your account is deactivated', 403);
+      if (drv.kyc_status !== 'approved') return fail('KYC_REQUIRED', 'Complete KYC verification to go online', 403);
+      const b = await readBody(req);
+      const lat = numOrNull(b.lat), lng = numOrNull(b.lng);
+      if (lat === null || lng === null) return fail('VALIDATION', 'lat and lng are required to go online', 422);
+      const { data, error } = await db.rpc('driver_go_online', { p_driver_id: driverId, p_vehicle_id: strOrNull(b.vehicle_id), p_lat: lat, p_lng: lng });
+      if (error) return pgFail(error);
+      return ok(presenceShape(data as Row | null));
+    }
+    if (id === 'heartbeat' && req.method === 'POST') {
+      const b = await readBody(req);
+      const lat = numOrNull(b.lat), lng = numOrNull(b.lng);
+      if (lat === null || lng === null) return fail('VALIDATION', 'lat and lng are required', 422);
+      const { data, error } = await db.rpc('driver_heartbeat', { p_driver_id: driverId, p_lat: lat, p_lng: lng });
+      if (error) return pgFail(error);
+      const row = data as Row | null;
+      if (!row || !row.driver_id) return fail('CONFLICT', 'Not online — call /drivers/online first', 409);
+      return ok(presenceShape(row));
+    }
+    if (id === 'offline' && req.method === 'POST') {
+      const { data, error } = await db.rpc('driver_go_offline', { p_driver_id: driverId });
+      if (error) return pgFail(error);
+      return ok(presenceShape(data as Row | null));
+    }
+    return fail('NOT_FOUND', 'Unknown presence route', 404);
   }
 
   // ── GET /drivers (list — public; private KYC fields stripped; paginated) ──
