@@ -233,6 +233,7 @@ export function PostTripPage() {
     fromCityId || undefined,
     pickupAtWatch || undefined,
     expectedEndAt || undefined,
+    carTypeId || undefined,
     previewEnabled,
   );
   const previewSettled = !previewEnabled || (!matchPreview.isFetching && (matchPreview.isSuccess || matchPreview.isError));

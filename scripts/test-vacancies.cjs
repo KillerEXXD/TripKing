@@ -93,6 +93,19 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('POST /vacancies without available_until → defaults to a 4h bounded window (never NULL)', !!au && Math.abs(gap4h - 4 * 3600_000) < 60_000, `available_from=${af} available_until=${au} gapMs=${gap4h}`);
   if (!vacancyId) process.exit(1);
 
+  // ── vehicle_id ownership (drives auto-invite car-type matching) ─────────
+  const carType = (await j('GET', '/admin/car-types')).json?.data?.[0]?.id;
+  const ownVehicle = await j('POST', '/vehicles', { token: driverToken, body: { car_type_id: carType, year: 2024, registration_number: `TN-VAC-${Date.now().toString().slice(-6)}`, seats: 4 } });
+  const ownVehicleId = ownVehicle.json?.data?.id;
+  check('POST /vehicles (own) → 200 + id', ownVehicle.status === 200 && !!ownVehicleId, `status=${ownVehicle.status} ${JSON.stringify(ownVehicle.json?.error || '')}`);
+  const badVeh = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destination_city_ids: [dest1], vehicle_id: NONE } });
+  check("POST /vacancies with someone else's / unknown vehicle_id → 422", badVeh.status === 422, `status=${badVeh.status} ${JSON.stringify(badVeh.json?.error || '')}`);
+  if (ownVehicleId) {
+    const withVeh = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: currentCityId, destination_city_ids: [dest1], vehicle_id: ownVehicleId } });
+    check('POST /vacancies with own vehicle_id → 200 + vehicle joined', withVeh.status === 200 && withVeh.json?.data?.vehicle?.id === ownVehicleId, `status=${withVeh.status} vehicle=${JSON.stringify(withVeh.json?.data?.vehicle || withVeh.json?.error || '')}`);
+    if (withVeh.json?.data?.id) await j('POST', `/vacancies/${withVeh.json.data.id}/cancel`, { token: driverToken });
+  }
+
   // Max-2-active rule: cancel `posted` here so the place-plumbing & destinations-array sub-tests
   // below have room to POST without hitting the limit. We resurrect a fresh vacancy for the
   // cancel-endpoint test block further down.

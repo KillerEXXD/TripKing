@@ -81,10 +81,12 @@ export function getTripMatchPreview(
   fromCityId: string,
   pickupAt?: string,
   expectedEndAt?: string,
+  carTypeId?: string,
 ): Promise<TripMatchPreview> {
   const params: Record<string, string> = { from_city_id: fromCityId };
   if (pickupAt) params.pickup_at = pickupAt;
   if (expectedEndAt) params.expected_end_at = expectedEndAt;
+  if (carTypeId) params.car_type_id = carTypeId;
   return apiClient.get<Api>('/trips/match-preview', params).then((r) => {
     const d = (r.data ?? {}) as Api;
     return {

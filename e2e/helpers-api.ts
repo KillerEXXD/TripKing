@@ -437,14 +437,17 @@ export async function getTrip(
 export async function postVacancy(
   req: APIRequestContext,
   driverToken: string,
-  opts: { currentCityId?: string; destinationCityIds?: string[]; notes?: string } = {},
+  opts: { currentCityId?: string; destinationCityIds?: string[]; notes?: string; vehicleId?: string } = {},
 ): Promise<{ vacancyId: string }> {
   const cities = await getCities(req);
-  const body = {
+  const body: Record<string, unknown> = {
     current_city_id: opts.currentCityId ?? cities[0]!.id,
     destination_city_ids: opts.destinationCityIds ?? [cities[1]!.id],
     notes: opts.notes ?? 'e2e vacancy',
   };
+  // Auto-invite matches the vacancy's vehicle car type to the trip — tests that rely on
+  // auto-invite must attach a vehicle (its car type defaults to the same carTypes[0] postTrip uses).
+  if (opts.vehicleId) body.vehicle_id = opts.vehicleId;
   const res = await call<{ id: string }>(req, 'POST', '/vacancies', { token: driverToken, data: body });
   if (res.status !== 200 || !res.data?.id) {
     throw new Error(`postVacancy failed: ${res.status} ${JSON.stringify(res.error)}`);

@@ -733,6 +733,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     excludeDriverId: string | null,
     pickupAt?: string | null,
     expectedEndAt?: string | null,
+    carTypeId?: string | null,
   ): Promise<Array<{ driverId: string; userId: string; distanceKm: number }>> {
     if (!fromCityId) return [];
     const { data: settings } = await db.from('app_settings').select('invite_max_radius_km').limit(1).maybeSingle();
@@ -750,7 +751,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // Mirrors the accept-time gate in syncVacanciesForTrip (~line 130) + expire_stale_vacancies.
     let q = db
       .from('vacancies')
-      .select('driver_id, available_from, available_until, current_city:cities!current_city_id(lat, lng), driver:drivers!driver_id(id, user_id, is_active, kyc_status)')
+      .select('driver_id, available_from, available_until, current_city:cities!current_city_id(lat, lng), vehicle:vehicles(car_type_id), driver:drivers!driver_id(id, user_id, is_active, kyc_status)')
       .eq('status', 'active');
     if (pickupAt) {
       const endIso = expectedEndAt ?? pickupAt;
@@ -760,6 +761,7 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     type VacRow = {
       driver_id: string;
       current_city: { lat: number | string | null; lng: number | string | null } | null;
+      vehicle: { car_type_id: string | null } | null;
       driver: { id: string; user_id: string; is_active: boolean; kyc_status: string } | null;
     };
     const out: Array<{ driverId: string; userId: string; distanceKm: number }> = [];
@@ -767,6 +769,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     for (const r of (vacRows as VacRow[] | null) ?? []) {
       if (!r.driver || r.driver.is_active === false || r.driver.kyc_status !== 'approved') continue;
       if (excludeDriverId && r.driver_id === excludeDriverId) continue;
+      // Car-type match: the vacancy's vehicle must be the type the trip asked for. A vacancy
+      // with no vehicle (legacy/none) can't be matched to a typed trip.
+      if (carTypeId && r.vehicle?.car_type_id !== carTypeId) continue;
       if (seen.has(r.driver_id)) continue;
       const lat = Number(r.current_city?.lat), lng = Number(r.current_city?.lng);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
@@ -1240,10 +1245,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (b.auto_invite_matches !== false) {
       try {
         const excludeDriverId = posterRole === 'driver' ? await driverIdFor(u.id) : null;
-        // Pass the trip's planned interval so we only invite drivers whose advertised
-        // availability covers it — the old behaviour ignored time bounds and invited a
-        // driver to any future trip in their city, even one years out.
-        const matches = await findMatchingDrivers(plan.from_city_id ?? '', excludeDriverId, pickupAtIso, plan.expected_end_at);
+        // Pass the trip's planned interval + required car type so we only invite drivers whose
+        // advertised availability covers it AND whose vacancy vehicle is the right type — the old
+        // behaviour ignored both and invited a driver to any future trip in their city.
+        const matches = await findMatchingDrivers(plan.from_city_id ?? '', excludeDriverId, pickupAtIso, plan.expected_end_at, String(b.car_type_id));
         const top5 = matches.slice(0, 5).map((m) => m.driverId);
         if (top5.length > 0) {
           const { created: inv } = await inviteDrivers(
@@ -1312,9 +1317,12 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // ~24h, so no real driver could ever take it). Without these the count is meaningless.
     const pickupAt = url.searchParams.get('pickup_at');
     const expectedEndAt = url.searchParams.get('expected_end_at');
+    // Optional: when the form knows the required car type, count only drivers whose vacancy
+    // vehicle matches it (mirrors the auto-invite filter so the preview reflects who'd be invited).
+    const carTypeId = url.searchParams.get('car_type_id');
     const { data: usr } = await db.from('users').select('role').eq('id', u.id).maybeSingle();
     const excludeDriverId = (usr?.role === 'driver') ? await driverIdFor(u.id) : null;
-    const matches = await findMatchingDrivers(fromCityId, excludeDriverId, pickupAt, expectedEndAt);
+    const matches = await findMatchingDrivers(fromCityId, excludeDriverId, pickupAt, expectedEndAt, carTypeId);
     const total = matches.length;
     const cap = 5;
     return ok({ total_matches: total, will_invite: Math.min(total, cap), max_invites: cap });

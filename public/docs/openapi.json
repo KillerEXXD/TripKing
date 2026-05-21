@@ -1209,7 +1209,7 @@
         "tags": [
           "trips"
         ],
-        "summary": "Auto-invite preview (Bearer). Counts only — returns { total_matches, will_invite, max_invites: 5 }. Same matching rules as the auto-invite branch on POST /trips. Driver callers exclude themselves. Per-user rate-limited (30/min). Used by the trip-post form to show \"N drivers available — top 5 will be invited\" and gate the Post button.",
+        "summary": "Auto-invite preview (Bearer). Counts only — returns { total_matches, will_invite, max_invites: 5 }. Same matching rules as the auto-invite branch on POST /trips (time-bounds + radius + car type when car_type_id is given). Driver callers exclude themselves. Per-user rate-limited (30/min). Used by the trip-post form to show \"N drivers available — top 5 will be invited\" and gate the Post button.",
         "parameters": [
           {
             "name": "from_city_id",
@@ -1218,6 +1218,33 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "pickup_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "expected_end_at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "car_type_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Count only drivers whose vacancy vehicle is this car type."
           }
         ],
         "responses": {
@@ -3887,7 +3914,7 @@
         "tags": [
           "vacancies"
         ],
-        "summary": "Post a vacancy (driver; Bearer; must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver is deactivated, 403 KYC_REQUIRED if not yet approved) — driver_id = the caller; current_place_id accepted alongside current_city_id; destinations: [{ cityId?, placeId? }] (each entry may be a curated city, a precise place, or both — at least one id required; or the legacy parallel destination_place_ids / destination_city_ids) → vacancy_destinations rows (a bad place id → 422); matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
+        "summary": "Post a vacancy (driver; Bearer; must be is_active + KYC-verified — 403 ACCOUNT_SUSPENDED if the driver is deactivated, 403 KYC_REQUIRED if not yet approved) — driver_id = the caller; current_place_id accepted alongside current_city_id; destinations: [{ cityId?, placeId? }] (each entry may be a curated city, a precise place, or both — at least one id required; or the legacy parallel destination_place_ids / destination_city_ids) → vacancy_destinations rows (a bad place id → 422); vehicle_id (if given) must be one of the caller's vehicles (422 otherwise) and drives car-type matching in auto-invite; available_until is never NULL — a missing value defaults to available_from + 4h; matching active alerts get an alert_match notification. Per-user rate-limited (429 RATE_LIMITED on excess).",
         "requestBody": {
           "required": true,
           "content": {

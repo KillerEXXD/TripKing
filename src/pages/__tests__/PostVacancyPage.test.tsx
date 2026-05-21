@@ -12,6 +12,8 @@ vi.mock('@/hooks/useVacancies', () => ({
 import { usePostVacancy, useUpdateVacancy, useVacancy } from '@/hooks/useVacancies';
 vi.mock('@/hooks/useDrivers', () => ({ useMyDriver: vi.fn() }));
 import { useMyDriver } from '@/hooks/useDrivers';
+vi.mock('@/hooks/useVehicles', () => ({ useDriverVehicles: vi.fn() }));
+import { useDriverVehicles } from '@/hooks/useVehicles';
 vi.mock('@/hooks/useAdminConfig', () => ({ cityHooks: { useList: vi.fn() } }));
 import { cityHooks } from '@/hooks/useAdminConfig';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -52,6 +54,10 @@ function setPost(over: Partial<{ mutateAsync: ReturnType<typeof vi.fn>; isPendin
 function setMyDriver(kycStatus: string | undefined = 'approved') {
   vi.mocked(useMyDriver).mockReturnValue({ isPending: false, isError: false, data: kycStatus ? { id: 'd1', kycStatus } : undefined, refetch: vi.fn() } as never);
 }
+const vehicle = (id: string, carTypeLabel: string, isPrimary = false) => ({ id, carTypeLabel, makeLabel: 'Maruti', modelName: 'Dzire', registrationNumber: `TN-${id}`, isPrimary, isActive: true });
+function setVehicles(over: ListState = {}) {
+  vi.mocked(useDriverVehicles).mockReturnValue({ isPending: false, isError: false, data: [vehicle('veh1', 'Sedan', true), vehicle('veh2', 'SUV')], refetch: vi.fn(), ...over } as never);
+}
 
 function renderPost() {
   return render(
@@ -81,9 +87,11 @@ describe('PostVacancyPage', () => {
     vi.mocked(usePostVacancy).mockReset();
     vi.mocked(cityHooks.useList).mockReset();
     vi.mocked(useMyDriver).mockReset();
+    vi.mocked(useDriverVehicles).mockReset();
     setCities();
     setPost();
     setMyDriver('approved');
+    setVehicles();
   });
 
   it('renders a skeleton while the city list loads', () => {
@@ -173,6 +181,7 @@ describe('PostVacancyPage', () => {
           availableUntil: new Date(start.getTime() + 6 * 3_600_000).toISOString(),
           destinationCityIds: ['c2'],
           destinations: [{ cityId: 'c2' }],
+          vehicleId: 'veh1', // auto-selected primary
         }),
       ),
     );
@@ -223,6 +232,23 @@ describe('PostVacancyPage', () => {
     expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
   });
 
+  it('auto-selects the driver primary vehicle so "Post vacant" enables once city + destination are set', () => {
+    renderPost();
+    expect((screen.getByRole('combobox', { name: /which vehicle/i }) as HTMLSelectElement).value).toBe('veh1'); // the primary
+    fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
+    expect(screen.getByRole('button', { name: /^post vacant$/i })).toBeEnabled();
+  });
+
+  it('blocks posting and prompts to add a vehicle when the driver has none', () => {
+    setVehicles({ data: [] });
+    renderPost();
+    fireEvent.change(screen.getByRole('combobox', { name: /where are you/i }), { target: { value: 'c1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Chennai' }));
+    expect(screen.getByText(/add a vehicle in your profile/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^post vacant$/i })).toBeDisabled();
+  });
+
   it('the Cancel button returns to the vacancy feed', () => {
     renderPost();
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
@@ -259,6 +285,7 @@ describe('PostVacancyPage', () => {
       availableUntil: '2099-06-01T12:00:00.000Z',
       destinationCities: [city('c2', 'Chennai')],
       destinationPlaces: [],
+      vehicleId: 'veh2',
       minRatePerKm: 18,
       notes: 'edit me',
       status: 'active',
@@ -269,10 +296,12 @@ describe('PostVacancyPage', () => {
     vi.mocked(useUpdateVacancy).mockReturnValue({ mutateAsync: updateAsync, isPending: false, isError: false } as never);
     renderEdit('v77');
     expect(await screen.findByRole('heading', { name: /edit your vacancy/i })).toBeInTheDocument();
-    await waitFor(() => expect((screen.getByRole('combobox') as HTMLSelectElement).value).toBe('c1'));
+    await waitFor(() => expect((screen.getByRole('combobox', { name: /where are you/i }) as HTMLSelectElement).value).toBe('c1'));
     expect(screen.getByDisplayValue('18')).toBeInTheDocument();
+    // the vacancy's own vehicle is prefilled (not the driver's primary)
+    expect((screen.getByRole('combobox', { name: /which vehicle/i }) as HTMLSelectElement).value).toBe('veh2');
     fireEvent.click(screen.getByRole('button', { name: /^save changes$/i }));
-    await waitFor(() => expect(updateAsync).toHaveBeenCalledWith(expect.objectContaining({ id: 'v77', input: expect.objectContaining({ currentCityId: 'c1', destinationCityIds: ['c2'] }) })));
+    await waitFor(() => expect(updateAsync).toHaveBeenCalledWith(expect.objectContaining({ id: 'v77', input: expect.objectContaining({ currentCityId: 'c1', destinationCityIds: ['c2'], vehicleId: 'veh2' }) })));
     expect(await screen.findByText('vacancy feed')).toBeInTheDocument();
   });
 });
