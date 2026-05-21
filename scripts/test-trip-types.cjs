@@ -135,6 +135,50 @@ const isoIn = (ms) => new Date(Date.now() + ms).toISOString();
     check('9. GET /trips/:id waypoints sorted by seq', got.status === 200 && seqs.length === 3 && seqs[0] === 0 && seqs[1] === 1 && seqs[2] === 2, `seqs=${seqs.join(',')}`);
   }
 
+  // 10. trip_category defaults to 'outstation' on the legacy/explicit city paths (migration 071)
+  check('10. legacy POST → trip_category outstation', leg.json?.data?.trip_category === 'outstation', `cat=${leg.json?.data?.trip_category}`);
+
+  // Resolve a place to exercise the address-based (Local) + Package paths.
+  const search = await j('GET', `/places/search?q=${encodeURIComponent('Katpadi Vellore')}`, { token: tok });
+  const hit = (search.json?.data || [])[0];
+  let placeId = null;
+  if (hit) {
+    const resolved = await j('POST', '/places', { token: tok, body: {
+      provider: hit.provider, provider_place_id: hit.providerPlaceId ?? hit.provider_place_id ?? null,
+      name: hit.name, formatted_address: hit.formattedAddress ?? hit.formatted_address ?? null,
+      state: hit.state ?? null, lat: hit.lat, lng: hit.lng,
+    }});
+    placeId = resolved.json?.data?.id ?? null;
+  }
+  if (!placeId) {
+    console.log('  ⚠ 11/12 skipped — geocoder/places unavailable in this env');
+  } else {
+    // 11. Local: address-only (place_id) → server derives from_city_id/to_city_id
+    const local = await j('POST', '/trips', { token: tok, body: {
+      ...baseBody, pickup_at: pickupAt, trip_category: 'local',
+      from_place_id: placeId, to_city_id: cities[1].id,
+    }});
+    check('11. local (place pickup) → 200 + derived from_city + category local',
+      local.status === 200 && local.json?.data?.trip_category === 'local' && !!local.json?.data?.from_city?.id && local.json?.data?.trip_type === 'one_way',
+      `status=${local.status} err=${JSON.stringify(local.json?.error)}`);
+
+    // 12. Package: hours + included km, pickup only, to derived = from
+    const pkg = await j('POST', '/trips', { token: tok, body: {
+      ...baseBody, expected_distance_km: 80, rate_per_km: 0, total_fare: 2400, pickup_at: pickupAt,
+      trip_category: 'package', from_place_id: placeId, package_hours: 8, package_included_km: 80,
+    }});
+    check('12. package (8hr/80km) → 200 + category package + hours/km + from==to city',
+      pkg.status === 200 && pkg.json?.data?.trip_category === 'package' && pkg.json?.data?.package_hours === 8 && pkg.json?.data?.package_included_km === 80 && pkg.json?.data?.from_city?.id === pkg.json?.data?.to_city?.id,
+      `status=${pkg.status} err=${JSON.stringify(pkg.json?.error)}`);
+
+    // 13. Package missing hours → 422
+    const badPkg = await j('POST', '/trips', { token: tok, body: {
+      ...baseBody, expected_distance_km: 80, rate_per_km: 0, total_fare: 2400, pickup_at: pickupAt,
+      trip_category: 'package', from_place_id: placeId, package_included_km: 80,
+    }});
+    check('13. package without package_hours → 422 VALIDATION', badPkg.status === 422 && badPkg.json?.error?.code === 'VALIDATION', `status=${badPkg.status}`);
+  }
+
   if (failures) { console.error(`\n[test-trip-types] ${failures} assertion(s) failed`); process.exit(1); }
   console.log('\n[test-trip-types] all passed');
 })().catch((e) => { console.error(e); process.exit(1); });

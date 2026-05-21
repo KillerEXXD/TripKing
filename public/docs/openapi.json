@@ -1112,6 +1112,26 @@
                   "to_place_id": {
                     "type": "string"
                   },
+                  "trip_category": {
+                    "type": "string",
+                    "enum": [
+                      "local",
+                      "outstation",
+                      "package"
+                    ],
+                    "default": "outstation",
+                    "description": "Local = address-booked (place_id, server derives the city from place.city_id or nearest city); Outstation = city-to-city; Package = hourly rental (pickup only, requires package_hours + package_included_km, to == from). Local/Package force trip_type one_way."
+                  },
+                  "package_hours": {
+                    "type": "integer",
+                    "minimum": 4,
+                    "description": "Package only: hired hours (≥4)."
+                  },
+                  "package_included_km": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Package only: included km cap."
+                  },
                   "trip_type": {
                     "type": "string",
                     "enum": [
@@ -1119,7 +1139,7 @@
                       "round_trip",
                       "multi_way"
                     ],
-                    "description": "route shape; defaults to one_way"
+                    "description": "route shape; defaults to one_way (honoured only when trip_category=outstation)"
                   },
                   "expected_end_at": {
                     "type": "string",
