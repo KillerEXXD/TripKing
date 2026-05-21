@@ -183,9 +183,8 @@ describe('DriverActivityPage', () => {
     expect(screen.getByText('Vellore → Salem')).toBeInTheDocument();
   });
 
-  // Regression: user reported the newest-posted trip was landing at the bottom of the Posted
-  // tab because the server returns trips ordered by pickup_at ASC. Sort client-side by
-  // createdAt DESC for "my posts" so a just-posted trip pops to the top.
+  // The server now returns trips newest-posted first (createdAt DESC), and the client also
+  // sorts "my posts" by createdAt DESC, so a just-posted trip pops to the top.
   it('the Posted tab sorts newest-posted first (createdAt DESC)', () => {
     setUp({ posted: tripsState({ data: [
       makeTrip({ id: 'p-old',    toCity: city('co', 'OldDest'),    createdAt: '2026-05-10T08:00:00.000Z' }),
@@ -359,6 +358,20 @@ describe('DriverActivityPage', () => {
     expect(cards[1]).toHaveTextContent(/invited-to/i);
     expect(cards[2]).toHaveTextContent(/applied-to/i);
     expect(cards[3]).toHaveTextContent(/cancelled-to/i);
+  });
+
+  it('All chip sorts newest-posted first within a bucket (createdAt DESC)', () => {
+    setUp({
+      invited: tripsState({ data: [
+        makeTrip({ id: 'inv-old', toCity: city('cO', 'OldInv-to'), createdAt: '2026-05-10T08:00:00.000Z', pickupAt: '2026-05-12T08:00:00.000Z' }),
+        makeTrip({ id: 'inv-new', toCity: city('cN', 'NewInv-to'), createdAt: '2026-05-18T08:00:00.000Z', pickupAt: '2026-05-20T08:00:00.000Z' }),
+      ] }),
+    });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: /^all/i }));
+    const cards = screen.getAllByText(/vellore → \w+inv-to/i);
+    expect(cards[0]).toHaveTextContent(/newinv-to/i);
+    expect(cards[1]).toHaveTextContent(/oldinv-to/i);
   });
 
   it('All chip dedupes — a trip that\'s both assigned and applied appears once, bucketed under Driving', () => {

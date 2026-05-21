@@ -950,8 +950,10 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       // Near path: order by distance is applied JS-side after the SQL — fetch enough rows
       // to slice the requested page there. Non-near path: SQL .range() applies offset/limit
       // efficiently. Either way, the cache key auto-includes the offset+limit query params.
+      // Default order is newest-posted first (created_at DESC) so the latest trip leads every
+      // login's list; id is the deterministic tie-breaker for rows sharing a created_at.
       if (!near) {
-        q = q.order('pickup_at', { ascending: true }).range(offset, offset + limit - 1);
+        q = q.order('created_at', { ascending: false }).order('id', { ascending: false }).range(offset, offset + limit - 1);
       } else {
         q = q.limit(Math.min(limit + offset, 200));
       }

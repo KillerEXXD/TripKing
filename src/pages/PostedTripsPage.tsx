@@ -226,12 +226,13 @@ export function PostedTripsPage() {
   const shown = scope
     ? scopedTrips
     : filter === 'all'
-    // "All" — sort by lifecycle priority (live trips first), then pickupAt ASC.
+    // "All" — live trips bubble to the top, then newest-posted first within each
+    // lifecycle bucket (createdAt DESC), so the most-recently-posted trip leads.
     ? [...trips].sort((a, b) => {
         const pa = FILTER_PRIORITY[bucketFor(a)];
         const pb = FILTER_PRIORITY[bucketFor(b)];
         if (pa !== pb) return pa - pb;
-        return a.pickupAt.localeCompare(b.pickupAt);
+        return b.createdAt.localeCompare(a.createdAt);
       })
     : trips.filter((t) => bucketFor(t) === filter).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const countFor = (f: Filter) => (f === 'all' ? trips.length : trips.filter((t) => bucketFor(t) === f).length);
