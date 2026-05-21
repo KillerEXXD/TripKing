@@ -86,6 +86,11 @@ const hasCity = (cities, cityId) => Array.isArray(cities) && cities.some((c) => 
   check('POST /vacancies joins current_city', !!posted.json?.data?.current_city && posted.json.data.current_city.id === currentCityId, `got=${JSON.stringify(posted.json?.data?.current_city || null)}`);
   const destCities = (posted.json?.data?.vacancy_destinations || []).map((vd) => vd.city).filter(Boolean);
   check('POST /vacancies joins destination cities', hasCity(destCities, dest1), `dests=${JSON.stringify(destCities.map((c) => c.id))}`);
+  // Never open-ended: a POST that omits available_until gets a bounded window (available_from + 4h,
+  // migration 071 / DEFAULT_VACANCY_DURATION_HOURS). Open-ended rows used to match far-future trips.
+  const af = posted.json?.data?.available_from, au = posted.json?.data?.available_until;
+  const gap4h = af && au ? new Date(au).getTime() - new Date(af).getTime() : NaN;
+  check('POST /vacancies without available_until → defaults to a 4h bounded window (never NULL)', !!au && Math.abs(gap4h - 4 * 3600_000) < 60_000, `available_from=${af} available_until=${au} gapMs=${gap4h}`);
   if (!vacancyId) process.exit(1);
 
   // Max-2-active rule: cancel `posted` here so the place-plumbing & destinations-array sub-tests

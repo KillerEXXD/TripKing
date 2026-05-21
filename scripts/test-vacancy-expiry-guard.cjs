@@ -3,11 +3,15 @@
  * Smoke test for the auto-invite expiry-race guard (Qase follow-up).
  *
  * The expire cron flips a lapsed vacancy active→expired every 5 min. In the gap before
- * the sweep, the row's status is still 'active'. An OPEN-ENDED vacancy (available_until
- * NULL) posted on a prior IST calendar day is logically stale per migration 058, but its
- * status hasn't flipped yet. This test proves the auto-invite matcher (findMatchingDrivers,
- * which backs both POST /trips auto-invite and GET /trips/match-preview) refuses to invite
- * such a vacancy at query time — i.e. correctness no longer depends on the cron's timing.
+ * the sweep, the row's status is still 'active'. A vacancy whose `available_until` has
+ * already passed is logically stale (migration 048/058), but its status hasn't flipped yet.
+ * This test proves the auto-invite matcher (findMatchingDrivers, which backs both POST /trips
+ * auto-invite and GET /trips/match-preview) refuses to invite such a vacancy at query time —
+ * i.e. correctness no longer depends on the cron's timing.
+ *
+ * It also covers the far-future-trip regression (migration 071): vacancies are never
+ * open-ended any more, so a trip with a far-future pickup (e.g. a stale 2060 row) matches
+ * NOBODY even when an active, bounded vacancy exists.
  *
  *   VACANCY_EXPIRY_API_BASE=https://<ref>.supabase.co/functions/v1 node scripts/test-vacancy-expiry-guard.cjs
  *
@@ -61,24 +65,31 @@ function sql(statement) {
   if (drvId) await j('PATCH', `/drivers/${drvId}/kyc`, { token: adminToken, body: { kyc_status: 'approved', note: 'smoke' } });
 
   const cities = (await j('GET', '/admin/cities')).json?.data || [];
-  const cityA = cities[0]?.id, cityB = cities[1]?.id || cities[0]?.id;
+  const cityB = cities[1]?.id || cities[0]?.id;
   const carType = (await j('GET', '/admin/car-types')).json?.data?.[0]?.id;
-  if (!cityA || !carType) { console.error('need a city + car type'); process.exit(1); }
+  // Isolated pickup city at remote coords so NO other driver in the shared QA DB is within the
+  // auto-invite radius — the only candidate is our test driver. Without this, genuinely-active
+  // drivers in a busy seed city (e.g. Vellore) make total_matches non-deterministic.
+  const isoCity = await j('POST', '/admin/cities', { token: adminToken, body: { name: `expguard-${Date.now()}`, state: 'QA', lat: 2.0, lng: 2.0 } });
+  const cityA = isoCity.json?.data?.id;
+  check('seed: isolated pickup city created', isoCity.status === 200 && !!cityA, `status=${isoCity.status} ${JSON.stringify(isoCity.json?.error || '')}`);
+  if (!cityA || !cityB || !carType) { console.error('need cities + car type'); process.exit(1); }
 
-  // Driver posts a vacancy, then we make it STALE + OPEN-ENDED directly in the DB:
-  //   available_until = NULL, available_from = 2 days ago, status left 'active' (cron NOT run).
+  // Driver posts a vacancy, then we make it STALE (past window) directly in the DB:
+  //   available_from = 2 days ago, available_until = 1 day ago, status left 'active' (cron NOT run).
+  // (available_until can no longer be NULL — migration 071 added a NOT NULL constraint.)
   const vac = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: cityA, destination_city_ids: [cityB] } });
   const vacId = vac.json?.data?.id;
   check('seed: vacancy created', vac.status === 200 && !!vacId, JSON.stringify(vac.json?.error || vac.status));
   if (!vacId) { process.exit(1); }
 
-  sql(`update public.vacancies set available_until = null, available_from = now() - interval '2 days', status = 'active' where id = '${vacId}'`);
+  sql(`update public.vacancies set available_until = now() - interval '1 day', available_from = now() - interval '2 days', status = 'active' where id = '${vacId}'`);
   const post = sql(`select status, available_until, available_from from public.vacancies where id = '${vacId}'`);
-  check('seed: vacancy is now stale open-ended + still status=active', /"status":\s*"active"/.test(post) && /"available_until":\s*null/.test(post), post.replace(/\s+/g, ' ').slice(0, 200));
+  check('seed: vacancy window is in the past + still status=active', /"status":\s*"active"/.test(post) && !/"available_until":\s*null/.test(post), post.replace(/\s+/g, ' ').slice(0, 200));
 
   // match-preview must NOT count this stale driver.
   const preview = await j('GET', `/trips/match-preview?from_city_id=${cityA}&pickup_at=${new Date(Date.now() + 4 * 3600e3).toISOString()}&expected_end_at=${new Date(Date.now() + 8 * 3600e3).toISOString()}`, { token: agentToken });
-  check('GET /trips/match-preview excludes the stale open-ended vacancy', preview.status === 200 && (preview.json?.data?.total_matches ?? 0) === 0,
+  check('GET /trips/match-preview excludes the stale vacancy', preview.status === 200 && (preview.json?.data?.total_matches ?? 0) === 0,
     `total_matches=${preview.json?.data?.total_matches}`);
 
   // POST /trips with auto-invite ON must NOT invite the stale driver.
@@ -94,6 +105,16 @@ function sql(statement) {
     check('GET /trips/:id/invites does NOT contain the stale driver', inv.status === 200 && !(inv.json?.data || []).some((r) => r.driver?.id === drvId),
       `count=${inv.json?.data?.length}`);
   }
+
+  // ── far-future-trip regression (migration 071) ─────────────────────────
+  // A fresh, fully-active bounded vacancy exists, but a trip whose pickup is years out
+  // must still match nobody (open-ended vacancies — which used to leak through — are gone).
+  const freshVac = await j('POST', '/vacancies', { token: driverToken, body: { current_city_id: cityA, destination_city_ids: [cityB] } });
+  check('regression: fresh active vacancy created', freshVac.status === 200 && !!freshVac.json?.data?.id, JSON.stringify(freshVac.json?.error || freshVac.status));
+  const farPickup = new Date(Date.now() + 1000 * 24 * 3600e3).toISOString(); // ~2.7 years out
+  const farPreview = await j('GET', `/trips/match-preview?from_city_id=${cityA}&pickup_at=${farPickup}&expected_end_at=${new Date(Date.now() + 1000 * 24 * 3600e3 + 4 * 3600e3).toISOString()}`, { token: agentToken });
+  check('GET /trips/match-preview for a far-future pickup → 0 matches', farPreview.status === 200 && (farPreview.json?.data?.total_matches ?? -1) === 0,
+    `total_matches=${farPreview.json?.data?.total_matches}`);
 
   if (failures) { console.error(`[test-vacancy-expiry-guard] ${failures} check(s) failed`); process.exit(1); }
   console.log('[test-vacancy-expiry-guard] all checks passed');

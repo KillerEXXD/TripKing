@@ -33,6 +33,17 @@ import { readBody, pgFail } from '../_shared/http.ts';
 
 const VACANCY_PURGE_URLS = purgeUrlsFor(['/functions/v1/vacancies']);
 
+// Vacancies are never open-ended: a missing `available_until` defaults to this many hours
+// after `available_from`. Open-ended rows (NULL until) used to slip through the auto-invite
+// time-bounds gate and match far-future trips (e.g. a stale 2060 pickup). Mirrors the DB
+// default + NOT NULL constraint in migration 071 and the backfill window there.
+const DEFAULT_VACANCY_DURATION_HOURS = 4;
+
+/** `available_from` + DEFAULT_VACANCY_DURATION_HOURS, as an ISO string. */
+function defaultAvailableUntil(availableFromIso: string): string {
+  return new Date(new Date(availableFromIso).getTime() + DEFAULT_VACANCY_DURATION_HOURS * 3_600_000).toISOString();
+}
+
 // LIVE tier — short TTLs, shared cache (memory + Postgres `api_cache`). The original assumption
 // that per-isolate memory was enough was wrong in practice: api_metrics showed a 0% hit rate for
 // vacancies because Deno isolates churn fast enough that warmed memory is rarely reused. Shared
@@ -338,13 +349,15 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
         ? destPlaceIds.map((placeId, i) => ({ place_id: placeId, city_id: destCityIds[i] ?? null }))
         : destCityIds.map((cityId) => ({ city_id: cityId, place_id: null }));
     }
+    const availableFrom = strOrNull(b.available_from) ?? new Date().toISOString();
     const insert = {
       driver_id: did,
       vehicle_id: strOrNull(b.vehicle_id),
       current_city_id: currentCityId,
       current_place_id: currentPlaceId,
-      available_from: strOrNull(b.available_from) ?? new Date().toISOString(),
-      available_until: strOrNull(b.available_until),
+      available_from: availableFrom,
+      // Never store NULL — a missing end time defaults to a bounded window (see migration 071).
+      available_until: strOrNull(b.available_until) ?? defaultAvailableUntil(availableFrom),
       min_rate_per_km: typeof b.min_rate_per_km === 'number' ? b.min_rate_per_km : null,
       notes: strOrNull(b.notes),
       status: 'active',
@@ -391,7 +404,7 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
   if (!id) return fail('NOT_FOUND', 'No such route', 404);
 
   // load the vacancy for ownership / 404
-  const { data: vac } = await db.from('vacancies').select('id, driver_id, status').eq('id', id).maybeSingle();
+  const { data: vac } = await db.from('vacancies').select('id, driver_id, status, available_from').eq('id', id).maybeSingle();
 
   // ── GET /vacancies/:id ───────────────────────────────────────────────────
   if (!sub && req.method === 'GET') {
@@ -428,7 +441,12 @@ const handler = withTiming('vacancies', async (req: Request): Promise<Response> 
       if (!v) return fail('VALIDATION', 'available_from cannot be empty', 422);
       update.available_from = v;
     }
-    if ('available_until' in b) update.available_until = strOrNull(b.available_until);
+    if ('available_until' in b) {
+      // Never persist NULL: an explicit empty value falls back to the bounded default,
+      // measured from the new available_from (if also being set) or the existing one.
+      const fromIso = (update.available_from as string | undefined) ?? (vac.available_from as string | null) ?? new Date().toISOString();
+      update.available_until = strOrNull(b.available_until) ?? defaultAvailableUntil(fromIso);
+    }
     if ('min_rate_per_km' in b) update.min_rate_per_km = typeof b.min_rate_per_km === 'number' ? b.min_rate_per_km : null;
     if ('notes' in b) update.notes = strOrNull(b.notes);
 
