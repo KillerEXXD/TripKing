@@ -128,7 +128,9 @@ async function sha256hex(s: string): Promise<string> {
  *   'accept'  → flip any active vacancy whose [available_from, available_until] covers the trip's
  *               pickup_at into 'on_trip' + linked_trip_id (hidden from agent search; banner shows
  *               on the driver's own IAmAvailableCard).
- *   'start'   → trip went in_progress; the slot is now consumed → vacancy 'expired'.
+ *   'start'   → trip went in_progress; the slot is consumed → the linked vacancy is DELETED
+ *               (not 'expired') so it doesn't linger in the driver's "I'm vacant" tab as a
+ *               "remove or repost" card. The driver posts a fresh vacancy after the trip.
  *   'revert'  → trip was cancelled or the agent unselected the accepted driver → put the vacancy
  *               back to 'active' if its window is still in the future, else 'expired'.
  *
@@ -167,13 +169,18 @@ async function syncVacanciesForTrip(
       return;
     }
     if (action === 'start') {
-      const { data: updated } = await db
+      // The driver is now on the trip — the availability slot is gone. DELETE the linked
+      // vacancy outright rather than marking it 'expired', which would leave a stale
+      // "EXPIRED — please remove or repost" card in the driver's "I'm vacant" tab even though
+      // the window may still be in the future. vacancy_destinations cascades (migration 003);
+      // linked_trip_id is the only inbound FK and is ON DELETE SET NULL, so the delete is safe.
+      const { data: deleted } = await db
         .from('vacancies')
-        .update({ status: 'expired', updated_at: new Date().toISOString() })
+        .delete()
         .eq('linked_trip_id', tripId)
         .eq('status', 'on_trip')
         .select('driver_id');
-      for (const r of (updated ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
+      for (const r of (deleted ?? []) as { driver_id: string }[]) touchedDriverIds.add(r.driver_id);
       return;
     }
     // 'revert' — trip cancelled or driver unselected after accepting.
