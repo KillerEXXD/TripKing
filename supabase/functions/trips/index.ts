@@ -225,8 +225,12 @@ type WaypointInsert = {
   is_destination: boolean;
   notes: string | null;
 };
+type TripCategory = 'local' | 'outstation' | 'package';
 type WaypointPlan = {
   trip_type: TripType;
+  trip_category: TripCategory;
+  package_hours: number | null;
+  package_included_km: number | null;
   expected_end_at: string;          // ISO; > pickup_at and ≤ pickup_at + max_trip_duration_days
   waypoints: WaypointInsert[];      // ≥ 2, with seq=0..N
   from_city_id: string;             // denormalised first waypoint
@@ -243,21 +247,85 @@ const FALLBACK_AVG_SPEED_KMH = 40;
 const FALLBACK_BUFFER_HOURS = 1;
 const FALLBACK_MIN_TRIP_HOURS = 1;
 
+/**
+ * Resolve a city for an address-only point (Local / Package). trips.from_city_id and
+ * to_city_id are NOT NULL, so a place-only waypoint still needs a city: prefer the
+ * place's own city_id, else fall back to the nearest active curated city by haversine.
+ */
+async function deriveCityId(db: Db, placeId: string | null): Promise<string | null> {
+  if (!placeId) return null;
+  const { data: place } = await db.from('places').select('city_id, lat, lng').eq('id', placeId).maybeSingle();
+  if (!place) return null;
+  if (place.city_id) return place.city_id as string;
+  const lat = Number(place.lat), lng = Number(place.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const { data: cities } = await db.from('cities').select('id, lat, lng').eq('is_active', true);
+  if (!Array.isArray(cities) || cities.length === 0) return null;
+  let best: string | null = null, bestKm = Infinity;
+  for (const c of cities as Record<string, unknown>[]) {
+    const cl = Number(c.lat), cn = Number(c.lng);
+    if (!Number.isFinite(cl) || !Number.isFinite(cn)) continue;
+    const km = haversineKm(lat, lng, cl, cn);
+    if (km < bestKm) { bestKm = km; best = c.id as string; }
+  }
+  return best;
+}
+
 /** Parse + validate the waypoint shape from a POST body. Returns a Response on failure. */
 async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAtIso: string, distanceKm: number): Promise<WaypointPlan | Response> {
-  const tripType = (typeof body.trip_type === 'string' && ['one_way', 'round_trip', 'multi_way'].includes(body.trip_type) ? body.trip_type : 'one_way') as TripType;
+  const tripCategory = (typeof body.trip_category === 'string' && ['local', 'outstation', 'package'].includes(body.trip_category) ? body.trip_category : 'outstation') as TripCategory;
+  // Local + Package are always one_way under the hood; Outstation honours the client's trip_type.
+  const tripType = (tripCategory === 'outstation'
+    ? (typeof body.trip_type === 'string' && ['one_way', 'round_trip', 'multi_way'].includes(body.trip_type) ? body.trip_type : 'one_way')
+    : 'one_way') as TripType;
+
+  // Package: hourly rental, pickup only. No destination/distance — synthesise a 2-waypoint
+  // plan anchored at the pickup, with from = to = the derived pickup city.
+  if (tripCategory === 'package') {
+    const pickupMs0 = new Date(pickupAtIso).getTime();
+    if (!Number.isFinite(pickupMs0)) return fail('VALIDATION', 'pickup_at is not a valid ISO timestamp', 422);
+    const fromPlace = typeof body.from_place_id === 'string' && body.from_place_id ? body.from_place_id : null;
+    const cityId = (typeof body.from_city_id === 'string' && body.from_city_id ? body.from_city_id : null) ?? await deriveCityId(db, fromPlace);
+    if (!cityId) return fail('VALIDATION', 'package trips need a pickup (from_place_id or from_city_id)', 422);
+    const packageHours = Math.floor(Number(body.package_hours));
+    const packageIncludedKm = Math.floor(Number(body.package_included_km));
+    if (!(packageHours >= 4)) return fail('VALIDATION', 'package_hours must be at least 4', 422);
+    if (!(packageIncludedKm > 0)) return fail('VALIDATION', 'package_included_km must be a positive number', 422);
+    const endIso = new Date(pickupMs0 + packageHours * 3600_000).toISOString();
+    return {
+      trip_type: 'one_way',
+      trip_category: 'package',
+      package_hours: packageHours,
+      package_included_km: packageIncludedKm,
+      expected_end_at: endIso,
+      waypoints: [
+        { seq: 0, city_id: cityId, place_id: fromPlace, arrive_at: null, wait_minutes: 0, is_destination: false, notes: null },
+        { seq: 1, city_id: cityId, place_id: fromPlace, arrive_at: endIso, wait_minutes: 0, is_destination: true, notes: null },
+      ],
+      from_city_id: cityId,
+      from_place_id: fromPlace,
+      to_city_id: cityId,
+      to_place_id: fromPlace,
+    };
+  }
 
   // Either accept `waypoints[]` directly, or synthesise from legacy from_*/to_* (one_way only).
   let raw: Record<string, unknown>[];
   if (Array.isArray(body.waypoints) && body.waypoints.length > 0) {
     raw = (body.waypoints as unknown[]).map((w) => (w && typeof w === 'object' ? (w as Record<string, unknown>) : {}));
   } else {
-    const fromCity = typeof body.from_city_id === 'string' ? body.from_city_id : '';
-    const toCity = typeof body.to_city_id === 'string' ? body.to_city_id : '';
-    if (!fromCity || !toCity) return fail('VALIDATION', 'either waypoints[] or both from_city_id and to_city_id are required', 422);
+    const fromCity = typeof body.from_city_id === 'string' && body.from_city_id ? body.from_city_id : null;
+    const toCity = typeof body.to_city_id === 'string' && body.to_city_id ? body.to_city_id : null;
+    const fromPlace = typeof body.from_place_id === 'string' && body.from_place_id ? body.from_place_id : null;
+    const toPlace = typeof body.to_place_id === 'string' && body.to_place_id ? body.to_place_id : null;
+    // Each endpoint needs a city OR a place — Local trips send only place_ids; the city is
+    // derived below. Outstation sends city_ids (with optional pinned places).
+    if ((!fromCity && !fromPlace) || (!toCity && !toPlace)) {
+      return fail('VALIDATION', 'either waypoints[] or both a from and to (city_id or place_id) are required', 422);
+    }
     raw = [
-      { city_id: fromCity, place_id: typeof body.from_place_id === 'string' ? body.from_place_id : null, wait_minutes: 0, is_destination: false },
-      { city_id: toCity, place_id: typeof body.to_place_id === 'string' ? body.to_place_id : null, arrive_at: null, wait_minutes: 0, is_destination: true },
+      { city_id: fromCity, place_id: fromPlace, wait_minutes: 0, is_destination: false },
+      { city_id: toCity, place_id: toPlace, arrive_at: null, wait_minutes: 0, is_destination: true },
     ];
   }
 
@@ -341,13 +409,25 @@ async function buildWaypointPlan(db: Db, body: Record<string, unknown>, pickupAt
   const maxDays = Number((settings as Record<string, unknown> | null)?.max_trip_duration_days ?? 14);
   if ((endMs - pickupMs) > maxDays * 86_400_000) return fail('VALIDATION', `trip span exceeds the ${maxDays}-day cap`, 422);
 
+  // Local trips (and any place-only endpoint) carry no city — derive it so the NOT NULL
+  // from_city_id/to_city_id columns and the mirror trigger stay satisfied.
+  const resolvedFirstCity = firstCity ?? (firstPlace ? await deriveCityId(db, firstPlace) : null);
+  const resolvedLastCity = lastCity ?? (lastPlace ? await deriveCityId(db, lastPlace) : null);
+  if (!resolvedFirstCity) return fail('VALIDATION', 'could not resolve a city for the pickup point', 422);
+  if (!resolvedLastCity) return fail('VALIDATION', 'could not resolve a city for the drop-off point', 422);
+  waypoints[0].city_id = resolvedFirstCity;
+  waypoints[waypoints.length - 1].city_id = resolvedLastCity;
+
   return {
     trip_type: tripType,
+    trip_category: tripCategory,
+    package_hours: null,
+    package_included_km: null,
     expected_end_at: endIso,
     waypoints,
-    from_city_id: firstCity ?? '',
+    from_city_id: resolvedFirstCity,
     from_place_id: firstPlace,
-    to_city_id: lastCity ?? '',
+    to_city_id: resolvedLastCity,
     to_place_id: lastPlace,
   };
 }
@@ -1099,6 +1179,9 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       posted_by_name: posterFullName,
       posted_by_phone: posterPhone || null,
       trip_type: plan.trip_type,
+      trip_category: plan.trip_category,
+      package_hours: plan.package_hours,
+      package_included_km: plan.package_included_km,
       from_city_id: plan.from_city_id,
       to_city_id: plan.to_city_id,
       from_place_id: plan.from_place_id,
