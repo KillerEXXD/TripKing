@@ -149,14 +149,31 @@ export function CompleteTripPage() {
   const tollValid = !toll.trim() || (Number.isFinite(tollNum) && tollNum >= 0);
   const step1Valid = !!endOdoPath && endValid && tollValid;
 
+  // Inline validation messages (Qase D18/D19): the Next button is disabled while
+  // invalid, so without these the driver gets no explanation for why they're stuck.
+  // Only shown once the field has a value — empty fields aren't "errors" yet.
+  const endOdoError = endOdoReading.trim() && !endValid
+    ? (startOdoReading != null && endOdoNum != null && Number.isFinite(endOdoNum) && endOdoNum <= startOdoReading
+        ? `Must be greater than the start reading (${startOdoReading} km).`
+        : 'Enter a positive number, in km.')
+    : null;
+  const tollError = toll.trim() && !tollValid ? 'Toll can’t be negative — enter 0 if there was no toll.' : null;
+
   async function onNext() {
     if (!step1Valid) {
       if (!endOdoPath) { toast.error('Upload a photo of the ending odometer.'); return; }
       if (!endValid) {
-        toast.error('Enter a valid ending odometer reading.');
+        // Be specific so the driver knows what to fix (Qase D18): a too-low reading
+        // vs. a blank/zero one are different mistakes.
+        if (startOdoReading != null && endOdoNum != null && Number.isFinite(endOdoNum) && endOdoNum <= startOdoReading) {
+          toast.error(`Ending odometer must be greater than the start reading (${startOdoReading} km).`);
+        } else {
+          toast.error('Enter a valid ending odometer reading (a positive number, in km).');
+        }
         return;
       }
-      if (!tollValid) { toast.error('Toll must be a non-negative number.'); return; }
+      // Qase D19 — negative toll: say it can be zero, not just "non-negative".
+      if (!tollValid) { toast.error('Toll can’t be negative — enter 0 if there was no toll.'); return; }
     }
     setStep(2);
   }
@@ -228,10 +245,13 @@ export function CompleteTripPage() {
               min={1}
               value={endOdoReading}
               onChange={(e) => setEndOdoReading(e.target.value)}
-              className="mt-1 h-11 w-full rounded-md border border-input bg-white px-3 text-base"
+              className={`mt-1 h-11 w-full rounded-md border bg-white px-3 text-base ${endOdoError ? 'border-destructive' : 'border-input'}`}
               placeholder="e.g. 50125"
+              aria-invalid={!!endOdoError}
             />
-            <div className="mt-1 text-xs text-secondary">Must be greater than the reading recorded when you started.</div>
+            <div className={`mt-1 text-xs ${endOdoError ? 'text-destructive' : 'text-secondary'}`}>
+              {endOdoError ?? 'Must be greater than the reading recorded when you started.'}
+            </div>
           </div>
           <div>
             <label className="block text-[11px] font-semibold uppercase tracking-wide text-secondary" htmlFor="toll-paid">Toll paid by you (₹)</label>
@@ -242,10 +262,13 @@ export function CompleteTripPage() {
               min={0}
               value={toll}
               onChange={(e) => setToll(e.target.value)}
-              className="mt-1 h-11 w-full rounded-md border border-input bg-white px-3 text-base"
+              className={`mt-1 h-11 w-full rounded-md border bg-white px-3 text-base ${tollError ? 'border-destructive' : 'border-input'}`}
               placeholder="0"
+              aria-invalid={!!tollError}
             />
-            <div className="mt-1 text-xs text-secondary">Reimbursed 100% in your payout and passed through to the passenger's bill.</div>
+            <div className={`mt-1 text-xs ${tollError ? 'text-destructive' : 'text-secondary'}`}>
+              {tollError ?? "Reimbursed 100% in your payout and passed through to the passenger's bill."}
+            </div>
           </div>
 
           <div className="space-y-1.5 rounded-lg border bg-slate-50 p-3">
