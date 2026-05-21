@@ -378,7 +378,8 @@ export function DriverActivityPage() {
   const cancelledTrips = assigned.filter((t) => t.status === 'cancelled');
 
   // "All" — union of every trip the driver has a role on, deduped by trip.id, bucketed by the
-  // most-progressed role (assigned > invited > applied), sorted by lifecycle priority then pickupAt.
+  // most-progressed role (assigned > invited > applied), sorted by lifecycle priority then
+  // newest-posted-first (createdAt DESC).
   const allEntries: AllEntry[] = (() => {
     const seen = new Map<string, AllEntry>();
     for (const t of assigned) {
@@ -397,7 +398,8 @@ export function DriverActivityPage() {
     }
     return [...seen.values()].sort((a, b) => {
       if (ALL_PRIORITY[a.bucket] !== ALL_PRIORITY[b.bucket]) return ALL_PRIORITY[a.bucket] - ALL_PRIORITY[b.bucket];
-      return a.trip.pickupAt.localeCompare(b.trip.pickupAt);
+      // Newest-posted first within each lifecycle bucket (createdAt DESC).
+      return b.trip.createdAt.localeCompare(a.trip.createdAt);
     });
   })();
 

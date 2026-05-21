@@ -184,6 +184,19 @@ describe('PostedTripsPage', () => {
     expect(cards[2]).toHaveTextContent(/^cancelled-from/i);
   });
 
+  it('All sorts newest-posted first WITHIN a lifecycle bucket (createdAt DESC)', () => {
+    setTrips({ data: [
+      makeTrip({ id: 't-old', status: 'open', createdAt: '2099-05-30T00:00:00.000Z', pickupAt: '2099-06-01T09:00:00.000Z', fromCity: city('co', 'Old-from') }),
+      makeTrip({ id: 't-new', status: 'open', createdAt: '2099-06-05T00:00:00.000Z', pickupAt: '2099-06-10T09:00:00.000Z', fromCity: city('cn', 'New-from') }),
+    ] });
+    renderPosted();
+    fireEvent.click(screen.getByRole('button', { name: /^all/i }));
+    const cards = screen.getAllByText(/-from → chennai/i);
+    // Newest-posted leads even though its pickup is later — proves createdAt DESC, not pickupAt ASC.
+    expect(cards[0]).toHaveTextContent(/^new-from/i);
+    expect(cards[1]).toHaveTextContent(/^old-from/i);
+  });
+
   it('shows a NEW badge + "Posted just now" on trips created within the last 5 minutes', () => {
     const fresh = new Date(Date.now() - 5_000).toISOString(); // 5s ago → "just now"
     setTrips({ data: [makeTrip({ id: 't-fresh', createdAt: fresh })] });
