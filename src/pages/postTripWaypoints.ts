@@ -53,3 +53,19 @@ export function buildWaypointInputs(args: BuildWaypointArgs): WaypointInput[] | 
 
   return undefined;
 }
+
+/**
+ * Success-toast copy after an agent saves a trip edit. Always states the notification
+ * outcome explicitly (Qase D14/D15/D17) — a bare "Trip updated" reads as "no one was
+ * told". The server fans out `trip_updated` to applicants + pending invitees on PATCH;
+ * this just describes what that meant.
+ */
+export function editUpdateToastMessage(recipientCount: number, changeCount: number): string {
+  if (recipientCount > 0 && changeCount > 0) {
+    return `Trip updated — ${recipientCount} applicant${recipientCount === 1 ? '' : 's'} notified of the changes.`;
+  }
+  if (recipientCount === 0) {
+    return 'Trip updated. No applicants yet — no one needed to be notified.';
+  }
+  return 'Trip updated.';
+}

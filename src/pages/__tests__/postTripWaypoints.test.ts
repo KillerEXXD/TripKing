@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWaypointInputs } from '@/pages/postTripWaypoints';
+import { buildWaypointInputs, editUpdateToastMessage } from '@/pages/postTripWaypoints';
 import type { WaypointDraft } from '@/components/trip/WaypointEditor';
 
 const END = '2099-06-01T18:00:00.000Z';
@@ -47,5 +47,19 @@ describe('buildWaypointInputs', () => {
     const withReturn = buildWaypointInputs({ tripType: 'multi_way', fromCityId: 'c1', toCityId: 'c1', endIso: END, multiWayRows: rows, returnToStart: true });
     expect(withReturn).toHaveLength(4);
     expect(withReturn![3]).toMatchObject({ cityId: 'c1', arriveAt: END, isDestination: true });
+  });
+});
+
+describe('editUpdateToastMessage (Qase D14/D15/D17)', () => {
+  it('0 recipients → explicit "no one needed to be notified"', () => {
+    expect(editUpdateToastMessage(0, 0)).toMatch(/no applicants yet — no one needed to be notified/i);
+    expect(editUpdateToastMessage(0, 3)).toMatch(/no applicants yet/i);
+  });
+  it('>=1 recipient with changes → states how many were notified', () => {
+    expect(editUpdateToastMessage(1, 2)).toBe('Trip updated — 1 applicant notified of the changes.');
+    expect(editUpdateToastMessage(3, 1)).toBe('Trip updated — 3 applicants notified of the changes.');
+  });
+  it('>=1 recipient but no notify-worthy change → plain "Trip updated."', () => {
+    expect(editUpdateToastMessage(2, 0)).toBe('Trip updated.');
   });
 });
