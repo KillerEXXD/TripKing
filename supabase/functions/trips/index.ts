@@ -1242,7 +1242,14 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     // manual invite path (shared `inviteDrivers` helper). Best-effort: failures must never
     // break trip creation.
     let autoInvitedCount = 0;
-    if (b.auto_invite_matches !== false) {
+    // Platform dispatch algorithm: in Auto, freeze the trip's mode and hand off to the
+    // token-queue engine (start_dispatch selects the first online driver synchronously);
+    // the legacy manual auto-invite is skipped. See migration 072.
+    const { data: dispatchCfg } = await db.from('app_settings').select('dispatch_algorithm').eq('id', 1).maybeSingle();
+    if (dispatchCfg?.dispatch_algorithm === 'auto') {
+      await db.from('trips').update({ dispatch_mode: 'auto' }).eq('id', created.id as string);
+      try { await db.rpc('start_dispatch', { p_trip: created.id as string }); } catch { /* best-effort — never fail the post */ }
+    } else if (b.auto_invite_matches !== false) {
       try {
         const excludeDriverId = posterRole === 'driver' ? await driverIdFor(u.id) : null;
         // Pass the trip's planned interval + required car type so we only invite drivers whose
@@ -1873,6 +1880,17 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       })
       .eq('id', tripId);
     if (error) return pgFail(error);
+    // Auto-dispatch: an `offered` trip_offers row exists only for auto trips, so this is
+    // self-scoping (manual trips are untouched). Mark the offer accepted, take the driver
+    // OUT of the queue (busy_trip_id), and flag the trip filled. Best-effort.
+    if (did) {
+      const { data: offerRow } = await db.from('trip_offers').select('id').eq('trip_id', tripId).eq('driver_id', did).eq('status', 'offered').maybeSingle();
+      if (offerRow?.id) {
+        await db.from('trip_offers').update({ status: 'accepted', responded_at: now }).eq('id', offerRow.id);
+        await db.from('driver_presence').update({ busy_trip_id: tripId }).eq('driver_id', did);
+        await db.from('trips').update({ dispatch_status: 'filled' }).eq('id', tripId);
+      }
+    }
     await db.from('trip_executions').upsert({ trip_id: tripId }, { onConflict: 'trip_id', ignoreDuplicates: true });
     // Migration 039: any active vacancy whose window covers this trip's pickup is now
     // 'on_trip' (hidden from agent search, banner on the driver's IAmAvailableCard).
@@ -1926,6 +1944,20 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
       })
       .eq('id', tripId);
     if (error) return pgFail(error);
+    // Auto-dispatch: an `offered` row exists only for auto trips. Log the decline + reset the
+    // offer state + advance to the next driver (no agent picks in auto). Early-return so we
+    // skip the manual "pick another applicant" notification below.
+    if (did) {
+      const { data: offerRow } = await db.from('trip_offers').select('id').eq('trip_id', tripId).eq('driver_id', did).eq('status', 'offered').maybeSingle();
+      if (offerRow?.id) {
+        await db.from('trip_offers').update({ status: 'declined', responded_at: now }).eq('id', offerRow.id);
+        await db.from('trips').update({ dispatch_status: 'searching', offer_deadline_at: null, current_offer_driver_id: null, current_offer_token: null }).eq('id', tripId);
+        try { await db.rpc('advance_dispatch', { p_trip: tripId }); } catch { /* best-effort */ }
+        const t2 = await fullTrip(tripId, u!);
+        await invalidateTrip(tripId);
+        return ok(t2);
+      }
+    }
     // Phase 3: notify the agent that the driver declined — they need to pick another.
     await db.from('notifications').insert({
       user_id: trip.posted_by_user_id,
@@ -2216,6 +2248,16 @@ const handler = withTiming('trips', async (req: Request): Promise<Response> => {
     if (trip.assigned_driver_id) {
       const { data: d } = await db.from('drivers').select('total_trips_completed').eq('id', trip.assigned_driver_id).maybeSingle();
       if (d) await db.from('drivers').update({ total_trips_completed: (Number(d.total_trips_completed) || 0) + 1 }).eq('id', trip.assigned_driver_id);
+      // Auto-dispatch: free the driver and auto re-join the queue with a FRESH token at the
+      // drop (last-known) location. Self-scoping — busy_trip_id matches only for auto trips.
+      const { data: pres } = await db.from('driver_presence').select('busy_trip_id, vehicle_id').eq('driver_id', trip.assigned_driver_id).maybeSingle();
+      if (pres?.busy_trip_id === tripId) {
+        await db.from('driver_presence').update({ busy_trip_id: null }).eq('driver_id', trip.assigned_driver_id);
+        const { data: drv } = await db.from('drivers').select('current_lat, current_lng').eq('id', trip.assigned_driver_id).maybeSingle();
+        if (drv?.current_lat != null && drv?.current_lng != null) {
+          try { await db.rpc('driver_go_online', { p_driver_id: trip.assigned_driver_id, p_vehicle_id: pres.vehicle_id ?? null, p_lat: drv.current_lat, p_lng: drv.current_lng }); } catch { /* best-effort */ }
+        }
+      }
     }
     // Notify the agent (trip poster) so they know to leave a review.
     if (trip.posted_by_user_id) {
