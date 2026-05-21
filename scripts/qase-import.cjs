@@ -58,13 +58,13 @@ const PHASES = [
   { code: 'P0', title: 'P0 · Onboarding & KYC',           description: 'One-time per account (4 accounts: A-agent, A-driver, B-agent, B-driver). Unlocks posting/applying/inviting.' },
   { code: 'P1', title: 'P1 · Trip posting',                description: 'Happy + every rejection path. Verifies KYC gating, validation, edit, pre-applicant cancel.' },
   { code: 'P2', title: 'P2 · Discovery & application',    description: 'Driver finds the trip in the public feed and applies organically.' },
-  { code: 'P3', title: 'P3 · Invitation',                  description: 'Agent invites specific drivers — single, multi, radius, decline, re-invite, dedup, and the new Auto-invite-on-post toggle (P3.8–P3.14).' },
+  { code: 'P3', title: 'P3 · Invitation',                  description: 'Agent invites specific drivers — single, multi, radius, decline, re-invite, dedup, the Auto-invite-on-post toggle (P3.8–P3.14), and car-type matching of the vacancy vehicle vs the trip (P3.19, PR #338).' },
   { code: 'P4', title: 'P4 · Selection (two-step handshake)', description: 'Agent picks → trip Selected with countdown → driver accepts/declines/expires.' },
   { code: 'P5', title: 'P5 · Passenger engagement',       description: 'Agent shares the /passenger/{otp} link manually; passenger sees trip detail + live tracking.' },
   { code: 'P6', title: 'P6 · Start & in-progress',        description: 'OTP handshake, brute-force lockout, live tracking, offline, mid-progress cancel.' },
   { code: 'P7', title: 'P7 · Completion & reviews',       description: 'Complete, complete-without-start blocked, reviews both directions, one-sided, review-on-cancelled blocked.' },
   { code: 'P8', title: 'P8 · Notifications & inbox',      description: 'Bell badge, deep-link per type, mark-read.' },
-  { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on window close. PR #330 — accept uses interval OVERLAP (not containment) so every overlapping active vacancy flips, and the agent feed excludes any driver on an accepted/in_progress trip (defense-in-depth). PR #334 — starting a trip DELETES the consumed vacancy (no stale "expired — remove or repost" card).' },
+  { code: 'V',  title: 'V · Vacancy lifecycle',           description: 'PR #167 — overlap fix (multi-day trips honour expected_end_at) + pg_cron auto-expiry every 5 min. Driver vacancy must flip to on_trip on accept, revert on cancel, expire on window close. PR #330 — accept uses interval OVERLAP (not containment) so every overlapping active vacancy flips, and the agent feed excludes any driver on an accepted/in_progress trip (defense-in-depth). PR #334 — starting a trip DELETES the consumed vacancy (no stale "expired — remove or repost" card). PR #331 — vacancies are never open-ended (missing end time → 4h default, NOT NULL), so far-future trips auto-invite nobody (V9). PR #338 — "I\'m vacant" requires a vehicle (V10); its car type drives auto-invite matching (P3.19).' },
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
   { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
   { code: 'M',  title: 'M · Multi-way trips',             description: 'Migration 024 trip_type=multi_way — itineraries with ≥3 waypoints (pickup, ≥1 intermediate stop, final destination which may equal the pickup for a city-loop). Covers the POST /trips body-shape contract (server-side validation: ≥3 waypoints, strictly monotonic arrive_at, last-may-equal-first), the form-level Multi-way tab UI, and the full trip lifecycle (post → apply → assign → accept → start → complete) to prove multi-way trips behave identically to one-way trips for the trip-acceptance endpoints. Mirrored 1:1 by e2e/trip-types.spec.ts M1-M5 + the existing tab test.' },
@@ -251,6 +251,13 @@ const SCENARIOS = [
     { action: 'From a logged-in session, hammer GET /trips/match-preview?from_city_id=<a city uuid> 35 times in under 60s (browser console for loop).', expected: 'First ~30 calls → 200 with { total_matches, will_invite, max_invites: 5 }. Around the 31st → 429 RATE_LIMITED. Within a minute the limit resets and 200s resume.' },
     { action: 'Verify the limit is per-user.', expected: 'Limit key is match-preview:<user_id>. One user\'s loop does not block another\'s form. Real agents normally fire this only a handful of times per session — should never see the 429 organically.' },
   ]},
+  { phase: 'P3', id: 'P3.19', title: 'Auto-invite matches the vacancy vehicle\'s car type to the trip',
+    preconditions: 'PR #338 — auto-invite (and the match-count preview) now filter on the vacancy\'s vehicle car type vs the trip\'s required car_type_id. Before this, an SUV trip would invite a driver whose only vehicle is a hatchback. A vacancy with no vehicle can\'t match a typed trip. Needs ≥2 car types in /admin/car-types (e.g. Hatchback, Sedan).',
+    steps: [
+    { action: 'Driver: post a vacancy naming a vehicle of car type A (e.g. Hatchback), in a city/window that otherwise qualifies for the trip below.', expected: 'Vacancy is active and carries that vehicle.' },
+    { action: 'Agent: on /trips/new, set the required car type to B (e.g. Sedan), with the pickup city + window covering the vacancy. Watch the live match-count preview, then post with auto-invite ON.', expected: 'Match-count preview shows 0 for car type B; after posting, auto_invited_count = 0 and the driver is NOT in the invite list. The preview/count reacts to the car-type field.' },
+    { action: 'Agent: change the required car type to A (Hatchback) — same city/window — and post with auto-invite ON.', expected: 'Match-count preview shows the driver (≥1); after posting, the driver IS auto-invited (appears in the trip\'s invite list with a trip_invitation bell).' },
+  ]},
 
   // ── P4 ────────────────────────────────────────────────────────────────
   { phase: 'P4', id: 'P4.1', title: 'Select from multiple applicants', preconditions: 'Have ≥2 applicants on the same trip (combine P2.2 + P3.5).', steps: [
@@ -423,7 +430,7 @@ const SCENARIOS = [
   ]},
   { phase: 'V', id: 'V3', title: 'Yesterday\'s vacancies hidden from agent search',
     steps: [
-    { action: 'Agent: open Vacant drivers. Scroll the full list.', expected: 'NO row whose "When" line is in the past. Every visible vacancy\'s available_until is in the future (or open-ended).' },
+    { action: 'Agent: open Vacant drivers. Scroll the full list.', expected: 'NO row whose "When" line is in the past. Every visible vacancy\'s available_until is in the future. (Open-ended vacancies no longer exist — PR #331; see V9.)' },
     { action: 'As a driver who posted a vacancy yesterday: open /vacancies.', expected: 'Yesterday\'s row shows status expired (not counted toward the 2-active quota — driver can post again).' },
   ]},
   { phase: 'V', id: 'V4', title: 'Cron auto-expires a vacancy when its window closes',
@@ -453,6 +460,20 @@ const SCENARIOS = [
     steps: [
     { action: 'Driver: accept a trip and start it (status in_progress). While on the trip, post a NEW vacancy whose window overlaps the trip (current city, available now).', expected: 'POST succeeds; the driver sees it in their own /vacancies as status active (the on_trip sync only runs at accept time, so a post-start vacancy stays active).' },
     { action: 'Agent: open Vacant drivers for that city.', expected: 'The on-trip driver is NOT listed — the feed excludes drivers with an accepted/in_progress trip not yet ended, even though their vacancy row is active. After the trip completes/cancels, a future-window vacancy reappears for agents.' },
+  ]},
+  { phase: 'V', id: 'V9', title: 'Vacancy availability is never open-ended — defaults to a 4-hour window',
+    preconditions: 'PR #331 — open-ended vacancies (no end time) used to slip through the auto-invite time-bounds gate and match far-future trips (a stale 2060-pickup trip auto-invited an "available now" driver). A vacancy now ALWAYS has an end time: a missing available_until defaults to available_from + 4h, enforced by a NOT NULL DB constraint; existing open-ended rows were backfilled to a 4h window.',
+    steps: [
+    { action: 'Driver: post availability via "I\'m vacant" with start = now and the shortest window the form allows; confirm the "Available … → …" summary shows a bounded end time.', expected: 'The vacancy has a real end time (never blank/open-ended). A row created by any path without an end time gets available_from + 4h.' },
+    { action: 'Agent: post a trip with a pickup date far in the future (e.g. years out — or use a stale fixture like 2060) with auto-invite ON; check the match-count preview and the invite list after posting.', expected: 'Match-count preview shows 0 (no vacancy window stretches that far) and auto_invited_count = 0 — NO driver is auto-invited to the far-future trip. (Pre-#331 an open-ended "available now" vacancy was wrongly invited.)' },
+    { action: 'Driver: open the "I\'m vacant" tab.', expected: 'No vacancy shows an indefinite/blank availability; every row has a concrete end time and expires on the IST calendar-day rule (V3/V4).' },
+  ]},
+  { phase: 'V', id: 'V10', title: '"I\'m vacant" requires selecting a vehicle',
+    preconditions: 'PR #338 — auto-invite matches the vacancy\'s vehicle car type to the trip\'s required car type (P3.19), so a vacancy must name a vehicle. The "I\'m vacant" form now has a required vehicle picker that defaults to the driver\'s primary vehicle; the chosen vehicle must belong to the posting driver.',
+    steps: [
+    { action: 'Driver (with ≥1 vehicle): open "I\'m vacant".', expected: 'A "Which vehicle?" dropdown is shown, pre-selected to the driver\'s primary (or first) vehicle. Helper text notes agents are matched to the car type they asked for.' },
+    { action: 'Fill current city + at least one destination, leave the vehicle selected, and Post.', expected: '"Post vacant" is enabled and the vacancy is created carrying that vehicle (vacancy.vehicle_id set). Editing the vacancy later pre-fills its own vehicle.' },
+    { action: 'Driver with NO vehicle on file: open "I\'m vacant".', expected: 'The vehicle field shows "Add a vehicle in your profile before posting your availability" and "Post vacant" stays disabled.' },
   ]},
 
   // ── R (Referral program — PRs #166/#168/#169/#171/#172) ──────────────
