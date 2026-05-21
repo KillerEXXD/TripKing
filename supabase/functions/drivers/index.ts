@@ -42,7 +42,8 @@ import { maybePromoteToReadyForApproval } from '../_shared/kyc.ts';
 // (Stage 1 of the referral program; migration 042).
 // v2 (2026-05-14): added `can_report_bugs` to the flattened shape; stale v1
 // cache entries were tripping `MISSING_CAN_REPORT_BUGS` on the client transform.
-const CACHE_EPOCH = 'v4';
+// v5 (2026-05-21): bumped after QA trips + e2e-profile wipe.
+const CACHE_EPOCH = 'v5';
 function invalidateDriverMe(userId: string): void {
   cacheDelete(`drivers:me:user-${userId}:${CACHE_EPOCH}`);
 }

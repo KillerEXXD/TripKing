@@ -53,7 +53,8 @@ function defaultAvailableUntil(availableFromIso: string): string {
 // v3 added `linked_trip` + `linked_trip_id` (migration 039 / on_trip); v4 forces a refresh after
 // migration 040 reconciled 3 vacancies that drifted across the 039 deploy boundary.
 // v5 (2026-05-16): bumped after QA-data reset wipe.
-const CACHE_EPOCH = 'v5';
+// v6 (2026-05-21): bumped after QA trips + e2e-profile wipe.
+const CACHE_EPOCH = 'v6';
 /** Split the cache scope so a single driver editing their own vacancy doesn't purge the
  * agent's "find available drivers in Chennai" search. Returns the entityId to use as the
  * invalidation tag — `'list-public'` for the agent search, `'list-driver-<id>'` per driver. */
