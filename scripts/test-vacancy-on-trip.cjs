@@ -78,6 +78,15 @@ async function postVacancy(driverToken, currentCityId, destCityIds) {
   return r.json?.data;
 }
 
+// Explicit-window variant for the overlap regression (vacancy that does NOT contain the trip).
+async function postVacancyWindow(driverToken, currentCityId, destCityIds, fromIso, untilIso) {
+  const r = await j('POST', '/vacancies', {
+    token: driverToken,
+    body: { current_city_id: currentCityId, available_from: fromIso, available_until: untilIso, destination_city_ids: destCityIds },
+  });
+  return r.json?.data;
+}
+
 async function postTrip(agentToken, fromCityId, toCityId, carTypeId, pickupAtIso) {
   const r = await j('POST', '/trips', {
     token: agentToken,
@@ -175,6 +184,33 @@ async function applyAssignAccept(agentToken, driverToken, tripId) {
   chk = await j('GET', `/vacancies?driver_id=${driverId}&status=active,on_trip,expired,cancelled`);
   v2 = (chk.json?.data || []).find((v) => v.id === vac2.id);
   check('after trip cancel the vacancy is reverted to active (window still in the future)', v2?.status === 'active' && !v2?.linked_trip_id, `status=${v2?.status} linked=${v2?.linked_trip_id}`);
+
+  // ── Flow 3: OVERLAP regression (vacancy does NOT contain the trip) ─────
+  // Reproduces the DrSentha bug: a driver posts availability that ends BEFORE the trip's
+  // expected_end_at but still overlaps the pickup. The old containment gate
+  // (available_until >= expected_end_at) left these 'active' → driver leaked into agent search
+  // while on the trip. Post TWO such windows to assert the sync flips *all* overlapping rows.
+  const pickup3 = futureIso(10);
+  const shortUntil = new Date(Date.now() + 10 * 3600_000 + 5 * 60_000).toISOString(); // pickup + 5min, well before trip end
+  const vac3 = await postVacancyWindow(driverToken, cityFrom, [cityTo], futureIso(-1), shortUntil);
+  check('overlap-regression: short-window vacancy posted (active)', vac3?.status === 'active', `status=${vac3?.status}`);
+
+  const trip3 = await postTrip(agentToken, cityFrom, cityTo, carTypeId, pickup3);
+  check('overlap-regression: trip #3 posted', !!trip3?.id);
+  if (vac3?.id && trip3?.id) {
+    const { accept: accept3 } = await applyAssignAccept(agentToken, driverToken, trip3.id);
+    check('overlap-regression: driver accepts trip #3', accept3.status === 200, `status=${accept3.status} ${JSON.stringify(accept3.json?.error || '')}`);
+
+    // The vacancy window ends ~5 min after pickup — it overlaps the trip but does NOT contain it.
+    // Under the old containment gate this stayed 'active' (the DrSentha leak); the overlap gate flips it.
+    const after = await j('GET', `/vacancies?driver_id=${driverId}&status=active,on_trip`);
+    const a = (after.json?.data || []).find((v) => v.id === vac3.id);
+    check('overlap-regression: overlapping-but-not-containing vacancy flipped to on_trip', a?.status === 'on_trip', `status=${a?.status}`);
+
+    const pub = await j('GET', `/vacancies?current_city_id=${cityFrom}`);
+    const leaked = (pub.json?.data || []).some((v) => v.id === vac3.id);
+    check('overlap-regression: driver on trip is absent from agent vacant-driver search', !leaked, `leaked=${leaked}`);
+  }
 
   // Suppress lint
   void adminToken;
