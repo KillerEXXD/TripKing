@@ -429,6 +429,10 @@ verify_jwt = false
 [functions.places]
 verify_jwt = false
 
+# /config — public platform config (curated app_settings subset: dispatch_algorithm + timings); no auth.
+[functions.config]
+verify_jwt = false
+
 # /debug/* — deliberate-failure endpoints to exercise the exception pipeline; the function requires an admin Bearer.
 [functions.debug]
 verify_jwt = false

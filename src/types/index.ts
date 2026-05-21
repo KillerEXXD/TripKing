@@ -7,6 +7,7 @@ export * from './driver';
 export * from './videoVerification';
 export * from './vehicle';
 export * from './vacancy';
+export * from './presence';
 export * from './alert';
 export * from './review';
 export * from './notification';

@@ -2644,6 +2644,19 @@
         }
       }
     },
+    "/config": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Public platform config (no auth) — a curated, non-sensitive subset of app_settings the browser needs before it knows the user/role: dispatch_algorithm (auto = \"I'm Online\" presence + token-queue; manual = \"I'm vacant\" + apply + agent-picks) plus the Auto-dispatch timings (offer window, offline grace, heartbeat stale). Cached ~30s so an admin algorithm flip propagates quickly. Omits commercial settings (commission/bata/fees).",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Envelope"
+          }
+        }
+      }
+    },
     "/drivers": {
       "get": {
         "tags": [
