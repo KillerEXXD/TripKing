@@ -4,7 +4,7 @@
 
 The platform runs **one of two dispatch algorithms at a time**, chosen by a single **Admin toggle**:
 
-- **Auto-dispatch** (the launch default) — drivers go **"I'm Online"** (pure presence + GPS); a posted trip is auto-offered to the nearest online drivers in global-token order, 60 s each, walking the queue, widening + retrying on exhaustion. **No applicants, no manual picking.**
+- **Auto-dispatch** (the target mode; **enabled by the admin after briefing QA**) — drivers go **"I'm Online"** (pure presence + GPS); a posted trip is auto-offered to the nearest online drivers in global-token order, 60 s each, walking the queue, widening + retrying on exhaustion. **No applicants, no manual picking.**
 - **Manual** (today's behaviour) — drivers post **"I'm vacant"** vacancies and/or browse + **apply**; the agent **picks** an applicant. Exactly the current flow.
 
 The driver's availability UI and the agent's trip surfaces **swap based on the active algorithm.** This is a **full re-architecture** behind a unified abstraction — not a parallel bolt-on.
@@ -16,7 +16,7 @@ The driver's availability UI and the agent's trip surfaces **swap based on the a
 | # | Decision | Choice |
 |---|---|---|
 | 1 | Toggle scope | **Global only.** One platform switch; everyone uses the selected algorithm. |
-| 2 | Launch default | **Auto** from the start. |
+| 2 | Launch default | **Manual** — all current trips are manual, so ship with the toggle = Manual (zero behaviour change at deploy). The admin flips to **Auto** manually, later, after briefing QA. |
 | 3 | Refactor depth | **Unified `DriverAvailability` + `DispatchStrategy` abstraction**; Manual & Auto are two strategies behind one interface. No duplication. |
 | 4 | 60 s advancement | **DB-authoritative deadline + Realtime/on-read advance + 1-min `pg_cron` safety net**, `FOR UPDATE SKIP LOCKED`. |
 | 5 | Offer delivery | **Realtime (in-app) + Push.** Provider = **FCM**, behind a provider-agnostic push interface. |
@@ -76,7 +76,7 @@ PR #324 gave us `src/lib/realtime.ts` (one lazy transport client, `isRealtimeCon
 ## 3. Data model (migrations 064 → 070; 063 is taken by Realtime)
 
 - **064 — `app_settings` toggle + tunables** (behaviour-neutral):
-  `dispatch_algorithm text not null default 'auto' check (in ('auto','manual'))`; plus `dispatch_offer_seconds` (60), `dispatch_offline_grace_seconds` (180), `dispatch_initial_radius_km` (3), `dispatch_radius_widen_km` (10), `dispatch_max_passes` (2), `dispatch_retry_cooldown_seconds` (120), `dispatch_max_retries` (3), `dispatch_heartbeat_stale_seconds` (90). All admin-editable + audit-logged.
+  `dispatch_algorithm text not null default 'manual' check (in ('auto','manual'))` (ship Manual = zero behaviour change; admin flips to Auto later); plus `dispatch_offer_seconds` (60), `dispatch_offline_grace_seconds` (180), `dispatch_initial_radius_km` (3), `dispatch_radius_widen_km` (10), `dispatch_max_passes` (2), `dispatch_retry_cooldown_seconds` (120), `dispatch_max_retries` (3), `dispatch_heartbeat_stale_seconds` (90). All admin-editable + audit-logged.
 - **065 — `create sequence driver_token_seq`.**
 - **066 — `driver_presence`** (one row/driver): `is_online`, `token bigint`, `online_since`, `last_heartbeat_at`, `current_lat/lng`, `current_city_id`, `went_offline_at`, `grace_expires_at`, `vehicle_id`, `busy_trip_id`, generated `geog` (mirror `drivers.geog` from 011), `update_updated_at` trigger. Indexes: `(token) where is_online`, `(grace_expires_at) where not null`, GiST `(geog)`, `(busy_trip_id) where not null`. RLS: owner-or-admin; never exposed raw to other drivers.
 - **067 — `trips` dispatch columns** (additive, mirror 030): `dispatch_mode text default 'auto' check(in('auto','manual'))` (frozen at POST), `dispatch_status text check(in('searching','offering','widening','waiting','filled','unfilled'))`, `current_offer_driver_id`, `current_offer_token bigint`, `offer_deadline_at`, `current_radius_km`, `pass_number int default 0`, `retry_count int default 0`, `next_retry_at timestamptz`. Partial index on active dispatch statuses.
@@ -167,7 +167,7 @@ Crons (mirror 031 guard): `dispatch_sweep`, `dispatch_retry_due`, `expire_offlin
 5. **Realtime + driver offer UX** — `trip_offers` publication + `CHANNELS` row, `<IncomingOfferModal>`, `useIncomingOffer`, Missed Trips tab.
 6. **Agent live status** — `<DispatchStatusPanel>`, `<DispatchBadge>`, `rebroadcast`, drain UI.
 7. **Push (FCM)** — `device_tokens`, SW, `usePush`, server sender; offer + unfilled pushes.
-8. **Flip default to Auto + retire/guard Manual-only UI** (vacancy screens become Manual-only). Drain hardening.
+8. **Auto-readiness hardening** — guard vacancy/apply screens to Manual-only, drain hardening, and a `/smokeall`+E2E pass in Auto. The actual switch to Auto is a **manual admin toggle the owner flips after briefing QA** — not a code default change.
 
 ---
 
