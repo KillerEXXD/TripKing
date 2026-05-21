@@ -68,6 +68,7 @@ const PHASES = [
   { code: 'R',  title: 'R · Referral program',            description: 'Referral program (Stages 6–9). Per-trip platform-fee accruals → referrer earnings → transfer-to-wallet OR UPI withdrawal → admin queue → fraud auto-detection on qualification + admin operations. Notifications (12 new types in migration 049) ride along.' },
   { code: 'N',  title: 'N · Navigation & Breadcrumbs',    description: 'PR #263 — the back-button on a trip detail (or any leaf page reached from a home-tab work card) must return to the LIST the user came from, not the generic /my-trips or /posted-trips fallback. Covers driver + agent. Also covers visual continuity: scoped page headers use the same accent colour as the home card that linked to them, and destructive actions (e.g. Decline invitation) sit INSIDE their parent trip card. List pages auto-refresh on back-navigation so any status change made on the detail page is reflected immediately.' },
   { code: 'M',  title: 'M · Multi-way trips',             description: 'Migration 024 trip_type=multi_way — itineraries with ≥3 waypoints (pickup, ≥1 intermediate stop, final destination which may equal the pickup for a city-loop). Covers the POST /trips body-shape contract (server-side validation: ≥3 waypoints, strictly monotonic arrive_at, last-may-equal-first), the form-level Multi-way tab UI, and the full trip lifecycle (post → apply → assign → accept → start → complete) to prove multi-way trips behave identically to one-way trips for the trip-acceptance endpoints. Mirrored 1:1 by e2e/trip-types.spec.ts M1-M5 + the existing tab test.' },
+  { code: 'RT', title: 'RT · Realtime live surfaces',     description: 'PR #324 — agent surfaces update WITHOUT a manual reload via a Supabase Realtime websocket used as a SIGNAL ("a row changed → refetch"), never as the data source: the payload is never rendered, data still flows through the REST API + transforms + per-viewer redaction, and RLS gates every subscription (the user\'s Supabase JWT, kept fresh by apiClient.onTokenChange). Four live tables: trip_acceptances (applicants), trips (status/count, filtered to posted_by_user_id), notifications, vacancies. React Query polling is the documented fallback when the socket drops (applicants ≤15s; trip detail 5–30s by status). Migration 063 adds these tables to the supabase_realtime publication with REPLICA IDENTITY FULL.' },
   { code: 'O',  title: 'O · Trip edit & applicant-conflict', description: 'PR #291 — agent can edit a posted trip after applicants exist; backend fans out a trip_updated notification to every applicant + pending invitee with a field-level diff. Frontend surfaces: Edit button on the home "Waiting for your decision" card (gated on 0 applicants), edit-mode on PostTripPage (heading flips, Update CTA), pre-submit conflict banner (applicants arrived mid-edit), diff confirm modal (lists each before → after), driver-side "Trip details changed" chip on the Applied tab, and the TripUpdatedDiffBanner on the trip-detail page with Keep / Withdraw CTAs. Backend gate: status ∈ {open, has_applicants}; selected/accepted/in_progress/completed/cancelled return 409.' },
 ];
 
@@ -474,6 +475,30 @@ const SCENARIOS = [
     { action: 'Driver (with ≥1 vehicle): open "I\'m vacant".', expected: 'A "Which vehicle?" dropdown is shown, pre-selected to the driver\'s primary (or first) vehicle. Helper text notes agents are matched to the car type they asked for.' },
     { action: 'Fill current city + at least one destination, leave the vehicle selected, and Post.', expected: '"Post vacant" is enabled and the vacancy is created carrying that vehicle (vacancy.vehicle_id set). Editing the vacancy later pre-fills its own vehicle.' },
     { action: 'Driver with NO vehicle on file: open "I\'m vacant".', expected: 'The vehicle field shows "Add a vehicle in your profile before posting your availability" and "Post vacant" stays disabled.' },
+  ]},
+
+  // ── RT (Realtime live surfaces — PR #324) ────────────────────────────
+  { phase: 'RT', id: 'RT1', title: 'Applicants list updates live when a driver applies (no manual reload)',
+    preconditions: 'Two sessions: Agent A viewing their own trip\'s applicants; Driver D (KYC-approved, has a vehicle) who will apply. Use two browser profiles/devices (or one + the API). Realtime is best-effort: if the socket can\'t connect, the ≤15s applicants polling fallback still delivers the update.',
+    steps: [
+    { action: 'Agent: post a trip, then open /app/trips/{id}/applicants and LEAVE IT OPEN (do not refresh).', expected: 'Empty state / no applicant rows; no "Select this driver" button.' },
+    { action: 'Driver (other session): browse to that trip and Apply.', expected: 'Agent\'s open page — WITHOUT any manual reload — shows the new applicant card (driver handle + counter-quote/message) and a "Select this driver" button within a few seconds (realtime) or ≤15s (polling fallback). The applicant count / "Has applicants" reflects it too.' },
+    { action: 'Network check (optional): in Agent\'s devtools, confirm a Realtime websocket (wss to the Supabase project) is open and a GET /trips/{id}/applicants fires right after the apply.', expected: 'The socket carries only a change signal (ids); the rendered data came from the REST refetch, not the socket payload.' },
+  ]},
+  { phase: 'RT', id: 'RT2', title: 'Trip status + applicant count update live on the agent\'s trip detail',
+    steps: [
+    { action: 'Agent: open /app/trips/{id} for an OPEN trip with no applicants and leave it open.', expected: 'Status shows Open; applicant count 0.' },
+    { action: 'A driver applies (other session / API).', expected: 'Without reloading, the detail page flips to "Has applicants" and the applicant count increments (realtime signal → refetch; polling fallback 5–30s by status otherwise).' },
+  ]},
+  { phase: 'RT', id: 'RT3', title: 'Notification bell + inbox update live',
+    preconditions: 'A signed-in user on /app/notifications (or anywhere the bell is visible).',
+    steps: [
+    { action: 'Trigger a notification for this user from another actor (e.g. agent assigns the driver → driver gets trip_assigned; or agent cancels → trip_cancelled).', expected: 'The bell unread badge increments and the new notification row appears in the inbox WITHOUT a reload. RLS scopes the realtime signal to the recipient — other users\' notifications never leak in.' },
+  ]},
+  { phase: 'RT', id: 'RT4', title: 'Vacancy feed updates live; socket-drop falls back to polling',
+    steps: [
+    { action: 'Agent: open Vacant drivers (/app/vacancies) for a city and leave it open. A driver posts a new vacancy in that city (other session).', expected: 'The new vacancy card appears in the agent\'s feed without a manual reload.' },
+    { action: 'Simulate a socket drop (devtools: go offline briefly then online, or block the wss). Driver posts/updates another vacancy.', expected: 'The feed still catches up via React Query polling/refetch-on-focus once connectivity returns — no permanently stale list. The realtime path is an optimisation, not the only path.' },
   ]},
 
   // ── R (Referral program — PRs #166/#168/#169/#171/#172) ──────────────
