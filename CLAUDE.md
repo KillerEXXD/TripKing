@@ -182,6 +182,7 @@ Edge functions get `withTiming()` performance instrumentation, a k6 load-test en
 - Don't ship a data view without loading / empty / error states.
 - Don't `git push` without an explicit instruction; don't commit to `main` directly; don't bundle unrelated changes in one commit.
 - Don't deviate from `docs/PLATFORM_AND_ADMIN_REQUIREMENTS.md` or change the API contract without asking.
+- **CI: never `playwright install --with-deps` per run.** The Playwright e2e job MUST run inside the official container `mcr.microsoft.com/playwright:v<ver>-jammy` (matched to `@playwright/test` in package.json) — browsers + deps are preinstalled. The per-run `--with-deps` install has no cache and stalls on apt mirrors for many minutes. Bump the image tag in lockstep with the Playwright version.
 
 > Maintenance: keep this file under ~300 lines (longer = skimmed). Most-violated rules stay near the top. If you catch yourself making the same mistake twice, that's the signal a rule is missing — add it here.
 
