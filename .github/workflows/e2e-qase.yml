@@ -39,6 +39,13 @@ jobs:
   e2e:
     name: E2E (${{ inputs.project || 'mobile' }})
     runs-on: ubuntu-latest
+    # Official Playwright image pinned to our @playwright/test version: Chromium +
+    # WebKit and all their system deps are PRE-INSTALLED, so `playwright install
+    # --with-deps` is skipped — that step had no browser cache and re-downloaded
+    # browsers + apt system libs every run, stalling on apt mirrors for many
+    # minutes. Bump this tag in lockstep with @playwright/test in package.json.
+    container:
+      image: mcr.microsoft.com/playwright:v1.57.0-jammy
     timeout-minutes: 30
     env:
       # When this token is present, the playwright-qase-reporter posts results.
@@ -56,12 +63,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
-      - name: Install Playwright browsers
-        # Defaults must match the test step's `--project=${{ inputs.project || 'mobile' }}`.
-        # Scheduled runs have no inputs at all → mobile is the default → webkit must be installed.
-        # An empty inputs.project on a dispatch also falls back to mobile/webkit. Only an
-        # explicit choice of `chromium` switches the install.
-        run: npx playwright install --with-deps ${{ inputs.project == 'chromium' && 'chromium' || 'webkit' }}
+      - name: Ensure Playwright browsers
+        # Browsers ship with the container — fast no-op safety net (no --with-deps
+        # → no apt) that only fetches a binary if a patch drifts. Defaults match the
+        # test step's `--project=${{ inputs.project || 'mobile' }}` (mobile → webkit).
+        run: npx playwright install ${{ inputs.project == 'chromium' && 'chromium' || 'webkit' }}
 
       - name: Run Playwright (headless)
         run: |
